@@ -5,12 +5,12 @@ import QtQuick.Layouts
 Rectangle {
     id: root
     
-    property string title: "Greetings"
+    property string title: audioManager.currentClip ? audioManager.currentClip.title : "Greetings"
     property string subtitle: "Press F1 to play"
-    property real currentTime: 1.30
-    property real totalTime: 3.30
-    property bool isPlaying: false
-    property string imagePath: ""
+    property real currentTime: audioManager.currentPosition
+    property real totalTime: audioManager.currentDuration
+    property bool isPlaying: audioManager.isPlaying
+    property string imagePath: audioManager.currentClip ? audioManager.currentClip.imagePath : ""
     
     signal playPauseClicked()
     signal previousClicked()
@@ -129,7 +129,11 @@ Rectangle {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: previousClicked()
+                        onClicked: {
+                            previousClicked()
+                            // Stop current playback
+                            audioManager.stopAll()
+                        }
                     }
                 }
                 
@@ -150,7 +154,16 @@ Rectangle {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: playPauseClicked()
+                        onClicked: {
+                            playPauseClicked()
+                            if (audioManager.currentClip) {
+                                if (audioManager.isPlaying) {
+                                    audioManager.pauseClip(audioManager.currentClip.id)
+                                } else {
+                                    audioManager.playClip(audioManager.currentClip.id)
+                                }
+                            }
+                        }
                     }
                 }
                 
@@ -171,7 +184,11 @@ Rectangle {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: nextClicked()
+                        onClicked: {
+                            nextClicked()
+                            // Stop current playback
+                            audioManager.stopAll()
+                        }
                     }
                 }
                 
@@ -184,9 +201,17 @@ Rectangle {
                     
                     Text {
                         anchors.centerIn: parent
-                        text: "🔇"
+                        text: audioManager.volume > 0 ? "🔊" : "🔇"
                         font.pixelSize: 14
                         color: "#9CA3AF"
+                    }
+                    
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            audioManager.volume = audioManager.volume > 0 ? 0 : 1.0
+                        }
                     }
                 }
             }

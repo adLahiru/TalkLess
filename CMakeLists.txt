@@ -6,12 +6,25 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick)
+find_package(Qt6 REQUIRED COMPONENTS Quick Multimedia)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
 qt_add_executable(appTalkLess
     src/main.cpp
+    # Models
+    src/models/audioclip.h
+    src/models/audioclip.cpp
+    # Controllers
+    src/controllers/audiomanager.h
+    src/controllers/audiomanager.cpp
+    src/controllers/hotkeymanager.h
+    src/controllers/hotkeymanager.cpp
+    # Views
+    src/view/soundboardview.h
+    src/view/soundboardview.cpp
+    src/view/audioplayerview.h
+    src/view/audioplayerview.cpp
 )
 
 # Mark singleton files before adding the QML module
@@ -80,6 +93,7 @@ set_target_properties(appTalkLess PROPERTIES
 
 target_link_libraries(appTalkLess
     PRIVATE Qt6::Quick
+    PRIVATE Qt6::Multimedia
 )
 
 include(GNUInstallDirs)

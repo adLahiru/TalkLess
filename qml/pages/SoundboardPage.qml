@@ -7,6 +7,16 @@ Item {
     
     property int selectedSlots: 0
     property int rightPanelIndex: 0  // 0: Details, 1: Add Audio, 2: Meters, 3: Teleprompter
+    property var audioClips: []
+    
+    Component.onCompleted: {
+        // Add sample audio clips
+        audioClips = [
+            audioManager.addClip("Greeting", "", "Alt+F1"),
+            audioManager.addClip("Welcome", "", "Alt+F2"),
+            audioManager.addClip("Intro", "", "Alt+F3")
+        ]
+    }
     
     RowLayout {
         anchors.fill: parent
@@ -172,18 +182,26 @@ Item {
                     
                     // Audio Cards
                     Repeater {
-                        model: 11
+                        model: audioManager.audioClips.length
                         
                         ColumnLayout {
                             spacing: 8
                             
                             AudioCard {
-                                title: ""
-                                hotkey: "Alt+F2+Shift"
+                                title: audioManager.audioClips[index] ? audioManager.audioClips[index].title : ""
+                                hotkey: audioManager.audioClips[index] ? audioManager.audioClips[index].hotkey : ""
                                 tagLabel: index < 3 ? "Morning" : ""
                                 tagColor: "#EAB308"
                                 isSelected: index === 0
+                                isPlaying: audioManager.audioClips[index] ? audioManager.audioClips[index].isPlaying : false
+                                audioClipId: audioManager.audioClips[index] ? audioManager.audioClips[index].id : ""
+                                imagePath: audioManager.audioClips[index] ? audioManager.audioClips[index].imagePath : ""
                                 onClicked: rightPanelIndex = 0
+                                onDeleteClicked: {
+                                    if (audioManager.audioClips[index]) {
+                                        audioManager.removeClip(audioManager.audioClips[index].id)
+                                    }
+                                }
                             }
                             
                             // Tags below card
@@ -297,7 +315,19 @@ Item {
                 title: "Introducing"
             }
             
-            AddAudioPanel {}
+            AddAudioPanel {
+                onAudioAdded: function(name, filePath) {
+                    var clip = audioManager.addClip(name, filePath, "")
+                    if (clip) {
+                        audioClips.push(clip)
+                        audioClipsChanged()
+                    }
+                    rightPanelIndex = 0
+                }
+                onCancelled: {
+                    rightPanelIndex = 0
+                }
+            }
             
             MetersPanel {}
             

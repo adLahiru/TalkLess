@@ -13,10 +13,12 @@ Rectangle {
     property bool isSelected: false
     property bool isPlaying: false
     property bool showTag: true
+    property string audioClipId: ""
     
     signal clicked()
     signal playClicked()
     signal menuClicked()
+    signal deleteClicked()
     
     width: 160
     height: 120
@@ -107,7 +109,16 @@ Rectangle {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: playClicked()
+                    onClicked: {
+                        playClicked()
+                        if (root.audioClipId) {
+                            if (isPlaying) {
+                                audioManager.pauseClip(root.audioClipId)
+                            } else {
+                                audioManager.playClip(root.audioClipId)
+                            }
+                        }
+                    }
                 }
             }
             
@@ -128,15 +139,18 @@ Rectangle {
                 
                 Text {
                     anchors.centerIn: parent
-                    text: "⚙"
+                    text: "🗑"
                     font.pixelSize: 12
-                    color: "#9CA3AF"
+                    color: "#EF4444"
                 }
                 
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: menuClicked()
+                    onClicked: {
+                        menuClicked()
+                        deleteClicked()
+                    }
                 }
             }
         }

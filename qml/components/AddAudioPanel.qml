@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 
 Rectangle {
     id: root
@@ -8,6 +9,22 @@ Rectangle {
     width: 280
     color: "#12121a"
     radius: 12
+    
+    property string audioName: ""
+    property string selectedFilePath: ""
+    
+    signal audioAdded(string name, string filePath)
+    signal cancelled()
+    
+    FileDialog {
+        id: fileDialog
+        title: "Select Audio File"
+        nameFilters: ["Audio files (*.mp3 *.wav *.ogg *.flac *.m4a)", "All files (*)"]
+        onAccepted: {
+            selectedFilePath = fileDialog.selectedFile
+            filePathText.text = selectedFilePath.toString().split('/').pop()
+        }
+    }
     
     ColumnLayout {
         anchors.fill: parent
@@ -67,10 +84,13 @@ Rectangle {
             border.color: "#2a2a3e"
             
             TextInput {
+                id: nameInput
                 anchors.fill: parent
                 anchors.margins: 12
                 color: "white"
                 font.pixelSize: 13
+                text: audioName
+                onTextChanged: audioName = text
                 
                 Text {
                     anchors.fill: parent
@@ -126,7 +146,7 @@ Rectangle {
             Layout.preferredHeight: 120
             radius: 8
             color: "transparent"
-            border.color: "#4B5563"
+            border.color: selectedFilePath ? "#7C3AED" : "#4B5563"
             border.width: 1
             
             ColumnLayout {
@@ -135,22 +155,27 @@ Rectangle {
                 
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "⬆"
+                    text: selectedFilePath ? "✓" : "⬆"
                     font.pixelSize: 24
-                    color: "#6B7280"
+                    color: selectedFilePath ? "#7C3AED" : "#6B7280"
                 }
                 
                 Text {
+                    id: filePathText
                     Layout.alignment: Qt.AlignHCenter
-                    text: "Drop audio files here or click to browse"
+                    Layout.maximumWidth: parent.parent.width - 20
+                    text: selectedFilePath ? "File selected" : "Drop audio files here or click to browse"
                     font.pixelSize: 12
-                    color: "#6B7280"
+                    color: selectedFilePath ? "#7C3AED" : "#6B7280"
+                    elide: Text.ElideMiddle
+                    horizontalAlignment: Text.AlignHCenter
                 }
             }
             
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
+                onClicked: fileDialog.open()
             }
         }
         
@@ -193,6 +218,11 @@ Rectangle {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        audioName = ""
+                        selectedFilePath = ""
+                        cancelled()
+                    }
                 }
             }
             
@@ -200,7 +230,7 @@ Rectangle {
                 Layout.preferredWidth: 80
                 height: 36
                 radius: 6
-                color: "#7C3AED"
+                color: (audioName && selectedFilePath) ? "#7C3AED" : "#4B5563"
                 
                 Text {
                     anchors.centerIn: parent
@@ -212,6 +242,14 @@ Rectangle {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
+                    enabled: audioName && selectedFilePath
+                    onClicked: {
+                        if (audioName && selectedFilePath) {
+                            audioAdded(audioName, selectedFilePath)
+                            audioName = ""
+                            selectedFilePath = ""
+                        }
+                    }
                 }
             }
         }
