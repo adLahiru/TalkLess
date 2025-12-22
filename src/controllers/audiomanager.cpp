@@ -6,8 +6,30 @@ AudioManager::AudioManager(QObject *parent)
     : QObject(parent)
     , m_currentClip(nullptr)
     , m_volume(1.0)
+    , m_mediaDevices(nullptr)
+#ifdef ENABLE_AUDIOENGINE
+    , m_audioEngine(nullptr)
+#endif
 {
-    qDebug() << "AudioManager initialized";
+#ifdef ENABLE_AUDIOENGINE
+    // Initialize AudioEngine
+    m_audioEngine = new AudioEngine(this);
+    qDebug() << "AudioManager initialized with AudioEngine";
+#else
+    qDebug() << "AudioManager initialized without AudioEngine (Qt fallback)";
+#endif
+    
+    // Initialize media devices
+    m_mediaDevices = new QMediaDevices(this);
+    
+    // Connect device change signals
+    connect(m_mediaDevices, &QMediaDevices::audioInputsChanged, 
+            this, &AudioManager::refreshAudioDevices);
+    connect(m_mediaDevices, &QMediaDevices::audioOutputsChanged, 
+            this, &AudioManager::refreshAudioDevices);
+    
+    // Initial device discovery
+    refreshAudioDevices();
 }
 
 AudioManager::~AudioManager()
@@ -389,4 +411,200 @@ void AudioManager::onErrorOccurred(QMediaPlayer::Error error, const QString &err
 {
     qWarning() << "Media player error:" << error << errorString;
     emit this->error(errorString);
+}
+
+// Device management methods
+QStringList AudioManager::inputDevices() const
+{
+    return m_inputDevices;
+}
+
+QStringList AudioManager::outputDevices() const
+{
+    return m_outputDevices;
+}
+
+QString AudioManager::currentInputDevice() const
+{
+    return m_currentInputDevice;
+}
+
+QString AudioManager::currentOutputDevice() const
+{
+    return m_currentOutputDevice;
+}
+
+void AudioManager::setCurrentInputDevice(const QString &device)
+{
+    if (m_currentInputDevice != device) {
+#ifdef ENABLE_AUDIOENGINE
+        if (m_audioEngine) {
+            // Find device ID by name (AudioEngine uses device IDs, not names)
+            std::vector<AudioEngine::AudioDeviceInfo> inputDevices = m_audioEngine->enumerateCaptureDevices();
+            for (const auto& deviceInfo : inputDevices) {
+                if (QString::fromStdString(deviceInfo.name) == device) {
+                    if (m_audioEngine->setCaptureDevice(deviceInfo.id)) {
+                        m_currentInputDevice = device;
+                        emit currentInputDeviceChanged();
+                        qDebug() << "Input device changed to:" << device << "(ID:" << QString::fromStdString(deviceInfo.id) << ")";
+                    } else {
+                        qWarning() << "Failed to set input device:" << device;
+                    }
+                    return;
+                }
+            }
+            qWarning() << "Input device not found:" << device;
+        } else {
+            // Fallback - just update the property
+            m_currentInputDevice = device;
+            emit currentInputDeviceChanged();
+            qDebug() << "Input device changed to:" << device << "(fallback mode)";
+        }
+#else
+        // Qt fallback - just update the property
+        m_currentInputDevice = device;
+        emit currentInputDeviceChanged();
+        qDebug() << "Input device changed to:" << device << "(Qt fallback)";
+#endif
+    }
+}
+
+void AudioManager::setCurrentOutputDevice(const QString &device)
+{
+    if (m_currentOutputDevice != device) {
+#ifdef ENABLE_AUDIOENGINE
+        if (m_audioEngine) {
+            // Find device ID by name (AudioEngine uses device IDs, not names)
+            std::vector<AudioEngine::AudioDeviceInfo> outputDevices = m_audioEngine->enumeratePlaybackDevices();
+            for (const auto& deviceInfo : outputDevices) {
+                if (QString::fromStdString(deviceInfo.name) == device) {
+                    if (m_audioEngine->setPlaybackDevice(deviceInfo.id)) {
+                        m_currentOutputDevice = device;
+                        emit currentOutputDeviceChanged();
+                        qDebug() << "Output device changed to:" << device << "(ID:" << QString::fromStdString(deviceInfo.id) << ")";
+                    } else {
+                        qWarning() << "Failed to set output device:" << device;
+                    }
+                    return;
+                }
+            }
+            qWarning() << "Output device not found:" << device;
+        } else {
+            // Fallback - just update the property
+            m_currentOutputDevice = device;
+            emit currentOutputDeviceChanged();
+            qDebug() << "Output device changed to:" << device << "(fallback mode)";
+        }
+#else
+        // Qt fallback - just update the property
+        m_currentOutputDevice = device;
+        emit currentOutputDeviceChanged();
+        qDebug() << "Output device changed to:" << device << "(Qt fallback)";
+#endif
+    }
+}
+
+void AudioManager::refreshAudioDevices()
+{
+    QStringList newInputDevices;
+    QStringList newOutputDevices;
+    
+#ifdef ENABLE_AUDIOENGINE
+    if (m_audioEngine) {
+        // Get input devices from AudioEngine
+        std::vector<AudioEngine::AudioDeviceInfo> inputDevices = m_audioEngine->enumerateCaptureDevices();
+        for (const auto& device : inputDevices) {
+            newInputDevices << QString::fromStdString(device.name);
+        }
+        
+        // Get output devices from AudioEngine
+        std::vector<AudioEngine::AudioDeviceInfo> outputDevices = m_audioEngine->enumeratePlaybackDevices();
+        for (const auto& device : outputDevices) {
+            newOutputDevices << QString::fromStdString(device.name);
+        }
+        
+        qDebug() << "AudioEngine enumerated - Inputs:" << inputDevices.size() 
+                 << "Outputs:" << outputDevices.size();
+    } else {
+        // Fallback to QMediaDevices if AudioEngine is not available
+        const QList<QAudioDevice> inputs = m_mediaDevices->audioInputs();
+        for (const QAudioDevice &device : inputs) {
+            newInputDevices << device.description();
+        }
+        
+        const QList<QAudioDevice> outputs = m_mediaDevices->audioOutputs();
+        for (const QAudioDevice &device : outputs) {
+            newOutputDevices << device.description();
+        }
+    }
+#else
+    // Qt fallback implementation
+    const QList<QAudioDevice> inputs = m_mediaDevices->audioInputs();
+    for (const QAudioDevice &device : inputs) {
+        newInputDevices << device.description();
+    }
+    
+    const QList<QAudioDevice> outputs = m_mediaDevices->audioOutputs();
+    for (const QAudioDevice &device : outputs) {
+        newOutputDevices << device.description();
+    }
+    
+    qDebug() << "Qt QMediaDevices enumerated - Inputs:" << inputs.size() 
+             << "Outputs:" << outputs.size();
+#endif
+    
+    // Update if changed
+    if (m_inputDevices != newInputDevices) {
+        m_inputDevices = newInputDevices;
+        emit inputDevicesChanged();
+    }
+    
+    if (m_outputDevices != newOutputDevices) {
+        m_outputDevices = newOutputDevices;
+        emit outputDevicesChanged();
+    }
+    
+    // Set defaults if not set
+    if (m_currentInputDevice.isEmpty() && !m_inputDevices.isEmpty()) {
+        setCurrentInputDevice(m_inputDevices.first());
+    }
+    
+    if (m_currentOutputDevice.isEmpty() && !m_outputDevices.isEmpty()) {
+        setCurrentOutputDevice(m_outputDevices.first());
+    }
+    
+    qDebug() << "Audio devices refreshed - Inputs:" << m_inputDevices.size() 
+             << "Outputs:" << m_outputDevices.size();
+}
+
+void AudioManager::testPlayback()
+{
+    qDebug() << "Testing audio playback with current output device:" << m_currentOutputDevice;
+    
+#ifdef ENABLE_AUDIOENGINE
+    if (m_audioEngine) {
+        // Start the AudioEngine device for testing
+        if (m_audioEngine->startAudioDevice()) {
+            qDebug() << "AudioEngine started successfully for testing";
+            // You could load a test sound file here or generate a test tone
+            emit error("AudioEngine test playback - device started successfully");
+        } else {
+            emit error("Failed to start AudioEngine device");
+        }
+    } else {
+        // Fallback to QtMediaPlayer test
+        if (!m_audioClips.isEmpty()) {
+            playClip(m_audioClips.first()->id());
+        } else {
+            emit error("No audio clips available for testing");
+        }
+    }
+#else
+    // Qt fallback implementation
+    if (!m_audioClips.isEmpty()) {
+        playClip(m_audioClips.first()->id());
+    } else {
+        emit error("No audio clips available for testing (Qt fallback)");
+    }
+#endif
 }

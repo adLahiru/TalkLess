@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Multimedia)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
@@ -74,11 +74,19 @@ qt_add_qml_module(appTalkLess
         qml/styles/Theme.qml
         # Utils (singleton)
         qml/utils/Functions.qml
+    SOURCES
+        src/view/soundboardview.h
+        src/view/soundboardview.cpp
+        src/view/audioplayerview.h
+        src/view/audioplayerview.cpp
     RESOURCES
         resources/images/background-51.png
         resources/images/background-52.png
         resources/images/background-53.png
 )
+
+# Add include directories for QML type registration
+target_include_directories(appTalkLess PRIVATE src/view)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
@@ -92,7 +100,9 @@ set_target_properties(appTalkLess PROPERTIES
 )
 
 target_link_libraries(appTalkLess
+    PRIVATE Qt6::Core
     PRIVATE Qt6::Quick
+    PRIVATE Qt6::Qml
     PRIVATE Qt6::Multimedia
 )
 

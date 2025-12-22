@@ -7,12 +7,16 @@ ApplicationWindow {
     
     width: 1400
     height: 900
-    minimumWidth: 1200
-    minimumHeight: 800
+    minimumWidth: 800
+    minimumHeight: 600
     visible: true
     title: qsTr("TalkLess")
-    color: "#0f0f1a"
+    color: Colors.background
     
+    // Window flags to respect work area when maximized
+    flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint | Qt.WindowMinMaxButtonsHint | Qt.WindowCloseButtonHint | Qt.WindowMaximizeUsingGeometryHint
+    
+        
     RowLayout {
         anchors.fill: parent
         spacing: 0
@@ -35,7 +39,9 @@ ApplicationWindow {
             HeaderBar {
                 id: headerBar
                 Layout.fillWidth: true
-                Layout.preferredHeight: 80
+                Layout.preferredHeight: 60
+                Layout.minimumHeight: 50
+                Layout.maximumHeight: 80
                 currentPageTitle: "Soundboard"
             }
             
@@ -49,11 +55,15 @@ ApplicationWindow {
                 // Soundboard Page
                 SoundboardPage {
                     id: soundboardPage
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
                 }
                 
                 // System Settings Page
                 SystemSettingsPage {
                     id: settingsPage
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
                 }
             }
         }

@@ -23,8 +23,12 @@ Item {
             }
             
             DropdownSelect {
-                currentValue: "Microphone 1"
-                model: ["Microphone 1", "Microphone 2", "USB Mic"]
+                id: inputDeviceDropdown
+                currentValue: audioManager.currentInputDevice || "Default"
+                model: audioManager.inputDevices || ["Default"]
+                onValueChanged: {
+                    audioManager.setCurrentInputDevice(value)
+                }
             }
         }
         
@@ -41,8 +45,12 @@ Item {
             }
             
             DropdownSelect {
-                currentValue: "Headset A"
-                model: ["Headset A", "Speakers", "USB Audio"]
+                id: outputDeviceDropdown
+                currentValue: audioManager.currentOutputDevice || "Default"
+                model: audioManager.outputDevices || ["Default"]
+                onValueChanged: {
+                    audioManager.setCurrentOutputDevice(value)
+                }
             }
         }
         
@@ -91,10 +99,23 @@ Item {
             
             ActionButton {
                 text: "Test Playback"
+                onClicked: {
+                    audioManager.testPlayback()
+                }
+            }
+            
+            ActionButton {
+                text: "Refresh Devices"
+                onClicked: {
+                    audioManager.refreshAudioDevices()
+                }
             }
             
             ActionButton {
                 text: "Reset to Default"
+                onClicked: {
+                    audioManager.refreshAudioDevices()
+                }
             }
             
             Item { Layout.fillWidth: true }

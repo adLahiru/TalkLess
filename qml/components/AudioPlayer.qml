@@ -5,11 +5,11 @@ import QtQuick.Layouts
 Rectangle {
     id: root
     
-    property string title: audioManager.currentClip ? audioManager.currentClip.title : "Greetings"
+    property string title: audioPlayerView.currentTitle
     property string subtitle: "Press F1 to play"
-    property real currentTime: audioManager.currentPosition
-    property real totalTime: audioManager.currentDuration
-    property bool isPlaying: audioManager.isPlaying
+    property real currentTime: audioPlayerView.currentPosition
+    property real totalTime: audioPlayerView.currentDuration
+    property bool isPlaying: audioPlayerView.isPlaying
     property string imagePath: audioManager.currentClip ? audioManager.currentClip.imagePath : ""
     
     signal playPauseClicked()
@@ -156,13 +156,7 @@ Rectangle {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             playPauseClicked()
-                            if (audioManager.currentClip) {
-                                if (audioManager.isPlaying) {
-                                    audioManager.pauseClip(audioManager.currentClip.id)
-                                } else {
-                                    audioManager.playClip(audioManager.currentClip.id)
-                                }
-                            }
+                            audioPlayerView.togglePlayPause()
                         }
                     }
                 }
@@ -210,7 +204,7 @@ Rectangle {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            audioManager.volume = audioManager.volume > 0 ? 0 : 1.0
+                            audioPlayerView.toggleMute()
                         }
                     }
                 }

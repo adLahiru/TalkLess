@@ -12,8 +12,8 @@ Rectangle {
     width: textContent.width + 32
     height: 36
     radius: 4
-    color: "transparent"
-    border.color: "#4B5563"
+    color: isPrimary ? Colors.primary : "transparent"
+    border.color: isPrimary ? Colors.primary : Colors.border
     border.width: 1
     
     Text {
@@ -21,7 +21,7 @@ Rectangle {
         anchors.centerIn: parent
         text: "[ " + root.text + " ]"
         font.pixelSize: 13
-        color: "#9CA3AF"
+        color: isPrimary ? "white" : Colors.textSecondary
     }
     
     MouseArea {
@@ -32,13 +32,15 @@ Rectangle {
         onClicked: root.clicked()
         
         onEntered: {
-            root.border.color = "#7C3AED"
-            textContent.color = "#A78BFA"
+            root.color = isPrimary ? Colors.primaryLight : Colors.surfaceLight
+            root.border.color = Colors.primary
+            textContent.color = isPrimary ? "white" : Colors.primary
         }
         
         onExited: {
-            root.border.color = "#4B5563"
-            textContent.color = "#9CA3AF"
+            root.color = isPrimary ? Colors.primary : "transparent"
+            root.border.color = isPrimary ? Colors.primary : Colors.border
+            textContent.color = isPrimary ? "white" : Colors.textSecondary
         }
     }
 }
