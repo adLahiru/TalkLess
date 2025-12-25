@@ -57,7 +57,7 @@ public:
     Q_INVOKABLE void stopClip(const QString &clipId);
     Q_INVOKABLE void stopAll();
     Q_INVOKABLE void seekTo(qreal position);
-    Q_INVOKABLE AudioClip* addClip(const QString &title, const QUrl &filePath, const QString &hotkey = "");
+    Q_INVOKABLE AudioClip* addClip(const QString &title, const QUrl &filePath, const QString &hotkey = "", const QString &sectionId = "");
     Q_INVOKABLE void removeClip(const QString &clipId);
     Q_INVOKABLE AudioClip* getClip(const QString &clipId);
     Q_INVOKABLE void playClipByHotkey(const QString &hotkey);

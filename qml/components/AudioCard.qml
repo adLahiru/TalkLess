@@ -17,6 +17,7 @@ Rectangle {
     
     signal clicked()
     signal playClicked()
+    signal stopClicked()
     signal menuClicked()
     signal deleteClicked()
     
@@ -110,13 +111,10 @@ Rectangle {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        playClicked()
-                        if (root.audioClipId) {
-                            if (isPlaying) {
-                                audioManager.pauseClip(root.audioClipId)
-                            } else {
-                                audioManager.playClip(root.audioClipId)
-                            }
+                        if (isPlaying) {
+                            stopClicked()
+                        } else {
+                            playClicked()
                         }
                     }
                 }

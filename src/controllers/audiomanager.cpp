@@ -225,8 +225,17 @@ void AudioManager::seekTo(qreal position)
     }
 }
 
-AudioClip* AudioManager::addClip(const QString &title, const QUrl &filePath, const QString &hotkey)
+AudioClip* AudioManager::addClip(const QString &title, const QUrl &filePath, const QString &hotkey, const QString &sectionId)
 {
+    // Check if the same file already exists in this section
+    for (AudioClip* existingClip : m_audioClips) {
+        if (existingClip->filePath() == filePath && existingClip->sectionId() == sectionId) {
+            qWarning() << "Duplicate audio file detected in section:" << sectionId << "File:" << filePath;
+            emit error("This audio file is already added to this soundboard.");
+            return nullptr;
+        }
+    }
+    
     QString clipId = QUuid::createUuid().toString();
     
     AudioClip* clip = new AudioClip(this);
@@ -234,6 +243,7 @@ AudioClip* AudioManager::addClip(const QString &title, const QUrl &filePath, con
     clip->setTitle(title);
     clip->setFilePath(filePath);
     clip->setHotkey(hotkey);
+    clip->setSectionId(sectionId);
     
     m_audioClips.append(clip);
     
@@ -243,7 +253,7 @@ AudioClip* AudioManager::addClip(const QString &title, const QUrl &filePath, con
     
     emit audioClipsChanged();
     
-    qDebug() << "Added clip:" << clipId << title;
+    qDebug() << "Added clip:" << clipId << title << "to section:" << sectionId;
     return clip;
 }
 

@@ -20,6 +20,7 @@ class AudioClip : public QObject
     Q_PROPERTY(qreal trimEnd READ trimEnd WRITE setTrimEnd NOTIFY trimEndChanged)
     Q_PROPERTY(qreal volume READ volume WRITE setVolume NOTIFY volumeChanged)
     Q_PROPERTY(bool isPlaying READ isPlaying WRITE setIsPlaying NOTIFY isPlayingChanged)
+    Q_PROPERTY(QString sectionId READ sectionId WRITE setSectionId NOTIFY sectionIdChanged)
 
 public:
     explicit AudioClip(QObject *parent = nullptr);
@@ -120,6 +121,14 @@ public:
         } 
     }
 
+    QString sectionId() const { return m_sectionId; }
+    void setSectionId(const QString &sectionId) { 
+        if (m_sectionId != sectionId) { 
+            m_sectionId = sectionId; 
+            emit sectionIdChanged(); 
+        } 
+    }
+
 signals:
     void idChanged();
     void titleChanged();
@@ -133,6 +142,7 @@ signals:
     void trimEndChanged();
     void volumeChanged();
     void isPlayingChanged();
+    void sectionIdChanged();
 
 private:
     QString m_id;
@@ -147,6 +157,7 @@ private:
     qreal m_trimEnd = 0.0;
     qreal m_volume = 1.0;
     bool m_isPlaying = false;
+    QString m_sectionId;
 };
 
 #endif // AUDIOCLIP_H

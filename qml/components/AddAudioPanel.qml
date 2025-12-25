@@ -12,9 +12,39 @@ Rectangle {
     
     property string audioName: ""
     property string selectedFilePath: ""
+    property string selectedImagePath: ""
+    property string errorMessage: ""
     
-    signal audioAdded(string name, string filePath)
+    signal audioAdded(string name, string filePath, string imagePath)
     signal cancelled()
+    
+    // Connect to audio manager error signal
+    Connections {
+        target: audioManager
+        function onError(message) {
+            errorMessage = message
+            errorTimer.restart()
+        }
+    }
+    
+    Timer {
+        id: errorTimer
+        interval: 5000
+        onTriggered: errorMessage = ""
+    }
+    
+    // Extract filename without extension
+    function extractNameFromPath(path) {
+        var filename = path.toString().split('/').pop()
+        // Remove file extension
+        var lastDot = filename.lastIndexOf('.')
+        if (lastDot > 0) {
+            filename = filename.substring(0, lastDot)
+        }
+        // Replace underscores and hyphens with spaces
+        filename = filename.replace(/_/g, ' ').replace(/-/g, ' ')
+        return filename
+    }
     
     FileDialog {
         id: fileDialog
@@ -23,6 +53,19 @@ Rectangle {
         onAccepted: {
             selectedFilePath = fileDialog.selectedFile
             filePathText.text = selectedFilePath.toString().split('/').pop()
+            // Auto-fill name from filename if empty
+            if (audioName === "") {
+                audioName = extractNameFromPath(selectedFilePath)
+            }
+        }
+    }
+    
+    FileDialog {
+        id: imageDialog
+        title: "Select Cover Image"
+        nameFilters: ["Image files (*.png *.jpg *.jpeg *.gif *.bmp *.webp)", "All files (*)"]
+        onAccepted: {
+            selectedImagePath = imageDialog.selectedFile
         }
     }
     
@@ -64,6 +107,47 @@ Rectangle {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
+                    }
+                }
+            }
+        }
+        
+        // Error message
+        Rectangle {
+            Layout.fillWidth: true
+            height: 36
+            radius: 6
+            color: "#DC2626"
+            visible: errorMessage !== ""
+            
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 8
+                spacing: 8
+                
+                Text {
+                    text: "⚠"
+                    font.pixelSize: 16
+                    color: "white"
+                }
+                
+                Text {
+                    text: errorMessage
+                    font.pixelSize: 11
+                    color: "white"
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+                
+                Text {
+                    text: "✕"
+                    font.pixelSize: 14
+                    color: "white"
+                    
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: errorMessage = ""
                     }
                 }
             }
@@ -140,10 +224,87 @@ Rectangle {
             }
         }
         
-        // Upload area
+        // Cover Image section
+        Text {
+            text: "Cover Image (Optional)"
+            font.pixelSize: 13
+            color: "white"
+        }
+        
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 120
+            Layout.preferredHeight: 80
+            radius: 8
+            color: "#1a1a2e"
+            border.color: selectedImagePath ? "#7C3AED" : "#2a2a3e"
+            clip: true
+            
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 8
+                spacing: 12
+                
+                // Image preview
+                Rectangle {
+                    width: 64
+                    height: 64
+                    radius: 6
+                    color: "#2a2a3e"
+                    clip: true
+                    
+                    Image {
+                        anchors.fill: parent
+                        source: selectedImagePath
+                        fillMode: Image.PreserveAspectCrop
+                        visible: selectedImagePath !== ""
+                    }
+                    
+                    Text {
+                        anchors.centerIn: parent
+                        text: "🖼"
+                        font.pixelSize: 24
+                        color: "#6B7280"
+                        visible: selectedImagePath === ""
+                    }
+                }
+                
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+                    
+                    Text {
+                        text: selectedImagePath ? selectedImagePath.toString().split('/').pop() : "No image selected"
+                        font.pixelSize: 11
+                        color: selectedImagePath ? "white" : "#6B7280"
+                        elide: Text.ElideMiddle
+                        Layout.fillWidth: true
+                    }
+                    
+                    Text {
+                        text: "Click to browse"
+                        font.pixelSize: 10
+                        color: "#7C3AED"
+                    }
+                }
+            }
+            
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: imageDialog.open()
+            }
+        }
+        
+        // Upload audio area
+        Text {
+            text: "Audio File"
+            font.pixelSize: 13
+            color: "white"
+        }
+        
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 80
             radius: 8
             color: "transparent"
             border.color: selectedFilePath ? "#7C3AED" : "#4B5563"
@@ -151,12 +312,12 @@ Rectangle {
             
             ColumnLayout {
                 anchors.centerIn: parent
-                spacing: 8
+                spacing: 4
                 
                 Text {
                     Layout.alignment: Qt.AlignHCenter
                     text: selectedFilePath ? "✓" : "⬆"
-                    font.pixelSize: 24
+                    font.pixelSize: 20
                     color: selectedFilePath ? "#7C3AED" : "#6B7280"
                 }
                 
@@ -164,8 +325,8 @@ Rectangle {
                     id: filePathText
                     Layout.alignment: Qt.AlignHCenter
                     Layout.maximumWidth: parent.parent.width - 20
-                    text: selectedFilePath ? "File selected" : "Drop audio files here or click to browse"
-                    font.pixelSize: 12
+                    text: selectedFilePath ? selectedFilePath.toString().split('/').pop() : "Click to browse audio"
+                    font.pixelSize: 11
                     color: selectedFilePath ? "#7C3AED" : "#6B7280"
                     elide: Text.ElideMiddle
                     horizontalAlignment: Text.AlignHCenter
@@ -177,20 +338,6 @@ Rectangle {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: fileDialog.open()
             }
-        }
-        
-        // Trim Audio
-        Text {
-            text: "Trim Audio"
-            font.pixelSize: 13
-            font.weight: Font.Medium
-            color: "white"
-        }
-        
-        WaveformDisplay {
-            Layout.fillWidth: true
-            startTime: 1.30
-            endTime: 3.30
         }
         
         Item { Layout.fillHeight: true }
@@ -221,6 +368,8 @@ Rectangle {
                     onClicked: {
                         audioName = ""
                         selectedFilePath = ""
+                        selectedImagePath = ""
+                        errorMessage = ""
                         cancelled()
                     }
                 }
@@ -230,7 +379,7 @@ Rectangle {
                 Layout.preferredWidth: 80
                 height: 36
                 radius: 6
-                color: (audioName && selectedFilePath) ? "#7C3AED" : "#4B5563"
+                color: selectedFilePath ? "#7C3AED" : "#4B5563"
                 
                 Text {
                     anchors.centerIn: parent
@@ -242,12 +391,20 @@ Rectangle {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    enabled: audioName && selectedFilePath
+                    enabled: selectedFilePath
                     onClicked: {
-                        if (audioName && selectedFilePath) {
-                            audioAdded(audioName, selectedFilePath)
-                            audioName = ""
-                            selectedFilePath = ""
+                        if (selectedFilePath) {
+                            // Clear any previous error
+                            errorMessage = ""
+                            // Use extracted name if user didn't provide one
+                            var finalName = audioName ? audioName : extractNameFromPath(selectedFilePath)
+                            audioAdded(finalName, selectedFilePath, selectedImagePath)
+                            // Only clear fields if no error occurred (checked by parent)
+                            if (errorMessage === "") {
+                                audioName = ""
+                                selectedFilePath = ""
+                                selectedImagePath = ""
+                            }
                         }
                     }
                 }
