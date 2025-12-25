@@ -1,6 +1,7 @@
 #include "soundboardview.h"
 #include <QDebug>
 #include <QUuid>
+#include "../models/audioclip.h"
 
 SoundboardView::SoundboardView(AudioManager* audioMgr, HotkeyManager* hotkeyMgr, QObject *parent)
     : QObject(parent)
@@ -12,6 +13,9 @@ SoundboardView::SoundboardView(AudioManager* audioMgr, HotkeyManager* hotkeyMgr,
             this, &SoundboardView::onClipFinished);
     connect(m_audioManager, &AudioManager::error, 
             this, &SoundboardView::onAudioError);
+    
+    // Connect to audioClipsChanged to update currentSectionClips
+    connect(m_audioManager, &AudioManager::audioClipsChanged, this, &SoundboardView::currentSectionClipsChanged);
     
     // Initialize default sections
     initializeDefaultSections();
@@ -72,6 +76,26 @@ void SoundboardView::initializeDefaultSections()
 {
     // Create a default section
     addSection("default");
+}
+
+QList<AudioClip*> SoundboardView::currentSectionClips() const
+{
+    QList<AudioClip*> filteredClips;
+    
+    if (!m_currentSection) {
+        return filteredClips;
+    }
+    
+    QString currentSectionId = m_currentSection->id();
+    
+    // Filter clips that belong to the current section
+    for (AudioClip* clip : m_audioManager->audioClips()) {
+        if (clip && clip->sectionId() == currentSectionId) {
+            filteredClips.append(clip);
+        }
+    }
+    
+    return filteredClips;
 }
 
 SoundboardSection* SoundboardView::addSection(const QString &name)
@@ -164,6 +188,7 @@ void SoundboardView::selectSection(const QString &sectionId)
     m_currentSection->setIsSelected(true);
     
     emit currentSectionChanged();
+    emit currentSectionClipsChanged();
     
     qDebug() << "Selected section:" << sectionId;
 }

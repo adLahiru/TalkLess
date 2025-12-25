@@ -7,16 +7,10 @@ Item {
     
     property int selectedSlots: 0
     property int rightPanelIndex: 0  // 0: Details, 1: Add Audio, 2: Meters, 3: Teleprompter
-    property var audioClips: []
+    property var selectedClip: null
     
-    Component.onCompleted: {
-        // Add sample audio clips
-        audioClips = [
-            audioManager.addClip("Greeting", "", "Alt+F1"),
-            audioManager.addClip("Welcome", "", "Alt+F2"),
-            audioManager.addClip("Intro", "", "Alt+F3")
-        ]
-    }
+    // Current soundboard name from the view
+    property string currentSoundboardName: soundboardView.currentSection ? soundboardView.currentSection.name : "Soundboard"
     
     RowLayout {
         anchors.fill: parent
@@ -26,6 +20,7 @@ Item {
         ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.minimumWidth: parent.width * 0.7
             spacing: 0
             
             // Page Header with background
@@ -64,7 +59,7 @@ Item {
                         spacing: 8
                         
                         Text {
-                            text: "Soundboard Test"
+                            text: currentSoundboardName
                             font.pixelSize: 28
                             font.weight: Font.Bold
                             color: "white"
@@ -99,16 +94,16 @@ Item {
                         }
                     }
                     
-                    // Add Soundboard button
+                    // Get Started button
                     Rectangle {
-                        width: 140
+                        width: 120
                         height: 40
                         radius: 8
                         color: "#7C3AED"
                         
                         Text {
                             anchors.centerIn: parent
-                            text: "Add Soundboard"
+                            text: "Get Started"
                             font.pixelSize: 13
                             font.weight: Font.Medium
                             color: "white"
@@ -117,6 +112,7 @@ Item {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
+                            onClicked: rightPanelIndex = 1
                         }
                     }
                 }
@@ -182,41 +178,38 @@ Item {
                     
                     // Audio Cards
                     Repeater {
-                        model: audioManager.audioClips.length
+                        model: soundboardView.currentSectionClips
                         
-                        ColumnLayout {
-                            spacing: 8
+                        AudioCard {
+                            required property var modelData
+                            required property int index
                             
-                            AudioCard {
-                                title: audioManager.audioClips[index] ? audioManager.audioClips[index].title : ""
-                                hotkey: audioManager.audioClips[index] ? audioManager.audioClips[index].hotkey : ""
-                                tagLabel: index < 3 ? "Morning" : ""
-                                tagColor: "#EAB308"
-                                isSelected: index === 0
-                                isPlaying: audioManager.audioClips[index] ? audioManager.audioClips[index].isPlaying : false
-                                audioClipId: audioManager.audioClips[index] ? audioManager.audioClips[index].id : ""
-                                imagePath: audioManager.audioClips[index] ? audioManager.audioClips[index].imagePath : ""
-                                onClicked: rightPanelIndex = 0
-                                onDeleteClicked: {
-                                    if (audioManager.audioClips[index]) {
-                                        audioManager.removeClip(audioManager.audioClips[index].id)
-                                    }
+                            title: modelData ? modelData.title : ""
+                            hotkey: modelData ? modelData.hotkey : ""
+                            tagLabel: modelData && modelData.tagLabel ? modelData.tagLabel : ""
+                            tagColor: modelData && modelData.tagColor ? modelData.tagColor : "#EAB308"
+                            isSelected: selectedClip && selectedClip.id === modelData.id
+                            isPlaying: modelData ? modelData.isPlaying : false
+                            audioClipId: modelData ? modelData.id : ""
+                            imagePath: modelData ? modelData.imagePath : ""
+                            
+                            onClicked: {
+                                selectedClip = modelData
+                                rightPanelIndex = 0
+                            }
+                            onPlayClicked: {
+                                if (modelData) {
+                                    audioManager.playClip(modelData.id)
                                 }
                             }
-                            
-                            // Tags below card
-                            RowLayout {
-                                spacing: 6
-                                visible: index < 3
-                                
-                                AudioTag {
-                                    text: "Professional"
-                                    tagColor: "#374151"
+                            onStopClicked: {
+                                if (modelData) {
+                                    audioManager.stopClip(modelData.id)
                                 }
-                                
-                                AudioTag {
-                                    text: "warm"
-                                    tagColor: "#374151"
+                            }
+                            onDeleteClicked: {
+                                if (modelData) {
+                                    audioManager.removeClip(modelData.id)
                                 }
                             }
                         }
@@ -307,22 +300,30 @@ Item {
         
         // Right Panel
         StackLayout {
-            Layout.preferredWidth: 280
+            Layout.preferredWidth: parent.width * 0.22
+            Layout.maximumWidth: 320
+            Layout.minimumWidth: 240
             Layout.fillHeight: true
             currentIndex: rightPanelIndex
             
             AudioDetailsPanel {
-                title: "Introducing"
+                clip: selectedClip
             }
             
             AddAudioPanel {
-                onAudioAdded: function(name, filePath) {
-                    var clip = audioManager.addClip(name, filePath, "")
+                onAudioAdded: function(name, filePath, imagePath) {
+                    var sectionId = soundboardView.currentSection ? soundboardView.currentSection.id : ""
+                    var clip = audioManager.addClip(name, filePath, "", sectionId)
                     if (clip) {
-                        audioClips.push(clip)
-                        audioClipsChanged()
+                        if (imagePath) {
+                            clip.imagePath = imagePath
+                        }
+                        selectedClip = clip
+                        rightPanelIndex = 0
+                    } else {
+                        // Duplicate detected, stay on add panel to show error
+                        console.log("Failed to add clip - duplicate detected")
                     }
-                    rightPanelIndex = 0
                 }
                 onCancelled: {
                     rightPanelIndex = 0

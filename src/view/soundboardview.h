@@ -16,6 +16,7 @@ class SoundboardView : public QObject
     Q_PROPERTY(HotkeyManager* hotkeyManager READ hotkeyManager CONSTANT)
     Q_PROPERTY(QList<SoundboardSection*> sections READ sections NOTIFY sectionsChanged)
     Q_PROPERTY(SoundboardSection* currentSection READ currentSection NOTIFY currentSectionChanged)
+    Q_PROPERTY(QList<AudioClip*> currentSectionClips READ currentSectionClips NOTIFY currentSectionClipsChanged)
 
 public:
     explicit SoundboardView(AudioManager* audioMgr, HotkeyManager* hotkeyMgr, QObject *parent = nullptr);
@@ -24,6 +25,7 @@ public:
     HotkeyManager* hotkeyManager() const { return m_hotkeyManager; }
     QList<SoundboardSection*> sections() const { return m_sections; }
     SoundboardSection* currentSection() const { return m_currentSection; }
+    QList<AudioClip*> currentSectionClips() const;
 
     // UI-specific methods
     Q_INVOKABLE void playAudioInSlot(int slotIndex);
@@ -46,6 +48,7 @@ signals:
     void sectionAdded(const QString &sectionId);
     void sectionDeleted(const QString &sectionId);
     void sectionRenamed(const QString &sectionId, const QString &newName);
+    void currentSectionClipsChanged();
 
 private slots:
     void onClipFinished(const QString& clipId);
