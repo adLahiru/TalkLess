@@ -15,6 +15,8 @@ qt_add_executable(appTalkLess
     # Models
     src/models/audioclip.h
     src/models/audioclip.cpp
+    src/models/soundboardsection.h
+    src/models/soundboardsection.cpp
     # Controllers
     src/controllers/audiomanager.h
     src/controllers/audiomanager.cpp

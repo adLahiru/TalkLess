@@ -6,6 +6,7 @@ Rectangle {
     id: root
     
     property int currentIndex: 0  // Soundboard selected by default
+    property string renamingSectionId: ""
     
     width: 250
     color: "#0a0a0f"
@@ -92,11 +93,172 @@ Rectangle {
         
         // Soundboard thumbnails
         Repeater {
-            model: 4
+            id: sectionsRepeater
+            model: soundboardView.sections
             
-            SoundboardListItem {
+            Rectangle {
+                id: sectionItem
+                
+                required property var modelData
+                required property int index
+                
+                property bool isCurrentSection: soundboardView.currentSection && soundboardView.currentSection.id === modelData.id
+                property bool isRenaming: renamingSectionId === modelData.id
+                
                 Layout.fillWidth: true
-                title: "Greeting"
+                Layout.preferredHeight: 48
+                color: isCurrentSection ? "#1a1a2e" : "transparent"
+                radius: 8
+                
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    spacing: 12
+                    
+                    // Thumbnail
+                    Rectangle {
+                        width: 36
+                        height: 36
+                        radius: 6
+                        color: "#2a2a3e"
+                        clip: true
+                        
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 6
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: "#EC4899" }
+                                GradientStop { position: 1.0; color: "#F97316" }
+                            }
+                            
+                            Text {
+                                anchors.centerIn: parent
+                                text: "🎤"
+                                font.pixelSize: 16
+                            }
+                        }
+                    }
+                    
+                    // Name or rename input
+                    TextField {
+                        id: renameField
+                        visible: sectionItem.isRenaming
+                        text: sectionItem.modelData.name
+                        font.pixelSize: 14
+                        color: "white"
+                        Layout.fillWidth: true
+                        selectByMouse: true
+                        background: Rectangle {
+                            color: "#2a2a3e"
+                            radius: 4
+                            border.color: "#7C3AED"
+                            border.width: 1
+                        }
+                        
+                        onAccepted: {
+                            if (text.trim() !== "") {
+                                soundboardView.renameSection(sectionItem.modelData.id, text.trim())
+                            }
+                            renamingSectionId = ""
+                        }
+                        
+                        Keys.onEscapePressed: {
+                            renamingSectionId = ""
+                        }
+                        
+                        onVisibleChanged: {
+                            if (visible) {
+                                text = sectionItem.modelData.name
+                                forceActiveFocus()
+                                selectAll()
+                            }
+                        }
+                    }
+                    
+                    Text {
+                        visible: !sectionItem.isRenaming
+                        text: sectionItem.modelData.name
+                        font.pixelSize: 14
+                        color: "white"
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
+                    }
+                }
+                
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true
+                    enabled: !sectionItem.isRenaming
+                    
+                    onClicked: function(mouse) {
+                        if (mouse.button === Qt.RightButton) {
+                            sectionContextMenu.sectionId = sectionItem.modelData.id
+                            sectionContextMenu.sectionName = sectionItem.modelData.name
+                            sectionContextMenu.popup()
+                        } else {
+                            soundboardView.selectSection(sectionItem.modelData.id)
+                        }
+                    }
+                    
+                    onEntered: {
+                        if (!sectionItem.isCurrentSection) sectionItem.color = "#1a1a2e"
+                    }
+                    
+                    onExited: {
+                        if (!sectionItem.isCurrentSection) sectionItem.color = "transparent"
+                    }
+                }
+            }
+        }
+        
+        // Context menu for sections
+        Menu {
+            id: sectionContextMenu
+            property string sectionId: ""
+            property string sectionName: ""
+            
+            background: Rectangle {
+                implicitWidth: 160
+                color: "#1a1a2e"
+                border.color: "#2a2a3e"
+                radius: 6
+            }
+            
+            MenuItem {
+                text: "Rename"
+                icon.source: ""
+                onTriggered: {
+                    renamingSectionId = sectionContextMenu.sectionId
+                }
+                background: Rectangle {
+                    color: parent.highlighted ? "#2a2a3e" : "transparent"
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: "white"
+                    font.pixelSize: 13
+                    leftPadding: 12
+                }
+            }
+            
+            MenuItem {
+                text: "Delete"
+                enabled: soundboardView.sections.length > 1
+                onTriggered: {
+                    soundboardView.deleteSection(sectionContextMenu.sectionId)
+                }
+                background: Rectangle {
+                    color: parent.highlighted ? "#2a2a3e" : "transparent"
+                }
+                contentItem: Text {
+                    text: parent.text
+                    color: parent.enabled ? "#EF4444" : "#6B7280"
+                    font.pixelSize: 13
+                    leftPadding: 12
+                }
             }
         }
         
@@ -104,7 +266,8 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 44
-            color: "transparent"
+            color: addSoundboardHover.containsMouse ? "#1a1a2e" : "transparent"
+            radius: 8
             
             RowLayout {
                 anchors.fill: parent
@@ -134,8 +297,16 @@ Rectangle {
             }
             
             MouseArea {
+                id: addSoundboardHover
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
+                hoverEnabled: true
+                onClicked: {
+                    var section = soundboardView.addSection("New Soundboard")
+                    if (section) {
+                        renamingSectionId = section.id
+                    }
+                }
             }
         }
     }
