@@ -31,6 +31,23 @@ int main(int argc, char *argv[])
     QObject::connect(&hotkeyManager, &HotkeyManager::hotkeyTriggered,
                      &audioManager, &AudioManager::playClip);
     
+    // Connect system hotkeys
+    QObject::connect(&hotkeyManager, &HotkeyManager::playPauseTriggered,
+                     &audioManager, [&audioManager]() {
+        if (audioManager.isPlaying()) {
+            if (audioManager.currentClip()) {
+                audioManager.pauseClip(audioManager.currentClip()->id());
+            }
+        } else {
+            if (audioManager.currentClip()) {
+                audioManager.playClip(audioManager.currentClip()->id());
+            }
+        }
+    });
+    
+    QObject::connect(&hotkeyManager, &HotkeyManager::stopAllTriggered,
+                     &audioManager, &AudioManager::stopAll);
+    
     qDebug() << "MVC Architecture initialized:";
     qDebug() << "- Controllers: AudioManager, HotkeyManager";
     qDebug() << "- Views: SoundboardView, AudioPlayerView";

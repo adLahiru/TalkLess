@@ -29,6 +29,9 @@ class AudioManager : public QObject
     Q_PROPERTY(QStringList outputDevices READ outputDevices NOTIFY outputDevicesChanged)
     Q_PROPERTY(QString currentInputDevice READ currentInputDevice WRITE setCurrentInputDevice NOTIFY currentInputDeviceChanged)
     Q_PROPERTY(QString currentOutputDevice READ currentOutputDevice WRITE setCurrentOutputDevice NOTIFY currentOutputDeviceChanged)
+    Q_PROPERTY(QString secondaryOutputDevice READ secondaryOutputDevice WRITE setSecondaryOutputDevice NOTIFY secondaryOutputDeviceChanged)
+    Q_PROPERTY(bool secondaryOutputEnabled READ secondaryOutputEnabled WRITE setSecondaryOutputEnabled NOTIFY secondaryOutputEnabledChanged)
+    Q_PROPERTY(bool inputDeviceEnabled READ inputDeviceEnabled WRITE setInputDeviceEnabled NOTIFY inputDeviceEnabledChanged)
 
 public:
     explicit AudioManager(QObject *parent = nullptr);
@@ -47,8 +50,14 @@ public:
     QStringList outputDevices() const;
     QString currentInputDevice() const;
     QString currentOutputDevice() const;
+    QString secondaryOutputDevice() const;
+    bool secondaryOutputEnabled() const;
+    bool inputDeviceEnabled() const;
     void setCurrentInputDevice(const QString &device);
     void setCurrentOutputDevice(const QString &device);
+    void setSecondaryOutputDevice(const QString &device);
+    void setSecondaryOutputEnabled(bool enabled);
+    void setInputDeviceEnabled(bool enabled);
 
     // Invokable methods for QML
     Q_INVOKABLE void loadAudioFile(const QString &clipId, const QUrl &filePath);
@@ -78,6 +87,9 @@ signals:
     void outputDevicesChanged();
     void currentInputDeviceChanged();
     void currentOutputDeviceChanged();
+    void secondaryOutputDeviceChanged();
+    void secondaryOutputEnabledChanged();
+    void inputDeviceEnabledChanged();
 
 private slots:
     void onPositionChanged(qint64 position);
@@ -99,7 +111,13 @@ private:
     QStringList m_outputDevices;
     QString m_currentInputDevice;
     QString m_currentOutputDevice;
+    QString m_secondaryOutputDevice;
+    bool m_secondaryOutputEnabled;
+    bool m_inputDeviceEnabled;
     QMediaDevices* m_mediaDevices;
+    
+    // Secondary output (audio only, no mic)
+    QMap<QString, QAudioOutput*> m_secondaryAudioOutputs;
     
 #ifdef ENABLE_AUDIOENGINE
     // AudioEngine integration
@@ -108,6 +126,7 @@ private:
 
     void initializePlayer(const QString &clipId);
     void cleanupPlayer(const QString &clipId);
+    void updateOutputDeviceForAllPlayers(const QString &deviceName);
 };
 
 #endif // AUDIOMANAGER_H

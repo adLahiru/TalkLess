@@ -7,16 +7,18 @@ Rectangle {
     property string currentValue: ""
     property var model: []
     property int currentIndex: 0
+    property bool enabled: true
     
     signal valueChanged(string value)
     
     width: 280
     height: 40
     radius: 6
-    color: Colors.surface
+    color: enabled ? Colors.surface : Qt.darker(Colors.surface, 1.2)
     border.color: dropdownPopup.visible ? Colors.primary : Colors.border
     border.width: 1
     clip: true
+    opacity: enabled ? 1.0 : 0.6
     
     // Current selection display
     Text {
@@ -104,9 +106,9 @@ Rectangle {
     // Click handler
     MouseArea {
         anchors.fill: parent
-        cursorShape: Qt.PointingHandCursor
+        cursorShape: root.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: {
-            if (model.length > 0) {
+            if (root.enabled && model.length > 0) {
                 dropdownPopup.opened ? dropdownPopup.close() : dropdownPopup.open()
             }
         }

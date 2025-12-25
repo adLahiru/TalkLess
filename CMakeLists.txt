@@ -108,6 +108,16 @@ target_link_libraries(appTalkLess
     PRIVATE Qt6::Multimedia
 )
 
+# Link Carbon framework for global hotkeys on macOS
+if(APPLE)
+    target_link_libraries(appTalkLess PRIVATE "-framework Carbon")
+    
+    # Set custom Info.plist
+    set_target_properties(appTalkLess PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/macos/Info.plist"
+    )
+endif()
+
 include(GNUInstallDirs)
 install(TARGETS appTalkLess
     BUNDLE DESTINATION .
