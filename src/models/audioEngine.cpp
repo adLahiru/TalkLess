@@ -1,16 +1,10 @@
+#define MINIAUDIO_IMPLEMENTATION
 #include "audioEngine.h"
 #include <cmath>
 #include <iostream>
 #include <algorithm>
+#include <cstring>
 #include <QDebug>
-
-extern "C" {
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-#include <libswresample/swresample.h>
-#include <libavutil/opt.h>
-#include <libavutil/channel_layout.h>
-}
 
 AudioEngine::AudioEngine()
     : device(nullptr)
@@ -23,8 +17,6 @@ AudioEngine::AudioEngine()
     , micPeakLevel(0.0f)
     , masterPeakLevel(0.0f)
 {
-    avformat_network_init();
-    
     // Initialize all clip slots
     for (int i = 0; i < MAX_CLIPS; ++i) {
         clips[i].ringBufferData = nullptr;
@@ -201,179 +193,68 @@ void AudioEngine::decoderThreadFunc(ClipSlot* slot, int slotId) {
         return;
     }
 
-    // FFmpeg objects (declared at function scope to avoid goto issues)
-    AVFormatContext* fmtCtx = nullptr;
-    AVCodecContext* codecCtx = nullptr;
-    SwrContext* swr = nullptr;
-    AVPacket* pkt = av_packet_alloc();
-    AVFrame* frame = av_frame_alloc();
-    uint8_t* outData = nullptr;
-    int outLinesize = 0;
-    int audioStreamIndex = -1;
-    int maxOutSamples = 0;
-    bool shouldLoop = false;
-    int framesWritten = 0;
-
-    // Suppress FFmpeg warnings
-    av_log_set_level(AV_LOG_ERROR);
-
-    // Open input file
-    if (avformat_open_input(&fmtCtx, filepath.c_str(), nullptr, nullptr) < 0 ||
-        avformat_find_stream_info(fmtCtx, nullptr) < 0) {
+    // Configure miniaudio decoder to output stereo 48kHz float
+    ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 2, 48000);
+    ma_decoder decoder;
+    if (ma_decoder_init_file(filepath.c_str(), &config, &decoder) != MA_SUCCESS) {
         std::cerr << "[Decoder " << slotId << "] Failed to open file" << std::endl;
-        goto cleanup;
-    }
-
-    // Find audio stream
-    for (unsigned i = 0; i < fmtCtx->nb_streams; ++i) {
-        if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-            audioStreamIndex = i;
-            break;
-        }
-    }
-
-    if (audioStreamIndex < 0) {
-        std::cerr << "[Decoder " << slotId << "] No audio stream" << std::endl;
-        goto cleanup;
-    }
-
-    // Open decoder
-    {
-        const AVCodec* codec = avcodec_find_decoder(fmtCtx->streams[audioStreamIndex]->codecpar->codec_id);
-        if (!codec) {
-            std::cerr << "[Decoder " << slotId << "] Codec not found" << std::endl;
-            goto cleanup;
-        }
-
-        codecCtx = avcodec_alloc_context3(codec);
-        avcodec_parameters_to_context(codecCtx, fmtCtx->streams[audioStreamIndex]->codecpar);
-        
-        if (avcodec_open2(codecCtx, codec, nullptr) < 0) {
-            std::cerr << "[Decoder " << slotId << "] Failed to open codec" << std::endl;
-            goto cleanup;
-        }
-    }
-
-    // Fix missing channel layout
-    if (codecCtx->ch_layout.nb_channels == 0) {
-        av_channel_layout_default(&codecCtx->ch_layout, 2);
+        slot->state.store(ClipState::Stopped, std::memory_order_release);
+        return;
     }
 
     // Save format info
-    slot->sampleRate.store(codecCtx->sample_rate, std::memory_order_relaxed);
-    slot->channels.store(2, std::memory_order_relaxed);
+    slot->sampleRate.store((int)decoder.outputSampleRate, std::memory_order_relaxed);
+    slot->channels.store((int)decoder.outputChannels, std::memory_order_relaxed);
 
-    // Setup resampler (use modern channel layout API)
-    {
-        AVChannelLayout outLayout = AV_CHANNEL_LAYOUT_STEREO;
-        swr = swr_alloc();
-        av_opt_set_chlayout(swr, "in_chlayout", &codecCtx->ch_layout, 0);
-        av_opt_set_chlayout(swr, "out_chlayout", &outLayout, 0);
-        av_opt_set_int(swr, "in_sample_rate", codecCtx->sample_rate, 0);
-        av_opt_set_int(swr, "out_sample_rate", 48000, 0);
-        av_opt_set_sample_fmt(swr, "in_sample_fmt", codecCtx->sample_fmt, 0);
-        av_opt_set_sample_fmt(swr, "out_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
-        
-        if (swr_init(swr) < 0) {
-            std::cerr << "[Decoder " << slotId << "] Failed to init resampler" << std::endl;
-            goto cleanup;
-        }
-    }
-
-    // Pre-allocate output buffer (generous size to handle any frame)
-    maxOutSamples = av_rescale_rnd(4096, 48000, codecCtx->sample_rate, AV_ROUND_UP);
-    if (av_samples_alloc(&outData, &outLinesize, 2, maxOutSamples, AV_SAMPLE_FMT_FLT, 0) < 0) {
-        std::cerr << "[Decoder " << slotId << "] Failed to allocate output buffer" << std::endl;
-        goto cleanup;
-    }
+    // Decode buffer
+    constexpr ma_uint32 kDecodeFrames = 1024;
+    float decodeBuffer[kDecodeFrames * 2];
+    int framesWritten = 0;
+    bool shouldLoop = false;
 
     std::cout << "[Decoder " << slotId << "] Decoding started" << std::endl;
     std::cout << "[Decoder " << slotId << "] Ring buffer capacity: " << RING_BUFFER_SIZE_IN_FRAMES << " frames" << std::endl;
 
     // Decode loop
-    do {
+    while (true) {
         // Stop requested?
         if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping) {
             std::cout << "[Decoder " << slotId << "] Stop requested" << std::endl;
             break;
         }
 
-        int ret = av_read_frame(fmtCtx, pkt);
-        if (ret < 0) {  // EOF or error
-            if (ret == AVERROR_EOF) {
-                // Flush decoder
-                avcodec_send_packet(codecCtx, nullptr);
-                while (avcodec_receive_frame(codecCtx, frame) == 0) {
-                    // Resample and write to ring buffer
-                    int outSamples = swr_get_out_samples(swr, frame->nb_samples);
-                    int converted = swr_convert(swr, &outData, outSamples,
-                                              (const uint8_t**)frame->data, frame->nb_samples);
-                    if (converted > 0) {
-                        void* pWrite;
-                        ma_uint32 frames = converted;
-                        if (ma_pcm_rb_acquire_write(&slot->ringBuffer, &frames, &pWrite) == MA_SUCCESS && frames > 0) {
-                            memcpy(pWrite, outData, frames * 2 * sizeof(float));
-                            ma_pcm_rb_commit_write(&slot->ringBuffer, frames);
-                        }
-                        // Drop remaining samples if ring buffer is full (non-blocking)
-                    }
-                }
+        ma_uint64 framesRead = 0;
+        ma_result readResult = ma_decoder_read_pcm_frames(&decoder, decodeBuffer, kDecodeFrames, &framesRead);
+        if (readResult != MA_SUCCESS && readResult != MA_AT_END) {
+            std::cerr << "[Decoder " << slotId << "] Read error: " << readResult << std::endl;
+            break;
+        }
 
-                // Check loop
-                shouldLoop = slot->loop.load(std::memory_order_relaxed);
-                if (shouldLoop) {
-                    std::cout << "[Decoder " << slotId << "] Looping" << std::endl;
-                    av_seek_frame(fmtCtx, audioStreamIndex, 0, AVSEEK_FLAG_BACKWARD);
-                    avcodec_flush_buffers(codecCtx);
-                    continue;
-                } else {
-                    std::cout << "[Decoder " << slotId << "] Finished" << std::endl;
-                    break;
-                }
+        if (framesRead == 0) {
+            shouldLoop = slot->loop.load(std::memory_order_relaxed);
+            if (shouldLoop) {
+                std::cout << "[Decoder " << slotId << "] Looping" << std::endl;
+                ma_decoder_seek_to_pcm_frame(&decoder, 0);
+                continue;
             } else {
-                std::cerr << "[Decoder " << slotId << "] Read error: " << ret << std::endl;
+                std::cout << "[Decoder " << slotId << "] Finished" << std::endl;
                 break;
             }
         }
 
-        if (pkt->stream_index == audioStreamIndex) {
-            avcodec_send_packet(codecCtx, pkt);
-            
-            while (avcodec_receive_frame(codecCtx, frame) == 0) {
-                // Resample and write to ring buffer
-                int outSamples = swr_get_out_samples(swr, frame->nb_samples);
-                int converted = swr_convert(swr, &outData, outSamples,
-                                          (const uint8_t**)frame->data, frame->nb_samples);
-                if (converted > 0) {
-                    void* pWrite;
-                    ma_uint32 frames = converted;
-                    if (ma_pcm_rb_acquire_write(&slot->ringBuffer, &frames, &pWrite) == MA_SUCCESS && frames > 0) {
-                        memcpy(pWrite, outData, frames * 2 * sizeof(float));
-                        ma_pcm_rb_commit_write(&slot->ringBuffer, frames);
-                        framesWritten += frames;
-                        if (framesWritten < 5000) { // Debug first few writes
-                            std::cout << "[Decoder " << slotId << "] Wrote " << frames << " frames to ring buffer" << std::endl;
-                        }
-                    } else if (frames == 0) {
-                        // Ring buffer full - drop samples (non-blocking)
-                        if (framesWritten % 10000 == 0) {
-                            std::cout << "[Decoder " << slotId << "] Ring buffer full, dropping samples" << std::endl;
-                        }
-                    }
-                }
+        void* pWrite = nullptr;
+        ma_uint32 framesToWrite = static_cast<ma_uint32>(framesRead);
+        if (ma_pcm_rb_acquire_write(&slot->ringBuffer, &framesToWrite, &pWrite) == MA_SUCCESS && framesToWrite > 0) {
+            memcpy(pWrite, decodeBuffer, framesToWrite * 2 * sizeof(float));
+            ma_pcm_rb_commit_write(&slot->ringBuffer, framesToWrite);
+            framesWritten += static_cast<int>(framesToWrite);
+            if (framesWritten < 5000) {
+                std::cout << "[Decoder " << slotId << "] Wrote " << framesToWrite << " frames to ring buffer" << std::endl;
             }
         }
+    }
 
-        av_packet_unref(pkt);
-    } while (true);
-
-cleanup:
-    if (outData) av_freep(&outData);
-    av_frame_free(&frame);
-    av_packet_free(&pkt);
-    swr_free(&swr);
-    avcodec_free_context(&codecCtx);
-    if (fmtCtx) avformat_close_input(&fmtCtx);
+    ma_decoder_uninit(&decoder);
 
     slot->state.store(ClipState::Stopped, std::memory_order_release);
     std::cout << "[Decoder " << slotId << "] Thread exiting" << std::endl;
@@ -535,6 +416,26 @@ float AudioEngine::getMasterGainDB() const {
     return masterGainDB.load(std::memory_order_relaxed);
 }
 
+void AudioEngine::setMasterGainLinear(float linear) {
+    if (linear < 0.0f) linear = 0.0f;
+    masterGain.store(linear, std::memory_order_relaxed);
+    masterGainDB.store(20.0f * log10(std::max(linear, 0.000001f)), std::memory_order_relaxed);
+}
+
+float AudioEngine::getMasterGainLinear() const {
+    return masterGain.load(std::memory_order_relaxed);
+}
+
+void AudioEngine::setMicGainLinear(float linear) {
+    if (linear < 0.0f) linear = 0.0f;
+    micGain.store(linear, std::memory_order_relaxed);
+    micGainDB.store(20.0f * log10(std::max(linear, 0.000001f)), std::memory_order_relaxed);
+}
+
+float AudioEngine::getMicGainLinear() const {
+    return micGain.load(std::memory_order_relaxed);
+}
+
 // Real-time audio level monitoring
 float AudioEngine::getMicPeakLevel() const {
     return micPeakLevel.load(std::memory_order_relaxed);
@@ -592,6 +493,7 @@ bool AudioEngine::initDevice() {
     config.sampleRate        = 48000;
     config.dataCallback      = AudioEngine::audioCallback;
     config.pUserData         = this;
+    applyDeviceSelection(config);
     
     if (ma_device_init(context, &config, device) != MA_SUCCESS) {
         std::cerr << "Failed to initialize audio device" << std::endl;
@@ -634,6 +536,35 @@ bool AudioEngine::isDeviceRunning() const {
     return deviceRunning.load(std::memory_order_relaxed);
 }
 
+bool AudioEngine::applyDeviceSelection(ma_device_config& config) {
+    if (selectedPlaybackSet) {
+        config.playback.pDeviceID = &selectedPlaybackDeviceIdStruct;
+    }
+    if (selectedCaptureSet) {
+        config.capture.pDeviceID = &selectedCaptureDeviceIdStruct;
+    }
+    return true;
+}
+
+bool AudioEngine::reinitializeDevice(bool restart) {
+    bool wasRunning = deviceRunning.load(std::memory_order_relaxed);
+    if (wasRunning) {
+        stopAudioDevice();
+    }
+    if (device) {
+        ma_device_uninit(device);
+        delete device;
+        device = nullptr;
+    }
+    if (!initDevice()) {
+        return false;
+    }
+    if (restart || wasRunning) {
+        return startAudioDevice();
+    }
+    return true;
+}
+
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -662,6 +593,7 @@ std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumeratePlaybackDevices(
         info.name = std::string(pPlaybackInfos[i].name);
         info.id = std::to_string(i);
         info.isDefault = pPlaybackInfos[i].isDefault;
+        info.deviceId = pPlaybackInfos[i].id;
         devices.push_back(info);
     }
     
@@ -687,6 +619,7 @@ std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumerateCaptureDevices()
         info.name = std::string(pCaptureInfos[i].name);
         info.id = std::to_string(i);
         info.isDefault = pCaptureInfos[i].isDefault;
+        info.deviceId = pCaptureInfos[i].id;
         devices.push_back(info);
     }
     
@@ -694,19 +627,29 @@ std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumerateCaptureDevices()
 }
 
 bool AudioEngine::setPlaybackDevice(const std::string& deviceId) {
-    if (deviceRunning.load(std::memory_order_relaxed)) {
-        std::cerr << "Stop device before changing" << std::endl;
-        return false;
+    auto devices = enumeratePlaybackDevices();
+    for (const auto& dev : devices) {
+        if (dev.id == deviceId || dev.name == deviceId) {
+            selectedPlaybackDeviceId = dev.id;
+            selectedPlaybackDeviceIdStruct = dev.deviceId;
+            selectedPlaybackSet = true;
+            return reinitializeDevice(true);
+        }
     }
-    selectedPlaybackDeviceId = deviceId;
-    return true;
+    std::cerr << "Playback device not found: " << deviceId << std::endl;
+    return false;
 }
 
 bool AudioEngine::setCaptureDevice(const std::string& deviceId) {
-    if (deviceRunning.load(std::memory_order_relaxed)) {
-        std::cerr << "Stop device before changing" << std::endl;
-        return false;
+    auto devices = enumerateCaptureDevices();
+    for (const auto& dev : devices) {
+        if (dev.id == deviceId || dev.name == deviceId) {
+            selectedCaptureDeviceId = dev.id;
+            selectedCaptureDeviceIdStruct = dev.deviceId;
+            selectedCaptureSet = true;
+            return reinitializeDevice(true);
+        }
     }
-    selectedCaptureDeviceId = deviceId;
-    return true;
+    std::cerr << "Capture device not found: " << deviceId << std::endl;
+    return false;
 }

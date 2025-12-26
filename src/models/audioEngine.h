@@ -7,15 +7,6 @@
 #include <functional>
 #include <mutex>
 
-extern "C" {
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-#include <libavutil/avutil.h>
-#include <libavutil/frame.h>
-#include <libavutil/samplefmt.h>
-#include <libswresample/swresample.h>
-}
-
 #include "miniaudio.h"
 
 // Callback types
@@ -93,6 +84,12 @@ public:
     // Master output gain (affects all audio)
     void setMasterGainDB(float gainDB);
     float getMasterGainDB() const;
+
+    // Expose linear gains for UI sliders (0.0 - 1.0 typical, but not clamped)
+    void setMasterGainLinear(float linear);
+    float getMasterGainLinear() const;
+    void setMicGainLinear(float linear);
+    float getMicGainLinear() const;
     
     // Real-time audio level monitoring (peak detection)
     float getMicPeakLevel() const;      // Returns 0.0 to 1.0
@@ -105,9 +102,10 @@ public:
     
     // Device enumeration
     struct AudioDeviceInfo {
-        std::string id;
+        std::string id;           // simple index-based id as string
         std::string name;
         bool isDefault;
+        ma_device_id deviceId;    // concrete device id for selection
     };
     std::vector<AudioDeviceInfo> enumeratePlaybackDevices();
     std::vector<AudioDeviceInfo> enumerateCaptureDevices();
@@ -157,4 +155,11 @@ private:
     // Device selection
     std::string selectedPlaybackDeviceId;
     std::string selectedCaptureDeviceId;
+    ma_device_id selectedPlaybackDeviceIdStruct{};
+    ma_device_id selectedCaptureDeviceIdStruct{};
+    bool selectedPlaybackSet = false;
+    bool selectedCaptureSet = false;
+
+    bool reinitializeDevice(bool restart = true);
+    bool applyDeviceSelection(ma_device_config& config);
 };

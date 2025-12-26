@@ -17,6 +17,10 @@ qt_add_executable(appTalkLess
     src/models/audioclip.cpp
     src/models/soundboardsection.h
     src/models/soundboardsection.cpp
+    src/models/audioEngine.h
+    src/models/audioEngine.cpp
+    src/controllers/maincontroller.h
+    src/controllers/maincontroller.cpp
     # Controllers
     src/controllers/audiomanager.h
     src/controllers/audiomanager.cpp
@@ -70,6 +74,7 @@ qt_add_qml_module(appTalkLess
         qml/pages/UIDisplayTab.qml
         qml/pages/UpdatesTab.qml
         qml/pages/SoundboardPage.qml
+        qml/pages/VolumeMixerPage.qml
         # Styles (singletons)
         qml/styles/Colors.qml
         qml/styles/Typography.qml
@@ -88,7 +93,10 @@ qt_add_qml_module(appTalkLess
 )
 
 # Add include directories for QML type registration
-target_include_directories(appTalkLess PRIVATE src/view)
+target_include_directories(appTalkLess PRIVATE 
+                        src/view
+                        lib
+                    )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an

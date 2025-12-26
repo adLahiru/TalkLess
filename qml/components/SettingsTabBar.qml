@@ -6,7 +6,7 @@ Rectangle {
     id: root
     
     property int currentIndex: 0
-    property var tabs: ["Audio Devices", "Hotkeys", "Features", "UI & Display", "Updates"]
+    property var tabs: ["Audio Devices", "Volume Mixer", "Hotkeys", "Features", "UI & Display", "Updates"]
     
     signal tabClicked(int index)
     

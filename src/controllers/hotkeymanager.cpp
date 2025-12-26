@@ -6,8 +6,9 @@
 // Static instance for callback
 static HotkeyManager* s_instance = nullptr;
 
-HotkeyManager::HotkeyManager(QObject *parent)
+HotkeyManager::HotkeyManager(AudioEngine* audioEngine, QObject *parent)
     : QObject(parent)
+    , m_audioEngine(audioEngine)
     , m_globalHotkeysEnabled(true)
     , m_hotkeyPollTimer(nullptr)
 #ifdef Q_OS_MAC

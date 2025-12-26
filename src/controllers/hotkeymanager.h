@@ -9,6 +9,8 @@
 #include <QSettings>
 #include <QVariantList>
 
+class AudioEngine;
+
 #ifdef Q_OS_MAC
 #include <Carbon/Carbon.h>
 #endif
@@ -19,7 +21,7 @@ class HotkeyManager : public QObject
     Q_PROPERTY(bool globalHotkeysEnabled READ globalHotkeysEnabled WRITE setGlobalHotkeysEnabled NOTIFY globalHotkeysEnabledChanged)
 
 public:
-    explicit HotkeyManager(QObject *parent = nullptr);
+    explicit HotkeyManager(AudioEngine* audioEngine = nullptr, QObject *parent = nullptr);
     ~HotkeyManager();
     
     Q_INVOKABLE bool registerHotkey(const QString &clipId, const QString &keySequence);
@@ -46,6 +48,7 @@ public slots:
     void checkGlobalHotkeys();
 
 private:
+    AudioEngine* m_audioEngine;
     QMap<QString, QString> m_clipHotkeys;  // clipId -> hotkey
     QMap<QString, QString> m_hotkeyClips;  // hotkey -> clipId
     bool m_globalHotkeysEnabled;

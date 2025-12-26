@@ -1,10 +1,8 @@
 #include "maincontroller.h"
-#include "../views/mainwindow.h"
 #include "../models/audioEngine.h"
 
-MainController::MainController(MainWindow *view, QObject *parent)
+MainController::MainController(QObject *parent)
     : QObject(parent)
-    , m_view(view)
     , m_audioEngine(new AudioEngine(this))
 {
 }
@@ -16,8 +14,9 @@ MainController::~MainController()
 
 void MainController::initialize()
 {
-    m_view->showWelcomeMessage(tr("Welcome to Call Assistant"));
-    m_audioEngine->startAudioDevice();
+    if (m_audioEngine) {
+        m_audioEngine->startAudioDevice();
+    }
 }
 
 AudioEngine* MainController::audioEngine()

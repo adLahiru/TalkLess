@@ -29,7 +29,7 @@ Item {
                 id: tabBar
                 anchors.centerIn: parent
                 currentIndex: currentTabIndex
-                tabs: ["Audio Devices", "Hotkeys", "Features", "UI & Display", "Updates"]
+                tabs: ["Audio Devices", "Volume Mixer", "Hotkeys", "Features", "UI & Display", "Updates"]
                 onTabClicked: function(index) {
                     currentTabIndex = index
                 }
@@ -43,6 +43,7 @@ Item {
             currentIndex: currentTabIndex
             
             AudioDevicesTab {}
+            VolumeMixerPage {}
             HotkeysTab {}
             FeaturesTab {}
             UIDisplayTab {}

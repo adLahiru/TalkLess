@@ -2,6 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QDebug>
+#include "controllers/maincontroller.h"
 #include "controllers/audiomanager.h"
 #include "controllers/hotkeymanager.h"
 #include "view/soundboardview.h"
@@ -13,9 +14,14 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
     
-    // Create controllers
-    AudioManager audioManager;
-    HotkeyManager hotkeyManager;
+    // Main controller owns the single AudioEngine instance
+    MainController mainController(nullptr);
+    AudioEngine* sharedAudioEngine = mainController.audioEngine();
+    sharedAudioEngine->startAudioDevice();
+
+    // Create controllers sharing the same AudioEngine
+    AudioManager audioManager(sharedAudioEngine);
+    HotkeyManager hotkeyManager(sharedAudioEngine);
     
     // Create views
     SoundboardView soundboardView(&audioManager, &hotkeyManager);
@@ -26,6 +32,11 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("hotkeyManager", &hotkeyManager);
     engine.rootContext()->setContextProperty("soundboardView", &soundboardView);
     engine.rootContext()->setContextProperty("audioPlayerView", &audioPlayerView);
+    // Also register as singletons to ensure availability inside module
+    qmlRegisterSingletonInstance("TalkLess", 1, 0, "AudioManager", &audioManager);
+    qmlRegisterSingletonInstance("TalkLess", 1, 0, "HotkeyManager", &hotkeyManager);
+    qmlRegisterSingletonInstance("TalkLess", 1, 0, "SoundboardView", &soundboardView);
+    qmlRegisterSingletonInstance("TalkLess", 1, 0, "AudioPlayerView", &audioPlayerView);
     
     // Connect hotkey manager to audio manager
     QObject::connect(&hotkeyManager, &HotkeyManager::hotkeyTriggered,

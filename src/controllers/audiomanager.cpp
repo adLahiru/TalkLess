@@ -1,35 +1,23 @@
 #include "audiomanager.h"
 #include <QDebug>
 #include <QUuid>
+#include <QMediaDevices>
+#include <QAudioDevice>
 
-AudioManager::AudioManager(QObject *parent)
+AudioManager::AudioManager(AudioEngine* audioEngine, QObject *parent)
     : QObject(parent)
     , m_currentClip(nullptr)
     , m_volume(1.0)
     , m_secondaryOutputEnabled(false)
     , m_inputDeviceEnabled(true)
-    , m_mediaDevices(nullptr)
-#ifdef ENABLE_AUDIOENGINE
-    , m_audioEngine(nullptr)
-#endif
+    , m_audioEngine(audioEngine)
 {
-#ifdef ENABLE_AUDIOENGINE
-    // Initialize AudioEngine
-    m_audioEngine = new AudioEngine(this);
-    qDebug() << "AudioManager initialized with AudioEngine";
-#else
-    qDebug() << "AudioManager initialized without AudioEngine (Qt fallback)";
-#endif
-    
-    // Initialize media devices
-    m_mediaDevices = new QMediaDevices(this);
-    
-    // Connect device change signals
-    connect(m_mediaDevices, &QMediaDevices::audioInputsChanged, 
-            this, &AudioManager::refreshAudioDevices);
-    connect(m_mediaDevices, &QMediaDevices::audioOutputsChanged, 
-            this, &AudioManager::refreshAudioDevices);
-    
+    if (!m_audioEngine) {
+        qWarning() << "AudioManager initialized without AudioEngine instance!";
+    } else {
+        qDebug() << "AudioManager initialized with shared AudioEngine";
+    }
+
     // Initial device discovery
     refreshAudioDevices();
 }
@@ -65,10 +53,13 @@ void AudioManager::setVolume(qreal volume)
     if (m_volume != volume) {
         m_volume = qBound(0.0, volume, 1.0);
         
-        // Update all audio outputs
-        for (auto output : m_audioOutputs) {
+        // Update all audio outputs (fallback for clips without per-clip volume)
+        for (auto it = m_audioOutputs.begin(); it != m_audioOutputs.end(); ++it) {
+            QAudioOutput* output = it.value();
             if (output) {
-                output->setVolume(m_volume);
+                AudioClip* clip = getClip(it.key());
+                qreal clipVolume = clip ? clip->volume() : m_volume;
+                output->setVolume(clipVolume);
             }
         }
         
@@ -121,6 +112,14 @@ void AudioManager::loadAudioFile(const QString &clipId, const QUrl &filePath)
             clip->setFilePath(filePath);
         }
     }
+
+    // Mirror to secondary player if exists
+    if (m_secondaryPlayers.contains(clipId)) {
+        QMediaPlayer* secondaryPlayer = m_secondaryPlayers[clipId];
+        if (secondaryPlayer) {
+            secondaryPlayer->setSource(filePath);
+        }
+    }
 }
 
 void AudioManager::playClip(const QString &clipId)
@@ -151,6 +150,14 @@ void AudioManager::playClip(const QString &clipId)
         }
         
         player->play();
+        // Start secondary player if available
+        if (m_secondaryPlayers.contains(clipId)) {
+            QMediaPlayer* secondaryPlayer = m_secondaryPlayers[clipId];
+            if (secondaryPlayer) {
+                secondaryPlayer->setPosition(player->position());
+                secondaryPlayer->play();
+            }
+        }
         m_currentPlayingId = clipId;
         m_currentClip = clip;
         clip->setIsPlaying(true);
@@ -175,6 +182,12 @@ void AudioManager::pauseClip(const QString &clipId)
             }
             
             emit isPlayingChanged();
+        }
+    }
+    if (m_secondaryPlayers.contains(clipId)) {
+        QMediaPlayer* secondaryPlayer = m_secondaryPlayers[clipId];
+        if (secondaryPlayer) {
+            secondaryPlayer->pause();
         }
     }
 }
@@ -202,6 +215,12 @@ void AudioManager::stopClip(const QString &clipId)
             emit isPlayingChanged();
         }
     }
+    if (m_secondaryPlayers.contains(clipId)) {
+        QMediaPlayer* secondaryPlayer = m_secondaryPlayers[clipId];
+        if (secondaryPlayer) {
+            secondaryPlayer->stop();
+        }
+    }
 }
 
 void AudioManager::stopAll()
@@ -209,6 +228,12 @@ void AudioManager::stopAll()
     qDebug() << "Stopping all clips";
     
     for (auto it = m_players.begin(); it != m_players.end(); ++it) {
+        if (it.value()) {
+            it.value()->stop();
+        }
+    }
+
+    for (auto it = m_secondaryPlayers.begin(); it != m_secondaryPlayers.end(); ++it) {
         if (it.value()) {
             it.value()->stop();
         }
@@ -331,7 +356,22 @@ void AudioManager::initializePlayer(const QString &clipId)
     QMediaPlayer* player = new QMediaPlayer(this);
     QAudioOutput* audioOutput = new QAudioOutput(this);
     
-    audioOutput->setVolume(m_volume);
+    // If a preferred output device is set, try to apply it for this player
+    if (!m_currentOutputDevice.isEmpty()) {
+        QMediaDevices devices;
+        const QList<QAudioDevice> outputs = devices.audioOutputs();
+        for (const QAudioDevice &dev : outputs) {
+            if (dev.description() == m_currentOutputDevice) {
+                audioOutput->setDevice(dev);
+                break;
+            }
+        }
+    }
+    
+    // Apply per-clip volume if available
+    AudioClip* clip = getClip(clipId);
+    qreal clipVolume = clip ? clip->volume() : m_volume;
+    audioOutput->setVolume(clipVolume);
     player->setAudioOutput(audioOutput);
     
     // Connect signals
@@ -343,23 +383,30 @@ void AudioManager::initializePlayer(const QString &clipId)
     
     m_players[clipId] = player;
     m_audioOutputs[clipId] = audioOutput;
-    
-    // Initialize secondary audio output if enabled (audio only output, no mic)
+
+    // Secondary output (clips only)
     if (m_secondaryOutputEnabled && !m_secondaryOutputDevice.isEmpty()) {
+        QMediaPlayer* secondaryPlayer = new QMediaPlayer(this);
         QAudioOutput* secondaryOutput = new QAudioOutput(this);
         secondaryOutput->setVolume(m_volume);
-        
-        // Find and set the secondary output device
-        const QList<QAudioDevice> outputs = m_mediaDevices->audioOutputs();
-        for (const QAudioDevice &device : outputs) {
-            if (device.description() == m_secondaryOutputDevice) {
-                secondaryOutput->setDevice(device);
+
+        QMediaDevices devices;
+        const QList<QAudioDevice> outputs = devices.audioOutputs();
+        for (const QAudioDevice &dev : outputs) {
+            if (dev.description() == m_secondaryOutputDevice) {
+                secondaryOutput->setDevice(dev);
                 break;
             }
         }
-        
+
+        secondaryPlayer->setAudioOutput(secondaryOutput);
+
+        // Mirror errors for visibility
+        connect(secondaryPlayer, &QMediaPlayer::errorOccurred, this, &AudioManager::onErrorOccurred);
+
+        m_secondaryPlayers[clipId] = secondaryPlayer;
         m_secondaryAudioOutputs[clipId] = secondaryOutput;
-        qDebug() << "Initialized secondary output for clip:" << clipId << "on device:" << m_secondaryOutputDevice;
+        qDebug() << "Initialized secondary player for clip:" << clipId << "on device:" << m_secondaryOutputDevice;
     }
     
     qDebug() << "Initialized player for clip:" << clipId;
@@ -384,7 +431,15 @@ void AudioManager::cleanupPlayer(const QString &clipId)
         m_audioOutputs.remove(clipId);
     }
     
-    // Clean up secondary audio output
+    // Clean up secondary audio output/player
+    if (m_secondaryPlayers.contains(clipId)) {
+        QMediaPlayer* secondaryPlayer = m_secondaryPlayers[clipId];
+        if (secondaryPlayer) {
+            secondaryPlayer->stop();
+            secondaryPlayer->deleteLater();
+        }
+        m_secondaryPlayers.remove(clipId);
+    }
     if (m_secondaryAudioOutputs.contains(clipId)) {
         QAudioOutput* secondaryOutput = m_secondaryAudioOutputs[clipId];
         if (secondaryOutput) {
@@ -397,7 +452,8 @@ void AudioManager::cleanupPlayer(const QString &clipId)
 void AudioManager::updateOutputDeviceForAllPlayers(const QString &deviceName)
 {
     // Find the QAudioDevice for the selected device
-    const QList<QAudioDevice> outputs = m_mediaDevices->audioOutputs();
+    QMediaDevices devices;
+    const QList<QAudioDevice> outputs = devices.audioOutputs();
     QAudioDevice selectedDevice;
     for (const QAudioDevice &audioDevice : outputs) {
         if (audioDevice.description() == deviceName) {
@@ -405,17 +461,44 @@ void AudioManager::updateOutputDeviceForAllPlayers(const QString &deviceName)
             break;
         }
     }
-    
+
     if (selectedDevice.isNull()) {
         qWarning() << "Output device not found:" << deviceName;
         return;
     }
-    
+
     // Update all existing audio outputs to use the new device
     for (auto it = m_audioOutputs.begin(); it != m_audioOutputs.end(); ++it) {
         if (it.value()) {
             it.value()->setDevice(selectedDevice);
             qDebug() << "Updated audio output for clip:" << it.key() << "to device:" << deviceName;
+        }
+    }
+}
+
+void AudioManager::updateSecondaryOutputsForAllPlayers(const QString &deviceName)
+{
+    if (m_secondaryPlayers.isEmpty()) return;
+
+    QMediaDevices devices;
+    const QList<QAudioDevice> outputs = devices.audioOutputs();
+    QAudioDevice selectedDevice;
+    for (const QAudioDevice &audioDevice : outputs) {
+        if (audioDevice.description() == deviceName) {
+            selectedDevice = audioDevice;
+            break;
+        }
+    }
+
+    if (selectedDevice.isNull()) {
+        qWarning() << "Secondary output device not found:" << deviceName;
+        return;
+    }
+
+    for (auto it = m_secondaryAudioOutputs.begin(); it != m_secondaryAudioOutputs.end(); ++it) {
+        if (it.value()) {
+            it.value()->setDevice(selectedDevice);
+            qDebug() << "Updated secondary output for clip:" << it.key() << "to device:" << deviceName;
         }
     }
 }
@@ -485,7 +568,80 @@ void AudioManager::onErrorOccurred(QMediaPlayer::Error error, const QString &err
     emit this->error(errorString);
 }
 
-// Device management methods
+qreal AudioManager::masterVolume() const
+{
+    if (m_audioEngine) return m_audioEngine->getMasterGainLinear();
+    return 1.0;
+}
+
+void AudioManager::setMasterVolume(qreal linear)
+{
+    if (!m_audioEngine) return;
+    m_audioEngine->setMasterGainLinear(static_cast<float>(linear));
+    // Apply master gain to all QMediaPlayer audio outputs (both primary and secondary)
+    for (auto it = m_audioOutputs.begin(); it != m_audioOutputs.end(); ++it) {
+        QAudioOutput* output = it.value();
+        if (output) {
+            // Combine per-clip volume with master gain
+            AudioClip* clip = getClip(it.key());
+            qreal clipVol = clip ? clip->volume() : 1.0;
+            output->setVolume(clipVol * linear);
+        }
+    }
+    for (auto it = m_secondaryAudioOutputs.begin(); it != m_secondaryAudioOutputs.end(); ++it) {
+        QAudioOutput* output = it.value();
+        if (output) {
+            AudioClip* clip = getClip(it.key());
+            qreal clipVol = clip ? clip->volume() : 1.0;
+            output->setVolume(clipVol * linear);
+        }
+    }
+    emit volumeChanged();
+}
+
+qreal AudioManager::micVolume() const
+{
+    if (m_audioEngine) return m_audioEngine->getMicGainLinear();
+    return 1.0;
+}
+
+void AudioManager::setMicVolume(qreal linear)
+{
+    if (!m_audioEngine) return;
+    m_audioEngine->setMicGainLinear(static_cast<float>(linear));
+}
+
+void AudioManager::setClipVolume(const QString &clipId, qreal volume)
+{
+    AudioClip* clip = getClip(clipId);
+    if (!clip) return;
+    clip->setVolume(volume);
+    // Apply to the player's audio output if it exists, combined with master gain
+    qreal masterGain = masterVolume();
+    if (m_audioOutputs.contains(clipId)) {
+        QAudioOutput* output = m_audioOutputs[clipId];
+        if (output) {
+            output->setVolume(volume * masterGain);
+        }
+    }
+    if (m_secondaryAudioOutputs.contains(clipId)) {
+        QAudioOutput* output = m_secondaryAudioOutputs[clipId];
+        if (output) {
+            output->setVolume(volume * masterGain);
+        }
+    }
+}
+
+QList<QObject*> AudioManager::audioClipsAsObjects() const
+{
+    QList<QObject*> objects;
+    objects.reserve(m_audioClips.size());
+    for (AudioClip* clip : m_audioClips) {
+        objects.append(clip);
+    }
+    return objects;
+}
+
 QStringList AudioManager::inputDevices() const
 {
     return m_inputDevices;
@@ -509,7 +665,6 @@ QString AudioManager::currentOutputDevice() const
 void AudioManager::setCurrentInputDevice(const QString &device)
 {
     if (m_currentInputDevice != device) {
-#ifdef ENABLE_AUDIOENGINE
         if (m_audioEngine) {
             // Find device ID by name (AudioEngine uses device IDs, not names)
             std::vector<AudioEngine::AudioDeviceInfo> inputDevices = m_audioEngine->enumerateCaptureDevices();
@@ -532,21 +687,20 @@ void AudioManager::setCurrentInputDevice(const QString &device)
             emit currentInputDeviceChanged();
             qDebug() << "Input device changed to:" << device << "(fallback mode)";
         }
-#else
-        // Qt fallback - just update the property
-        m_currentInputDevice = device;
-        emit currentInputDeviceChanged();
-        qDebug() << "Input device changed to:" << device << "(Qt fallback)";
-#endif
     }
 }
 
 void AudioManager::setCurrentOutputDevice(const QString &device)
 {
     if (m_currentOutputDevice != device) {
-#ifdef ENABLE_AUDIOENGINE
+
         if (m_audioEngine) {
-            // Find device ID by name (AudioEngine uses device IDs, not names)
+            bool qtDeviceApplied = false;
+            // First, apply to Qt media players (names must match QMediaDevices)
+            updateOutputDeviceForAllPlayers(device);
+            qtDeviceApplied = true;
+
+            // Then, find matching device in AudioEngine enumeration by name
             std::vector<AudioEngine::AudioDeviceInfo> outputDevices = m_audioEngine->enumeratePlaybackDevices();
             for (const auto& deviceInfo : outputDevices) {
                 if (QString::fromStdString(deviceInfo.name) == device) {
@@ -555,12 +709,12 @@ void AudioManager::setCurrentOutputDevice(const QString &device)
                         emit currentOutputDeviceChanged();
                         qDebug() << "Output device changed to:" << device << "(ID:" << QString::fromStdString(deviceInfo.id) << ")";
                     } else {
-                        qWarning() << "Failed to set output device:" << device;
+                        qWarning() << "Failed to set output device (AudioEngine):" << device;
                     }
                     return;
                 }
             }
-            qWarning() << "Output device not found:" << device;
+            qWarning() << "Output device not found in AudioEngine list:" << device << " (Qt device applied:" << qtDeviceApplied << ")";
         } else {
             // Fallback - update property and QAudioOutputs
             m_currentOutputDevice = device;
@@ -568,13 +722,6 @@ void AudioManager::setCurrentOutputDevice(const QString &device)
             emit currentOutputDeviceChanged();
             qDebug() << "Output device changed to:" << device << "(fallback mode)";
         }
-#else
-        // Qt fallback - update property and QAudioOutputs
-        m_currentOutputDevice = device;
-        updateOutputDeviceForAllPlayers(device);
-        emit currentOutputDeviceChanged();
-        qDebug() << "Output device changed to:" << device << "(Qt fallback)";
-#endif
     }
 }
 
@@ -595,25 +742,8 @@ void AudioManager::setSecondaryOutputDevice(const QString &device)
         emit secondaryOutputDeviceChanged();
         qDebug() << "Secondary output device changed to:" << device;
         
-        // Update existing secondary audio outputs if enabled
-        if (m_secondaryOutputEnabled) {
-            // Find the QAudioDevice for the selected device
-            const QList<QAudioDevice> outputs = m_mediaDevices->audioOutputs();
-            QAudioDevice selectedDevice;
-            for (const QAudioDevice &audioDevice : outputs) {
-                if (audioDevice.description() == device) {
-                    selectedDevice = audioDevice;
-                    break;
-                }
-            }
-            
-            // Update all secondary outputs to use the new device
-            for (auto it = m_secondaryAudioOutputs.begin(); it != m_secondaryAudioOutputs.end(); ++it) {
-                if (it.value() && !selectedDevice.isNull()) {
-                    it.value()->setDevice(selectedDevice);
-                }
-            }
-        }
+        // Retarget existing secondary outputs
+        updateSecondaryOutputsForAllPlayers(device);
     }
 }
 
@@ -627,6 +757,52 @@ void AudioManager::setSecondaryOutputEnabled(bool enabled)
         if (enabled && m_secondaryOutputDevice.isEmpty() && !m_outputDevices.isEmpty()) {
             // Set default secondary output device if not set
             setSecondaryOutputDevice(m_outputDevices.first());
+        }
+
+        if (enabled) {
+            // Create secondary players for existing clips
+            QMediaDevices devices;
+            const QList<QAudioDevice> outputs = devices.audioOutputs();
+            QAudioDevice selectedDevice;
+            for (const QAudioDevice &dev : outputs) {
+                if (dev.description() == m_secondaryOutputDevice) {
+                    selectedDevice = dev;
+                    break;
+                }
+            }
+
+            for (auto it = m_players.begin(); it != m_players.end(); ++it) {
+                const QString clipId = it.key();
+                if (m_secondaryPlayers.contains(clipId)) continue;
+
+                QMediaPlayer* secondaryPlayer = new QMediaPlayer(this);
+                QAudioOutput* secondaryOutput = new QAudioOutput(this);
+                secondaryOutput->setVolume(m_volume);
+                if (!selectedDevice.isNull()) {
+                    secondaryOutput->setDevice(selectedDevice);
+                }
+                secondaryPlayer->setAudioOutput(secondaryOutput);
+                secondaryPlayer->setSource(it.value()->source());
+                connect(secondaryPlayer, &QMediaPlayer::errorOccurred, this, &AudioManager::onErrorOccurred);
+                m_secondaryPlayers[clipId] = secondaryPlayer;
+                m_secondaryAudioOutputs[clipId] = secondaryOutput;
+            }
+        } else {
+            // Tear down secondary players
+            for (auto it = m_secondaryPlayers.begin(); it != m_secondaryPlayers.end(); ++it) {
+                if (it.value()) {
+                    it.value()->stop();
+                    it.value()->deleteLater();
+                }
+            }
+            m_secondaryPlayers.clear();
+
+            for (auto it = m_secondaryAudioOutputs.begin(); it != m_secondaryAudioOutputs.end(); ++it) {
+                if (it.value()) {
+                    it.value()->deleteLater();
+                }
+            }
+            m_secondaryAudioOutputs.clear();
         }
     }
 }
@@ -643,19 +819,14 @@ void AudioManager::setInputDeviceEnabled(bool enabled)
         emit inputDeviceEnabledChanged();
         qDebug() << "Input device (microphone) enabled:" << enabled;
         
-#ifdef ENABLE_AUDIOENGINE
         if (m_audioEngine) {
             if (enabled) {
-                // Re-enable capture device
-                if (!m_currentInputDevice.isEmpty()) {
-                    setCurrentInputDevice(m_currentInputDevice);
-                }
+                m_audioEngine->startAudioDevice();
             } else {
-                // Disable capture - stop capturing audio from mic
-                m_audioEngine->stopCapture();
+                m_audioEngine->stopAudioDevice();
             }
         }
-#endif
+
     }
 }
 
@@ -663,8 +834,6 @@ void AudioManager::refreshAudioDevices()
 {
     QStringList newInputDevices;
     QStringList newOutputDevices;
-    
-#ifdef ENABLE_AUDIOENGINE
     if (m_audioEngine) {
         // Get input devices from AudioEngine
         std::vector<AudioEngine::AudioDeviceInfo> inputDevices = m_audioEngine->enumerateCaptureDevices();
@@ -680,33 +849,8 @@ void AudioManager::refreshAudioDevices()
         
         qDebug() << "AudioEngine enumerated - Inputs:" << inputDevices.size() 
                  << "Outputs:" << outputDevices.size();
-    } else {
-        // Fallback to QMediaDevices if AudioEngine is not available
-        const QList<QAudioDevice> inputs = m_mediaDevices->audioInputs();
-        for (const QAudioDevice &device : inputs) {
-            newInputDevices << device.description();
-        }
-        
-        const QList<QAudioDevice> outputs = m_mediaDevices->audioOutputs();
-        for (const QAudioDevice &device : outputs) {
-            newOutputDevices << device.description();
-        }
     }
-#else
-    // Qt fallback implementation
-    const QList<QAudioDevice> inputs = m_mediaDevices->audioInputs();
-    for (const QAudioDevice &device : inputs) {
-        newInputDevices << device.description();
-    }
-    
-    const QList<QAudioDevice> outputs = m_mediaDevices->audioOutputs();
-    for (const QAudioDevice &device : outputs) {
-        newOutputDevices << device.description();
-    }
-    
-    qDebug() << "Qt QMediaDevices enumerated - Inputs:" << inputs.size() 
-             << "Outputs:" << outputs.size();
-#endif
+
     
     // Update if changed
     if (m_inputDevices != newInputDevices) {
@@ -736,7 +880,7 @@ void AudioManager::testPlayback()
 {
     qDebug() << "Testing audio playback with current output device:" << m_currentOutputDevice;
     
-#ifdef ENABLE_AUDIOENGINE
+
     if (m_audioEngine) {
         // Start the AudioEngine device for testing
         if (m_audioEngine->startAudioDevice()) {
@@ -754,12 +898,4 @@ void AudioManager::testPlayback()
             emit error("No audio clips available for testing");
         }
     }
-#else
-    // Qt fallback implementation
-    if (!m_audioClips.isEmpty()) {
-        playClip(m_audioClips.first()->id());
-    } else {
-        emit error("No audio clips available for testing (Qt fallback)");
-    }
-#endif
 }

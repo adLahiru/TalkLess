@@ -4,17 +4,12 @@
 #include <QObject>
 #include <QMediaPlayer>
 #include <QAudioOutput>
-#include <QMediaDevices>
-#include <QAudioDevice>
 #include <QList>
 #include <QMap>
 #include <QUrl>
 #include "../models/audioclip.h"
-
-// Conditional AudioEngine integration
-#ifdef ENABLE_AUDIOENGINE
 #include "../models/audioEngine.h"
-#endif
+#include <miniaudio.h>
 
 class AudioManager : public QObject
 {
@@ -32,12 +27,14 @@ class AudioManager : public QObject
     Q_PROPERTY(QString secondaryOutputDevice READ secondaryOutputDevice WRITE setSecondaryOutputDevice NOTIFY secondaryOutputDeviceChanged)
     Q_PROPERTY(bool secondaryOutputEnabled READ secondaryOutputEnabled WRITE setSecondaryOutputEnabled NOTIFY secondaryOutputEnabledChanged)
     Q_PROPERTY(bool inputDeviceEnabled READ inputDeviceEnabled WRITE setInputDeviceEnabled NOTIFY inputDeviceEnabledChanged)
+    Q_PROPERTY(QList<QObject*> audioClips READ audioClipsAsObjects NOTIFY audioClipsChanged)
 
 public:
-    explicit AudioManager(QObject *parent = nullptr);
+    explicit AudioManager(AudioEngine* audioEngine, QObject *parent = nullptr);
     ~AudioManager();
 
     QList<AudioClip*> audioClips() const { return m_audioClips; }
+    QList<QObject*> audioClipsAsObjects() const;
     AudioClip* currentClip() const { return m_currentClip; }
     qreal currentPosition() const;
     qreal currentDuration() const;
@@ -53,11 +50,11 @@ public:
     QString secondaryOutputDevice() const;
     bool secondaryOutputEnabled() const;
     bool inputDeviceEnabled() const;
-    void setCurrentInputDevice(const QString &device);
-    void setCurrentOutputDevice(const QString &device);
-    void setSecondaryOutputDevice(const QString &device);
-    void setSecondaryOutputEnabled(bool enabled);
-    void setInputDeviceEnabled(bool enabled);
+    Q_INVOKABLE void setCurrentInputDevice(const QString &device);
+    Q_INVOKABLE void setCurrentOutputDevice(const QString &device);
+    Q_INVOKABLE void setSecondaryOutputDevice(const QString &device);
+    Q_INVOKABLE void setSecondaryOutputEnabled(bool enabled);
+    Q_INVOKABLE void setInputDeviceEnabled(bool enabled);
 
     // Invokable methods for QML
     Q_INVOKABLE void loadAudioFile(const QString &clipId, const QUrl &filePath);
@@ -73,6 +70,12 @@ public:
     Q_INVOKABLE QString formatTime(qreal seconds) const;
     Q_INVOKABLE void refreshAudioDevices();
     Q_INVOKABLE void testPlayback();
+    // Volume mixer controls
+    Q_INVOKABLE qreal masterVolume() const;
+    Q_INVOKABLE void setMasterVolume(qreal linear);
+    Q_INVOKABLE qreal micVolume() const;
+    Q_INVOKABLE void setMicVolume(qreal linear);
+    Q_INVOKABLE void setClipVolume(const QString &clipId, qreal volume);
 
 signals:
     void audioClipsChanged();
@@ -102,6 +105,8 @@ private:
     QList<AudioClip*> m_audioClips;
     QMap<QString, QMediaPlayer*> m_players;
     QMap<QString, QAudioOutput*> m_audioOutputs;
+    QMap<QString, QMediaPlayer*> m_secondaryPlayers;
+    QMap<QString, QAudioOutput*> m_secondaryAudioOutputs;
     AudioClip* m_currentClip;
     qreal m_volume;
     QString m_currentPlayingId;
@@ -114,19 +119,15 @@ private:
     QString m_secondaryOutputDevice;
     bool m_secondaryOutputEnabled;
     bool m_inputDeviceEnabled;
-    QMediaDevices* m_mediaDevices;
-    
-    // Secondary output (audio only, no mic)
-    QMap<QString, QAudioOutput*> m_secondaryAudioOutputs;
-    
-#ifdef ENABLE_AUDIOENGINE
+
     // AudioEngine integration
     AudioEngine* m_audioEngine;
-#endif
+
 
     void initializePlayer(const QString &clipId);
     void cleanupPlayer(const QString &clipId);
     void updateOutputDeviceForAllPlayers(const QString &deviceName);
+    void updateSecondaryOutputsForAllPlayers(const QString &deviceName);
 };
 
 #endif // AUDIOMANAGER_H
