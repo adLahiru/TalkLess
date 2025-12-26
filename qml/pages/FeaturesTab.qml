@@ -11,6 +11,17 @@ Item {
         spacing: 12
         
         FeatureToggleItem {
+            featureName: "Global Hotkeys"
+            isEnabled: hotkeyManager ? hotkeyManager.globalHotkeysEnabled : false
+            Layout.fillWidth: true
+            onEnabledChanged: {
+                if (hotkeyManager) {
+                    hotkeyManager.globalHotkeysEnabled = isEnabled
+                }
+            }
+        }
+        
+        FeatureToggleItem {
             featureName: "Equalizer"
             isEnabled: true
             Layout.fillWidth: true

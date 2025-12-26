@@ -2,9 +2,15 @@
 #include <QDebug>
 #include <QKeySequence>
 #include <QCoreApplication>
+#include <QGuiApplication>
+#include <QWindow>
 
-// Static instance for callback
-static HotkeyManager* s_instance = nullptr;
+// Static member definitions for Windows
+#ifdef Q_OS_WIN
+HotkeyManager* HotkeyManager::s_instance = nullptr;
+bool HotkeyManager::s_messageHookInstalled = false;
+HHOOK HotkeyManager::s_messageHook = nullptr;
+#endif
 
 HotkeyManager::HotkeyManager(AudioEngine* audioEngine, QObject *parent)
     : QObject(parent)
@@ -13,9 +19,16 @@ HotkeyManager::HotkeyManager(AudioEngine* audioEngine, QObject *parent)
     , m_hotkeyPollTimer(nullptr)
 #ifdef Q_OS_MAC
     , m_nextHotkeyId(1)
+#elif defined(Q_OS_WIN)
+    , m_nextHotkeyId(1)
 #endif
 {
     s_instance = this;
+    
+    // Initialize default system hotkeys
+    m_systemHotkeys["playPause"] = "Space";
+    m_systemHotkeys["stopAll"] = "Ctrl+S";
+    
     setupGlobalHotkeyListener();
     loadHotkeys();  // Load saved hotkeys on startup
     qDebug() << "HotkeyManager initialized with global hotkey support";
@@ -94,14 +107,15 @@ bool HotkeyManager::isHotkeyAvailable(const QString &keySequence) const
 void HotkeyManager::handleKeyPress(int key, int modifiers)
 {
     QString hotkeyString = createHotkeyString(key, modifiers);
+    qDebug() << "handleKeyPress called with hotkeyString:" << hotkeyString;
     
-    // Handle system hotkeys
-    if (hotkeyString == "Space") {
-        qDebug() << "System hotkey: Play/Pause";
+    // Handle system hotkeys using configurable mappings
+    if (m_systemHotkeys.contains("playPause") && hotkeyString == m_systemHotkeys["playPause"]) {
+        qDebug() << "System hotkey: Play/Pause triggered";
         emit playPauseTriggered();
         return;
-    } else if (hotkeyString == "Ctrl+S") {
-        qDebug() << "System hotkey: Stop All";
+    } else if (m_systemHotkeys.contains("stopAll") && hotkeyString == m_systemHotkeys["stopAll"]) {
+        qDebug() << "System hotkey: Stop All triggered";
         emit stopAllTriggered();
         return;
     }
@@ -110,6 +124,11 @@ void HotkeyManager::handleKeyPress(int key, int modifiers)
     if (m_hotkeyClips.contains(hotkeyString)) {
         QString clipId = m_hotkeyClips[hotkeyString];
         qDebug() << "Hotkey triggered:" << hotkeyString << "for clip:" << clipId;
+        
+        // Bring application to front before playing the clip
+        bringToFront();
+        
+        // Then trigger the clip playback
         emit hotkeyTriggered(clipId);
     }
 }
@@ -163,6 +182,9 @@ void HotkeyManager::loadHotkeys()
     settings.endGroup();
     qDebug() << "Loaded" << m_clipHotkeys.size() << "hotkeys from settings";
     
+    // Load system hotkeys
+    loadSystemHotkeys();
+    
     // Register all loaded hotkeys as system hotkeys
     registerAllSystemHotkeys();
 }
@@ -178,7 +200,7 @@ void HotkeyManager::registerAllSystemHotkeys()
     m_hotkeyIdToClipId.clear();
     m_nextHotkeyId = 1;
     
-    // Register all current hotkeys as system hotkeys
+    // Register all current clip hotkeys as system hotkeys
     for (auto it = m_clipHotkeys.begin(); it != m_clipHotkeys.end(); ++it) {
         QString clipId = it.key();
         QString keySequence = it.value();
@@ -188,7 +210,56 @@ void HotkeyManager::registerAllSystemHotkeys()
         }
     }
     
-    qDebug() << "Registered" << m_registeredHotKeyRefs.size() << "system hotkeys";
+    // Register system hotkeys as global hotkeys
+    for (auto it = m_systemHotkeys.begin(); it != m_systemHotkeys.end(); ++it) {
+        QString action = it.key();
+        QString keySequence = it.value();
+        
+        // Only register non-empty system hotkeys
+        if (!keySequence.isEmpty()) {
+            // Use special IDs for system hotkeys (1000+ to distinguish from clip hotkeys)
+            quint32 systemHotkeyId = 1000 + (action == "playPause" ? 1 : 2);
+            if (registerSystemHotkey(action, keySequence, systemHotkeyId)) {
+                qDebug() << "Registered system hotkey:" << action << "as" << keySequence;
+            }
+        }
+    }
+    
+    qDebug() << "Registered" << m_registeredHotKeyRefs.size() << "system hotkeys (macOS)";
+#elif defined(Q_OS_WIN)
+    // First unregister all existing system hotkeys
+    for (auto it = m_registeredHotkeys.begin(); it != m_registeredHotkeys.end(); ++it) {
+        UnregisterHotKey(nullptr, it.key());
+    }
+    m_registeredHotkeys.clear();
+    m_nextHotkeyId = 1;
+    
+    // Register all current clip hotkeys as system hotkeys
+    for (auto it = m_clipHotkeys.begin(); it != m_clipHotkeys.end(); ++it) {
+        QString clipId = it.key();
+        QString keySequence = it.value();
+        
+        if (registerSystemHotkey(clipId, keySequence, m_nextHotkeyId)) {
+            m_nextHotkeyId++;
+        }
+    }
+    
+    // Register system hotkeys as global hotkeys
+    for (auto it = m_systemHotkeys.begin(); it != m_systemHotkeys.end(); ++it) {
+        QString action = it.key();
+        QString keySequence = it.value();
+        
+        // Only register non-empty system hotkeys
+        if (!keySequence.isEmpty()) {
+            // Use special IDs for system hotkeys (1000+ to distinguish from clip hotkeys)
+            int systemHotkeyId = 1000 + (action == "playPause" ? 1 : 2);
+            if (registerSystemHotkey(action, keySequence, systemHotkeyId)) {
+                qDebug() << "Registered system hotkey:" << action << "as" << keySequence;
+            }
+        }
+    }
+    
+    qDebug() << "Registered" << m_registeredHotkeys.size() << "system hotkeys (Windows)";
 #endif
 }
 
@@ -196,6 +267,14 @@ void HotkeyManager::setGlobalHotkeysEnabled(bool enabled)
 {
     if (m_globalHotkeysEnabled != enabled) {
         m_globalHotkeysEnabled = enabled;
+        if (enabled) {
+            setupGlobalHotkeyListener();
+            registerAllSystemHotkeys();
+            qDebug() << "Global hotkeys ENABLED - hotkeys will work when app is minimized";
+        } else {
+            teardownGlobalHotkeyListener();
+            qDebug() << "Global hotkeys DISABLED - hotkeys will NOT work when app is minimized";
+        }
         emit globalHotkeysEnabledChanged();
         qDebug() << "Global hotkeys enabled:" << enabled;
     }
@@ -217,6 +296,17 @@ void HotkeyManager::setupGlobalHotkeyListener()
     
     InstallApplicationEventHandler(&HotkeyManager::hotkeyCallback, 1, &eventType, this, NULL);
     qDebug() << "Global hotkey listener installed (macOS)";
+#elif defined(Q_OS_WIN)
+    // Install low-level keyboard hook to capture WM_HOTKEY in Qt message loop
+    if (!s_messageHookInstalled) {
+        s_messageHook = SetWindowsHookEx(WH_GETMESSAGE, messageHookProc, nullptr, GetCurrentThreadId());
+        if (s_messageHook) {
+            s_messageHookInstalled = true;
+            qDebug() << "Global hotkey listener installed (Windows)";
+        } else {
+            qWarning() << "Failed to install Windows message hook for hotkeys";
+        }
+    }
 #else
     qDebug() << "Global hotkey listener not available on this platform";
 #endif
@@ -231,6 +321,20 @@ void HotkeyManager::teardownGlobalHotkeyListener()
     }
     m_registeredHotKeyRefs.clear();
     qDebug() << "Global hotkey listener removed (macOS)";
+#elif defined(Q_OS_WIN)
+    // Unregister message hook
+    if (s_messageHookInstalled && s_messageHook) {
+        UnhookWindowsHookEx(s_messageHook);
+        s_messageHook = nullptr;
+        s_messageHookInstalled = false;
+        qDebug() << "Global hotkey listener removed (Windows)";
+    }
+    // Unregister all system hotkeys
+    for (auto it = m_registeredHotkeys.begin(); it != m_registeredHotkeys.end(); ++it) {
+        UnregisterHotKey(nullptr, it.key());
+    }
+    m_registeredHotkeys.clear();
+    qDebug() << "Unregistered" << m_registeredHotkeys.size() << "system hotkeys (Windows)";
 #endif
 }
 
@@ -247,12 +351,26 @@ OSStatus HotkeyManager::hotkeyCallback(EventHandlerCallRef nextHandler, EventRef
     EventHotKeyID hotKeyID;
     GetEventParameter(event, kEventParamDirectObject, typeEventHotKeyID, NULL, sizeof(hotKeyID), NULL, &hotKeyID);
     
-    // Find the clip associated with this hotkey ID using the mapping
+    // Find the clip or action associated with this hotkey ID
     quint32 hotkeyId = hotKeyID.id;
-    if (manager->m_hotkeyIdToClipId.contains(hotkeyId)) {
+    
+    // Check if this is a system hotkey (ID >= 1000)
+    if (hotkeyId >= 1000) {
+        if (hotkeyId == 1001) {
+            qDebug() << "Global system hotkey triggered: Play/Pause";
+            QMetaObject::invokeMethod(manager, "playPauseTriggered", Qt::QueuedConnection);
+        } else if (hotkeyId == 1002) {
+            qDebug() << "Global system hotkey triggered: Stop All";
+            QMetaObject::invokeMethod(manager, "stopAllTriggered", Qt::QueuedConnection);
+        }
+    } else if (manager->m_hotkeyIdToClipId.contains(hotkeyId)) {
         QString clipId = manager->m_hotkeyIdToClipId[hotkeyId];
         qDebug() << "Global hotkey triggered for clip:" << clipId;
-        // Emit the signal on the main thread
+        
+        // Bring application to front before playing the clip
+        QMetaObject::invokeMethod(manager, "bringToFront", Qt::QueuedConnection);
+        
+        // Then trigger the clip playback
         QMetaObject::invokeMethod(manager, "hotkeyTriggered", Qt::QueuedConnection, Q_ARG(QString, clipId));
     }
     
@@ -282,8 +400,13 @@ bool HotkeyManager::registerSystemHotkey(const QString &clipId, const QString &k
     
     if (status == noErr) {
         m_registeredHotKeyRefs[hotkeyId] = hotKeyRef;
-        m_hotkeyIdToClipId[hotkeyId] = clipId;  // Store the mapping
-        qDebug() << "Registered system hotkey:" << keySequence << "for clip:" << clipId << "with ID:" << hotkeyId;
+        
+        // Only store clip mapping for actual clip hotkeys, not system hotkeys
+        if (hotkeyId < 1000) {
+            m_hotkeyIdToClipId[hotkeyId] = clipId;
+        }
+        
+        qDebug() << "Registered system hotkey:" << keySequence << "for" << (hotkeyId >= 1000 ? "system action" : "clip") << ":" << clipId << "with ID:" << hotkeyId;
         return true;
     }
     
@@ -425,4 +548,279 @@ QString HotkeyManager::createHotkeyString(int key, int modifiers) const
         parts << keyName;
     
     return parts.join("+");
+}
+
+#ifdef Q_OS_WIN
+LRESULT CALLBACK HotkeyManager::messageHookProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    if (nCode >= 0 && wParam == PM_REMOVE) {
+        MSG* msg = reinterpret_cast<MSG*>(lParam);
+        if (msg->message == WM_HOTKEY && s_instance) {
+            // Check if global hotkeys are enabled
+            if (!s_instance->m_globalHotkeysEnabled) {
+                qDebug() << "Global hotkey blocked - global hotkeys are DISABLED";
+                return CallNextHookEx(s_messageHook, nCode, wParam, lParam);
+            }
+            
+            int hotkeyId = static_cast<int>(msg->wParam);
+            qDebug() << "Global hotkey received - global hotkeys are ENABLED";
+            
+            // Check if this is a system hotkey (ID >= 1000)
+            if (hotkeyId >= 1000) {
+                if (hotkeyId == 1001) {
+                    qDebug() << "Global system hotkey triggered: Play/Pause";
+                    QMetaObject::invokeMethod(s_instance, "playPauseTriggered", Qt::QueuedConnection);
+                } else if (hotkeyId == 1002) {
+                    qDebug() << "Global system hotkey triggered: Stop All";
+                    QMetaObject::invokeMethod(s_instance, "stopAllTriggered", Qt::QueuedConnection);
+                }
+            } else if (s_instance->m_registeredHotkeys.contains(hotkeyId)) {
+                QString clipId = s_instance->m_registeredHotkeys[hotkeyId];
+                qDebug() << "Global hotkey triggered for clip:" << clipId;
+                
+                // Bring application to front before playing the clip
+                QMetaObject::invokeMethod(s_instance, "bringToFront", Qt::QueuedConnection);
+                
+                // Then trigger the clip playback
+                QMetaObject::invokeMethod(s_instance, "hotkeyTriggered", Qt::QueuedConnection, Q_ARG(QString, clipId));
+            }
+        }
+    }
+    return CallNextHookEx(s_messageHook, nCode, wParam, lParam);
+}
+
+bool HotkeyManager::registerSystemHotkey(const QString &clipId, const QString &keySequence, int hotkeyId)
+{
+    QStringList parts = keySequence.split("+");
+    if (parts.isEmpty()) return false;
+    
+    QString keyPart = parts.last();
+    quint32 vk = keyStringToVirtualKey(keyPart);
+    quint32 mods = modifiersFromString(keySequence);
+    
+    if (vk == 0) {
+        qWarning() << "Invalid key in hotkey:" << keySequence;
+        return false;
+    }
+    
+    BOOL ok = RegisterHotKey(nullptr, hotkeyId, mods, vk);
+    if (ok) {
+        // Only store clip mapping for actual clip hotkeys, not system hotkeys
+        if (hotkeyId < 1000) {
+            m_registeredHotkeys[hotkeyId] = clipId;
+        }
+        
+        qDebug() << "Registered system hotkey:" << keySequence << "for" << (hotkeyId >= 1000 ? "system action" : "clip") << ":" << clipId << "with ID:" << hotkeyId;
+        return true;
+    } else {
+        DWORD err = GetLastError();
+        qWarning() << "Failed to register system hotkey:" << keySequence << "error:" << err;
+        return false;
+    }
+}
+
+void HotkeyManager::unregisterSystemHotkey(int hotkeyId)
+{
+    if (m_registeredHotkeys.contains(hotkeyId)) {
+        UnregisterHotKey(nullptr, hotkeyId);
+        m_registeredHotkeys.remove(hotkeyId);
+        qDebug() << "Unregistered system hotkey ID:" << hotkeyId;
+    }
+}
+
+quint32 HotkeyManager::keyStringToVirtualKey(const QString &key) const
+{
+    static QMap<QString, quint32> keyMap = {
+        {"A", 0x41}, {"B", 0x42}, {"C", 0x43}, {"D", 0x44},
+        {"E", 0x45}, {"F", 0x46}, {"G", 0x47}, {"H", 0x48},
+        {"I", 0x49}, {"J", 0x4A}, {"K", 0x4B}, {"L", 0x4C},
+        {"M", 0x4D}, {"N", 0x4E}, {"O", 0x4F}, {"P", 0x50},
+        {"Q", 0x51}, {"R", 0x52}, {"S", 0x53}, {"T", 0x54},
+        {"U", 0x55}, {"V", 0x56}, {"W", 0x57}, {"X", 0x58},
+        {"Y", 0x59}, {"Z", 0x5A},
+        {"0", 0x30}, {"1", 0x31}, {"2", 0x32}, {"3", 0x33},
+        {"4", 0x34}, {"5", 0x35}, {"6", 0x36}, {"7", 0x37},
+        {"8", 0x38}, {"9", 0x39},
+        {"F1", VK_F1}, {"F2", VK_F2}, {"F3", VK_F3}, {"F4", VK_F4},
+        {"F5", VK_F5}, {"F6", VK_F6}, {"F7", VK_F7}, {"F8", VK_F8},
+        {"F9", VK_F9}, {"F10", VK_F10}, {"F11", VK_F11}, {"F12", VK_F12},
+        {"Space", VK_SPACE}, {"Enter", VK_RETURN}, {"Tab", VK_TAB},
+        {"Backspace", VK_BACK}, {"Delete", VK_DELETE},
+        {"Home", VK_HOME}, {"End", VK_END}, {"PageUp", VK_PRIOR}, {"PageDown", VK_NEXT},
+        {"Up", VK_UP}, {"Down", VK_DOWN}, {"Left", VK_LEFT}, {"Right", VK_RIGHT}
+    };
+    return keyMap.value(key.toUpper(), 0);
+}
+
+quint32 HotkeyManager::modifiersFromString(const QString &keySequence) const
+{
+    quint32 mods = 0;
+    if (keySequence.contains("Ctrl", Qt::CaseInsensitive) || keySequence.contains("Control", Qt::CaseInsensitive))
+        mods |= MOD_CONTROL;
+    if (keySequence.contains("Alt", Qt::CaseInsensitive) || keySequence.contains("Option", Qt::CaseInsensitive))
+        mods |= MOD_ALT;
+    if (keySequence.contains("Shift", Qt::CaseInsensitive))
+        mods |= MOD_SHIFT;
+    if (keySequence.contains("Meta", Qt::CaseInsensitive) || keySequence.contains("Win", Qt::CaseInsensitive))
+        mods |= MOD_WIN;
+    return mods;
+}
+#endif
+
+void HotkeyManager::setSystemHotkey(const QString &action, const QString &keySequence)
+{
+    qDebug() << "setSystemHotkey called with action:" << action << "keySequence:" << keySequence;
+    
+    // Allow empty keySequence to clear the hotkey
+    if (keySequence.isEmpty()) {
+        m_systemHotkeys[action] = "";
+        saveSystemHotkeys();
+        registerAllSystemHotkeys();
+        emit systemHotkeysChanged();
+        qDebug() << "Cleared system hotkey for action:" << action;
+        return;
+    }
+    
+    // Validate action
+    if (action != "playPause" && action != "stopAll") {
+        qWarning() << "Invalid system hotkey action:" << action;
+        return;
+    }
+    
+    // Check if hotkey conflicts with existing clip hotkeys and remove the conflicting clip hotkey
+    if (m_hotkeyClips.contains(keySequence)) {
+        QString conflictingClipId = m_hotkeyClips[keySequence];
+        qDebug() << "System hotkey conflicts with clip hotkey:" << keySequence << "- removing clip hotkey";
+        unregisterHotkey(conflictingClipId);
+    }
+    
+    m_systemHotkeys[action] = keySequence;
+    qDebug() << "Updated m_systemHotkeys[" << action << "] to:" << keySequence;
+    
+    saveSystemHotkeys();
+    registerAllSystemHotkeys();
+    
+    // Emit signal to update UI
+    emit systemHotkeysChanged();
+    
+    qDebug() << "Set system hotkey:" << action << "to" << keySequence;
+}
+
+QString HotkeyManager::getSystemHotkey(const QString &action) const
+{
+    return m_systemHotkeys.value(action, QString());
+}
+
+QVariantList HotkeyManager::getSystemHotkeys() const
+{
+    QVariantList result;
+    for (auto it = m_systemHotkeys.begin(); it != m_systemHotkeys.end(); ++it) {
+        QVariantMap item;
+        item["action"] = it.key();
+        item["displayName"] = (it.key() == "playPause") ? "Play/Pause" : "Stop All";
+        item["hotkey"] = it.value();
+        result.append(item);
+    }
+    return result;
+}
+
+void HotkeyManager::resetSystemHotkeys()
+{
+    m_systemHotkeys["playPause"] = "Space";
+    m_systemHotkeys["stopAll"] = "Ctrl+S";
+    saveSystemHotkeys();
+    registerAllSystemHotkeys();
+    
+    // Emit signal to update UI
+    emit systemHotkeysChanged();
+    
+    qDebug() << "Reset system hotkeys to defaults";
+}
+
+void HotkeyManager::clearAllSystemHotkeys()
+{
+    m_systemHotkeys["playPause"] = "";
+    m_systemHotkeys["stopAll"] = "";
+    saveSystemHotkeys();
+    registerAllSystemHotkeys();
+    
+    // Emit signal to update UI
+    emit systemHotkeysChanged();
+    
+    qDebug() << "Cleared all system hotkeys";
+}
+
+void HotkeyManager::saveSystemHotkeys()
+{
+    QSettings settings("TalkLess", "Hotkeys");
+    settings.beginGroup("systemHotkeys");
+    settings.remove("");  // Clear existing system hotkeys
+    
+    for (auto it = m_systemHotkeys.begin(); it != m_systemHotkeys.end(); ++it) {
+        settings.setValue(it.key(), it.value());
+    }
+    
+    settings.endGroup();
+    settings.sync();
+    qDebug() << "Saved system hotkeys to settings";
+}
+
+void HotkeyManager::loadSystemHotkeys()
+{
+    QSettings settings("TalkLess", "Hotkeys");
+    settings.beginGroup("systemHotkeys");
+    
+    QStringList actions = settings.childKeys();
+    for (const QString &action : actions) {
+        QString keySequence = settings.value(action).toString();
+        if (!keySequence.isEmpty()) {
+            m_systemHotkeys[action] = keySequence;
+        }
+    }
+    
+    settings.endGroup();
+    qDebug() << "Loaded" << m_systemHotkeys.size() << "system hotkeys from settings";
+    
+    // Register system hotkeys after loading
+    registerAllSystemHotkeys();
+}
+
+void HotkeyManager::bringToFront()
+{
+#ifdef Q_OS_WIN
+    // Windows implementation
+    HWND hwnd = (HWND)QGuiApplication::topLevelWindows().first()->winId();
+    if (hwnd) {
+        // Restore window if minimized
+        if (IsIconic(hwnd)) {
+            ShowWindow(hwnd, SW_RESTORE);
+        }
+        
+        // Bring to front and set focus
+        SetForegroundWindow(hwnd);
+        SetActiveWindow(hwnd);
+        SetFocus(hwnd);
+        
+        qDebug() << "Brought application to front (Windows)";
+    }
+#elif defined(Q_OS_MAC)
+    // macOS implementation
+    // This is more complex on macOS and would require AppleScript or other methods
+    // For now, we'll use a simple approach
+    QWindow* window = QGuiApplication::topLevelWindows().first();
+    if (window) {
+        window->raise();
+        window->requestActivate();
+        qDebug() << "Brought application to front (macOS)";
+    }
+#else
+    // Linux/X11 implementation
+    QWindow* window = QGuiApplication::topLevelWindows().first();
+    if (window) {
+        window->raise();
+        window->requestActivate();
+        window->showNormal();
+        qDebug() << "Brought application to front (Linux)";
+    }
+#endif
 }
