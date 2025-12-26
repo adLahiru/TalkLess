@@ -103,6 +103,7 @@ Rectangle {
                 required property int index
                 
                 property bool isCurrentSection: soundboardView.currentSection && soundboardView.currentSection.id === modelData.id
+                property bool isActiveSection: soundboardView.activeSection && soundboardView.activeSection.id === modelData.id
                 property bool isRenaming: renamingSectionId === modelData.id
                 
                 Layout.fillWidth: true
@@ -114,7 +115,44 @@ Rectangle {
                     anchors.fill: parent
                     anchors.leftMargin: 8
                     anchors.rightMargin: 8
-                    spacing: 12
+                    spacing: 8
+                    
+                    // Radio button for active soundboard selection
+                    RadioButton {
+                        id: sectionRadio
+                        checked: sectionItem.isActiveSection
+                        Layout.preferredWidth: 20
+                        Layout.preferredHeight: 20
+                        Layout.alignment: Qt.AlignVCenter
+                        onClicked: {
+                            soundboardView.setActiveSection(sectionItem.modelData.id)
+                        }
+                        
+                        indicator: Rectangle {
+                            width: 18
+                            height: 18
+                            radius: 9
+                            color: "transparent"
+                            border.color: sectionRadio.checked ? "#7C3AED" : "#6B7280"
+                            border.width: 2
+                            
+                            Rectangle {
+                                width: 10
+                                height: 10
+                                anchors.centerIn: parent
+                                radius: 5
+                                color: "#7C3AED"
+                                visible: sectionRadio.checked
+                            }
+                        }
+                        
+                        contentItem: Item { width: 0; height: 0 }
+                        padding: 0
+                        leftPadding: 0
+                        rightPadding: 0
+                        topPadding: 0
+                        bottomPadding: 0
+                    }
                     
                     // Thumbnail
                     Rectangle {
@@ -188,6 +226,7 @@ Rectangle {
                 
                 MouseArea {
                     anchors.fill: parent
+                    anchors.leftMargin: 30  // Leave space for radio button
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                     cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true
@@ -200,6 +239,7 @@ Rectangle {
                             sectionContextMenu.popup()
                         } else {
                             soundboardView.selectSection(sectionItem.modelData.id)
+                            currentIndex = 0  // Switch to Soundboard page to show audio clips
                         }
                     }
                     

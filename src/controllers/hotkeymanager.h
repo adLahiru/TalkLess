@@ -76,6 +76,8 @@ private:
     void saveSystemHotkeys();
     void loadSystemHotkeys();
     
+    static HotkeyManager* s_instance;
+    
 #ifdef Q_OS_MAC
     static OSStatus hotkeyCallback(EventHandlerCallRef nextHandler, EventRef event, void *userData);
     QMap<quint32, EventHotKeyRef> m_registeredHotKeyRefs;
@@ -94,7 +96,6 @@ private:
     quint32 modifiersFromString(const QString &keySequence) const;
     static bool s_messageHookInstalled;
     static HHOOK s_messageHook;
-    static HotkeyManager* s_instance;
     static LRESULT CALLBACK messageHookProc(int nCode, WPARAM wParam, LPARAM lParam);
 #endif
 };

@@ -131,6 +131,12 @@ SoundboardSection* SoundboardView::addSection(const QString &name)
         selectSection(sectionId);
     }
     
+    // Set as active section if it's the first one or no active section exists
+    if (m_sections.count() == 1 || !m_activeSection) {
+        m_activeSection = section;
+        emit activeSectionChanged();
+    }
+    
     emit sectionsChanged();
     emit sectionAdded(sectionId);
     
@@ -260,6 +266,27 @@ void SoundboardView::selectSection(const QString &sectionId)
     }
 }
 
+void SoundboardView::setActiveSection(const QString &sectionId)
+{
+    SoundboardSection* section = getSection(sectionId);
+    if (!section) {
+        qWarning() << "SoundboardView: Cannot set active section, section not found:" << sectionId;
+        return;
+    }
+    
+    if (m_activeSection == section) {
+        return;
+    }
+    
+    m_activeSection = section;
+    emit activeSectionChanged();
+    
+    // Save the active section
+    saveSoundboardData();
+    
+    qDebug() << "SoundboardView: Active section set to:" << section->name();
+}
+
 SoundboardSection* SoundboardView::getSection(const QString &sectionId) const
 {
     for (SoundboardSection* section : m_sections) {
@@ -292,6 +319,9 @@ void SoundboardView::saveSoundboardData()
     
     // Save current section ID
     settings.setValue("currentSectionId", m_currentSection ? m_currentSection->id() : "");
+    
+    // Save active section ID
+    settings.setValue("activeSectionId", m_activeSection ? m_activeSection->id() : "");
     
     settings.sync();
     qDebug() << "SoundboardView: Saved" << m_sections.size() << "sections";
@@ -344,33 +374,45 @@ void SoundboardView::loadSoundboardData()
                 }
             }
             
-            // Restore current section
-            try {
-                qDebug() << "SoundboardView: Restoring current section...";
-                QString currentSectionId = settings.value("currentSectionId").toString();
-                qDebug() << "SoundboardView: Current section ID from settings:" << currentSectionId;
-                if (!currentSectionId.isEmpty()) {
-                    selectSection(currentSectionId);
-                } else if (!m_sections.isEmpty()) {
-                    selectSection(m_sections.first()->id());
-                }
-                
-                emit sectionsChanged();
-                emit currentSectionChanged();
-                qDebug() << "SoundboardView: Current section restored";
-            } catch (const std::exception& e) {
-                qWarning() << "SoundboardView: Failed to restore current section, using first available. Exception:" << e.what();
-                if (!m_sections.isEmpty()) {
-                    selectSection(m_sections.first()->id());
-                }
-            } catch (...) {
-                qWarning() << "SoundboardView: Failed to restore current section, using first available";
-                if (!m_sections.isEmpty()) {
-                    selectSection(m_sections.first()->id());
-                }
-            }
         }
         settings.endGroup();
+        
+        // Restore active section (read from root, not from sections group)
+        try {
+            qDebug() << "SoundboardView: Restoring active section...";
+            QString activeSectionId = settings.value("activeSectionId").toString();
+            qDebug() << "SoundboardView: Active section ID from settings:" << activeSectionId;
+            if (!activeSectionId.isEmpty()) {
+                m_activeSection = getSection(activeSectionId);
+            }
+            if (!m_activeSection && !m_sections.isEmpty()) {
+                m_activeSection = m_sections.first();
+            }
+            
+            // Set current section to active section (app opens with active soundboard displayed)
+            if (m_activeSection) {
+                selectSection(m_activeSection->id());
+            } else if (!m_sections.isEmpty()) {
+                selectSection(m_sections.first()->id());
+            }
+            
+            emit sectionsChanged();
+            emit currentSectionChanged();
+            emit activeSectionChanged();
+            qDebug() << "SoundboardView: Active section restored:" << (m_activeSection ? m_activeSection->name() : "none");
+        } catch (const std::exception& e) {
+            qWarning() << "SoundboardView: Failed to restore active section, using first available. Exception:" << e.what();
+            if (!m_sections.isEmpty()) {
+                m_activeSection = m_sections.first();
+                selectSection(m_sections.first()->id());
+            }
+        } catch (...) {
+            qWarning() << "SoundboardView: Failed to restore active section, using first available";
+            if (!m_sections.isEmpty()) {
+                m_activeSection = m_sections.first();
+                selectSection(m_sections.first()->id());
+            }
+        }
         
         qDebug() << "SoundboardView: Loaded" << m_sections.size() << "sections successfully";
         

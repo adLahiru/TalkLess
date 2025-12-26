@@ -5,9 +5,10 @@
 #include <QGuiApplication>
 #include <QWindow>
 
-// Static member definitions for Windows
-#ifdef Q_OS_WIN
+// Static member definitions
 HotkeyManager* HotkeyManager::s_instance = nullptr;
+
+#ifdef Q_OS_WIN
 bool HotkeyManager::s_messageHookInstalled = false;
 HHOOK HotkeyManager::s_messageHook = nullptr;
 #endif
@@ -224,7 +225,6 @@ void HotkeyManager::registerAllSystemHotkeys()
         UnregisterEventHotKey(it.value());
     }
     m_registeredHotKeyRefs.clear();
-    m_registeredHotkeys.clear();  // Also clear the general map
     m_hotkeyIdToClipId.clear();
     m_nextHotkeyId = 1;
     

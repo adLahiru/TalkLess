@@ -16,6 +16,7 @@ class SoundboardView : public QObject
     Q_PROPERTY(HotkeyManager* hotkeyManager READ hotkeyManager CONSTANT)
     Q_PROPERTY(QList<SoundboardSection*> sections READ sections NOTIFY sectionsChanged)
     Q_PROPERTY(SoundboardSection* currentSection READ currentSection NOTIFY currentSectionChanged)
+    Q_PROPERTY(SoundboardSection* activeSection READ activeSection NOTIFY activeSectionChanged)
     Q_PROPERTY(QList<AudioClip*> currentSectionClips READ currentSectionClips NOTIFY currentSectionClipsChanged)
 
 public:
@@ -25,6 +26,7 @@ public:
     HotkeyManager* hotkeyManager() const { return m_hotkeyManager; }
     QList<SoundboardSection*> sections() const { return m_sections; }
     SoundboardSection* currentSection() const { return m_currentSection; }
+    SoundboardSection* activeSection() const { return m_activeSection; }
     QList<AudioClip*> currentSectionClips() const;
 
     // UI-specific methods
@@ -37,6 +39,7 @@ public:
     Q_INVOKABLE void deleteSection(const QString &sectionId);
     Q_INVOKABLE void renameSection(const QString &sectionId, const QString &newName);
     Q_INVOKABLE void selectSection(const QString &sectionId);
+    Q_INVOKABLE void setActiveSection(const QString &sectionId);
     Q_INVOKABLE SoundboardSection* getSection(const QString &sectionId) const;
     
     // Settings persistence
@@ -49,6 +52,7 @@ signals:
     void playbackStateChanged(int slotIndex, bool isPlaying);
     void sectionsChanged();
     void currentSectionChanged();
+    void activeSectionChanged();
     void sectionAdded(const QString &sectionId);
     void sectionDeleted(const QString &sectionId);
     void sectionRenamed(const QString &sectionId, const QString &newName);
@@ -63,6 +67,7 @@ private:
     HotkeyManager* m_hotkeyManager;
     QList<SoundboardSection*> m_sections;
     SoundboardSection* m_currentSection = nullptr;
+    SoundboardSection* m_activeSection = nullptr;
 
     void initializeDefaultSections();
 };
