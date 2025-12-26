@@ -1,12 +1,20 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Qt.labs.settings
 
 Rectangle {
     id: root
     
     property int currentIndex: 0  // Soundboard selected by default
     property string renamingSectionId: ""
+    
+    // Persistent settings storage
+    Settings {
+        id: sidebarSettings
+        category: "Sidebar"
+        property alias currentIndex: root.currentIndex
+    }
     
     width: 250
     color: "#0a0a0f"
