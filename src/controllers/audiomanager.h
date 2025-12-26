@@ -7,6 +7,7 @@
 #include <QList>
 #include <QMap>
 #include <QUrl>
+#include <QSettings>
 #include "../models/audioclip.h"
 #include "../models/audioEngine.h"
 #include <miniaudio.h>
@@ -27,7 +28,6 @@ class AudioManager : public QObject
     Q_PROPERTY(QString secondaryOutputDevice READ secondaryOutputDevice WRITE setSecondaryOutputDevice NOTIFY secondaryOutputDeviceChanged)
     Q_PROPERTY(bool secondaryOutputEnabled READ secondaryOutputEnabled WRITE setSecondaryOutputEnabled NOTIFY secondaryOutputEnabledChanged)
     Q_PROPERTY(bool inputDeviceEnabled READ inputDeviceEnabled WRITE setInputDeviceEnabled NOTIFY inputDeviceEnabledChanged)
-    Q_PROPERTY(QList<QObject*> audioClips READ audioClipsAsObjects NOTIFY audioClipsChanged)
 
 public:
     explicit AudioManager(AudioEngine* audioEngine, QObject *parent = nullptr);
@@ -76,6 +76,10 @@ public:
     Q_INVOKABLE qreal micVolume() const;
     Q_INVOKABLE void setMicVolume(qreal linear);
     Q_INVOKABLE void setClipVolume(const QString &clipId, qreal volume);
+    
+    // Settings persistence
+    Q_INVOKABLE void saveSettings();
+    Q_INVOKABLE void loadSettings();
 
 signals:
     void audioClipsChanged();

@@ -38,6 +38,10 @@ public:
     Q_INVOKABLE void renameSection(const QString &sectionId, const QString &newName);
     Q_INVOKABLE void selectSection(const QString &sectionId);
     Q_INVOKABLE SoundboardSection* getSection(const QString &sectionId) const;
+    
+    // Settings persistence
+    Q_INVOKABLE void saveSoundboardData();
+    Q_INVOKABLE void loadSoundboardData();
 
 signals:
     void audioClipAdded(int slotIndex);

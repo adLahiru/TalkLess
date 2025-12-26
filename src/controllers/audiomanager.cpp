@@ -3,6 +3,7 @@
 #include <QUuid>
 #include <QMediaDevices>
 #include <QAudioDevice>
+#include <QTimer>
 
 AudioManager::AudioManager(AudioEngine* audioEngine, QObject *parent)
     : QObject(parent)
@@ -16,10 +17,15 @@ AudioManager::AudioManager(AudioEngine* audioEngine, QObject *parent)
         qWarning() << "AudioManager initialized without AudioEngine instance!";
     } else {
         qDebug() << "AudioManager initialized with shared AudioEngine";
+        // Set initial master volume to ensure AudioEngine is at 0dB
+        m_audioEngine->setMasterGainLinear(1.0f);
     }
 
     // Initial device discovery
     refreshAudioDevices();
+    
+    // Load saved settings (will apply after devices are ready)
+    loadSettings();
 }
 
 AudioManager::~AudioManager()
@@ -576,8 +582,10 @@ qreal AudioManager::masterVolume() const
 
 void AudioManager::setMasterVolume(qreal linear)
 {
+    qDebug() << "AudioManager::setMasterVolume called with linear value:" << linear;
     if (!m_audioEngine) return;
     m_audioEngine->setMasterGainLinear(static_cast<float>(linear));
+    qDebug() << "AudioEngine master gain set to:" << m_audioEngine->getMasterGainLinear();
     // Apply master gain to all QMediaPlayer audio outputs (both primary and secondary)
     for (auto it = m_audioOutputs.begin(); it != m_audioOutputs.end(); ++it) {
         QAudioOutput* output = it.value();
@@ -897,5 +905,228 @@ void AudioManager::testPlayback()
         } else {
             emit error("No audio clips available for testing");
         }
+    }
+}
+
+void AudioManager::saveSettings()
+{
+    QSettings settings("TalkLess", "AudioSettings");
+    
+    // Save audio device settings
+    settings.beginGroup("devices");
+    settings.setValue("inputDevice", m_currentInputDevice);
+    settings.setValue("outputDevice", m_currentOutputDevice);
+    settings.setValue("secondaryOutputDevice", m_secondaryOutputDevice);
+    settings.setValue("secondaryOutputEnabled", m_secondaryOutputEnabled);
+    settings.setValue("inputDeviceEnabled", m_inputDeviceEnabled);
+    settings.endGroup();
+    
+    // Save volume settings
+    settings.beginGroup("volume");
+    settings.setValue("masterVolume", m_volume);
+    if (m_audioEngine) {
+        settings.setValue("micVolume", m_audioEngine->getMicGainLinear());
+        settings.setValue("masterGain", m_audioEngine->getMasterGainLinear());
+    }
+    settings.endGroup();
+    
+    // Save audio clips data
+    settings.beginGroup("clips");
+    settings.remove(""); // Clear existing clips
+    for (int i = 0; i < m_audioClips.size(); ++i) {
+        AudioClip* clip = m_audioClips[i];
+        if (clip) {
+            QString clipKey = QString("clip_%1").arg(i);
+            settings.beginGroup(clipKey);
+            settings.setValue("id", clip->id());
+            settings.setValue("title", clip->title());
+            settings.setValue("filePath", clip->filePath());
+            settings.setValue("hotkey", clip->hotkey());
+            settings.setValue("volume", clip->volume());
+            settings.setValue("trimStart", clip->trimStart());
+            settings.setValue("trimEnd", clip->trimEnd());
+            settings.setValue("sectionId", clip->sectionId());
+            settings.endGroup();
+        }
+    }
+    settings.endGroup();
+    
+    settings.sync();
+    qDebug() << "AudioManager: Saved settings including" << m_audioClips.size() << "clips";
+}
+
+void AudioManager::loadSettings()
+{
+    try {
+        QSettings settings("TalkLess", "AudioSettings");
+        
+        qDebug() << "AudioManager: Loading settings...";
+        
+        // Check if we have any saved settings at all
+        bool hasSettings = false;
+        settings.beginGroup("devices");
+        if (settings.childKeys().length() > 0) {
+            hasSettings = true;
+        }
+        settings.endGroup();
+        
+        if (!hasSettings) {
+            qDebug() << "AudioManager: No saved settings found, using defaults";
+            return; // Use default settings
+        }
+        
+        // Load audio device settings
+        QString savedInputDevice, savedOutputDevice, savedSecondaryOutputDevice;
+        bool savedSecondaryOutputEnabled = false, savedInputDeviceEnabled = true;
+        
+        try {
+            settings.beginGroup("devices");
+            savedInputDevice = settings.value("inputDevice").toString();
+            savedOutputDevice = settings.value("outputDevice").toString();
+            savedSecondaryOutputDevice = settings.value("secondaryOutputDevice").toString();
+            savedSecondaryOutputEnabled = settings.value("secondaryOutputEnabled", false).toBool();
+            savedInputDeviceEnabled = settings.value("inputDeviceEnabled", true).toBool();
+            settings.endGroup();
+        } catch (...) {
+            qWarning() << "AudioManager: Failed to load device settings, using defaults";
+            emit error("Warning: Could not load device settings, using defaults");
+            // Use default values
+            savedInputDevice.clear();
+            savedOutputDevice.clear();
+            savedSecondaryOutputDevice.clear();
+            savedSecondaryOutputEnabled = false;
+            savedInputDeviceEnabled = true;
+        }
+        
+        // Load volume settings
+        qreal savedVolume = 1.0;
+        float savedMicGain = 1.0f, savedMasterGain = 1.0f;
+        
+        try {
+            settings.beginGroup("volume");
+            savedVolume = settings.value("masterVolume", 1.0).toReal();
+            savedMicGain = settings.value("micVolume", 1.0).toFloat();
+            savedMasterGain = settings.value("masterGain", 1.0).toFloat();
+            settings.endGroup();
+        } catch (...) {
+            qWarning() << "AudioManager: Failed to load volume settings, using defaults";
+            emit error("Warning: Could not load volume settings, using defaults");
+            // Use default values
+            savedVolume = 1.0;
+            savedMicGain = 1.0f;
+            savedMasterGain = 1.0f;
+        }
+        
+        // Load audio clips (but don't clear existing ones during initialization)
+        QStringList clipKeys;
+        int successfulClips = 0;
+        int failedClips = 0;
+        
+        try {
+            settings.beginGroup("clips");
+            clipKeys = settings.childKeys();
+            
+            for (const QString& clipKey : clipKeys) {
+                try {
+                    settings.beginGroup(clipKey);
+                    QString clipId = settings.value("id").toString();
+                    QString title = settings.value("title").toString();
+                    QString filePath = settings.value("filePath").toString();
+                    QString hotkey = settings.value("hotkey").toString();
+                    qreal volume = settings.value("volume", 1.0).toReal();
+                    qreal trimStart = settings.value("trimStart", 0.0).toReal();
+                    qreal trimEnd = settings.value("trimEnd", -1.0).toReal();
+                    QString sectionId = settings.value("sectionId").toString();
+                    settings.endGroup();
+                    
+                    if (!clipId.isEmpty() && !title.isEmpty()) {
+                        // Check if clip already exists before adding
+                        bool clipExists = false;
+                        for (AudioClip* existingClip : m_audioClips) {
+                            if (existingClip && existingClip->id() == clipId) {
+                                clipExists = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!clipExists) {
+                            AudioClip* clip = new AudioClip(this);
+                            clip->setId(clipId);
+                            clip->setTitle(title);
+                            clip->setFilePath(QUrl(filePath));
+                            clip->setHotkey(hotkey);
+                            clip->setVolume(volume);
+                            clip->setTrimStart(trimStart);
+                            clip->setTrimEnd(trimEnd);
+                            clip->setSectionId(sectionId);
+                            
+                            m_audioClips.append(clip);
+                            
+                            // Load audio file if path is valid
+                            if (!filePath.isEmpty()) {
+                                loadAudioFile(clipId, QUrl(filePath));
+                            }
+                            
+                            successfulClips++;
+                            qDebug() << "Loaded clip:" << title << "ID:" << clipId;
+                        }
+                    }
+                } catch (...) {
+                    failedClips++;
+                    qWarning() << "AudioManager: Failed to load clip with key:" << clipKey;
+                    continue; // Skip this clip and continue with others
+                }
+            }
+            settings.endGroup();
+            
+            if (failedClips > 0) {
+                emit error(QString("Warning: Failed to load %1 audio clip(s), loaded %2 successfully").arg(failedClips).arg(successfulClips));
+            }
+            
+        } catch (...) {
+            qWarning() << "AudioManager: Failed to load clips section, skipping clips";
+            emit error("Warning: Could not load audio clips, starting with empty soundboard");
+        }
+        
+        // Apply loaded settings after devices are initialized (only if we have valid settings)
+        QTimer::singleShot(100, [this, savedInputDevice, savedOutputDevice, savedSecondaryOutputDevice, 
+                               savedSecondaryOutputEnabled, savedInputDeviceEnabled, 
+                               savedVolume, savedMicGain, savedMasterGain]() {
+            try {
+                // Set devices if they exist in current device list
+                if (!savedInputDevice.isEmpty() && m_inputDevices.contains(savedInputDevice)) {
+                    setCurrentInputDevice(savedInputDevice);
+                }
+                if (!savedOutputDevice.isEmpty() && m_outputDevices.contains(savedOutputDevice)) {
+                    setCurrentOutputDevice(savedOutputDevice);
+                }
+                if (!savedSecondaryOutputDevice.isEmpty() && m_outputDevices.contains(savedSecondaryOutputDevice)) {
+                    setSecondaryOutputDevice(savedSecondaryOutputDevice);
+                }
+                setSecondaryOutputEnabled(savedSecondaryOutputEnabled);
+                setInputDeviceEnabled(savedInputDeviceEnabled);
+                
+                // Set volume
+                setVolume(savedVolume);
+                if (m_audioEngine) {
+                    m_audioEngine->setMicGainLinear(savedMicGain);
+                    m_audioEngine->setMasterGainLinear(savedMasterGain);
+                }
+                
+                qDebug() << "AudioManager: Settings loaded including" << m_audioClips.size() << "saved clips";
+            } catch (...) {
+                qWarning() << "AudioManager: Failed to apply some settings, using defaults";
+                emit error("Warning: Could not apply some settings, using defaults");
+            }
+        });
+        
+        if (!clipKeys.isEmpty()) {
+            emit audioClipsChanged();
+        }
+        
+    } catch (...) {
+        qWarning() << "AudioManager: Failed to load settings, using defaults";
+        emit error("Warning: Could not load settings, starting with default configuration");
+        // Continue with default settings - don't crash the application
     }
 }

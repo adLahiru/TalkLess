@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import TalkLess 1.0
 
 Rectangle {
     id: root
@@ -160,9 +161,9 @@ Rectangle {
             Slider {
                 id: volumeSlider
                 Layout.fillWidth: true
-                from: 0
-                to: 100
-                value: voiceVolume
+                from: -20.0  // -20dB to 0dB range
+                to: 0.0
+                value: Functions.linearToDb(voiceVolume / 100)  // Convert percentage to linear then to dB
                 
                 background: Rectangle {
                     x: volumeSlider.leftPadding
@@ -191,10 +192,10 @@ Rectangle {
             }
             
             Text {
-                text: Math.round(volumeSlider.value)
+                text: Functions.formatDb(volumeSlider.value)
                 font.pixelSize: 12
                 color: "#9CA3AF"
-                Layout.preferredWidth: 40
+                Layout.preferredWidth: 50
                 horizontalAlignment: Text.AlignRight
             }
         }

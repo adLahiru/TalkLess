@@ -26,6 +26,8 @@ qt_add_executable(appTalkLess
     src/controllers/audiomanager.cpp
     src/controllers/hotkeymanager.h
     src/controllers/hotkeymanager.cpp
+    src/controllers/settingsmanager.h
+    src/controllers/settingsmanager.cpp
     # Views
     src/view/soundboardview.h
     src/view/soundboardview.cpp
@@ -60,6 +62,7 @@ qt_add_qml_module(appTalkLess
         qml/components/AddAudioCard.qml
         qml/components/AudioTag.qml
         qml/components/WaveformDisplay.qml
+        qml/components/SettingsImportExport.qml
         qml/components/AudioPlayer.qml
         qml/components/VolumeMeter.qml
         qml/components/AudioDetailsPanel.qml
@@ -75,6 +78,7 @@ qt_add_qml_module(appTalkLess
         qml/pages/UpdatesTab.qml
         qml/pages/SoundboardPage.qml
         qml/pages/VolumeMixerPage.qml
+        qml/pages/SettingsManagementPage.qml
         # Styles (singletons)
         qml/styles/Colors.qml
         qml/styles/Typography.qml
@@ -90,6 +94,7 @@ qt_add_qml_module(appTalkLess
         resources/images/background-51.png
         resources/images/background-52.png
         resources/images/background-53.png
+        qml/utils/Functions.js
 )
 
 # Add include directories for QML type registration

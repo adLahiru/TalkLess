@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import TalkLess 1.0
 
 Item {
     id: root
@@ -52,11 +53,11 @@ Item {
                         Slider {
                             id: masterSlider
                             Layout.fillWidth: true
-                            from: 0.0
-                            to: 1.0
-                            value: audioManager ? audioManager.masterVolume() : 1.0
+                            from: -60.0
+                            to: 20.0
+                            value: audioManager ? Functions.linearToDb(audioManager.masterVolume()) : 0.0
                             onValueChanged: {
-                                if (audioManager) audioManager.setMasterVolume(value)
+                                if (audioManager) audioManager.setMasterVolume(Functions.dbToLinear(value))
                             }
                             background: Rectangle {
                                 implicitWidth: 200
@@ -85,10 +86,10 @@ Item {
                         }
 
                         Text {
-                            text: Math.round(masterSlider.value * 100) + "%"
+                            text: Functions.formatDb(masterSlider.value)
                             font.pixelSize: 14
                             color: "#d1d5db"
-                            Layout.minimumWidth: 45
+                            Layout.minimumWidth: 60
                             horizontalAlignment: Text.AlignRight
                         }
                     }
@@ -113,11 +114,11 @@ Item {
                         Slider {
                             id: micSlider
                             Layout.fillWidth: true
-                            from: 0.0
-                            to: 2.0
-                            value: audioManager ? audioManager.micVolume() : 1.0
+                            from: -20.0  // -20dB to +6dB (200% boost)
+                            to: 6.0
+                            value: audioManager ? Functions.linearToDb(audioManager.micVolume()) : 0.0
                             onValueChanged: {
-                                if (audioManager) audioManager.setMicVolume(value)
+                                if (audioManager) audioManager.setMicVolume(Functions.dbToLinear(value))
                             }
                             background: Rectangle {
                                 implicitWidth: 200
@@ -146,16 +147,16 @@ Item {
                         }
 
                         Text {
-                            text: Math.round(micSlider.value * 100) + "%"
+                            text: Functions.formatDb(micSlider.value)
                             font.pixelSize: 14
                             color: "#d1d5db"
-                            Layout.minimumWidth: 45
+                            Layout.minimumWidth: 60
                             horizontalAlignment: Text.AlignRight
                         }
                     }
 
                     Text {
-                        text: "Mic slider allows up to 200% for boost"
+                        text: "Mic slider range: -20dB to +6dB (200% boost)"
                         font.pixelSize: 12
                         color: "#9CA3AF"
                         Layout.topMargin: 4
@@ -188,14 +189,14 @@ Item {
                         Slider {
                             id: currentClipSlider
                             Layout.fillWidth: true
-                            from: 0.0
-                            to: 1.0
+                            from: -60.0
+                            to: 20.0
                             enabled: audioManager && audioManager.currentClip !== null
-                            value: (audioManager && audioManager.currentClip) ? audioManager.currentClip.volume : 1.0
+                            value: (audioManager && audioManager.currentClip) ? Functions.linearToDb(audioManager.currentClip.volume) : 0.0
                             onValueChanged: {
-                                if (audioManager && audioManager.currentClip && audioManager.currentClip.volume !== value) {
-                                    audioManager.currentClip.volume = value
-                                    audioManager.setClipVolume(audioManager.currentClip.id, value)
+                                if (audioManager && audioManager.currentClip && audioManager.currentClip.volume !== Functions.dbToLinear(value)) {
+                                    audioManager.currentClip.volume = Functions.dbToLinear(value)
+                                    audioManager.setClipVolume(audioManager.currentClip.id, Functions.dbToLinear(value))
                                 }
                             }
                             background: Rectangle {
@@ -225,10 +226,10 @@ Item {
                         }
 
                         Text {
-                            text: Math.round(currentClipSlider.value * 100) + "%"
+                            text: Functions.formatDb(currentClipSlider.value)
                             font.pixelSize: 14
                             color: "#d1d5db"
-                            Layout.minimumWidth: 45
+                            Layout.minimumWidth: 60
                             horizontalAlignment: Text.AlignRight
                         }
                     }

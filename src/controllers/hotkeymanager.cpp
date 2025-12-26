@@ -167,26 +167,53 @@ void HotkeyManager::saveHotkeys()
 
 void HotkeyManager::loadHotkeys()
 {
-    QSettings settings("TalkLess", "Hotkeys");
-    settings.beginGroup("hotkeys");
-    
-    QStringList clipIds = settings.childKeys();
-    for (const QString &clipId : clipIds) {
-        QString keySequence = settings.value(clipId).toString();
-        if (!keySequence.isEmpty()) {
-            m_clipHotkeys[clipId] = keySequence;
-            m_hotkeyClips[keySequence] = clipId;
+    try {
+        QSettings settings("TalkLess", "Hotkeys");
+        settings.beginGroup("hotkeys");
+        
+        QStringList clipIds = settings.childKeys();
+        int successfulHotkeys = 0;
+        int failedHotkeys = 0;
+        
+        for (const QString &clipId : clipIds) {
+            try {
+                QString keySequence = settings.value(clipId).toString();
+                if (!keySequence.isEmpty()) {
+                    m_clipHotkeys[clipId] = keySequence;
+                    m_hotkeyClips[keySequence] = clipId;
+                    successfulHotkeys++;
+                }
+            } catch (...) {
+                failedHotkeys++;
+                qWarning() << "HotkeyManager: Failed to load hotkey for clip:" << clipId;
+                continue;
+            }
         }
+        
+        settings.endGroup();
+        qDebug() << "Loaded" << successfulHotkeys << "hotkeys from settings";
+        if (failedHotkeys > 0) {
+            qWarning() << "Failed to load" << failedHotkeys << "hotkeys";
+        }
+        
+        // Load system hotkeys
+        try {
+            loadSystemHotkeys();
+        } catch (...) {
+            qWarning() << "HotkeyManager: Failed to load system hotkeys, using defaults";
+        }
+        
+        // Register all loaded hotkeys as system hotkeys
+        try {
+            registerAllSystemHotkeys();
+        } catch (...) {
+            qWarning() << "HotkeyManager: Failed to register system hotkeys, hotkeys may not work";
+        }
+        
+    } catch (...) {
+        qWarning() << "HotkeyManager: Failed to load hotkeys, using defaults";
+        // Continue with default hotkeys - don't crash the application
     }
-    
-    settings.endGroup();
-    qDebug() << "Loaded" << m_clipHotkeys.size() << "hotkeys from settings";
-    
-    // Load system hotkeys
-    loadSystemHotkeys();
-    
-    // Register all loaded hotkeys as system hotkeys
-    registerAllSystemHotkeys();
 }
 
 void HotkeyManager::registerAllSystemHotkeys()
@@ -197,6 +224,7 @@ void HotkeyManager::registerAllSystemHotkeys()
         UnregisterEventHotKey(it.value());
     }
     m_registeredHotKeyRefs.clear();
+    m_registeredHotkeys.clear();  // Also clear the general map
     m_hotkeyIdToClipId.clear();
     m_nextHotkeyId = 1;
     
@@ -235,27 +263,53 @@ void HotkeyManager::registerAllSystemHotkeys()
     m_nextHotkeyId = 1;
     
     // Register all current clip hotkeys as system hotkeys
+    int successfulClipHotkeys = 0;
+    int failedClipHotkeys = 0;
+    
     for (auto it = m_clipHotkeys.begin(); it != m_clipHotkeys.end(); ++it) {
-        QString clipId = it.key();
-        QString keySequence = it.value();
-        
-        if (registerSystemHotkey(clipId, keySequence, m_nextHotkeyId)) {
-            m_nextHotkeyId++;
+        try {
+            QString clipId = it.key();
+            QString keySequence = it.value();
+            
+            if (registerSystemHotkey(clipId, keySequence, m_nextHotkeyId)) {
+                m_nextHotkeyId++;
+                successfulClipHotkeys++;
+            } else {
+                failedClipHotkeys++;
+                qWarning() << "Failed to register hotkey for clip:" << clipId << "with key:" << keySequence;
+            }
+        } catch (...) {
+            failedClipHotkeys++;
+            qWarning() << "Exception while registering hotkey for clip:" << it.key();
+            continue;
         }
     }
     
     // Register system hotkeys as global hotkeys
+    int successfulSystemHotkeys = 0;
+    int failedSystemHotkeys = 0;
+    
     for (auto it = m_systemHotkeys.begin(); it != m_systemHotkeys.end(); ++it) {
-        QString action = it.key();
-        QString keySequence = it.value();
-        
-        // Only register non-empty system hotkeys
-        if (!keySequence.isEmpty()) {
-            // Use special IDs for system hotkeys (1000+ to distinguish from clip hotkeys)
-            int systemHotkeyId = 1000 + (action == "playPause" ? 1 : 2);
-            if (registerSystemHotkey(action, keySequence, systemHotkeyId)) {
-                qDebug() << "Registered system hotkey:" << action << "as" << keySequence;
+        try {
+            QString action = it.key();
+            QString keySequence = it.value();
+            
+            // Only register non-empty system hotkeys
+            if (!keySequence.isEmpty()) {
+                // Use special IDs for system hotkeys (1000+ to distinguish from clip hotkeys)
+                int systemHotkeyId = 1000 + (action == "playPause" ? 1 : 2);
+                if (registerSystemHotkey(action, keySequence, systemHotkeyId)) {
+                    successfulSystemHotkeys++;
+                    qDebug() << "Registered system hotkey:" << action << "as" << keySequence;
+                } else {
+                    failedSystemHotkeys++;
+                    qWarning() << "Failed to register system hotkey:" << action << "with key:" << keySequence;
+                }
             }
+        } catch (...) {
+            failedSystemHotkeys++;
+            qWarning() << "Exception while registering system hotkey:" << it.key();
+            continue;
         }
     }
     
