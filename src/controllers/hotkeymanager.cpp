@@ -500,7 +500,7 @@ void HotkeyManager::unregisterSystemHotkey(quint32 hotkeyId)
 
 quint32 HotkeyManager::keyStringToKeyCode(const QString &key) const
 {
-    // macOS virtual key codes
+    // macOS virtual key codes - all keys in UPPERCASE for consistent lookup
     static QMap<QString, quint32> keyMap = {
         {"A", kVK_ANSI_A}, {"B", kVK_ANSI_B}, {"C", kVK_ANSI_C}, {"D", kVK_ANSI_D},
         {"E", kVK_ANSI_E}, {"F", kVK_ANSI_F}, {"G", kVK_ANSI_G}, {"H", kVK_ANSI_H},
@@ -515,10 +515,11 @@ quint32 HotkeyManager::keyStringToKeyCode(const QString &key) const
         {"F1", kVK_F1}, {"F2", kVK_F2}, {"F3", kVK_F3}, {"F4", kVK_F4},
         {"F5", kVK_F5}, {"F6", kVK_F6}, {"F7", kVK_F7}, {"F8", kVK_F8},
         {"F9", kVK_F9}, {"F10", kVK_F10}, {"F11", kVK_F11}, {"F12", kVK_F12},
-        {"Space", kVK_Space}, {"Enter", kVK_Return}, {"Tab", kVK_Tab},
-        {"Backspace", kVK_Delete}, {"Delete", kVK_ForwardDelete},
-        {"Home", kVK_Home}, {"End", kVK_End}, {"PageUp", kVK_PageUp}, {"PageDown", kVK_PageDown},
-        {"Up", kVK_UpArrow}, {"Down", kVK_DownArrow}, {"Left", kVK_LeftArrow}, {"Right", kVK_RightArrow}
+        {"SPACE", kVK_Space}, {"ENTER", kVK_Return}, {"RETURN", kVK_Return}, {"TAB", kVK_Tab},
+        {"BACKSPACE", kVK_Delete}, {"DELETE", kVK_ForwardDelete},
+        {"HOME", kVK_Home}, {"END", kVK_End}, {"PAGEUP", kVK_PageUp}, {"PAGEDOWN", kVK_PageDown},
+        {"UP", kVK_UpArrow}, {"DOWN", kVK_DownArrow}, {"LEFT", kVK_LeftArrow}, {"RIGHT", kVK_RightArrow},
+        {"ESC", kVK_Escape}, {"ESCAPE", kVK_Escape}
     };
     
     return keyMap.value(key.toUpper(), 0);
@@ -705,6 +706,7 @@ void HotkeyManager::unregisterSystemHotkey(int hotkeyId)
 
 quint32 HotkeyManager::keyStringToVirtualKey(const QString &key) const
 {
+    // Windows virtual key codes - all special keys in UPPERCASE for consistent lookup
     static QMap<QString, quint32> keyMap = {
         {"A", 0x41}, {"B", 0x42}, {"C", 0x43}, {"D", 0x44},
         {"E", 0x45}, {"F", 0x46}, {"G", 0x47}, {"H", 0x48},
@@ -719,10 +721,11 @@ quint32 HotkeyManager::keyStringToVirtualKey(const QString &key) const
         {"F1", VK_F1}, {"F2", VK_F2}, {"F3", VK_F3}, {"F4", VK_F4},
         {"F5", VK_F5}, {"F6", VK_F6}, {"F7", VK_F7}, {"F8", VK_F8},
         {"F9", VK_F9}, {"F10", VK_F10}, {"F11", VK_F11}, {"F12", VK_F12},
-        {"Space", VK_SPACE}, {"Enter", VK_RETURN}, {"Tab", VK_TAB},
-        {"Backspace", VK_BACK}, {"Delete", VK_DELETE},
-        {"Home", VK_HOME}, {"End", VK_END}, {"PageUp", VK_PRIOR}, {"PageDown", VK_NEXT},
-        {"Up", VK_UP}, {"Down", VK_DOWN}, {"Left", VK_LEFT}, {"Right", VK_RIGHT}
+        {"SPACE", VK_SPACE}, {"ENTER", VK_RETURN}, {"RETURN", VK_RETURN}, {"TAB", VK_TAB},
+        {"BACKSPACE", VK_BACK}, {"DELETE", VK_DELETE},
+        {"HOME", VK_HOME}, {"END", VK_END}, {"PAGEUP", VK_PRIOR}, {"PAGEDOWN", VK_NEXT},
+        {"UP", VK_UP}, {"DOWN", VK_DOWN}, {"LEFT", VK_LEFT}, {"RIGHT", VK_RIGHT},
+        {"ESC", VK_ESCAPE}, {"ESCAPE", VK_ESCAPE}
     };
     return keyMap.value(key.toUpper(), 0);
 }

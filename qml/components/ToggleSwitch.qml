@@ -6,9 +6,6 @@ Rectangle {
     
     property bool checked: false
     
-    // Emit when checked state changes (for two-way binding)
-    signal checkedChanged()
-    
     width: 52
     height: 28
     radius: 14
