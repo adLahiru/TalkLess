@@ -230,8 +230,9 @@ Item {
             }
             
             DropdownSelect {
-                currentValue: "WASAPI"
+                currentValue: settingsManager.audioDriver
                 model: ["WASAPI", "DirectSound", "ASIO"]
+                onValueChanged: settingsManager.audioDriver = value
             }
         }
         
@@ -248,8 +249,9 @@ Item {
             }
             
             DropdownSelect {
-                currentValue: "44.1 kHz"
+                currentValue: settingsManager.sampleRate
                 model: ["44.1 kHz", "48 kHz", "96 kHz"]
+                onValueChanged: settingsManager.sampleRate = value
             }
         }
         

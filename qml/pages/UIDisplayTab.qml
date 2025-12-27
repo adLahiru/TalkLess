@@ -5,33 +5,11 @@ import QtQuick.Layouts
 Item {
     id: root
     
-    // Theme properties
-    property string currentTheme: "dark"
-    property real interfaceScale: 1.0
-    property bool uiAnimationsEnabled: true
-    property bool systemThemeEnabled: false
-    
-    // Theme settings object
-    QtObject {
-        id: themeSettings
-        
-        property string theme: currentTheme
-        property real scale: interfaceScale
-        property bool animations: uiAnimationsEnabled
-        property bool systemTheme: systemThemeEnabled
-        
-        function saveSettings() {
-            // Save settings to storage (would need backend integration)
-            console.log("Saving theme settings:", theme, scale, animations, systemTheme)
-        }
-        
-        function resetToDefaults() {
-            currentTheme = "dark"
-            interfaceScale = 1.0
-            uiAnimationsEnabled = true
-            systemThemeEnabled = false
-        }
-    }
+    // Bind to settingsManager properties for persistence
+    property string currentTheme: settingsManager.theme
+    property real interfaceScale: settingsManager.interfaceScale
+    property bool uiAnimationsEnabled: settingsManager.uiAnimationsEnabled
+    property bool systemThemeEnabled: settingsManager.systemThemeEnabled
     
     ColumnLayout {
         anchors.fill: parent
@@ -69,12 +47,11 @@ Item {
                 
                 ToggleSwitch {
                     id: systemThemeSwitch
-                    checked: systemThemeEnabled
+                    checked: settingsManager.systemThemeEnabled
                     onCheckedChanged: {
-                        systemThemeEnabled = checked
+                        settingsManager.systemThemeEnabled = checked
                         if (checked) {
-                            // Auto-detect system theme (would need backend integration)
-                            currentTheme = Qt.platform.os === "windows" ? "dark" : "light"
+                            settingsManager.theme = Qt.platform.os === "windows" ? "dark" : "light"
                         }
                     }
                 }
@@ -94,11 +71,11 @@ Item {
             
             DropdownSelect {
                 id: scaleDropdown
-                currentValue: (interfaceScale * 100).toFixed(0) + "%"
+                currentValue: (settingsManager.interfaceScale * 100).toFixed(0) + "%"
                 model: ["75%", "100%", "125%", "150%", "175%", "200%"]
                 width: 150
                 onValueChanged: {
-                    interfaceScale = parseFloat(value.replace("%", "")) / 100
+                    settingsManager.interfaceScale = parseFloat(value.replace("%", "")) / 100
                 }
             }
         }
@@ -120,17 +97,17 @@ Item {
                 id: themeDropdown
                 Layout.fillWidth: true
                 Layout.maximumWidth: 300
-                currentValue: currentTheme === "light" ? "Light" : currentTheme === "dark" ? "Dark" : "Auto (System)"
+                currentValue: settingsManager.theme === "light" ? "Light" : settingsManager.theme === "dark" ? "Dark" : "Auto (System)"
                 model: ["Light", "Dark", "Auto (System)"]
                 onValueChanged: {
                     if (value === "Light") {
-                        currentTheme = "light"
+                        settingsManager.theme = "light"
                         Colors.setTheme("light")
                     } else if (value === "Dark") {
-                        currentTheme = "dark"
+                        settingsManager.theme = "dark"
                         Colors.setTheme("dark")
                     } else if (value === "Auto (System)") {
-                        currentTheme = "auto"
+                        settingsManager.theme = "auto"
                         Colors.setTheme("auto")
                     }
                 }
@@ -151,8 +128,8 @@ Item {
             
             ToggleSwitch {
                 id: animationsSwitch
-                checked: uiAnimationsEnabled
-                onCheckedChanged: uiAnimationsEnabled = checked
+                checked: settingsManager.uiAnimationsEnabled
+                onCheckedChanged: settingsManager.uiAnimationsEnabled = checked
             }
         }
         
@@ -186,7 +163,8 @@ Item {
             
             ToggleSwitch {
                 id: compactModeSwitch
-                checked: false
+                checked: settingsManager.compactMode
+                onCheckedChanged: settingsManager.compactMode = checked
             }
         }
         
@@ -204,7 +182,8 @@ Item {
             
             ToggleSwitch {
                 id: tooltipsSwitch
-                checked: true
+                checked: settingsManager.showTooltips
+                onCheckedChanged: settingsManager.showTooltips = checked
             }
         }
         
@@ -222,7 +201,8 @@ Item {
             
             ToggleSwitch {
                 id: hardwareAccelSwitch
-                checked: true
+                checked: settingsManager.hardwareAcceleration
+                onCheckedChanged: settingsManager.hardwareAcceleration = checked
             }
         }
         
@@ -236,23 +216,22 @@ Item {
             ActionButton {
                 text: "Apply Changes"
                 onClicked: {
-                    themeSettings.saveSettings()
-                    // Apply theme changes to the application
-                    console.log("Theme applied:", currentTheme, "Scale:", interfaceScale)
+                    settingsManager.saveAllSettings()
+                    console.log("Settings saved - Theme:", settingsManager.theme, "Scale:", settingsManager.interfaceScale)
                 }
             }
             
             ActionButton {
                 text: "Reset to Defaults"
                 onClicked: {
-                    themeSettings.resetToDefaults()
-                    scaleDropdown.currentValue = "100%"
-                    themeDropdown.currentValue = "Dark"
-                    systemThemeSwitch.checked = false
-                    animationsSwitch.checked = true
-                    compactModeSwitch.checked = false
-                    tooltipsSwitch.checked = true
-                    hardwareAccelSwitch.checked = true
+                    settingsManager.theme = "dark"
+                    settingsManager.interfaceScale = 1.0
+                    settingsManager.uiAnimationsEnabled = true
+                    settingsManager.systemThemeEnabled = false
+                    settingsManager.compactMode = false
+                    settingsManager.showTooltips = true
+                    settingsManager.hardwareAcceleration = true
+                    Colors.setTheme("dark")
                 }
             }
             

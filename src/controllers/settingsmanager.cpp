@@ -17,7 +17,27 @@ SettingsManager::SettingsManager(QObject *parent)
     , m_audioManager(nullptr)
     , m_hotkeyManager(nullptr)
     , m_soundboardView(nullptr)
+    // UI Display Settings defaults
+    , m_theme("dark")
+    , m_interfaceScale(1.0)
+    , m_uiAnimationsEnabled(true)
+    , m_systemThemeEnabled(false)
+    , m_compactMode(false)
+    , m_showTooltips(true)
+    , m_hardwareAcceleration(true)
+    // Feature Settings defaults
+    , m_equalizerEnabled(true)
+    , m_macrosEnabled(true)
+    , m_apiAccessEnabled(true)
+    , m_smartSuggestionsEnabled(true)
+    // Update Settings defaults
+    , m_autoUpdateEnabled(true)
+    // Audio Settings defaults
+    , m_audioDriver("WASAPI")
+    , m_sampleRate("44.1 kHz")
 {
+    // Load settings on construction
+    loadAllSettings();
 }
 
 bool SettingsManager::exportSettingsToJson(const QString &filePath)
@@ -297,12 +317,44 @@ QJsonObject SettingsManager::serializeSoundboardSettings() const
 QJsonObject SettingsManager::serializeApplicationSettings() const
 {
     QJsonObject appSettings;
-    
-    // Add any general application settings here
-    appSettings["theme"] = "dark"; // Example
-    appSettings["language"] = "en"; // Example
-    
+    appSettings["language"] = "en";
     return appSettings;
+}
+
+QJsonObject SettingsManager::serializeUISettings() const
+{
+    QJsonObject uiSettings;
+    uiSettings["theme"] = m_theme;
+    uiSettings["interfaceScale"] = m_interfaceScale;
+    uiSettings["uiAnimationsEnabled"] = m_uiAnimationsEnabled;
+    uiSettings["systemThemeEnabled"] = m_systemThemeEnabled;
+    uiSettings["compactMode"] = m_compactMode;
+    uiSettings["showTooltips"] = m_showTooltips;
+    uiSettings["hardwareAcceleration"] = m_hardwareAcceleration;
+    return uiSettings;
+}
+
+QJsonObject SettingsManager::serializeFeatureSettings() const
+{
+    QJsonObject featureSettings;
+    featureSettings["equalizerEnabled"] = m_equalizerEnabled;
+    featureSettings["macrosEnabled"] = m_macrosEnabled;
+    featureSettings["apiAccessEnabled"] = m_apiAccessEnabled;
+    featureSettings["smartSuggestionsEnabled"] = m_smartSuggestionsEnabled;
+    
+    // Include global hotkeys enabled from HotkeyManager
+    if (m_hotkeyManager) {
+        featureSettings["globalHotkeysEnabled"] = m_hotkeyManager->globalHotkeysEnabled();
+    }
+    
+    return featureSettings;
+}
+
+QJsonObject SettingsManager::serializeUpdateSettings() const
+{
+    QJsonObject updateSettings;
+    updateSettings["autoUpdateEnabled"] = m_autoUpdateEnabled;
+    return updateSettings;
 }
 
 QJsonArray SettingsManager::serializeAudioClips() const
@@ -541,5 +593,336 @@ bool SettingsManager::deserializeHotkeys(const QJsonArray &array)
     } catch (...) {
         qCritical() << "SettingsManager: Exception in deserializeHotkeys";
         return false;
+    }
+}
+
+// ============================================================================
+// Auto Save/Load Functions
+// ============================================================================
+
+QString SettingsManager::getSettingsFilePath() const
+{
+    QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir dir(appDataPath);
+    if (!dir.exists()) {
+        dir.mkpath(appDataPath);
+    }
+    return dir.filePath("settings.json");
+}
+
+void SettingsManager::saveAllSettings()
+{
+    try {
+        QString filePath = getSettingsFilePath();
+        qDebug() << "SettingsManager: Saving all settings to:" << filePath;
+        
+        QJsonObject rootObject;
+        
+        // Add metadata
+        QJsonObject metadata;
+        metadata["appName"] = APP_NAME;
+        metadata["version"] = SETTINGS_VERSION;
+        metadata["saveDate"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+        rootObject["metadata"] = metadata;
+        
+        // Serialize all settings categories
+        rootObject["uiSettings"] = serializeUISettings();
+        rootObject["featureSettings"] = serializeFeatureSettings();
+        rootObject["updateSettings"] = serializeUpdateSettings();
+        rootObject["audioSettings"] = serializeAudioSettings();
+        rootObject["applicationSettings"] = serializeApplicationSettings();
+        
+        // Create JSON document with pretty formatting
+        QJsonDocument doc(rootObject);
+        
+        // Ensure directory exists
+        QFileInfo fileInfo(filePath);
+        QDir dir = fileInfo.absoluteDir();
+        if (!dir.exists()) {
+            dir.mkpath(dir.absolutePath());
+        }
+        
+        // Write to file
+        QFile file(filePath);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            qCritical() << "SettingsManager: Failed to open settings file for writing:" << filePath;
+            return;
+        }
+        
+        file.write(doc.toJson(QJsonDocument::Indented));
+        file.close();
+        
+        qDebug() << "SettingsManager: All settings saved successfully";
+        emit settingsSaved();
+        
+    } catch (const std::exception &e) {
+        qCritical() << "SettingsManager: Exception saving settings:" << e.what();
+    } catch (...) {
+        qCritical() << "SettingsManager: Unknown exception saving settings";
+    }
+}
+
+void SettingsManager::loadAllSettings()
+{
+    try {
+        QString filePath = getSettingsFilePath();
+        qDebug() << "SettingsManager: Loading settings from:" << filePath;
+        
+        QFile file(filePath);
+        if (!file.exists()) {
+            qDebug() << "SettingsManager: No settings file found, using defaults";
+            return;
+        }
+        
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            qWarning() << "SettingsManager: Failed to open settings file:" << filePath;
+            return;
+        }
+        
+        QByteArray jsonData = file.readAll();
+        file.close();
+        
+        QJsonParseError parseError;
+        QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
+        
+        if (parseError.error != QJsonParseError::NoError) {
+            qWarning() << "SettingsManager: JSON parse error:" << parseError.errorString();
+            return;
+        }
+        
+        if (!doc.isObject()) {
+            qWarning() << "SettingsManager: Invalid settings file format";
+            return;
+        }
+        
+        QJsonObject rootObject = doc.object();
+        
+        // Load all settings categories
+        if (rootObject.contains("uiSettings")) {
+            deserializeUISettings(rootObject["uiSettings"].toObject());
+        }
+        if (rootObject.contains("featureSettings")) {
+            deserializeFeatureSettings(rootObject["featureSettings"].toObject());
+        }
+        if (rootObject.contains("updateSettings")) {
+            deserializeUpdateSettings(rootObject["updateSettings"].toObject());
+        }
+        
+        qDebug() << "SettingsManager: All settings loaded successfully";
+        emit settingsLoaded();
+        
+    } catch (const std::exception &e) {
+        qCritical() << "SettingsManager: Exception loading settings:" << e.what();
+    } catch (...) {
+        qCritical() << "SettingsManager: Unknown exception loading settings";
+    }
+}
+
+// ============================================================================
+// Deserialize Functions for New Settings
+// ============================================================================
+
+bool SettingsManager::deserializeUISettings(const QJsonObject &json)
+{
+    try {
+        if (json.contains("theme")) {
+            m_theme = json["theme"].toString("dark");
+        }
+        if (json.contains("interfaceScale")) {
+            m_interfaceScale = json["interfaceScale"].toDouble(1.0);
+        }
+        if (json.contains("uiAnimationsEnabled")) {
+            m_uiAnimationsEnabled = json["uiAnimationsEnabled"].toBool(true);
+        }
+        if (json.contains("systemThemeEnabled")) {
+            m_systemThemeEnabled = json["systemThemeEnabled"].toBool(false);
+        }
+        if (json.contains("compactMode")) {
+            m_compactMode = json["compactMode"].toBool(false);
+        }
+        if (json.contains("showTooltips")) {
+            m_showTooltips = json["showTooltips"].toBool(true);
+        }
+        if (json.contains("hardwareAcceleration")) {
+            m_hardwareAcceleration = json["hardwareAcceleration"].toBool(true);
+        }
+        
+        // Emit all signals to update UI
+        emit themeChanged();
+        emit interfaceScaleChanged();
+        emit uiAnimationsEnabledChanged();
+        emit systemThemeEnabledChanged();
+        emit compactModeChanged();
+        emit showTooltipsChanged();
+        emit hardwareAccelerationChanged();
+        
+        return true;
+    } catch (...) {
+        qCritical() << "SettingsManager: Exception in deserializeUISettings";
+        return false;
+    }
+}
+
+bool SettingsManager::deserializeFeatureSettings(const QJsonObject &json)
+{
+    try {
+        if (json.contains("equalizerEnabled")) {
+            m_equalizerEnabled = json["equalizerEnabled"].toBool(true);
+        }
+        if (json.contains("macrosEnabled")) {
+            m_macrosEnabled = json["macrosEnabled"].toBool(true);
+        }
+        if (json.contains("apiAccessEnabled")) {
+            m_apiAccessEnabled = json["apiAccessEnabled"].toBool(true);
+        }
+        if (json.contains("smartSuggestionsEnabled")) {
+            m_smartSuggestionsEnabled = json["smartSuggestionsEnabled"].toBool(true);
+        }
+        if (json.contains("globalHotkeysEnabled") && m_hotkeyManager) {
+            m_hotkeyManager->setGlobalHotkeysEnabled(json["globalHotkeysEnabled"].toBool(true));
+        }
+        
+        // Emit all signals
+        emit equalizerEnabledChanged();
+        emit macrosEnabledChanged();
+        emit apiAccessEnabledChanged();
+        emit smartSuggestionsEnabledChanged();
+        
+        return true;
+    } catch (...) {
+        qCritical() << "SettingsManager: Exception in deserializeFeatureSettings";
+        return false;
+    }
+}
+
+bool SettingsManager::deserializeUpdateSettings(const QJsonObject &json)
+{
+    try {
+        if (json.contains("autoUpdateEnabled")) {
+            m_autoUpdateEnabled = json["autoUpdateEnabled"].toBool(true);
+        }
+        
+        emit autoUpdateEnabledChanged();
+        
+        return true;
+    } catch (...) {
+        qCritical() << "SettingsManager: Exception in deserializeUpdateSettings";
+        return false;
+    }
+}
+
+// ============================================================================
+// Property Setters
+// ============================================================================
+
+void SettingsManager::setTheme(const QString &theme)
+{
+    if (m_theme != theme) {
+        m_theme = theme;
+        emit themeChanged();
+    }
+}
+
+void SettingsManager::setInterfaceScale(qreal scale)
+{
+    if (!qFuzzyCompare(m_interfaceScale, scale)) {
+        m_interfaceScale = scale;
+        emit interfaceScaleChanged();
+    }
+}
+
+void SettingsManager::setUiAnimationsEnabled(bool enabled)
+{
+    if (m_uiAnimationsEnabled != enabled) {
+        m_uiAnimationsEnabled = enabled;
+        emit uiAnimationsEnabledChanged();
+    }
+}
+
+void SettingsManager::setSystemThemeEnabled(bool enabled)
+{
+    if (m_systemThemeEnabled != enabled) {
+        m_systemThemeEnabled = enabled;
+        emit systemThemeEnabledChanged();
+    }
+}
+
+void SettingsManager::setCompactMode(bool enabled)
+{
+    if (m_compactMode != enabled) {
+        m_compactMode = enabled;
+        emit compactModeChanged();
+    }
+}
+
+void SettingsManager::setShowTooltips(bool enabled)
+{
+    if (m_showTooltips != enabled) {
+        m_showTooltips = enabled;
+        emit showTooltipsChanged();
+    }
+}
+
+void SettingsManager::setHardwareAcceleration(bool enabled)
+{
+    if (m_hardwareAcceleration != enabled) {
+        m_hardwareAcceleration = enabled;
+        emit hardwareAccelerationChanged();
+    }
+}
+
+void SettingsManager::setEqualizerEnabled(bool enabled)
+{
+    if (m_equalizerEnabled != enabled) {
+        m_equalizerEnabled = enabled;
+        emit equalizerEnabledChanged();
+    }
+}
+
+void SettingsManager::setMacrosEnabled(bool enabled)
+{
+    if (m_macrosEnabled != enabled) {
+        m_macrosEnabled = enabled;
+        emit macrosEnabledChanged();
+    }
+}
+
+void SettingsManager::setApiAccessEnabled(bool enabled)
+{
+    if (m_apiAccessEnabled != enabled) {
+        m_apiAccessEnabled = enabled;
+        emit apiAccessEnabledChanged();
+    }
+}
+
+void SettingsManager::setSmartSuggestionsEnabled(bool enabled)
+{
+    if (m_smartSuggestionsEnabled != enabled) {
+        m_smartSuggestionsEnabled = enabled;
+        emit smartSuggestionsEnabledChanged();
+    }
+}
+
+void SettingsManager::setAutoUpdateEnabled(bool enabled)
+{
+    if (m_autoUpdateEnabled != enabled) {
+        m_autoUpdateEnabled = enabled;
+        emit autoUpdateEnabledChanged();
+    }
+}
+
+void SettingsManager::setAudioDriver(const QString &driver)
+{
+    if (m_audioDriver != driver) {
+        m_audioDriver = driver;
+        emit audioDriverChanged();
+    }
+}
+
+void SettingsManager::setSampleRate(const QString &rate)
+{
+    if (m_sampleRate != rate) {
+        m_sampleRate = rate;
+        emit sampleRateChanged();
     }
 }

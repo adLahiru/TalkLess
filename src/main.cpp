@@ -146,8 +146,11 @@ int main(int argc, char *argv[])
         Qt::QueuedConnection);
     
     // Connect application close event to save all settings
-    QObject::connect(&app, &QGuiApplication::aboutToQuit, [&hotkeyManager, &audioManager, &soundboardView]() {
+    QObject::connect(&app, &QGuiApplication::aboutToQuit, [&hotkeyManager, &audioManager, &soundboardView, &settingsManager]() {
         qDebug() << "Application is closing - saving all settings...";
+        
+        // Save all UI/feature/update settings to JSON
+        settingsManager.saveAllSettings();
         
         // Save hotkeys (already implemented in HotkeyManager)
         hotkeyManager.saveHotkeys();

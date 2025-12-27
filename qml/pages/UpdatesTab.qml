@@ -29,7 +29,8 @@ Item {
             }
             
             ToggleSwitch {
-                checked: true
+                checked: settingsManager.autoUpdateEnabled
+                onCheckedChanged: settingsManager.autoUpdateEnabled = checked
             }
         }
         

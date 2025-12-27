@@ -23,26 +23,30 @@ Item {
         
         FeatureToggleItem {
             featureName: "Equalizer"
-            isEnabled: true
+            isEnabled: settingsManager.equalizerEnabled
             Layout.fillWidth: true
+            onEnabledChanged: settingsManager.equalizerEnabled = isEnabled
         }
         
         FeatureToggleItem {
             featureName: "Macros"
-            isEnabled: true
+            isEnabled: settingsManager.macrosEnabled
             Layout.fillWidth: true
+            onEnabledChanged: settingsManager.macrosEnabled = isEnabled
         }
         
         FeatureToggleItem {
             featureName: "API Access"
-            isEnabled: true
+            isEnabled: settingsManager.apiAccessEnabled
             Layout.fillWidth: true
+            onEnabledChanged: settingsManager.apiAccessEnabled = isEnabled
         }
         
         FeatureToggleItem {
             featureName: "Smart Suggestions"
-            isEnabled: true
+            isEnabled: settingsManager.smartSuggestionsEnabled
             Layout.fillWidth: true
+            onEnabledChanged: settingsManager.smartSuggestionsEnabled = isEnabled
         }
         
         Item { Layout.fillHeight: true }
@@ -53,6 +57,7 @@ Item {
             
             ActionButton {
                 text: "Save Changes"
+                onClicked: settingsManager.saveAllSettings()
             }
             
             Item { Layout.fillWidth: true }
