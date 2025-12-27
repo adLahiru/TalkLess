@@ -53,6 +53,13 @@ jobs:
           arch: ${{ matrix.arch }}
           modules: 'qtmultimedia'
           cache: true
+          set-env: true
+
+      - name: Set Qt paths
+        run: |
+          echo "QT_PATH=${QT_ROOT_DIR}" >> $GITHUB_ENV
+          echo "Qt installed at: ${QT_ROOT_DIR}"
+          ls -la "${QT_ROOT_DIR}/bin/" | head -10
 
       - name: Install build dependencies
         run: |
@@ -62,7 +69,7 @@ jobs:
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DCMAKE_PREFIX_PATH="${Qt6_DIR}" \
+            -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR}" \
             -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
             -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
 
@@ -85,7 +92,7 @@ jobs:
           echo "=== Deploying Qt dependencies ==="
           
           # Run macdeployqt to bundle all Qt frameworks, plugins, and QML modules
-          "${Qt6_DIR}/bin/macdeployqt" build/appTalkLess.app \
+          "${QT_ROOT_DIR}/bin/macdeployqt" build/appTalkLess.app \
             -qmldir=qml \
             -verbose=2 \
             -always-overwrite
@@ -196,6 +203,14 @@ jobs:
           arch: 'win64_msvc2022_64'
           modules: 'qtmultimedia'
           cache: true
+          set-env: true
+
+      - name: Set Qt paths
+        shell: pwsh
+        run: |
+          echo "QT_PATH=$env:QT_ROOT_DIR" >> $env:GITHUB_ENV
+          Write-Host "Qt installed at: $env:QT_ROOT_DIR"
+          Get-ChildItem "$env:QT_ROOT_DIR\bin" | Select-Object -First 10
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
@@ -210,7 +225,7 @@ jobs:
         run: |
           cmake -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
-            -DCMAKE_PREFIX_PATH="$env:Qt6_DIR" `
+            -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" `
             -DCMAKE_C_COMPILER=cl `
             -DCMAKE_CXX_COMPILER=cl
 
@@ -244,7 +259,7 @@ jobs:
           Copy-Item "build/appTalkLess.exe" "deploy/"
           
           # Run windeployqt to gather all DLLs, plugins, and QML modules
-          $windeployqt = Join-Path $env:Qt6_DIR "bin/windeployqt.exe"
+          $windeployqt = Join-Path $env:QT_ROOT_DIR "bin/windeployqt.exe"
           
           & $windeployqt `
             --release `
