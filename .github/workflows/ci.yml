@@ -11,6 +11,9 @@ env:
   BUILD_TYPE: Release
 
 jobs:
+  # ============================================================================
+  # macOS Build Verification
+  # ============================================================================
   build-macos:
     runs-on: macos-14
     steps:
@@ -33,16 +36,42 @@ jobs:
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DCMAKE_PREFIX_PATH=${{ env.Qt6_DIR }}
+            -DCMAKE_PREFIX_PATH="${Qt6_DIR}" \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
 
       - name: Build
-        run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel
+        run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel $(sysctl -n hw.ncpu)
 
       - name: Verify build
         run: |
+          echo "=== Build output ==="
           ls -la build/
-          test -d build/appTalkLess.app && echo "✅ macOS app bundle created successfully"
+          
+          if [ ! -d "build/appTalkLess.app" ]; then
+            echo "❌ ERROR: App bundle not found!"
+            exit 1
+          fi
+          
+          echo "✅ macOS app bundle created successfully"
+          echo "App bundle size: $(du -sh build/appTalkLess.app | cut -f1)"
 
+      - name: Test Qt deployment
+        run: |
+          # Verify macdeployqt can process the app
+          "${Qt6_DIR}/bin/macdeployqt" build/appTalkLess.app \
+            -qmldir=qml \
+            -verbose=1
+          
+          # Check frameworks were deployed
+          if [ -d "build/appTalkLess.app/Contents/Frameworks" ]; then
+            echo "✅ Qt frameworks deployed successfully"
+            ls build/appTalkLess.app/Contents/Frameworks/
+          fi
+
+  # ============================================================================
+  # Windows Build Verification
+  # ============================================================================
   build-windows:
     runs-on: windows-latest
     steps:
@@ -66,11 +95,17 @@ jobs:
         with:
           arch: x64
 
+      - name: Install Ninja
+        run: choco install ninja -y
+
       - name: Configure CMake
+        shell: pwsh
         run: |
           cmake -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
-            -DCMAKE_PREFIX_PATH="$env:Qt6_DIR"
+            -DCMAKE_PREFIX_PATH="$env:Qt6_DIR" `
+            -DCMAKE_C_COMPILER=cl `
+            -DCMAKE_CXX_COMPILER=cl
 
       - name: Build
         run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel
@@ -78,10 +113,40 @@ jobs:
       - name: Verify build
         shell: pwsh
         run: |
+          Write-Host "=== Build output ==="
           Get-ChildItem build/
-          if (Test-Path "build/appTalkLess.exe") {
-            Write-Host "✅ Windows executable created successfully"
+          
+          if (-not (Test-Path "build/appTalkLess.exe")) {
+            Write-Error "❌ ERROR: Executable not found!"
+            exit 1
+          }
+          
+          $exe = Get-Item "build/appTalkLess.exe"
+          Write-Host "✅ Windows executable created successfully"
+          Write-Host "Executable size: $([math]::Round($exe.Length / 1MB, 2)) MB"
+
+      - name: Test Qt deployment
+        shell: pwsh
+        run: |
+          # Create test deployment directory
+          New-Item -ItemType Directory -Force -Path "test_deploy"
+          Copy-Item "build/appTalkLess.exe" "test_deploy/"
+          
+          # Run windeployqt
+          $windeployqt = Join-Path $env:Qt6_DIR "bin/windeployqt.exe"
+          & $windeployqt `
+            --release `
+            --no-translations `
+            --qmldir "qml" `
+            --dir "test_deploy" `
+            "test_deploy/appTalkLess.exe"
+          
+          # Verify DLLs were deployed
+          $dlls = Get-ChildItem "test_deploy" -Filter "*.dll"
+          if ($dlls.Count -gt 0) {
+            Write-Host "✅ Qt dependencies deployed successfully"
+            Write-Host "DLLs deployed: $($dlls.Count)"
           } else {
-            Write-Error "❌ Build failed - executable not found"
+            Write-Error "❌ No DLLs deployed!"
             exit 1
           }
