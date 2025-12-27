@@ -59,6 +59,7 @@ public:
     // Invokable methods for QML
     Q_INVOKABLE void loadAudioFile(const QString &clipId, const QUrl &filePath);
     Q_INVOKABLE void playClip(const QString &clipId);
+    Q_INVOKABLE void playClipFromStart(const QString &clipId);
     Q_INVOKABLE void pauseClip(const QString &clipId);
     Q_INVOKABLE void stopClip(const QString &clipId);
     Q_INVOKABLE void stopAll();

@@ -109,9 +109,9 @@ int main(int argc, char *argv[])
     qmlRegisterSingletonInstance("TalkLess", 1, 0, "SettingsManager", &settingsManager);
     
     qDebug() << "Connecting signals...";
-    // Connect hotkey manager to audio manager
+    // Connect hotkey manager to audio manager - play from start when hotkey triggered
     QObject::connect(&hotkeyManager, &HotkeyManager::hotkeyTriggered,
-                     &audioManager, &AudioManager::playClip);
+                     &audioManager, &AudioManager::playClipFromStart);
     
     // Connect system hotkeys
     QObject::connect(&hotkeyManager, &HotkeyManager::playPauseTriggered,

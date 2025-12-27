@@ -173,6 +173,50 @@ void AudioManager::playClip(const QString &clipId)
     }
 }
 
+void AudioManager::playClipFromStart(const QString &clipId)
+{
+    qDebug() << "Playing clip from start (hotkey triggered):" << clipId;
+    
+    AudioClip* clip = getClip(clipId);
+    if (!clip) {
+        qWarning() << "Clip not found:" << clipId;
+        return;
+    }
+    
+    // Stop currently playing clip if different
+    if (!m_currentPlayingId.isEmpty() && m_currentPlayingId != clipId) {
+        stopClip(m_currentPlayingId);
+    }
+    
+    if (!m_players.contains(clipId)) {
+        initializePlayer(clipId);
+        loadAudioFile(clipId, clip->filePath());
+    }
+    
+    QMediaPlayer* player = m_players[clipId];
+    if (player) {
+        // Always reset to beginning (or trim start position)
+        qint64 startPosition = clip->trimStart() > 0 ? static_cast<qint64>(clip->trimStart() * 1000) : 0;
+        player->setPosition(startPosition);
+        
+        player->play();
+        // Start secondary player if available
+        if (m_secondaryPlayers.contains(clipId)) {
+            QMediaPlayer* secondaryPlayer = m_secondaryPlayers[clipId];
+            if (secondaryPlayer) {
+                secondaryPlayer->setPosition(startPosition);
+                secondaryPlayer->play();
+            }
+        }
+        m_currentPlayingId = clipId;
+        m_currentClip = clip;
+        clip->setIsPlaying(true);
+        
+        emit currentClipChanged();
+        emit isPlayingChanged();
+    }
+}
+
 void AudioManager::pauseClip(const QString &clipId)
 {
     qDebug() << "Pausing clip:" << clipId;

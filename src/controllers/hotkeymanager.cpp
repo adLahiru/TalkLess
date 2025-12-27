@@ -126,10 +126,7 @@ void HotkeyManager::handleKeyPress(int key, int modifiers)
         QString clipId = m_hotkeyClips[hotkeyString];
         qDebug() << "Hotkey triggered:" << hotkeyString << "for clip:" << clipId;
         
-        // Bring application to front before playing the clip
-        bringToFront();
-        
-        // Then trigger the clip playback
+        // Trigger the clip playback (don't bring app to front - play in background)
         emit hotkeyTriggered(clipId);
     }
 }
@@ -442,10 +439,7 @@ OSStatus HotkeyManager::hotkeyCallback(EventHandlerCallRef nextHandler, EventRef
         QString clipId = manager->m_hotkeyIdToClipId[hotkeyId];
         qDebug() << "Global hotkey triggered for clip:" << clipId;
         
-        // Bring application to front before playing the clip
-        QMetaObject::invokeMethod(manager, "bringToFront", Qt::QueuedConnection);
-        
-        // Then trigger the clip playback
+        // Trigger the clip playback (don't bring app to front - play in background)
         QMetaObject::invokeMethod(manager, "hotkeyTriggered", Qt::QueuedConnection, Q_ARG(QString, clipId));
     }
     
@@ -654,10 +648,7 @@ LRESULT CALLBACK HotkeyManager::messageHookProc(int nCode, WPARAM wParam, LPARAM
                 QString clipId = s_instance->m_registeredHotkeys[hotkeyId];
                 qDebug() << "Global hotkey triggered for clip:" << clipId;
                 
-                // Bring application to front before playing the clip
-                QMetaObject::invokeMethod(s_instance, "bringToFront", Qt::QueuedConnection);
-                
-                // Then trigger the clip playback
+                // Trigger the clip playback (don't bring app to front - play in background)
                 QMetaObject::invokeMethod(s_instance, "hotkeyTriggered", Qt::QueuedConnection, Q_ARG(QString, clipId));
             }
         }
