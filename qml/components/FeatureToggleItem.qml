@@ -8,7 +8,7 @@ Rectangle {
     property string featureName: ""
     property bool isEnabled: true
     
-    signal toggled(bool enabled)
+    signal enabledChanged(bool enabled)
     
     width: parent ? parent.width : 400
     height: 50
@@ -28,9 +28,12 @@ Rectangle {
         }
         
         ToggleSwitch {
-            checked: isEnabled
-            onToggled: function(checked) {
-                root.toggled(checked)
+            checked: root.isEnabled
+            onCheckedChanged: {
+                if (root.isEnabled !== checked) {
+                    root.isEnabled = checked
+                    root.enabledChanged(checked)
+                }
             }
         }
     }

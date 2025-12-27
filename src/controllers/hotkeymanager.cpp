@@ -154,6 +154,10 @@ QVariantList HotkeyManager::getClipsWithHotkeys() const
 void HotkeyManager::saveHotkeys()
 {
     QSettings settings("TalkLess", "Hotkeys");
+    
+    // Save global hotkeys enabled state
+    settings.setValue("globalHotkeysEnabled", m_globalHotkeysEnabled);
+    
     settings.beginGroup("hotkeys");
     settings.remove("");  // Clear existing hotkeys
     
@@ -163,13 +167,24 @@ void HotkeyManager::saveHotkeys()
     
     settings.endGroup();
     settings.sync();
-    qDebug() << "Saved" << m_clipHotkeys.size() << "hotkeys to settings";
+    qDebug() << "Saved" << m_clipHotkeys.size() << "hotkeys to settings (globalHotkeysEnabled:" << m_globalHotkeysEnabled << ")";
 }
 
 void HotkeyManager::loadHotkeys()
 {
     try {
         QSettings settings("TalkLess", "Hotkeys");
+        
+        // Load global hotkeys enabled state
+        if (settings.contains("globalHotkeysEnabled")) {
+            bool enabled = settings.value("globalHotkeysEnabled", true).toBool();
+            if (m_globalHotkeysEnabled != enabled) {
+                m_globalHotkeysEnabled = enabled;
+                emit globalHotkeysEnabledChanged();
+            }
+            qDebug() << "Loaded globalHotkeysEnabled:" << m_globalHotkeysEnabled;
+        }
+        
         settings.beginGroup("hotkeys");
         
         QStringList clipIds = settings.childKeys();
@@ -329,6 +344,12 @@ void HotkeyManager::setGlobalHotkeysEnabled(bool enabled)
             teardownGlobalHotkeyListener();
             qDebug() << "Global hotkeys DISABLED - hotkeys will NOT work when app is minimized";
         }
+        
+        // Save state immediately
+        QSettings settings("TalkLess", "Hotkeys");
+        settings.setValue("globalHotkeysEnabled", m_globalHotkeysEnabled);
+        settings.sync();
+        
         emit globalHotkeysEnabledChanged();
         qDebug() << "Global hotkeys enabled:" << enabled;
     }

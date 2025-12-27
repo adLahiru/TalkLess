@@ -12,11 +12,11 @@ Item {
         
         FeatureToggleItem {
             featureName: "Global Hotkeys"
-            isEnabled: hotkeyManager ? hotkeyManager.globalHotkeysEnabled : false
+            isEnabled: hotkeyManager ? hotkeyManager.globalHotkeysEnabled : true
             Layout.fillWidth: true
-            onEnabledChanged: {
+            onEnabledChanged: function(enabled) {
                 if (hotkeyManager) {
-                    hotkeyManager.globalHotkeysEnabled = isEnabled
+                    hotkeyManager.globalHotkeysEnabled = enabled
                 }
             }
         }
@@ -25,28 +25,28 @@ Item {
             featureName: "Equalizer"
             isEnabled: settingsManager.equalizerEnabled
             Layout.fillWidth: true
-            onEnabledChanged: settingsManager.equalizerEnabled = isEnabled
+            onEnabledChanged: function(enabled) { settingsManager.equalizerEnabled = enabled }
         }
         
         FeatureToggleItem {
             featureName: "Macros"
             isEnabled: settingsManager.macrosEnabled
             Layout.fillWidth: true
-            onEnabledChanged: settingsManager.macrosEnabled = isEnabled
+            onEnabledChanged: function(enabled) { settingsManager.macrosEnabled = enabled }
         }
         
         FeatureToggleItem {
             featureName: "API Access"
             isEnabled: settingsManager.apiAccessEnabled
             Layout.fillWidth: true
-            onEnabledChanged: settingsManager.apiAccessEnabled = isEnabled
+            onEnabledChanged: function(enabled) { settingsManager.apiAccessEnabled = enabled }
         }
         
         FeatureToggleItem {
             featureName: "Smart Suggestions"
             isEnabled: settingsManager.smartSuggestionsEnabled
             Layout.fillWidth: true
-            onEnabledChanged: settingsManager.smartSuggestionsEnabled = isEnabled
+            onEnabledChanged: function(enabled) { settingsManager.smartSuggestionsEnabled = enabled }
         }
         
         Item { Layout.fillHeight: true }

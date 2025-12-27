@@ -6,7 +6,8 @@ Rectangle {
     
     property bool checked: false
     
-    signal toggled(bool checked)
+    // Emit when checked state changes (for two-way binding)
+    signal checkedChanged()
     
     width: 52
     height: 28
@@ -35,8 +36,7 @@ Rectangle {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
         onClicked: {
-            checked = !checked
-            toggled(checked)
+            root.checked = !root.checked
         }
     }
 }
