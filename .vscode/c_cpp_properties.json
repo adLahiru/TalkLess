@@ -6,17 +6,17 @@
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/lib",
                 "${workspaceFolder}/build/appTalkLess_autogen/include",
-                "/Users/lahiru/Qt/6.10.1/macos/lib/QtCore.framework/Headers",
-                "/Users/lahiru/Qt/6.10.1/macos/lib/QtGui.framework/Headers",
-                "/Users/lahiru/Qt/6.10.1/macos/lib/QtQml.framework/Headers",
-                "/Users/lahiru/Qt/6.10.1/macos/lib/QtQuick.framework/Headers",
-                "/Users/lahiru/Qt/6.10.1/macos/lib/QtMultimedia.framework/Headers",
-                "/Users/lahiru/Qt/6.10.1/macos/lib/QtQuickControls2.framework/Headers",
-                "/Users/lahiru/Qt/6.10.1/macos/lib/QtNetwork.framework/Headers",
-                "/Users/lahiru/Qt/6.10.1/macos/lib/QtOpenGL.framework/Headers",
-                "/Users/lahiru/Qt/6.10.1/macos/include",
-                "/Users/lahiru/Qt/6.10.1/macos/include/QtQmlIntegration",
-                "/Users/lahiru/Qt/6.10.1/macos/mkspecs/macx-clang"
+                "${config:qt.installPath}/lib/QtCore.framework/Headers",
+                "${config:qt.installPath}/lib/QtGui.framework/Headers",
+                "${config:qt.installPath}/lib/QtQml.framework/Headers",
+                "${config:qt.installPath}/lib/QtQuick.framework/Headers",
+                "${config:qt.installPath}/lib/QtMultimedia.framework/Headers",
+                "${config:qt.installPath}/lib/QtQuickControls2.framework/Headers",
+                "${config:qt.installPath}/lib/QtNetwork.framework/Headers",
+                "${config:qt.installPath}/lib/QtOpenGL.framework/Headers",
+                "${config:qt.installPath}/include",
+                "${config:qt.installPath}/include/QtQmlIntegration",
+                "${config:qt.installPath}/mkspecs/macx-clang"
             ],
             "defines": [
                 "QT_CORE_LIB",
@@ -30,7 +30,7 @@
                 "QT_QMLINTEGRATION_LIB"
             ],
             "macFrameworkPath": [
-                "/Users/lahiru/Qt/6.10.1/macos/lib",
+                "${config:qt.installPath}/lib",
                 "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
             ],
             "compilerPath": "/usr/bin/clang++",

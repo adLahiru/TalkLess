@@ -2,5 +2,11 @@
     "cmake.sourceDirectory": "${workspaceFolder}",
     "cmake.buildDirectory": "${workspaceFolder}/build",
     "C_Cpp.intelliSenseEngine": "default",
-    "C_Cpp.errorSquiggles": "enabled"
+    "C_Cpp.errorSquiggles": "enabled",
+    // ========================================
+    // Qt Configuration - CHANGE PATH HERE ONLY
+    // ========================================
+    // When you update Qt version or move Qt installation,
+    // only change this single path below:
+    "qt.installPath": "/Users/lahiru/Qt/6.10.1/macos"
 }
