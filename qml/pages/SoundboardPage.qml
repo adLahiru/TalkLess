@@ -156,9 +156,112 @@ Item {
             
             // Audio Grid
             ScrollView {
+                id: audioGridScrollView
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
+                
+                // Helper function to check if file is audio
+                function isAudioFile(filePath) {
+                    var path = filePath.toString().toLowerCase()
+                    var audioExtensions = [".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".wma", ".aiff"]
+                    for (var i = 0; i < audioExtensions.length; i++) {
+                        if (path.endsWith(audioExtensions[i])) {
+                            return true
+                        }
+                    }
+                    return false
+                }
+                
+                // Helper function to extract name from path
+                function extractNameFromPath(path) {
+                    var filename = path.toString().split('/').pop()
+                    var lastDot = filename.lastIndexOf('.')
+                    if (lastDot > 0) {
+                        filename = filename.substring(0, lastDot)
+                    }
+                    filename = filename.replace(/_/g, ' ').replace(/-/g, ' ')
+                    return filename
+                }
+                
+                // Global drop area for the entire grid
+                DropArea {
+                    id: gridDropArea
+                    anchors.fill: parent
+                    z: -1  // Behind the grid items
+                    
+                    onEntered: function(drag) {
+                        if (drag.hasUrls) {
+                            var hasAudio = false
+                            for (var i = 0; i < drag.urls.length; i++) {
+                                if (audioGridScrollView.isAudioFile(drag.urls[i].toString())) {
+                                    hasAudio = true
+                                    break
+                                }
+                            }
+                            drag.accepted = hasAudio
+                        } else {
+                            drag.accepted = false
+                        }
+                    }
+                    
+                    onDropped: function(drop) {
+                        if (drop.hasUrls) {
+                            for (var i = 0; i < drop.urls.length; i++) {
+                                var url = drop.urls[i].toString()
+                                if (audioGridScrollView.isAudioFile(url)) {
+                                    var filename = audioGridScrollView.extractNameFromPath(url)
+                                    var sectionId = soundboardView.currentSection ? soundboardView.currentSection.id : ""
+                                    var clip = audioManager.addClip(filename, url, "", sectionId)
+                                    if (clip) {
+                                        selectedClip = clip
+                                        rightPanelIndex = 0
+                                    }
+                                    break // Only handle first audio file
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Visual feedback overlay when dragging
+                Rectangle {
+                    anchors.fill: parent
+                    color: "#7C3AED"
+                    opacity: gridDropArea.containsDrag ? 0.1 : 0
+                    visible: gridDropArea.containsDrag
+                    z: 100
+                    
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 200
+                        height: 100
+                        radius: 12
+                        color: "#1a1a2e"
+                        border.color: "#7C3AED"
+                        border.width: 2
+                        
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 8
+                            
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "↓"
+                                font.pixelSize: 32
+                                color: "#7C3AED"
+                            }
+                            
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "Drop Audio Here"
+                                font.pixelSize: 14
+                                font.weight: Font.Medium
+                                color: "#7C3AED"
+                            }
+                        }
+                    }
+                }
                 
                 GridLayout {
                     width: parent.width
@@ -174,6 +277,22 @@ Item {
                     // Add Audio Card
                     AddAudioCard {
                         onClicked: rightPanelIndex = 1
+                        onAudioDropped: function(filePath) {
+                            // Extract name from file path
+                            var filename = filePath.toString().split('/').pop()
+                            var lastDot = filename.lastIndexOf('.')
+                            if (lastDot > 0) {
+                                filename = filename.substring(0, lastDot)
+                            }
+                            filename = filename.replace(/_/g, ' ').replace(/-/g, ' ')
+                            
+                            var sectionId = soundboardView.currentSection ? soundboardView.currentSection.id : ""
+                            var clip = audioManager.addClip(filename, filePath, "", sectionId)
+                            if (clip) {
+                                selectedClip = clip
+                                rightPanelIndex = 0
+                            }
+                        }
                     }
                     
                     // Audio Cards

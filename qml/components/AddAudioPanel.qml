@@ -18,6 +18,29 @@ Rectangle {
     signal audioAdded(string name, string filePath, string imagePath)
     signal cancelled()
     
+    // Supported audio file extensions
+    readonly property var audioExtensions: [".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".wma", ".aiff"]
+    
+    function isAudioFile(filePath) {
+        var path = filePath.toString().toLowerCase()
+        for (var i = 0; i < audioExtensions.length; i++) {
+            if (path.endsWith(audioExtensions[i])) {
+                return true
+            }
+        }
+        return false
+    }
+    
+    // Set audio file from external source (drag and drop)
+    function setAudioFile(filePath) {
+        selectedFilePath = filePath
+        filePathText.text = filePath.toString().split('/').pop()
+        // Auto-fill name from filename if empty
+        if (audioName === "") {
+            audioName = extractNameFromPath(filePath)
+        }
+    }
+    
     // Connect to audio manager error signal
     Connections {
         target: audioManager
@@ -303,12 +326,13 @@ Rectangle {
         }
         
         Rectangle {
+            id: audioDropZone
             Layout.fillWidth: true
             Layout.preferredHeight: 80
             radius: 8
-            color: "transparent"
-            border.color: selectedFilePath ? "#7C3AED" : "#4B5563"
-            border.width: 1
+            color: audioDropArea.containsDrag ? "#2a2a4e" : "transparent"
+            border.color: audioDropArea.containsDrag ? "#7C3AED" : (selectedFilePath ? "#7C3AED" : "#4B5563")
+            border.width: audioDropArea.containsDrag ? 2 : 1
             
             ColumnLayout {
                 anchors.centerIn: parent
@@ -316,20 +340,52 @@ Rectangle {
                 
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: selectedFilePath ? "✓" : "⬆"
+                    text: audioDropArea.containsDrag ? "↓" : (selectedFilePath ? "✓" : "⬆")
                     font.pixelSize: 20
-                    color: selectedFilePath ? "#7C3AED" : "#6B7280"
+                    color: audioDropArea.containsDrag ? "#7C3AED" : (selectedFilePath ? "#7C3AED" : "#6B7280")
                 }
                 
                 Text {
                     id: filePathText
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.maximumWidth: parent.parent.width - 20
-                    text: selectedFilePath ? selectedFilePath.toString().split('/').pop() : "Click to browse audio"
+                    Layout.maximumWidth: audioDropZone.width - 20
+                    text: audioDropArea.containsDrag ? "Drop audio file here" : (selectedFilePath ? selectedFilePath.toString().split('/').pop() : "Click or drag audio here")
                     font.pixelSize: 11
-                    color: selectedFilePath ? "#7C3AED" : "#6B7280"
+                    color: audioDropArea.containsDrag ? "#7C3AED" : (selectedFilePath ? "#7C3AED" : "#6B7280")
                     elide: Text.ElideMiddle
                     horizontalAlignment: Text.AlignHCenter
+                }
+            }
+            
+            DropArea {
+                id: audioDropArea
+                anchors.fill: parent
+                
+                onEntered: function(drag) {
+                    if (drag.hasUrls) {
+                        var hasAudio = false
+                        for (var i = 0; i < drag.urls.length; i++) {
+                            if (isAudioFile(drag.urls[i].toString())) {
+                                hasAudio = true
+                                break
+                            }
+                        }
+                        drag.accepted = hasAudio
+                    } else {
+                        drag.accepted = false
+                    }
+                }
+                
+                onDropped: function(drop) {
+                    if (drop.hasUrls) {
+                        for (var i = 0; i < drop.urls.length; i++) {
+                            var url = drop.urls[i].toString()
+                            if (isAudioFile(url)) {
+                                setAudioFile(url)
+                                break
+                            }
+                        }
+                    }
                 }
             }
             

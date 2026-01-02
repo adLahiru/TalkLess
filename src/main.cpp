@@ -10,6 +10,7 @@
 #include <QDebug>
 #include <QSettings>
 #include <QDir>
+#include <QTimer>
 #include "controllers/maincontroller.h"
 #include "controllers/audiomanager.h"
 #include "controllers/hotkeymanager.h"
