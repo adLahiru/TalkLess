@@ -1,6 +1,3 @@
 #include "soundboardsection.h"
 
-SoundboardSection::SoundboardSection(QObject *parent)
-    : QObject(parent)
-{
-}
+SoundboardSection::SoundboardSection(QObject* parent) : QObject(parent) {}

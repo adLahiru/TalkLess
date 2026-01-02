@@ -1,23 +1,17 @@
 #include "audioplayerview.h"
+
 #include <QDebug>
 
-AudioPlayerView::AudioPlayerView(AudioManager* audioMgr, QObject *parent)
-    : QObject(parent)
-    , m_audioManager(audioMgr)
-    , m_savedVolume(1.0)
+AudioPlayerView::AudioPlayerView(AudioManager* audioMgr, QObject* parent)
+    : QObject(parent), m_audioManager(audioMgr), m_savedVolume(1.0)
 {
     // Connect to audio manager signals
-    connect(m_audioManager, &AudioManager::currentClipChanged,
-            this, &AudioPlayerView::onCurrentClipChanged);
-    connect(m_audioManager, &AudioManager::isPlayingChanged,
-            this, &AudioPlayerView::onPlayingStateChanged);
-    connect(m_audioManager, &AudioManager::currentPositionChanged,
-            this, &AudioPlayerView::currentPositionChanged);
-    connect(m_audioManager, &AudioManager::currentDurationChanged,
-            this, &AudioPlayerView::currentDurationChanged);
-    connect(m_audioManager, &AudioManager::volumeChanged,
-            this, &AudioPlayerView::volumeChanged);
-    
+    connect(m_audioManager, &AudioManager::currentClipChanged, this, &AudioPlayerView::onCurrentClipChanged);
+    connect(m_audioManager, &AudioManager::isPlayingChanged, this, &AudioPlayerView::onPlayingStateChanged);
+    connect(m_audioManager, &AudioManager::currentPositionChanged, this, &AudioPlayerView::currentPositionChanged);
+    connect(m_audioManager, &AudioManager::currentDurationChanged, this, &AudioPlayerView::currentDurationChanged);
+    connect(m_audioManager, &AudioManager::volumeChanged, this, &AudioPlayerView::volumeChanged);
+
     qDebug() << "AudioPlayerView initialized";
 }
 

@@ -8,7 +8,7 @@ Rectangle {
     property string featureName: ""
     property bool isEnabled: true
     
-    signal enabledChanged(bool enabled)
+    signal toggled(bool enabled)
     
     width: parent ? parent.width : 400
     height: 50
@@ -32,7 +32,7 @@ Rectangle {
             onCheckedChanged: {
                 if (root.isEnabled !== checked) {
                     root.isEnabled = checked
-                    root.enabledChanged(checked)
+                    root.toggled(checked)
                 }
             }
         }

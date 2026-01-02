@@ -5,11 +5,10 @@ import TalkLess 1.0
 
 Item {
     id: root
-    anchors.fill: parent
-    anchors.margins: 24
 
     ColumnLayout {
         anchors.fill: parent
+        anchors.margins: 24
         spacing: 24
 
         Text {
@@ -23,11 +22,11 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.margins: 0
             color: "#26293a"
             radius: 12
             border.color: "#3f3f46"
             border.width: 1
-            anchors.margins: 24
 
             ColumnLayout {
                 anchors.fill: parent

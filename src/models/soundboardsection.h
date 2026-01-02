@@ -1,10 +1,11 @@
 #ifndef SOUNDBOARDSECTION_H
 #define SOUNDBOARDSECTION_H
 
+#include "audioclip.h"
+
+#include <QList>
 #include <QObject>
 #include <QString>
-#include <QList>
-#include "audioclip.h"
 
 class SoundboardSection : public QObject
 {
@@ -16,10 +17,11 @@ class SoundboardSection : public QObject
     Q_PROPERTY(int clipCount READ clipCount NOTIFY clipCountChanged)
 
 public:
-    explicit SoundboardSection(QObject *parent = nullptr);
+    explicit SoundboardSection(QObject* parent = nullptr);
 
     QString id() const { return m_id; }
-    void setId(const QString &id) {
+    void setId(const QString& id)
+    {
         if (m_id != id) {
             m_id = id;
             emit idChanged();
@@ -27,7 +29,8 @@ public:
     }
 
     QString name() const { return m_name; }
-    void setName(const QString &name) {
+    void setName(const QString& name)
+    {
         if (m_name != name) {
             m_name = name;
             emit nameChanged();
@@ -35,7 +38,8 @@ public:
     }
 
     QString imagePath() const { return m_imagePath; }
-    void setImagePath(const QString &imagePath) {
+    void setImagePath(const QString& imagePath)
+    {
         if (m_imagePath != imagePath) {
             m_imagePath = imagePath;
             emit imagePathChanged();
@@ -43,7 +47,8 @@ public:
     }
 
     bool isSelected() const { return m_isSelected; }
-    void setIsSelected(bool isSelected) {
+    void setIsSelected(bool isSelected)
+    {
         if (m_isSelected != isSelected) {
             m_isSelected = isSelected;
             emit isSelectedChanged();
@@ -53,13 +58,15 @@ public:
     int clipCount() const { return m_clipIds.count(); }
 
     QStringList clipIds() const { return m_clipIds; }
-    void addClipId(const QString &clipId) {
+    void addClipId(const QString& clipId)
+    {
         if (!m_clipIds.contains(clipId)) {
             m_clipIds.append(clipId);
             emit clipCountChanged();
         }
     }
-    void removeClipId(const QString &clipId) {
+    void removeClipId(const QString& clipId)
+    {
         if (m_clipIds.removeOne(clipId)) {
             emit clipCountChanged();
         }

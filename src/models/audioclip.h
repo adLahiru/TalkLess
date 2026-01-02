@@ -23,110 +23,123 @@ class AudioClip : public QObject
     Q_PROPERTY(QString sectionId READ sectionId WRITE setSectionId NOTIFY sectionIdChanged)
 
 public:
-    explicit AudioClip(QObject *parent = nullptr);
+    explicit AudioClip(QObject* parent = nullptr);
 
     QString id() const { return m_id; }
-    void setId(const QString &id) { 
-        if (m_id != id) { 
-            m_id = id; 
-            emit idChanged(); 
-        } 
+    void setId(const QString& id)
+    {
+        if (m_id != id) {
+            m_id = id;
+            emit idChanged();
+        }
     }
 
     QString title() const { return m_title; }
-    void setTitle(const QString &title) { 
-        if (m_title != title) { 
-            m_title = title; 
-            emit titleChanged(); 
-        } 
+    void setTitle(const QString& title)
+    {
+        if (m_title != title) {
+            m_title = title;
+            emit titleChanged();
+        }
     }
 
     QString hotkey() const { return m_hotkey; }
-    void setHotkey(const QString &hotkey) { 
-        if (m_hotkey != hotkey) { 
-            m_hotkey = hotkey; 
-            emit hotkeyChanged(); 
-        } 
+    void setHotkey(const QString& hotkey)
+    {
+        if (m_hotkey != hotkey) {
+            m_hotkey = hotkey;
+            emit hotkeyChanged();
+        }
     }
 
     QUrl filePath() const { return m_filePath; }
-    void setFilePath(const QUrl &filePath) { 
-        if (m_filePath != filePath) { 
-            m_filePath = filePath; 
-            emit filePathChanged(); 
-        } 
+    void setFilePath(const QUrl& filePath)
+    {
+        if (m_filePath != filePath) {
+            m_filePath = filePath;
+            emit filePathChanged();
+        }
     }
 
     QString imagePath() const { return m_imagePath; }
-    void setImagePath(const QString &imagePath) { 
-        if (m_imagePath != imagePath) { 
-            m_imagePath = imagePath; 
-            emit imagePathChanged(); 
-        } 
+    void setImagePath(const QString& imagePath)
+    {
+        if (m_imagePath != imagePath) {
+            m_imagePath = imagePath;
+            emit imagePathChanged();
+        }
     }
 
     QString tagLabel() const { return m_tagLabel; }
-    void setTagLabel(const QString &tagLabel) { 
-        if (m_tagLabel != tagLabel) { 
-            m_tagLabel = tagLabel; 
-            emit tagLabelChanged(); 
-        } 
+    void setTagLabel(const QString& tagLabel)
+    {
+        if (m_tagLabel != tagLabel) {
+            m_tagLabel = tagLabel;
+            emit tagLabelChanged();
+        }
     }
 
     QString tagColor() const { return m_tagColor; }
-    void setTagColor(const QString &tagColor) { 
-        if (m_tagColor != tagColor) { 
-            m_tagColor = tagColor; 
-            emit tagColorChanged(); 
-        } 
+    void setTagColor(const QString& tagColor)
+    {
+        if (m_tagColor != tagColor) {
+            m_tagColor = tagColor;
+            emit tagColorChanged();
+        }
     }
 
     qreal duration() const { return m_duration; }
-    void setDuration(qreal duration) { 
-        if (m_duration != duration) { 
-            m_duration = duration; 
-            emit durationChanged(); 
-        } 
+    void setDuration(qreal duration)
+    {
+        if (m_duration != duration) {
+            m_duration = duration;
+            emit durationChanged();
+        }
     }
 
     qreal trimStart() const { return m_trimStart; }
-    void setTrimStart(qreal trimStart) { 
-        if (m_trimStart != trimStart) { 
-            m_trimStart = trimStart; 
-            emit trimStartChanged(); 
-        } 
+    void setTrimStart(qreal trimStart)
+    {
+        if (m_trimStart != trimStart) {
+            m_trimStart = trimStart;
+            emit trimStartChanged();
+        }
     }
 
     qreal trimEnd() const { return m_trimEnd; }
-    void setTrimEnd(qreal trimEnd) { 
-        if (m_trimEnd != trimEnd) { 
-            m_trimEnd = trimEnd; 
-            emit trimEndChanged(); 
-        } 
+    void setTrimEnd(qreal trimEnd)
+    {
+        if (m_trimEnd != trimEnd) {
+            m_trimEnd = trimEnd;
+            emit trimEndChanged();
+        }
     }
 
     qreal volume() const { return m_volume; }
-    void setVolume(qreal volume) { 
-        if (m_volume != volume) { 
-            m_volume = volume; 
-            emit volumeChanged(); 
-        } 
+    void setVolume(qreal volume)
+    {
+        if (m_volume != volume) {
+            m_volume = volume;
+            emit volumeChanged();
+        }
     }
 
     bool isPlaying() const { return m_isPlaying; }
-    void setIsPlaying(bool isPlaying) { 
-        if (m_isPlaying != isPlaying) { 
-            m_isPlaying = isPlaying; 
-            emit isPlayingChanged(); 
-        } 
+    void setIsPlaying(bool isPlaying)
+    {
+        if (m_isPlaying != isPlaying) {
+            m_isPlaying = isPlaying;
+            emit isPlayingChanged();
+        }
     }
 
     QString sectionId() const { return m_sectionId; }
-    void setSectionId(const QString &sectionId) { 
-        if (m_sectionId != sectionId) { 
-            m_sectionId = sectionId; 
-            emit sectionIdChanged(); 
-        } 
+    void setSectionId(const QString& sectionId)
+    {
+        if (m_sectionId != sectionId) {
+            m_sectionId = sectionId;
+            emit sectionIdChanged();
+        }
     }
 
 signals:

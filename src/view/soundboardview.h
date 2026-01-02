@@ -1,12 +1,13 @@
 #ifndef SOUNDBOARDVIEW_H
 #define SOUNDBOARDVIEW_H
 
-#include <QObject>
-#include <QQmlEngine>
-#include <QList>
 #include "../controllers/audiomanager.h"
 #include "../controllers/hotkeymanager.h"
 #include "../models/soundboardsection.h"
+
+#include <QList>
+#include <QObject>
+#include <QQmlEngine>
 
 class SoundboardView : public QObject
 {
@@ -20,7 +21,7 @@ class SoundboardView : public QObject
     Q_PROPERTY(QList<AudioClip*> currentSectionClips READ currentSectionClips NOTIFY currentSectionClipsChanged)
 
 public:
-    explicit SoundboardView(AudioManager* audioMgr, HotkeyManager* hotkeyMgr, QObject *parent = nullptr);
+    explicit SoundboardView(AudioManager* audioMgr, HotkeyManager* hotkeyMgr, QObject* parent = nullptr);
 
     AudioManager* audioManager() const { return m_audioManager; }
     HotkeyManager* hotkeyManager() const { return m_hotkeyManager; }
@@ -35,13 +36,13 @@ public:
     Q_INVOKABLE QString getAudioClipInfo(int slotIndex) const;
 
     // Section management methods
-    Q_INVOKABLE SoundboardSection* addSection(const QString &name);
-    Q_INVOKABLE void deleteSection(const QString &sectionId);
-    Q_INVOKABLE void renameSection(const QString &sectionId, const QString &newName);
-    Q_INVOKABLE void selectSection(const QString &sectionId);
-    Q_INVOKABLE void setActiveSection(const QString &sectionId);
-    Q_INVOKABLE SoundboardSection* getSection(const QString &sectionId) const;
-    
+    Q_INVOKABLE SoundboardSection* addSection(const QString& name);
+    Q_INVOKABLE void deleteSection(const QString& sectionId);
+    Q_INVOKABLE void renameSection(const QString& sectionId, const QString& newName);
+    Q_INVOKABLE void selectSection(const QString& sectionId);
+    Q_INVOKABLE void setActiveSection(const QString& sectionId);
+    Q_INVOKABLE SoundboardSection* getSection(const QString& sectionId) const;
+
     // Settings persistence
     Q_INVOKABLE void saveSoundboardData();
     Q_INVOKABLE void loadSoundboardData();
@@ -53,9 +54,9 @@ signals:
     void sectionsChanged();
     void currentSectionChanged();
     void activeSectionChanged();
-    void sectionAdded(const QString &sectionId);
-    void sectionDeleted(const QString &sectionId);
-    void sectionRenamed(const QString &sectionId, const QString &newName);
+    void sectionAdded(const QString& sectionId);
+    void sectionDeleted(const QString& sectionId);
+    void sectionRenamed(const QString& sectionId, const QString& newName);
     void currentSectionClipsChanged();
 
 private slots:

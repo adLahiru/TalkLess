@@ -1,9 +1,10 @@
 #ifndef AUDIOPLAYERVIEW_H
 #define AUDIOPLAYERVIEW_H
 
+#include "../controllers/audiomanager.h"
+
 #include <QObject>
 #include <QQmlEngine>
-#include "../controllers/audiomanager.h"
 
 class AudioPlayerView : public QObject
 {
@@ -16,7 +17,7 @@ class AudioPlayerView : public QObject
     Q_PROPERTY(qreal volume READ volume WRITE setVolume NOTIFY volumeChanged)
 
 public:
-    explicit AudioPlayerView(AudioManager* audioMgr, QObject *parent = nullptr);
+    explicit AudioPlayerView(AudioManager* audioMgr, QObject* parent = nullptr);
 
     QString currentTitle() const;
     qreal currentPosition() const;

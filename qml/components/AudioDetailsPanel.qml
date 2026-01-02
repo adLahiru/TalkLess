@@ -6,9 +6,10 @@ import TalkLess 1.0
 Rectangle {
     id: root
     
-    property string title: "Introducing"
-    property string imagePath: ""
-    property real voiceVolume: 45
+    property var clip: null
+    property string title: clip ? clip.title : "No Selection"
+    property string imagePath: clip ? clip.imagePath : ""
+    property real voiceVolume: clip ? clip.volume * 100 : 45
     property real speed: 1.0
     
     width: 280

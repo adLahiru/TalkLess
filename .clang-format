@@ -1,0 +1,189 @@
+# TalkLess Project - Clang Format Configuration
+# Compatible with clang-format 14+
+
+Language: Cpp
+Standard: c++17
+
+# Base style - modified for Qt conventions
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+IndentCaseLabels: false
+IndentCaseBlocks: false
+IndentPPDirectives: BeforeHash
+IndentExternBlock: AfterExternBlock
+IndentWrappedFunctionNames: false
+NamespaceIndentation: None
+AccessModifierOffset: -4
+
+# Braces
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterClass: true
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: true
+  AfterNamespace: false
+  AfterStruct: true
+  AfterUnion: true
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+
+# Line breaks
+ColumnLimit: 120
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+EmptyLineBeforeAccessModifier: LogicalBlock
+EmptyLineAfterAccessModifier: Never
+SeparateDefinitionBlocks: Leave
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignArrayOfStructures: Right
+AlignConsecutiveAssignments: None
+AlignConsecutiveBitFields: Consecutive
+AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: Consecutive
+AlignEscapedNewlines: Left
+AlignOperands: Align
+AlignTrailingComments: true
+
+# Arguments and parameters
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: All
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: Yes
+BinPackArguments: true
+BinPackParameters: true
+
+# Breaks
+BreakAfterJavaFieldAnnotations: true
+BreakBeforeBinaryOperators: None
+BreakBeforeConceptDeclarations: true
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeColon
+BreakInheritanceList: BeforeColon
+BreakStringLiterals: true
+
+# Spacing
+BitFieldColonSpacing: Both
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+PointerAlignment: Left
+ReferenceAlignment: Pointer
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceAroundPointerQualifiers: Default
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles: Never
+SpacesInCStyleCastParentheses: false
+SpacesInConditionalStatement: false
+SpacesInContainerLiterals: false
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: -1
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Includes and sorting
+SortIncludes: CaseSensitive
+SortUsingDeclarations: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  # Qt headers
+  - Regex: '^<Q[A-Z][a-zA-Z]*>'
+    Priority: 3
+    SortPriority: 3
+  - Regex: '^<Qt[A-Z][a-zA-Z]*/'
+    Priority: 3
+    SortPriority: 3
+  # Project headers
+  - Regex: '^"'
+    Priority: 1
+    SortPriority: 1
+  # System/STL headers
+  - Regex: '^<'
+    Priority: 4
+    SortPriority: 4
+
+# Penalties (for line breaking decisions)
+PenaltyBreakAssignment: 2
+PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakComment: 300
+PenaltyBreakFirstLessLess: 120
+PenaltyBreakOpenParenthesis: 0
+PenaltyBreakString: 1000
+PenaltyBreakTemplateDeclaration: 10
+PenaltyExcessCharacter: 1000000
+PenaltyIndentedWhitespace: 0
+PenaltyReturnTypeOnItsOwnLine: 1000
+
+# Other
+CompactNamespaces: false
+FixNamespaceComments: true
+InsertBraces: false
+InsertTrailingCommas: None
+LambdaBodyIndentation: Signature
+PackConstructorInitializers: BinPack
+QualifierAlignment: Leave
+ReflowComments: true
+ShortNamespaceLines: 1
+
+# Qt-specific macros
+AttributeMacros:
+  - Q_EMIT
+  - Q_SIGNAL
+  - Q_SLOT
+
+StatementMacros:
+  - Q_UNUSED
+  - QT_REQUIRE_VERSION
+
+ForEachMacros:
+  - foreach
+  - Q_FOREACH
+  - BOOST_FOREACH
+
+IfMacros:
+  - Q_LIKELY
+  - Q_UNLIKELY
+
+MacroBlockBegin: ''
+MacroBlockEnd: ''
+
+WhitespaceSensitiveMacros:
+  - STRINGIZE
+  - PP_STRINGIZE
+  - BOOST_PP_STRINGIZE
+  - NS_SWIFT_NAME
+  - CF_SWIFT_NAME

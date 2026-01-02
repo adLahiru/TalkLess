@@ -1,15 +1,17 @@
 #ifndef AUDIOMANAGER_H
 #define AUDIOMANAGER_H
 
-#include <QObject>
-#include <QMediaPlayer>
+#include "../models/audioEngine.h"
+#include "../models/audioclip.h"
+
 #include <QAudioOutput>
 #include <QList>
 #include <QMap>
-#include <QUrl>
+#include <QMediaPlayer>
+#include <QObject>
 #include <QSettings>
-#include "../models/audioclip.h"
-#include "../models/audioEngine.h"
+#include <QUrl>
+
 #include <miniaudio.h>
 
 class AudioManager : public QObject
@@ -23,14 +25,19 @@ class AudioManager : public QObject
     Q_PROPERTY(qreal volume READ volume WRITE setVolume NOTIFY volumeChanged)
     Q_PROPERTY(QStringList inputDevices READ inputDevices NOTIFY inputDevicesChanged)
     Q_PROPERTY(QStringList outputDevices READ outputDevices NOTIFY outputDevicesChanged)
-    Q_PROPERTY(QString currentInputDevice READ currentInputDevice WRITE setCurrentInputDevice NOTIFY currentInputDeviceChanged)
-    Q_PROPERTY(QString currentOutputDevice READ currentOutputDevice WRITE setCurrentOutputDevice NOTIFY currentOutputDeviceChanged)
-    Q_PROPERTY(QString secondaryOutputDevice READ secondaryOutputDevice WRITE setSecondaryOutputDevice NOTIFY secondaryOutputDeviceChanged)
-    Q_PROPERTY(bool secondaryOutputEnabled READ secondaryOutputEnabled WRITE setSecondaryOutputEnabled NOTIFY secondaryOutputEnabledChanged)
-    Q_PROPERTY(bool inputDeviceEnabled READ inputDeviceEnabled WRITE setInputDeviceEnabled NOTIFY inputDeviceEnabledChanged)
+    Q_PROPERTY(
+        QString currentInputDevice READ currentInputDevice WRITE setCurrentInputDevice NOTIFY currentInputDeviceChanged)
+    Q_PROPERTY(QString currentOutputDevice READ currentOutputDevice WRITE setCurrentOutputDevice NOTIFY
+                   currentOutputDeviceChanged)
+    Q_PROPERTY(QString secondaryOutputDevice READ secondaryOutputDevice WRITE setSecondaryOutputDevice NOTIFY
+                   secondaryOutputDeviceChanged)
+    Q_PROPERTY(bool secondaryOutputEnabled READ secondaryOutputEnabled WRITE setSecondaryOutputEnabled NOTIFY
+                   secondaryOutputEnabledChanged)
+    Q_PROPERTY(
+        bool inputDeviceEnabled READ inputDeviceEnabled WRITE setInputDeviceEnabled NOTIFY inputDeviceEnabledChanged)
 
 public:
-    explicit AudioManager(AudioEngine* audioEngine, QObject *parent = nullptr);
+    explicit AudioManager(AudioEngine* audioEngine, QObject* parent = nullptr);
     ~AudioManager();
 
     QList<AudioClip*> audioClips() const { return m_audioClips; }
@@ -41,7 +48,7 @@ public:
     bool isPlaying() const;
     qreal volume() const { return m_volume; }
     void setVolume(qreal volume);
-    
+
     // Device management methods
     QStringList inputDevices() const;
     QStringList outputDevices() const;
@@ -50,24 +57,25 @@ public:
     QString secondaryOutputDevice() const;
     bool secondaryOutputEnabled() const;
     bool inputDeviceEnabled() const;
-    Q_INVOKABLE void setCurrentInputDevice(const QString &device);
-    Q_INVOKABLE void setCurrentOutputDevice(const QString &device);
-    Q_INVOKABLE void setSecondaryOutputDevice(const QString &device);
+    Q_INVOKABLE void setCurrentInputDevice(const QString& device);
+    Q_INVOKABLE void setCurrentOutputDevice(const QString& device);
+    Q_INVOKABLE void setSecondaryOutputDevice(const QString& device);
     Q_INVOKABLE void setSecondaryOutputEnabled(bool enabled);
     Q_INVOKABLE void setInputDeviceEnabled(bool enabled);
 
     // Invokable methods for QML
-    Q_INVOKABLE void loadAudioFile(const QString &clipId, const QUrl &filePath);
-    Q_INVOKABLE void playClip(const QString &clipId);
-    Q_INVOKABLE void playClipFromStart(const QString &clipId);
-    Q_INVOKABLE void pauseClip(const QString &clipId);
-    Q_INVOKABLE void stopClip(const QString &clipId);
+    Q_INVOKABLE void loadAudioFile(const QString& clipId, const QUrl& filePath);
+    Q_INVOKABLE void playClip(const QString& clipId);
+    Q_INVOKABLE void playClipFromStart(const QString& clipId);
+    Q_INVOKABLE void pauseClip(const QString& clipId);
+    Q_INVOKABLE void stopClip(const QString& clipId);
     Q_INVOKABLE void stopAll();
     Q_INVOKABLE void seekTo(qreal position);
-    Q_INVOKABLE AudioClip* addClip(const QString &title, const QUrl &filePath, const QString &hotkey = "", const QString &sectionId = "");
-    Q_INVOKABLE void removeClip(const QString &clipId);
-    Q_INVOKABLE AudioClip* getClip(const QString &clipId);
-    Q_INVOKABLE void playClipByHotkey(const QString &hotkey);
+    Q_INVOKABLE AudioClip* addClip(const QString& title, const QUrl& filePath, const QString& hotkey = "",
+                                   const QString& sectionId = "");
+    Q_INVOKABLE void removeClip(const QString& clipId);
+    Q_INVOKABLE AudioClip* getClip(const QString& clipId);
+    Q_INVOKABLE void playClipByHotkey(const QString& hotkey);
     Q_INVOKABLE QString formatTime(qreal seconds) const;
     Q_INVOKABLE void refreshAudioDevices();
     Q_INVOKABLE void testPlayback();
@@ -76,8 +84,8 @@ public:
     Q_INVOKABLE void setMasterVolume(qreal linear);
     Q_INVOKABLE qreal micVolume() const;
     Q_INVOKABLE void setMicVolume(qreal linear);
-    Q_INVOKABLE void setClipVolume(const QString &clipId, qreal volume);
-    
+    Q_INVOKABLE void setClipVolume(const QString& clipId, qreal volume);
+
     // Settings persistence
     Q_INVOKABLE void saveSettings();
     Q_INVOKABLE void loadSettings();
@@ -89,8 +97,8 @@ signals:
     void currentDurationChanged();
     void isPlayingChanged();
     void volumeChanged();
-    void clipFinished(const QString &clipId);
-    void error(const QString &message);
+    void clipFinished(const QString& clipId);
+    void error(const QString& message);
     void inputDevicesChanged();
     void outputDevicesChanged();
     void currentInputDeviceChanged();
@@ -104,7 +112,7 @@ private slots:
     void onDurationChanged(qint64 duration);
     void onPlaybackStateChanged(QMediaPlayer::PlaybackState state);
     void onMediaStatusChanged(QMediaPlayer::MediaStatus status);
-    void onErrorOccurred(QMediaPlayer::Error error, const QString &errorString);
+    void onErrorOccurred(QMediaPlayer::Error error, const QString& errorString);
 
 private:
     QList<AudioClip*> m_audioClips;
@@ -115,7 +123,7 @@ private:
     AudioClip* m_currentClip;
     qreal m_volume;
     QString m_currentPlayingId;
-    
+
     // Audio device management
     QStringList m_inputDevices;
     QStringList m_outputDevices;
@@ -127,12 +135,12 @@ private:
 
     // AudioEngine integration
     AudioEngine* m_audioEngine;
+    bool m_initialized;
 
-
-    void initializePlayer(const QString &clipId);
-    void cleanupPlayer(const QString &clipId);
-    void updateOutputDeviceForAllPlayers(const QString &deviceName);
-    void updateSecondaryOutputsForAllPlayers(const QString &deviceName);
+    void initializePlayer(const QString& clipId);
+    void cleanupPlayer(const QString& clipId);
+    void updateOutputDeviceForAllPlayers(const QString& deviceName);
+    void updateSecondaryOutputsForAllPlayers(const QString& deviceName);
 };
 
 #endif // AUDIOMANAGER_H

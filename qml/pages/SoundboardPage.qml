@@ -10,7 +10,7 @@ Item {
     property var selectedClip: null
     
     // Current soundboard name from the view
-    property string currentSoundboardName: soundboardView.currentSection ? soundboardView.currentSection.name : "Soundboard"
+    property string currentSoundboardName: soundboardView && soundboardView.currentSection ? soundboardView.currentSection.name : "Soundboard"
     
     RowLayout {
         anchors.fill: parent
@@ -33,7 +33,7 @@ Item {
                 // Background Image
                 Image {
                     anchors.fill: parent
-                    source: "qrc:/TalkLess/resources/images/background-52.png"
+                    source: "qrc:/qt/qml/TalkLess/resources/images/background-52.png"
                     fillMode: Image.PreserveAspectCrop
                     opacity: 0.8
                 }
@@ -211,7 +211,7 @@ Item {
                                 var url = drop.urls[i].toString()
                                 if (audioGridScrollView.isAudioFile(url)) {
                                     var filename = audioGridScrollView.extractNameFromPath(url)
-                                    var sectionId = soundboardView.currentSection ? soundboardView.currentSection.id : ""
+                                    var sectionId = soundboardView && soundboardView.currentSection ? soundboardView.currentSection.id : ""
                                     var clip = audioManager.addClip(filename, url, "", sectionId)
                                     if (clip) {
                                         selectedClip = clip
@@ -286,7 +286,7 @@ Item {
                             }
                             filename = filename.replace(/_/g, ' ').replace(/-/g, ' ')
                             
-                            var sectionId = soundboardView.currentSection ? soundboardView.currentSection.id : ""
+                            var sectionId = soundboardView && soundboardView.currentSection ? soundboardView.currentSection.id : ""
                             var clip = audioManager.addClip(filename, filePath, "", sectionId)
                             if (clip) {
                                 selectedClip = clip
@@ -297,7 +297,7 @@ Item {
                     
                     // Audio Cards
                     Repeater {
-                        model: soundboardView.currentSectionClips
+                        model: soundboardView ? soundboardView.currentSectionClips : []
                         
                         AudioCard {
                             required property var modelData
@@ -307,7 +307,7 @@ Item {
                             hotkey: modelData ? modelData.hotkey : ""
                             tagLabel: modelData && modelData.tagLabel ? modelData.tagLabel : ""
                             tagColor: modelData && modelData.tagColor ? modelData.tagColor : "#EAB308"
-                            isSelected: selectedClip && selectedClip.id === modelData.id
+                            isSelected: selectedClip && modelData && selectedClip.id === modelData.id
                             isPlaying: modelData ? modelData.isPlaying : false
                             audioClipId: modelData ? modelData.id : ""
                             imagePath: modelData ? modelData.imagePath : ""
@@ -431,7 +431,7 @@ Item {
             
             AddAudioPanel {
                 onAudioAdded: function(name, filePath, imagePath) {
-                    var sectionId = soundboardView.currentSection ? soundboardView.currentSection.id : ""
+                    var sectionId = soundboardView && soundboardView.currentSection ? soundboardView.currentSection.id : ""
                     var clip = audioManager.addClip(name, filePath, "", sectionId)
                     if (clip) {
                         if (imagePath) {

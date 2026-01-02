@@ -16,7 +16,7 @@ Item {
             Layout.fillWidth: true
             title: "System Settings"
             subtitle: "Manage subscription plans, quotas, and billing details."
-            backgroundImage: "qrc:/TalkLess/resources/images/background-52.png"
+            backgroundImage: "qrc:/qt/qml/TalkLess/resources/images/background-52.png"
         }
         
         // Tab Bar

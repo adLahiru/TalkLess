@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Qt.labs.settings
+import QtCore
 
 Rectangle {
     id: root
@@ -102,7 +102,7 @@ Rectangle {
         // Soundboard thumbnails
         Repeater {
             id: sectionsRepeater
-            model: soundboardView.sections
+            model: soundboardView ? soundboardView.sections : []
             
             Rectangle {
                 id: sectionItem
@@ -110,9 +110,9 @@ Rectangle {
                 required property var modelData
                 required property int index
                 
-                property bool isCurrentSection: soundboardView.currentSection && soundboardView.currentSection.id === modelData.id
-                property bool isActiveSection: soundboardView.activeSection && soundboardView.activeSection.id === modelData.id
-                property bool isRenaming: renamingSectionId === modelData.id
+                property bool isCurrentSection: soundboardView && soundboardView.currentSection && modelData && modelData.id && soundboardView.currentSection.id === modelData.id
+                property bool isActiveSection: soundboardView && soundboardView.activeSection && modelData && modelData.id && soundboardView.activeSection.id === modelData.id
+                property bool isRenaming: modelData && renamingSectionId === modelData.id
                 
                 Layout.fillWidth: true
                 Layout.preferredHeight: 48
@@ -133,7 +133,9 @@ Rectangle {
                         Layout.preferredHeight: 20
                         Layout.alignment: Qt.AlignVCenter
                         onClicked: {
-                            soundboardView.setActiveSection(sectionItem.modelData.id)
+                            if (soundboardView && sectionItem.modelData) {
+                                soundboardView.setActiveSection(sectionItem.modelData.id)
+                            }
                         }
                         
                         indicator: Rectangle {
@@ -190,7 +192,7 @@ Rectangle {
                     TextField {
                         id: renameField
                         visible: sectionItem.isRenaming
-                        text: sectionItem.modelData.name
+                        text: sectionItem.modelData ? sectionItem.modelData.name : ""
                         font.pixelSize: 14
                         color: "white"
                         Layout.fillWidth: true
@@ -203,7 +205,7 @@ Rectangle {
                         }
                         
                         onAccepted: {
-                            if (text.trim() !== "") {
+                            if (text.trim() !== "" && soundboardView && sectionItem.modelData) {
                                 soundboardView.renameSection(sectionItem.modelData.id, text.trim())
                             }
                             renamingSectionId = ""
@@ -214,7 +216,7 @@ Rectangle {
                         }
                         
                         onVisibleChanged: {
-                            if (visible) {
+                            if (visible && sectionItem.modelData) {
                                 text = sectionItem.modelData.name
                                 forceActiveFocus()
                                 selectAll()
@@ -224,7 +226,7 @@ Rectangle {
                     
                     Text {
                         visible: !sectionItem.isRenaming
-                        text: sectionItem.modelData.name
+                        text: sectionItem.modelData ? sectionItem.modelData.name : ""
                         font.pixelSize: 14
                         color: "white"
                         Layout.fillWidth: true
@@ -242,12 +244,16 @@ Rectangle {
                     
                     onClicked: function(mouse) {
                         if (mouse.button === Qt.RightButton) {
-                            sectionContextMenu.sectionId = sectionItem.modelData.id
-                            sectionContextMenu.sectionName = sectionItem.modelData.name
-                            sectionContextMenu.popup()
+                            if (sectionItem.modelData) {
+                                sectionContextMenu.sectionId = sectionItem.modelData.id
+                                sectionContextMenu.sectionName = sectionItem.modelData.name
+                                sectionContextMenu.popup()
+                            }
                         } else {
-                            soundboardView.selectSection(sectionItem.modelData.id)
-                            currentIndex = 0  // Switch to Soundboard page to show audio clips
+                            if (soundboardView && sectionItem.modelData) {
+                                soundboardView.selectSection(sectionItem.modelData.id)
+                                currentIndex = 0  // Switch to Soundboard page to show audio clips
+                            }
                         }
                     }
                     
@@ -294,9 +300,11 @@ Rectangle {
             
             MenuItem {
                 text: "Delete"
-                enabled: soundboardView.sections.length > 1
+                enabled: soundboardView && soundboardView.sections && soundboardView.sections.length > 1
                 onTriggered: {
-                    soundboardView.deleteSection(sectionContextMenu.sectionId)
+                    if (soundboardView) {
+                        soundboardView.deleteSection(sectionContextMenu.sectionId)
+                    }
                 }
                 background: Rectangle {
                     color: parent.highlighted ? "#2a2a3e" : "transparent"
@@ -350,9 +358,11 @@ Rectangle {
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true
                 onClicked: {
-                    var section = soundboardView.addSection("New Soundboard")
-                    if (section) {
-                        renamingSectionId = section.id
+                    if (soundboardView) {
+                        var section = soundboardView.addSection("New Soundboard")
+                        if (section) {
+                            renamingSectionId = section.id
+                        }
                     }
                 }
             }

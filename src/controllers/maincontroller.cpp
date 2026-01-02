@@ -1,11 +1,8 @@
 #include "maincontroller.h"
+
 #include "../models/audioEngine.h"
 
-MainController::MainController(QObject *parent)
-    : QObject(parent)
-    , m_audioEngine(new AudioEngine(this))
-{
-}
+MainController::MainController(QObject* parent) : QObject(parent), m_audioEngine(new AudioEngine(this)) {}
 
 MainController::~MainController()
 {

@@ -10,14 +10,14 @@ class MainController : public QObject
     Q_OBJECT
 
 public:
-    explicit MainController(QObject *parent = nullptr);
+    explicit MainController(QObject* parent = nullptr);
     ~MainController();
 
     void initialize();
-    AudioEngine* audioEngine();                     // get audio engine
+    AudioEngine* audioEngine(); // get audio engine
 
 private:
-    AudioEngine *m_audioEngine;
+    AudioEngine* m_audioEngine;
 };
 
 #endif // MAINCONTROLLER_H
