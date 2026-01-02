@@ -41,9 +41,9 @@ SoundboardView::SoundboardView(AudioManager* audioMgr, HotkeyManager* hotkeyMgr,
 
 void SoundboardView::playAudioInSlot(int slotIndex)
 {
-    if (m_audioManager && slotIndex >= 0 && slotIndex < m_audioManager->audioClips().count()) {
+    if (m_audioManager != nullptr && slotIndex >= 0 && slotIndex < m_audioManager->audioClips().count()) {
         AudioClip* clip = m_audioManager->audioClips().at(slotIndex);
-        if (clip) {
+        if (clip != nullptr) {
             m_audioManager->playClip(clip->id());
         }
     }
@@ -51,7 +51,7 @@ void SoundboardView::playAudioInSlot(int slotIndex)
 
 void SoundboardView::stopAllAudio()
 {
-    if (m_audioManager) {
+    if (m_audioManager != nullptr) {
         m_audioManager->stopAll();
     }
 }
@@ -98,7 +98,7 @@ QList<AudioClip*> SoundboardView::currentSectionClips() const
 {
     QList<AudioClip*> filteredClips;
 
-    if (!m_currentSection) {
+    if (m_currentSection == nullptr) {
         return filteredClips;
     }
 
@@ -106,7 +106,7 @@ QList<AudioClip*> SoundboardView::currentSectionClips() const
 
     // Filter clips that belong to the current section
     for (AudioClip* clip : m_audioManager->audioClips()) {
-        if (clip && clip->sectionId() == currentSectionId) {
+        if (clip != nullptr && clip->sectionId() == currentSectionId) {
             filteredClips.append(clip);
         }
     }

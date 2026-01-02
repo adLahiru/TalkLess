@@ -243,8 +243,8 @@ void HotkeyManager::registerAllSystemHotkeys()
 
     // Register all current clip hotkeys as system hotkeys
     for (auto it = m_clipHotkeys.begin(); it != m_clipHotkeys.end(); ++it) {
-        QString clipId = it.key();
-        QString keySequence = it.value();
+        const QString& clipId = it.key();
+        const QString& keySequence = it.value();
 
         if (registerSystemHotkey(clipId, keySequence, m_nextHotkeyId)) {
             m_nextHotkeyId++;
@@ -253,8 +253,8 @@ void HotkeyManager::registerAllSystemHotkeys()
 
     // Register system hotkeys as global hotkeys
     for (auto it = m_systemHotkeys.begin(); it != m_systemHotkeys.end(); ++it) {
-        QString action = it.key();
-        QString keySequence = it.value();
+        const QString& action = it.key();
+        const QString& keySequence = it.value();
 
         // Only register non-empty system hotkeys
         if (!keySequence.isEmpty()) {
@@ -417,7 +417,7 @@ OSStatus HotkeyManager::hotkeyCallback(EventHandlerCallRef nextHandler, EventRef
     Q_UNUSED(nextHandler)
 
     HotkeyManager* manager = static_cast<HotkeyManager*>(userData);
-    if (!manager || !manager->m_globalHotkeysEnabled) {
+    if (manager == nullptr || !manager->m_globalHotkeysEnabled) {
         return noErr;
     }
 
@@ -450,10 +450,11 @@ OSStatus HotkeyManager::hotkeyCallback(EventHandlerCallRef nextHandler, EventRef
 bool HotkeyManager::registerSystemHotkey(const QString& clipId, const QString& keySequence, quint32 hotkeyId)
 {
     QStringList parts = keySequence.split("+");
-    if (parts.isEmpty())
+    if (parts.isEmpty()) {
         return false;
+    }
 
-    QString keyPart = parts.last();
+    const QString& keyPart = parts.last();
     quint32 keyCode = keyStringToKeyCode(keyPart);
     quint32 modifiers = modifiersFromString(keySequence);
 
@@ -572,14 +573,18 @@ quint32 HotkeyManager::modifiersFromString(const QString& keySequence) const
 {
     quint32 modifiers = 0;
 
-    if (keySequence.contains("Ctrl", Qt::CaseInsensitive) || keySequence.contains("Control", Qt::CaseInsensitive))
+    if (keySequence.contains("Ctrl", Qt::CaseInsensitive) || keySequence.contains("Control", Qt::CaseInsensitive)) {
         modifiers |= controlKey;
-    if (keySequence.contains("Alt", Qt::CaseInsensitive) || keySequence.contains("Option", Qt::CaseInsensitive))
+    }
+    if (keySequence.contains("Alt", Qt::CaseInsensitive) || keySequence.contains("Option", Qt::CaseInsensitive)) {
         modifiers |= optionKey;
-    if (keySequence.contains("Shift", Qt::CaseInsensitive))
+    }
+    if (keySequence.contains("Shift", Qt::CaseInsensitive)) {
         modifiers |= shiftKey;
-    if (keySequence.contains("Meta", Qt::CaseInsensitive) || keySequence.contains("Cmd", Qt::CaseInsensitive))
+    }
+    if (keySequence.contains("Meta", Qt::CaseInsensitive) || keySequence.contains("Cmd", Qt::CaseInsensitive)) {
         modifiers |= cmdKey;
+    }
 
     return modifiers;
 }
@@ -589,14 +594,18 @@ QString HotkeyManager::createHotkeyString(int key, int modifiers) const
 {
     QStringList parts;
 
-    if (modifiers & Qt::ControlModifier)
+    if ((modifiers & Qt::ControlModifier) != 0) {
         parts << "Ctrl";
-    if (modifiers & Qt::AltModifier)
+    }
+    if ((modifiers & Qt::AltModifier) != 0) {
         parts << "Alt";
-    if (modifiers & Qt::ShiftModifier)
+    }
+    if ((modifiers & Qt::ShiftModifier) != 0) {
         parts << "Shift";
-    if (modifiers & Qt::MetaModifier)
+    }
+    if ((modifiers & Qt::MetaModifier) != 0) {
         parts << "Cmd";
+    }
 
     // Map Qt key codes to key names matching our registration format
     QString keyName;

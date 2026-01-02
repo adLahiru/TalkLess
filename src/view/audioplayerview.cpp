@@ -17,7 +17,7 @@ AudioPlayerView::AudioPlayerView(AudioManager* audioMgr, QObject* parent)
 
 QString AudioPlayerView::currentTitle() const
 {
-    if (m_audioManager && m_audioManager->currentClip()) {
+    if (m_audioManager != nullptr && m_audioManager->currentClip() != nullptr) {
         return m_audioManager->currentClip()->title();
     }
     return "No audio playing";
@@ -25,55 +25,55 @@ QString AudioPlayerView::currentTitle() const
 
 qreal AudioPlayerView::currentPosition() const
 {
-    return m_audioManager ? m_audioManager->currentPosition() : 0.0;
+    return m_audioManager != nullptr ? m_audioManager->currentPosition() : 0.0;
 }
 
 qreal AudioPlayerView::currentDuration() const
 {
-    return m_audioManager ? m_audioManager->currentDuration() : 0.0;
+    return m_audioManager != nullptr ? m_audioManager->currentDuration() : 0.0;
 }
 
 bool AudioPlayerView::isPlaying() const
 {
-    return m_audioManager ? m_audioManager->isPlaying() : false;
+    return m_audioManager != nullptr ? m_audioManager->isPlaying() : false;
 }
 
 qreal AudioPlayerView::volume() const
 {
-    return m_audioManager ? m_audioManager->volume() : 1.0;
+    return m_audioManager != nullptr ? m_audioManager->volume() : 1.0;
 }
 
 void AudioPlayerView::setVolume(qreal volume)
 {
-    if (m_audioManager) {
+    if (m_audioManager != nullptr) {
         m_audioManager->setVolume(volume);
     }
 }
 
 void AudioPlayerView::play()
 {
-    if (m_audioManager && m_audioManager->currentClip()) {
+    if (m_audioManager != nullptr && m_audioManager->currentClip() != nullptr) {
         m_audioManager->playClip(m_audioManager->currentClip()->id());
     }
 }
 
 void AudioPlayerView::pause()
 {
-    if (m_audioManager && m_audioManager->currentClip()) {
+    if (m_audioManager != nullptr && m_audioManager->currentClip() != nullptr) {
         m_audioManager->pauseClip(m_audioManager->currentClip()->id());
     }
 }
 
 void AudioPlayerView::stop()
 {
-    if (m_audioManager) {
+    if (m_audioManager != nullptr) {
         m_audioManager->stopAll();
     }
 }
 
 void AudioPlayerView::seekTo(qreal position)
 {
-    if (m_audioManager) {
+    if (m_audioManager != nullptr) {
         m_audioManager->seekTo(position);
     }
 }
@@ -89,7 +89,7 @@ void AudioPlayerView::togglePlayPause()
 
 void AudioPlayerView::toggleMute()
 {
-    if (m_audioManager) {
+    if (m_audioManager != nullptr) {
         qreal currentVol = m_audioManager->volume();
         if (currentVol > 0) {
             m_savedVolume = currentVol;
@@ -102,7 +102,7 @@ void AudioPlayerView::toggleMute()
 
 QString AudioPlayerView::formatTime(qreal seconds) const
 {
-    return m_audioManager ? m_audioManager->formatTime(seconds) : "0:00.00";
+    return m_audioManager != nullptr ? m_audioManager->formatTime(seconds) : "0:00.00";
 }
 
 void AudioPlayerView::onCurrentClipChanged()
