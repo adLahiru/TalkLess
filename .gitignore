@@ -1,82 +1,225 @@
-# This file is used to ignore files which are generated
-# ----------------------------------------------------------------------------
+# ==============================================================================
+# TalkLess Project .gitignore
+# Qt6 + CMake + C++ project
+# ==============================================================================
 
-*~
-*.autosave
-*.a
-*.core
+# Build directories
+# -----------------
+build/
+build-*/
+out/
+cmake-build-*/
+Debug/
+Release/
+MinSizeRel/
+RelWithDebInfo/
+
+# CMake generated files
+# ---------------------
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+CMakeUserPresets.json
+*.cmake
+!CMakeLists.txt
+
+# Qt generated files
+# ------------------
 *.moc
-*.o
-*.obj
-*.orig
-*.rej
-*.so
-*.so.*
-*_pch.h.cpp
-*_resource.rc
-*.qm
-.#*
-*.*#
-core
-!core/
-tags
-.DS_Store
-.directory
-*.debug
-Makefile*
-*.prl
-*.app
 moc_*.cpp
+moc_*.h
 ui_*.h
 qrc_*.cpp
-Thumbs.db
-*.res
-*.rc
-/.qmake.cache
-/.qmake.stash
+*.qm
+*_autogen/
+*.qmlc
+*.jsc
+.qml.lock
+.qmlls.cache
+meta_types/
+qmltypes/
 
-# qtcreator generated files
+# Qt Creator
+# ----------
 *.pro.user*
 *.qbs.user*
+*.qmlproject.user*
 CMakeLists.txt.user*
+.qtcreator/
 
-# xemacs temporary files
-*.flc
+# Compiled object files
+# ---------------------
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dll
+*.dylib
 
-# Vim temporary files
-.*.swp
+# Precompiled headers
+# -------------------
+*.gch
+*.pch
+*_pch.h.cpp
 
-# Visual Studio generated files
-*.ib_pdb_index
-*.idb
+# Executables and applications
+# ----------------------------
+*.exe
+*.app
+*.out
+*.elf
+
+# Debug files
+# -----------
+*.debug
+*.dSYM/
 *.ilk
 *.pdb
+*.idb
+*.ib_pdb_index
+
+# macOS
+# -----
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+# -------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.lnk
+
+# Visual Studio
+# -------------
 *.sln
 *.suo
 *.vcproj
+*.vcxproj
+*.vcxproj.*
 *vcproj.*.*.user
 *.ncb
 *.sdf
 *.opensdf
-*.vcxproj
-*vcxproj.*
+*.user
+.vs/
 
-# MinGW generated files
+# VS Code
+# -------
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/c_cpp_properties.json
+.vscode/ipch/
+*.code-workspace
+
+# Clangd / LSP
+# ------------
+.cache/
+.clangd/
+compile_flags.txt
+
+# IDE and editor files
+# --------------------
+*.autosave
+*.swp
+*.swo
+*~
+*.bak
+*.orig
+*.rej
+.#*
+*.*#
+*.flc
+.idea/
+*.iml
+*.sublime-workspace
+*.sublime-project
+
+# Qt resource files (if generated)
+# --------------------------------
+*.res
+*.rc
+!*.qrc
+*_resource.rc
+
+# Test and coverage
+# -----------------
+*.gcov
+*.gcno
+*.gcda
+coverage/
+test-results/
+
+# Logs
+# ----
+*.log
+logs/
+
+# Python (if any scripts)
+# -----------------------
+*.pyc
+*.pyo
+__pycache__/
+.python-version
+venv/
+.env
+
+# Package managers
+# ----------------
+node_modules/
+vcpkg_installed/
+conan/
+
+# Temporary files
+# ---------------
+*.tmp
+*.temp
+*.cache
+core
+!core/
+
+# MinGW
+# -----
 *.Debug
 *.Release
 
-# Python byte code
-*.pyc
+# Makefiles (generated)
+# ---------------------
+Makefile
+Makefile.*
+*.prl
 
-# Binaries
-# --------
-*.dll
-*.exe
+# Ninja
+# -----
+.ninja_deps
+.ninja_log
+build.ninja
 
-# Directories with generated files
+# Tags
+# ----
+tags
+TAGS
+.tags
+.TAGS
+
+# Qt specific directories
+# -----------------------
 .moc/
 .obj/
 .pch/
 .rcc/
 .uic/
-/build*/
+/.qmake.cache
+/.qmake.stash

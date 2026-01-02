@@ -1,0 +1,44 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/lib",
+                "${workspaceFolder}/build/appTalkLess_autogen/include",
+                "/Users/lahiru/Qt/6.10.1/macos/lib/QtCore.framework/Headers",
+                "/Users/lahiru/Qt/6.10.1/macos/lib/QtGui.framework/Headers",
+                "/Users/lahiru/Qt/6.10.1/macos/lib/QtQml.framework/Headers",
+                "/Users/lahiru/Qt/6.10.1/macos/lib/QtQuick.framework/Headers",
+                "/Users/lahiru/Qt/6.10.1/macos/lib/QtMultimedia.framework/Headers",
+                "/Users/lahiru/Qt/6.10.1/macos/lib/QtQuickControls2.framework/Headers",
+                "/Users/lahiru/Qt/6.10.1/macos/lib/QtNetwork.framework/Headers",
+                "/Users/lahiru/Qt/6.10.1/macos/lib/QtOpenGL.framework/Headers",
+                "/Users/lahiru/Qt/6.10.1/macos/include",
+                "/Users/lahiru/Qt/6.10.1/macos/include/QtQmlIntegration",
+                "/Users/lahiru/Qt/6.10.1/macos/mkspecs/macx-clang"
+            ],
+            "defines": [
+                "QT_CORE_LIB",
+                "QT_GUI_LIB",
+                "QT_QML_LIB",
+                "QT_QUICK_LIB",
+                "QT_MULTIMEDIA_LIB",
+                "QT_QUICKCONTROLS2_LIB",
+                "QT_NETWORK_LIB",
+                "QT_OPENGL_LIB",
+                "QT_QMLINTEGRATION_LIB"
+            ],
+            "macFrameworkPath": [
+                "/Users/lahiru/Qt/6.10.1/macos/lib",
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            ],
+            "compilerPath": "/usr/bin/clang++",
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "macos-clang-arm64",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+        }
+    ],
+    "version": 4
+}
