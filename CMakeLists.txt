@@ -70,6 +70,9 @@ qt_add_qml_module(appTalkLess
         qml/components/AddAudioPanel.qml
         qml/components/MetersPanel.qml
         qml/components/TeleprompterPanel.qml
+        qml/components/AudioPanelTabs.qml
+        qml/components/AddAudioContent.qml
+        qml/components/RecordAudioContent.qml
         # Pages
         qml/pages/SystemSettingsPage.qml
         qml/pages/AudioDevicesTab.qml

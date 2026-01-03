@@ -109,6 +109,12 @@ public:
     bool setPlaybackDevice(const std::string& deviceId);
     bool setCaptureDevice(const std::string& deviceId);
 
+    // Recording functionality
+    bool startRecording(const std::string& outputPath);
+    bool stopRecording(); // Returns true on success, file path set via startRecording
+    bool isRecording() const;
+    float getRecordingDuration() const; // Returns duration in seconds
+
 private:
     // Audio callback (REAL-TIME SAFE)
     static void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
@@ -158,4 +164,14 @@ private:
 
     bool reinitializeDevice(bool restart = true);
     bool applyDeviceSelection(ma_device_config& config);
+
+    // Recording state
+    std::atomic<bool> recording;
+    std::string recordingOutputPath;
+    std::vector<float> recordingBuffer;
+    std::mutex recordingMutex;
+    std::atomic<uint64_t> recordedFrames;
+
+    // Write recording to WAV file
+    bool writeWavFile(const std::string& path, const std::vector<float>& samples, int sampleRate, int channels);
 };

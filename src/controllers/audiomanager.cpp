@@ -1,8 +1,12 @@
 #include "audiomanager.h"
 
 #include <QAudioDevice>
+#include <QDateTime>
 #include <QDebug>
+#include <QDir>
+#include <QFileInfo>
 #include <QMediaDevices>
+#include <QStandardPaths>
 #include <QTimer>
 #include <QUuid>
 
@@ -65,9 +69,9 @@ void AudioManager::setVolume(qreal volume)
         // Update all audio outputs (fallback for clips without per-clip volume)
         for (auto it = m_audioOutputs.begin(); it != m_audioOutputs.end(); ++it) {
             QAudioOutput* output = it.value();
-            if (output) {
+            if (output != nullptr) {
                 AudioClip* clip = getClip(it.key());
-                qreal clipVolume = clip ? clip->volume() : m_volume;
+                qreal clipVolume = clip != nullptr ? clip->volume() : m_volume;
                 output->setVolume(clipVolume);
             }
         }
@@ -80,7 +84,7 @@ qreal AudioManager::currentPosition() const
 {
     if (!m_currentPlayingId.isEmpty() && m_players.contains(m_currentPlayingId)) {
         QMediaPlayer* player = m_players[m_currentPlayingId];
-        return player ? player->position() / 1000.0 : 0.0;
+        return player != nullptr ? static_cast<double>(player->position()) / 1000.0 : 0.0;
     }
     return 0.0;
 }
@@ -89,7 +93,7 @@ qreal AudioManager::currentDuration() const
 {
     if (!m_currentPlayingId.isEmpty() && m_players.contains(m_currentPlayingId)) {
         QMediaPlayer* player = m_players[m_currentPlayingId];
-        return player ? player->duration() / 1000.0 : 0.0;
+        return player != nullptr ? static_cast<double>(player->duration()) / 1000.0 : 0.0;
     }
     return 0.0;
 }
@@ -105,7 +109,17 @@ bool AudioManager::isPlaying() const
 
 void AudioManager::loadAudioFile(const QString& clipId, const QUrl& filePath)
 {
-    qDebug() << "Loading audio file for clip:" << clipId << filePath;
+    qDebug() << "Loading audio file for clip:" << clipId << "URL:" << filePath;
+    qDebug() << "  - Local file path:" << filePath.toLocalFile();
+    qDebug() << "  - Is valid:" << filePath.isValid();
+    qDebug() << "  - Is local file:" << filePath.isLocalFile();
+
+    // Check if file exists
+    if (filePath.isLocalFile()) {
+        QFileInfo fileInfo(filePath.toLocalFile());
+        qDebug() << "  - File exists:" << fileInfo.exists();
+        qDebug() << "  - File size:" << fileInfo.size() << "bytes";
+    }
 
     if (!m_players.contains(clipId)) {
         initializePlayer(clipId);
@@ -114,6 +128,7 @@ void AudioManager::loadAudioFile(const QString& clipId, const QUrl& filePath)
     QMediaPlayer* player = m_players[clipId];
     if (player != nullptr) {
         player->setSource(filePath);
+        qDebug() << "  - Player source set to:" << player->source();
 
         // Update clip duration when loaded
         AudioClip* clip = getClip(clipId);
@@ -141,6 +156,10 @@ void AudioManager::playClip(const QString& clipId)
         return;
     }
 
+    qDebug() << "  - Clip title:" << clip->title();
+    qDebug() << "  - Clip file path:" << clip->filePath();
+    qDebug() << "  - Clip volume:" << clip->volume();
+
     // Stop currently playing clip if different
     if (!m_currentPlayingId.isEmpty() && m_currentPlayingId != clipId) {
         stopClip(m_currentPlayingId);
@@ -153,12 +172,28 @@ void AudioManager::playClip(const QString& clipId)
 
     QMediaPlayer* player = m_players[clipId];
     if (player) {
+        qDebug() << "  - Player source:" << player->source();
+        qDebug() << "  - Player media status:" << player->mediaStatus();
+        qDebug() << "  - Player error:" << player->error() << player->errorString();
+
+        // Check audio output
+        QAudioOutput* output = m_audioOutputs.value(clipId);
+        if (output) {
+            qDebug() << "  - Audio output volume:" << output->volume();
+            qDebug() << "  - Audio output device:" << output->device().description();
+            qDebug() << "  - Audio output muted:" << output->isMuted();
+        } else {
+            qWarning() << "  - No audio output found for clip!";
+        }
+
         // Apply trim start if set
         if (clip->trimStart() > 0) {
             player->setPosition(static_cast<qint64>(clip->trimStart() * 1000));
         }
 
         player->play();
+        qDebug() << "  - Player state after play():" << player->playbackState();
+
         // Start secondary player if available
         if (m_secondaryPlayers.contains(clipId)) {
             QMediaPlayer* secondaryPlayer = m_secondaryPlayers[clipId];
@@ -410,22 +445,32 @@ void AudioManager::initializePlayer(const QString& clipId)
     QMediaPlayer* player = new QMediaPlayer(this);
     QAudioOutput* audioOutput = new QAudioOutput(this);
 
-    // If a preferred output device is set, try to apply it for this player
+    // Set output device - use configured device or system default
     if (!m_currentOutputDevice.isEmpty()) {
         const QList<QAudioDevice> audioOutputList = QMediaDevices::audioOutputs();
         for (const QAudioDevice& dev : audioOutputList) {
             if (dev.description() == m_currentOutputDevice) {
                 audioOutput->setDevice(dev);
+                qDebug() << "initializePlayer:" << clipId << "using configured device:" << dev.description();
                 break;
             }
         }
+    } else {
+        // Use system default audio output
+        QAudioDevice defaultDevice = QMediaDevices::defaultAudioOutput();
+        audioOutput->setDevice(defaultDevice);
+        qDebug() << "initializePlayer:" << clipId << "using default device:" << defaultDevice.description();
     }
 
-    // Apply per-clip volume if available
+    // Apply per-clip volume if available, multiplied by master volume
     AudioClip* clip = getClip(clipId);
-    qreal clipVolume = clip != nullptr ? clip->volume() : m_volume;
-    audioOutput->setVolume(clipVolume);
+    qreal clipVolume = clip != nullptr ? clip->volume() : 1.0;
+    qreal finalVolume = clipVolume * m_volume;
+    audioOutput->setVolume(finalVolume);
     player->setAudioOutput(audioOutput);
+
+    qDebug() << "initializePlayer:" << clipId << "volume:" << finalVolume
+             << "device:" << audioOutput->device().description();
 
     // Connect signals
     connect(player, &QMediaPlayer::positionChanged, this, &AudioManager::onPositionChanged);
@@ -563,8 +608,8 @@ void AudioManager::onPositionChanged(qint64 position)
     // Check for trim end
     if (!m_currentPlayingId.isEmpty()) {
         AudioClip* clip = getClip(m_currentPlayingId);
-        if (clip && clip->trimEnd() > 0) {
-            qreal currentPos = position / 1000.0;
+        if (clip != nullptr && clip->trimEnd() > 0) {
+            qreal currentPos = static_cast<double>(position) / 1000.0;
             if (currentPos >= clip->trimEnd()) {
                 stopClip(m_currentPlayingId);
             }
@@ -576,12 +621,12 @@ void AudioManager::onDurationChanged(qint64 duration)
 {
     if (!m_currentPlayingId.isEmpty()) {
         AudioClip* clip = getClip(m_currentPlayingId);
-        if (clip) {
-            clip->setDuration(duration / 1000.0);
+        if (clip != nullptr) {
+            clip->setDuration(static_cast<double>(duration) / 1000.0);
 
             // Set default trim end to duration if not set
             if (clip->trimEnd() == 0.0) {
-                clip->setTrimEnd(duration / 1000.0);
+                clip->setTrimEnd(static_cast<double>(duration) / 1000.0);
             }
         }
     }
@@ -616,7 +661,11 @@ void AudioManager::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
 
 void AudioManager::onErrorOccurred(QMediaPlayer::Error error, const QString& errorString)
 {
-    qWarning() << "Media player error:" << error << errorString;
+    QMediaPlayer* player = qobject_cast<QMediaPlayer*>(sender());
+    QString sourceUrl = player ? player->source().toString() : "unknown";
+    qWarning() << "Media player error:" << error << "-" << errorString;
+    qWarning() << "  Source URL:" << sourceUrl;
+    qWarning() << "  Error type:" << static_cast<int>(error);
     emit this->error(errorString);
 }
 
@@ -927,9 +976,24 @@ void AudioManager::refreshAudioDevices()
         emit outputDevicesChanged();
     }
 
-    // Set defaults if not set
+    // Set defaults if not set - prefer built-in devices over external ones (like iPhone)
     if (m_currentInputDevice.isEmpty() && !m_inputDevices.isEmpty()) {
-        setCurrentInputDevice(m_inputDevices.first());
+        // Try to find a built-in microphone first
+        QString preferredDevice;
+        for (const QString& deviceName : m_inputDevices) {
+            if (deviceName.contains("MacBook", Qt::CaseInsensitive) ||
+                deviceName.contains("Built-in", Qt::CaseInsensitive) ||
+                deviceName.contains("Internal", Qt::CaseInsensitive)) {
+                preferredDevice = deviceName;
+                break;
+            }
+        }
+        // Fall back to first device if no built-in found
+        if (preferredDevice.isEmpty()) {
+            preferredDevice = m_inputDevices.first();
+        }
+        qDebug() << "Selecting default input device:" << preferredDevice;
+        setCurrentInputDevice(preferredDevice);
     }
 
     if (m_currentOutputDevice.isEmpty() && !m_outputDevices.isEmpty()) {
@@ -1030,8 +1094,11 @@ void AudioManager::loadSettings()
         }
 
         // Load audio device settings
-        QString savedInputDevice, savedOutputDevice, savedSecondaryOutputDevice;
-        bool savedSecondaryOutputEnabled = false, savedInputDeviceEnabled = true;
+        QString savedInputDevice;
+        QString savedOutputDevice;
+        QString savedSecondaryOutputDevice;
+        bool savedSecondaryOutputEnabled = false;
+        bool savedInputDeviceEnabled = true;
 
         try {
             settings.beginGroup("devices");
@@ -1054,7 +1121,8 @@ void AudioManager::loadSettings()
 
         // Load volume settings
         qreal savedVolume = 1.0;
-        float savedMicGain = 1.0f, savedMasterGain = 1.0f;
+        float savedMicGain = 1.0F;
+        float savedMasterGain = 1.0F;
 
         try {
             settings.beginGroup("volume");
@@ -1185,4 +1253,83 @@ void AudioManager::loadSettings()
         emit error("Warning: Could not load settings, starting with default configuration");
         // Continue with default settings - don't crash the application
     }
+}
+
+// ============================================================================
+// RECORDING FUNCTIONALITY
+// ============================================================================
+
+bool AudioManager::startRecording()
+{
+    if (m_audioEngine == nullptr) {
+        emit error("Audio engine not available");
+        return false;
+    }
+
+    // Generate unique filename for recording
+    QString recordingsDir = getRecordingsPath();
+    QDir dir(recordingsDir);
+    if (!dir.exists()) {
+        dir.mkpath(recordingsDir);
+    }
+
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    QString filename = QString("recording_%1.wav").arg(timestamp);
+    QString fullPath = dir.filePath(filename);
+
+    // Store the path for later retrieval
+    m_currentRecordingPath = fullPath;
+
+    bool success = m_audioEngine->startRecording(fullPath.toStdString());
+    if (!success) {
+        emit error("Failed to start recording");
+        m_currentRecordingPath.clear();
+    }
+    return success;
+}
+
+QString AudioManager::stopRecording()
+{
+    if (m_audioEngine == nullptr) {
+        emit error("Audio engine not available");
+        return QString();
+    }
+
+    if (!m_audioEngine->isRecording()) {
+        return QString();
+    }
+
+    QString recordedPath = m_currentRecordingPath;
+    bool success = m_audioEngine->stopRecording();
+
+    if (success && !recordedPath.isEmpty()) {
+        qDebug() << "Recording saved to:" << recordedPath;
+        return recordedPath;
+    }
+
+    emit error("Failed to save recording");
+    return QString();
+}
+
+bool AudioManager::isRecordingAudio() const
+{
+    if (m_audioEngine == nullptr) {
+        return false;
+    }
+    return m_audioEngine->isRecording();
+}
+
+qreal AudioManager::getRecordingDuration() const
+{
+    if (m_audioEngine == nullptr) {
+        return 0.0;
+    }
+    return static_cast<qreal>(m_audioEngine->getRecordingDuration());
+}
+
+QString AudioManager::getRecordingsPath() const
+{
+    // Use application data location for recordings
+    QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return QDir(dataPath).filePath("recordings");
 }

@@ -115,7 +115,8 @@ void HotkeyManager::handleKeyPress(int key, int modifiers)
         qDebug() << "System hotkey: Play/Pause triggered";
         emit playPauseTriggered();
         return;
-    } else if (m_systemHotkeys.contains("stopAll") && hotkeyString == m_systemHotkeys["stopAll"]) {
+    }
+    if (m_systemHotkeys.contains("stopAll") && hotkeyString == m_systemHotkeys["stopAll"]) {
         qDebug() << "System hotkey: Stop All triggered";
         emit stopAllTriggered();
         return;
@@ -467,7 +468,7 @@ bool HotkeyManager::registerSystemHotkey(const QString& clipId, const QString& k
     hotKeyID.signature = 'TkLs'; // TalkLess signature
     hotKeyID.id = hotkeyId;
 
-    EventHotKeyRef hotKeyRef;
+    EventHotKeyRef hotKeyRef = nullptr;
     OSStatus status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef);
 
     if (status == noErr) {
@@ -758,8 +759,6 @@ QString HotkeyManager::createHotkeyString(int key, int modifiers) const
         keyName = "Space";
         break;
     case Qt::Key_Return:
-        keyName = "Enter";
-        break;
     case Qt::Key_Enter:
         keyName = "Enter";
         break;
@@ -788,8 +787,9 @@ QString HotkeyManager::createHotkeyString(int key, int modifiers) const
         keyName = QKeySequence(key).toString().toUpper();
     }
 
-    if (!keyName.isEmpty())
+    if (!keyName.isEmpty()) {
         parts << keyName;
+    }
 
     return parts.join("+");
 }

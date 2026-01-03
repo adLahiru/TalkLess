@@ -247,7 +247,7 @@ QJsonObject SettingsManager::serializeAudioSettings() const
 {
     QJsonObject audioSettings;
 
-    if (!m_audioManager) {
+    if (m_audioManager == nullptr) {
         qWarning() << "SettingsManager: AudioManager not set for serialization";
         return audioSettings;
     }
@@ -277,7 +277,7 @@ QJsonObject SettingsManager::serializeHotkeySettings() const
 {
     QJsonObject hotkeySettings;
 
-    if (!m_hotkeyManager) {
+    if (m_hotkeyManager == nullptr) {
         qWarning() << "SettingsManager: HotkeyManager not set for serialization";
         return hotkeySettings;
     }
@@ -292,7 +292,7 @@ QJsonObject SettingsManager::serializeSoundboardSettings() const
 {
     QJsonObject soundboardSettings;
 
-    if (!m_soundboardView) {
+    if (m_soundboardView == nullptr) {
         qWarning() << "SettingsManager: SoundboardView not set for serialization";
         return soundboardSettings;
     }
@@ -301,7 +301,7 @@ QJsonObject SettingsManager::serializeSoundboardSettings() const
     soundboardSettings["sections"] = serializeSections();
 
     // Current section
-    if (m_soundboardView->currentSection()) {
+    if (m_soundboardView->currentSection() != nullptr) {
         soundboardSettings["currentSectionId"] = m_soundboardView->currentSection()->id();
     }
 
@@ -337,7 +337,7 @@ QJsonObject SettingsManager::serializeFeatureSettings() const
     featureSettings["smartSuggestionsEnabled"] = m_smartSuggestionsEnabled;
 
     // Include global hotkeys enabled from HotkeyManager
-    if (m_hotkeyManager) {
+    if (m_hotkeyManager != nullptr) {
         featureSettings["globalHotkeysEnabled"] = m_hotkeyManager->globalHotkeysEnabled();
     }
 
@@ -355,13 +355,14 @@ QJsonArray SettingsManager::serializeAudioClips() const
 {
     QJsonArray clipsArray;
 
-    if (!m_audioManager) {
+    if (m_audioManager == nullptr) {
         return clipsArray;
     }
 
     for (AudioClip* clip : m_audioManager->audioClips()) {
-        if (!clip)
+        if (clip == nullptr) {
             continue;
+        }
 
         QJsonObject clipObj;
         clipObj["id"] = clip->id();
@@ -384,7 +385,7 @@ QJsonArray SettingsManager::serializeSections() const
 {
     QJsonArray sectionsArray;
 
-    if (!m_soundboardView) {
+    if (m_soundboardView == nullptr) {
         return sectionsArray;
     }
 
@@ -404,7 +405,7 @@ QJsonArray SettingsManager::serializeHotkeys() const
 
 bool SettingsManager::deserializeAudioSettings(const QJsonObject& json)
 {
-    if (!m_audioManager) {
+    if (m_audioManager == nullptr) {
         qWarning() << "SettingsManager: AudioManager not set for deserialization";
         return false;
     }
@@ -460,7 +461,7 @@ bool SettingsManager::deserializeAudioSettings(const QJsonObject& json)
 
 bool SettingsManager::deserializeHotkeySettings(const QJsonObject& json)
 {
-    if (!m_hotkeyManager) {
+    if (m_hotkeyManager == nullptr) {
         qWarning() << "SettingsManager: HotkeyManager not set for deserialization";
         return false;
     }
@@ -479,7 +480,7 @@ bool SettingsManager::deserializeHotkeySettings(const QJsonObject& json)
 
 bool SettingsManager::deserializeSoundboardSettings(const QJsonObject& json)
 {
-    if (!m_soundboardView) {
+    if (m_soundboardView == nullptr) {
         qWarning() << "SettingsManager: SoundboardView not set for deserialization";
         return false;
     }
@@ -518,12 +519,12 @@ bool SettingsManager::deserializeApplicationSettings(const QJsonObject& json)
 
 bool SettingsManager::deserializeAudioClips(const QJsonArray& array)
 {
-    if (!m_audioManager) {
+    if (m_audioManager == nullptr) {
         return false;
     }
 
     try {
-        for (const QJsonValue& value : array) {
+        for (const auto& value : array) {
             QJsonObject clipObj = value.toObject();
 
             QString id = clipObj["id"].toString();
@@ -559,7 +560,7 @@ bool SettingsManager::deserializeAudioClips(const QJsonArray& array)
 
 bool SettingsManager::deserializeSections(const QJsonArray& array)
 {
-    if (!m_soundboardView) {
+    if (m_soundboardView == nullptr) {
         return false;
     }
 
@@ -576,7 +577,7 @@ bool SettingsManager::deserializeSections(const QJsonArray& array)
 
 bool SettingsManager::deserializeHotkeys(const QJsonArray& array)
 {
-    if (!m_hotkeyManager) {
+    if (m_hotkeyManager == nullptr) {
         return false;
     }
 
@@ -773,7 +774,7 @@ bool SettingsManager::deserializeFeatureSettings(const QJsonObject& json)
         if (json.contains("smartSuggestionsEnabled")) {
             m_smartSuggestionsEnabled = json["smartSuggestionsEnabled"].toBool(true);
         }
-        if (json.contains("globalHotkeysEnabled") && m_hotkeyManager) {
+        if (json.contains("globalHotkeysEnabled") && m_hotkeyManager != nullptr) {
             m_hotkeyManager->setGlobalHotkeysEnabled(json["globalHotkeysEnabled"].toBool(true));
         }
 

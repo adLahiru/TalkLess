@@ -11,7 +11,7 @@
 
 AudioEngine::AudioEngine()
     : device(nullptr), context(nullptr), deviceRunning(false), micGain(1.0f), micGainDB(0.0f), masterGain(1.0f),
-      masterGainDB(0.0f), micPeakLevel(0.0f), masterPeakLevel(0.0f)
+      masterGainDB(0.0f), micPeakLevel(0.0f), masterPeakLevel(0.0f), recording(false), recordedFrames(0)
 {
     // Initialize all clip slots
     for (int i = 0; i < MAX_CLIPS; ++i) {
@@ -109,6 +109,22 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
         float currentPeak = micPeakLevel.load(std::memory_order_relaxed);
         if (micPeak > currentPeak) {
             micPeakLevel.store(micPeak, std::memory_order_relaxed);
+        }
+
+        // Capture recording if enabled (lock-free check, minimal lock for buffer append)
+        if (recording.load(std::memory_order_relaxed)) {
+            std::lock_guard<std::mutex> lock(recordingMutex);
+            // Store stereo samples (duplicate mono to stereo) - APPLY MIC GAIN
+            for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
+                float monoSample = 0.0f;
+                for (ma_uint32 ch = 0; ch < captureChannels; ++ch) {
+                    monoSample += mic[frame * captureChannels + ch];
+                }
+                monoSample = (monoSample / static_cast<float>(captureChannels)) * currentMicGain;
+                recordingBuffer.push_back(monoSample); // Left
+                recordingBuffer.push_back(monoSample); // Right
+            }
+            recordedFrames.fetch_add(frameCount, std::memory_order_relaxed);
         }
     }
 
@@ -739,4 +755,165 @@ bool AudioEngine::setCaptureDevice(const std::string& deviceId)
     }
     std::cerr << "Capture device not found: " << deviceId << std::endl;
     return false;
+}
+
+// ============================================================================
+// RECORDING FUNCTIONALITY
+// ============================================================================
+
+bool AudioEngine::startRecording(const std::string& outputPath)
+{
+    if (recording.load(std::memory_order_relaxed)) {
+        std::cerr << "Already recording" << std::endl;
+        return false;
+    }
+
+    if (outputPath.empty()) {
+        std::cerr << "Recording output path is empty" << std::endl;
+        return false;
+    }
+
+    // Ensure audio device is running
+    if (!deviceRunning.load(std::memory_order_relaxed)) {
+        if (!startAudioDevice()) {
+            std::cerr << "Failed to start audio device for recording" << std::endl;
+            return false;
+        }
+    }
+
+    // Clear previous recording
+    {
+        std::lock_guard<std::mutex> lock(recordingMutex);
+        recordingBuffer.clear();
+        recordingBuffer.reserve(48000 * 2 * 60); // Reserve ~1 minute stereo at 48kHz
+    }
+
+    recordingOutputPath = outputPath;
+    recordedFrames.store(0, std::memory_order_relaxed);
+    recording.store(true, std::memory_order_release);
+
+    std::cout << "Recording started: " << outputPath << std::endl;
+    return true;
+}
+
+bool AudioEngine::stopRecording()
+{
+    if (!recording.load(std::memory_order_relaxed)) {
+        std::cerr << "Not currently recording" << std::endl;
+        return false;
+    }
+
+    recording.store(false, std::memory_order_release);
+
+    // Small delay to ensure audio callback has finished any in-progress capture
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    // Write to file
+    std::vector<float> samples;
+    {
+        std::lock_guard<std::mutex> lock(recordingMutex);
+        samples = std::move(recordingBuffer);
+        recordingBuffer.clear();
+    }
+
+    std::cout << "Recording stopped - buffer size: " << samples.size() << " samples" << std::endl;
+
+    if (samples.empty()) {
+        std::cerr << "No audio data recorded - buffer was empty" << std::endl;
+        return false;
+    }
+
+    // Calculate peak level to verify we captured actual audio
+    float peak = 0.0F;
+    for (size_t i = 0; i < samples.size(); ++i) {
+        float absSample = std::abs(samples[i]);
+        if (absSample > peak) {
+            peak = absSample;
+        }
+    }
+    std::cout << "Recording peak level: " << peak << " (" << (peak * 100.0F) << "%)" << std::endl;
+
+    if (peak < 0.001F) {
+        std::cerr << "Warning: Recording appears to be silent (peak < 0.1%)" << std::endl;
+    }
+
+    bool success = writeWavFile(recordingOutputPath, samples, 48000, 2);
+    if (success) {
+        std::cout << "Recording saved: " << recordingOutputPath << " (" << samples.size() / 2 << " frames)"
+                  << std::endl;
+    } else {
+        std::cerr << "Failed to save recording: " << recordingOutputPath << std::endl;
+    }
+
+    return success;
+}
+
+bool AudioEngine::isRecording() const
+{
+    return recording.load(std::memory_order_relaxed);
+}
+
+float AudioEngine::getRecordingDuration() const
+{
+    uint64_t frames = recordedFrames.load(std::memory_order_relaxed);
+    return static_cast<float>(frames) / 48000.0f; // Assuming 48kHz sample rate
+}
+
+bool AudioEngine::writeWavFile(const std::string& path, const std::vector<float>& samples, int sampleRate, int channels)
+{
+    if (samples.empty() || path.empty()) {
+        return false;
+    }
+
+    FILE* file = fopen(path.c_str(), "wb");
+    if (!file) {
+        std::cerr << "Failed to open file for writing: " << path << std::endl;
+        return false;
+    }
+
+    // WAV header
+    uint32_t dataSize = static_cast<uint32_t>(samples.size() * sizeof(int16_t));
+    uint32_t fileSize = 36 + dataSize;
+
+    // RIFF header
+    fwrite("RIFF", 1, 4, file);
+    fwrite(&fileSize, 4, 1, file);
+    fwrite("WAVE", 1, 4, file);
+
+    // fmt chunk
+    fwrite("fmt ", 1, 4, file);
+    uint32_t fmtSize = 16;
+    fwrite(&fmtSize, 4, 1, file);
+    uint16_t audioFormat = 1; // PCM
+    fwrite(&audioFormat, 2, 1, file);
+    uint16_t numChannels = static_cast<uint16_t>(channels);
+    fwrite(&numChannels, 2, 1, file);
+    uint32_t sampleRateU = static_cast<uint32_t>(sampleRate);
+    fwrite(&sampleRateU, 4, 1, file);
+    uint32_t byteRate = sampleRateU * numChannels * 2; // 16-bit
+    fwrite(&byteRate, 4, 1, file);
+    uint16_t blockAlign = static_cast<uint16_t>(numChannels * 2);
+    fwrite(&blockAlign, 2, 1, file);
+    uint16_t bitsPerSample = 16;
+    fwrite(&bitsPerSample, 2, 1, file);
+
+    // data chunk
+    fwrite("data", 1, 4, file);
+    fwrite(&dataSize, 4, 1, file);
+
+    // Convert float samples to 16-bit PCM and write
+    for (size_t i = 0; i < samples.size(); ++i) {
+        float sample = samples[i];
+        // Clamp to [-1, 1]
+        if (sample > 1.0f)
+            sample = 1.0f;
+        if (sample < -1.0f)
+            sample = -1.0f;
+        // Convert to 16-bit
+        int16_t pcmSample = static_cast<int16_t>(sample * 32767.0f);
+        fwrite(&pcmSample, 2, 1, file);
+    }
+
+    fclose(file);
+    return true;
 }

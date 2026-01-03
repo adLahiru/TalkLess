@@ -28,9 +28,9 @@ int main(int argc, char* argv[])
     QGuiApplication app(argc, argv);
 
     // Set application metadata for QSettings
-    app.setOrganizationName("TalkLess");
-    app.setOrganizationDomain("talkless.app");
-    app.setApplicationName("TalkLess");
+    QGuiApplication::setOrganizationName("TalkLess");
+    QGuiApplication::setOrganizationDomain("talkless.app");
+    QGuiApplication::setApplicationName("TalkLess");
 
     qDebug() << "=== TalkLess Application Starting ===";
     qDebug() << "Qt version:" << QT_VERSION_STR;
@@ -125,11 +125,11 @@ int main(int argc, char* argv[])
         // Connect system hotkeys
         QObject::connect(&hotkeyManager, &HotkeyManager::playPauseTriggered, &audioManager, [&audioManager]() {
             if (audioManager.isPlaying()) {
-                if (audioManager.currentClip()) {
+                if (audioManager.currentClip() != nullptr) {
                     audioManager.pauseClip(audioManager.currentClip()->id());
                 }
             } else {
-                if (audioManager.currentClip()) {
+                if (audioManager.currentClip() != nullptr) {
                     audioManager.playClip(audioManager.currentClip()->id());
                 }
             }
@@ -181,7 +181,7 @@ int main(int argc, char* argv[])
         if (!engine.rootObjects().isEmpty()) {
             qDebug() << "Module loaded successfully, root objects count:" << engine.rootObjects().size();
             qDebug() << "Starting event loop...";
-            int result = app.exec();
+            int result = QGuiApplication::exec();
 
             // Clear QML engine before destroying C++ objects
             // This prevents QML from accessing destroyed C++ objects
@@ -189,17 +189,16 @@ int main(int argc, char* argv[])
             engine.clearComponentCache();
 
             // Explicitly stop audio engine before destruction
-            if (sharedAudioEngine && sharedAudioEngine->isDeviceRunning()) {
+            if (sharedAudioEngine != nullptr && sharedAudioEngine->isDeviceRunning()) {
                 qDebug() << "Stopping audio device...";
                 sharedAudioEngine->stopAudioDevice();
             }
 
             qDebug() << "Application exiting cleanly";
             return result;
-        } else {
-            qCritical() << "Failed to load QML module - no root objects created";
-            return -1;
         }
+        qCritical() << "Failed to load QML module - no root objects created";
+        return -1;
 
     } catch (const std::exception& e) {
         qCritical() << "Standard exception during startup:" << e.what();

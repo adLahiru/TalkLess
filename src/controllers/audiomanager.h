@@ -90,6 +90,13 @@ public:
     Q_INVOKABLE void saveSettings();
     Q_INVOKABLE void loadSettings();
 
+    // Recording methods
+    Q_INVOKABLE bool startRecording();
+    Q_INVOKABLE QString stopRecording(); // Returns file path on success
+    Q_INVOKABLE bool isRecordingAudio() const;
+    Q_INVOKABLE qreal getRecordingDuration() const;
+    Q_INVOKABLE QString getRecordingsPath() const;
+
 signals:
     void audioClipsChanged();
     void currentClipChanged();
@@ -136,6 +143,9 @@ private:
     // AudioEngine integration
     AudioEngine* m_audioEngine;
     bool m_initialized;
+
+    // Recording state
+    QString m_currentRecordingPath;
 
     void initializePlayer(const QString& clipId);
     void cleanupPlayer(const QString& clipId);

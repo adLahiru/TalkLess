@@ -429,7 +429,7 @@ Item {
                 clip: selectedClip
             }
             
-            AddAudioPanel {
+            AudioPanelTabs {
                 onAudioAdded: function(name, filePath, imagePath) {
                     var sectionId = soundboardView && soundboardView.currentSection ? soundboardView.currentSection.id : ""
                     var clip = audioManager.addClip(name, filePath, "", sectionId)
