@@ -370,6 +370,27 @@ AudioClip* AudioManager::addClip(const QString& title, const QUrl& filePath, con
 
     m_audioClips.append(clip);
 
+    // Connect clip's volumeChanged to update audio output in real-time
+    connect(clip, &AudioClip::volumeChanged, this, [this, clipId]() {
+        AudioClip* clip = getClip(clipId);
+        if (clip && m_audioOutputs.contains(clipId)) {
+            QAudioOutput* output = m_audioOutputs[clipId];
+            if (output) {
+                qreal newVolume = clip->volume() * m_volume;
+                output->setVolume(newVolume);
+                qDebug() << "Updated clip volume:" << clipId << "to" << newVolume;
+            }
+        }
+        // Also update secondary output if exists
+        if (clip && m_secondaryAudioOutputs.contains(clipId)) {
+            QAudioOutput* secondaryOutput = m_secondaryAudioOutputs[clipId];
+            if (secondaryOutput) {
+                qreal newVolume = clip->volume() * m_volume;
+                secondaryOutput->setVolume(newVolume);
+            }
+        }
+    });
+
     // Initialize player for this clip
     initializePlayer(clipId);
     loadAudioFile(clipId, filePath);
@@ -1193,6 +1214,25 @@ void AudioManager::loadSettings()
                             clip->setSectionId(sectionId);
 
                             m_audioClips.append(clip);
+
+                            // Connect clip's volumeChanged to update audio output in real-time
+                            connect(clip, &AudioClip::volumeChanged, this, [this, clipId]() {
+                                AudioClip* clip = getClip(clipId);
+                                if (clip && m_audioOutputs.contains(clipId)) {
+                                    QAudioOutput* output = m_audioOutputs[clipId];
+                                    if (output) {
+                                        qreal newVolume = clip->volume() * m_volume;
+                                        output->setVolume(newVolume);
+                                    }
+                                }
+                                if (clip && m_secondaryAudioOutputs.contains(clipId)) {
+                                    QAudioOutput* secondaryOutput = m_secondaryAudioOutputs[clipId];
+                                    if (secondaryOutput) {
+                                        qreal newVolume = clip->volume() * m_volume;
+                                        secondaryOutput->setVolume(newVolume);
+                                    }
+                                }
+                            });
 
                             // Load audio file if path is valid
                             if (!filePath.isEmpty()) {

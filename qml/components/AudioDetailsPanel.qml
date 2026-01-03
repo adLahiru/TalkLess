@@ -162,9 +162,18 @@ Rectangle {
             Slider {
                 id: volumeSlider
                 Layout.fillWidth: true
-                from: -20.0  // -20dB to 0dB range
-                to: 0.0
-                value: Functions.linearToDb(voiceVolume / 100)  // Convert percentage to linear then to dB
+                // Industry-standard range: -60dB (near silent) to +6dB (boost)
+                from: -60.0
+                to: 6.0
+                stepSize: 0.5
+                value: root.clip ? Functions.linearToDb(root.clip.volume) : 0
+                
+                onMoved: {
+                    // Convert dB back to linear and update clip volume
+                    if (root.clip) {
+                        root.clip.volume = Functions.dbToLinear(value)
+                    }
+                }
                 
                 background: Rectangle {
                     x: volumeSlider.leftPadding
