@@ -3,7 +3,12 @@
 #include "../models/audioclip.h"
 
 #include <QDebug>
-#include <QSettings>
+#include <QDir>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QStandardPaths>
 #include <QUuid>
 
 SoundboardView::SoundboardView(AudioManager* audioMgr, HotkeyManager* hotkeyMgr, QObject* parent)
@@ -306,62 +311,134 @@ SoundboardSection* SoundboardView::getSection(const QString& sectionId) const
 
 void SoundboardView::saveSoundboardData()
 {
-    QSettings settings("TalkLess", "Soundboard");
-
-    // Save sections
-    settings.beginGroup("sections");
-    settings.remove(""); // Clear existing sections
-    for (int i = 0; i < m_sections.size(); ++i) {
-        SoundboardSection* section = m_sections[i];
-        if (section) {
-            QString sectionKey = QString("section_%1").arg(i);
-            settings.beginGroup(sectionKey);
-            settings.setValue("id", section->id());
-            settings.setValue("name", section->name());
-            settings.setValue("isSelected", section->isSelected());
-            settings.endGroup();
+    try {
+        // Get app data path
+        QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QDir dir(appDataPath);
+        if (!dir.exists()) {
+            dir.mkpath(appDataPath);
         }
+        QString filePath = dir.filePath("soundboard_data.json");
+
+        qDebug() << "SoundboardView: Saving soundboard data to:" << filePath;
+
+        QJsonObject rootObject;
+
+        // Add metadata
+        QJsonObject metadata;
+        metadata["version"] = "1.0";
+        metadata["appName"] = "TalkLess";
+        metadata["saveDate"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+        rootObject["metadata"] = metadata;
+
+        // Save sections
+        QJsonArray sectionsArray;
+        for (SoundboardSection* section : m_sections) {
+            if (section != nullptr) {
+                QJsonObject sectionObj;
+                sectionObj["id"] = section->id();
+                sectionObj["name"] = section->name();
+                sectionObj["isSelected"] = section->isSelected();
+                sectionsArray.append(sectionObj);
+            }
+        }
+        rootObject["sections"] = sectionsArray;
+
+        // Save audio clips (from AudioManager)
+        QJsonArray clipsArray;
+        for (AudioClip* clip : m_audioManager->audioClips()) {
+            if (clip != nullptr) {
+                QJsonObject clipObj;
+                clipObj["id"] = clip->id();
+                clipObj["title"] = clip->title();
+                clipObj["filePath"] = clip->filePath().toString();
+                clipObj["hotkey"] = clip->hotkey();
+                clipObj["volume"] = clip->volume();
+                clipObj["trimStart"] = clip->trimStart();
+                clipObj["trimEnd"] = clip->trimEnd();
+                clipObj["sectionId"] = clip->sectionId();
+                clipObj["imagePath"] = clip->imagePath();
+                clipsArray.append(clipObj);
+            }
+        }
+        rootObject["audioClips"] = clipsArray;
+
+        // Save current/active section IDs
+        rootObject["currentSectionId"] = m_currentSection != nullptr ? m_currentSection->id() : "";
+        rootObject["activeSectionId"] = m_activeSection != nullptr ? m_activeSection->id() : "";
+
+        // Write to file
+        QJsonDocument doc(rootObject);
+        QFile file(filePath);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            qCritical() << "SoundboardView: Failed to open file for writing:" << filePath;
+            return;
+        }
+
+        file.write(doc.toJson(QJsonDocument::Indented));
+        file.close();
+
+        qDebug() << "SoundboardView: Saved" << m_sections.size() << "sections and"
+                 << m_audioManager->audioClips().size() << "clips";
+
+    } catch (const std::exception& e) {
+        qCritical() << "SoundboardView: Exception saving data:" << e.what();
+    } catch (...) {
+        qCritical() << "SoundboardView: Unknown exception saving data";
     }
-    settings.endGroup();
-
-    // Save current section ID
-    settings.setValue("currentSectionId", m_currentSection ? m_currentSection->id() : "");
-
-    // Save active section ID
-    settings.setValue("activeSectionId", m_activeSection ? m_activeSection->id() : "");
-
-    settings.sync();
-    qDebug() << "SoundboardView: Saved" << m_sections.size() << "sections";
 }
 
 void SoundboardView::loadSoundboardData()
 {
     try {
-        qDebug() << "SoundboardView: Starting to load soundboard data...";
-        QSettings settings("TalkLess", "Soundboard");
+        QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QString filePath = QDir(appDataPath).filePath("soundboard_data.json");
+
+        qDebug() << "SoundboardView: Loading soundboard data from:" << filePath;
+
+        QFile file(filePath);
+        if (!file.exists()) {
+            qDebug() << "SoundboardView: No saved data file found, using defaults";
+            return;
+        }
+
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            qWarning() << "SoundboardView: Failed to open data file:" << filePath;
+            return;
+        }
+
+        QByteArray jsonData = file.readAll();
+        file.close();
+
+        QJsonParseError parseError;
+        QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
+
+        if (parseError.error != QJsonParseError::NoError) {
+            qWarning() << "SoundboardView: JSON parse error:" << parseError.errorString();
+            return;
+        }
+
+        if (!doc.isObject()) {
+            qWarning() << "SoundboardView: Invalid JSON format";
+            return;
+        }
+
+        QJsonObject rootObject = doc.object();
 
         // Load sections
-        settings.beginGroup("sections");
-        QStringList sectionKeys = settings.childGroups();
-        qDebug() << "SoundboardView: Found" << sectionKeys.size() << "section keys";
+        if (rootObject.contains("sections")) {
+            QJsonArray sectionsArray = rootObject["sections"].toArray();
 
-        // Only load sections if we have saved data (don't clear defaults on first run)
-        if (!sectionKeys.isEmpty()) {
-            qDebug() << "SoundboardView: Loading saved sections...";
-            // Clear default sections only if we have saved data
-            qDeleteAll(m_sections);
-            m_sections.clear();
+            if (!sectionsArray.isEmpty()) {
+                // Clear default sections
+                qDeleteAll(m_sections);
+                m_sections.clear();
 
-            for (const QString& sectionKey : sectionKeys) {
-                try {
-                    qDebug() << "SoundboardView: Loading section key:" << sectionKey;
-                    settings.beginGroup(sectionKey);
-                    QString sectionId = settings.value("id").toString();
-                    QString sectionName = settings.value("name").toString();
-                    bool isSelected = settings.value("isSelected", false).toBool();
-                    settings.endGroup();
-
-                    qDebug() << "SoundboardView: Section data - ID:" << sectionId << "Name:" << sectionName;
+                for (const QJsonValue& sectionVal : sectionsArray) {
+                    QJsonObject sectionObj = sectionVal.toObject();
+                    QString sectionId = sectionObj["id"].toString();
+                    QString sectionName = sectionObj["name"].toString();
+                    bool isSelected = sectionObj["isSelected"].toBool(false);
 
                     if (!sectionId.isEmpty() && !sectionName.isEmpty()) {
                         SoundboardSection* section = new SoundboardSection(this);
@@ -369,68 +446,82 @@ void SoundboardView::loadSoundboardData()
                         section->setName(sectionName);
                         section->setIsSelected(isSelected);
                         m_sections.append(section);
-
-                        qDebug() << "SoundboardView: Loaded section:" << sectionName << "ID:" << sectionId;
+                        qDebug() << "SoundboardView: Loaded section:" << sectionName;
                     }
-                } catch (const std::exception& e) {
-                    qWarning() << "SoundboardView: Failed to load section with key:" << sectionKey
-                               << "Exception:" << e.what();
-                    continue; // Skip this section and continue with others
-                } catch (...) {
-                    qWarning() << "SoundboardView: Failed to load section with key:" << sectionKey;
-                    continue; // Skip this section and continue with others
                 }
             }
         }
-        settings.endGroup();
 
-        // Restore active section (read from root, not from sections group)
-        try {
-            qDebug() << "SoundboardView: Restoring active section...";
-            QString activeSectionId = settings.value("activeSectionId").toString();
-            qDebug() << "SoundboardView: Active section ID from settings:" << activeSectionId;
-            if (!activeSectionId.isEmpty()) {
-                m_activeSection = getSection(activeSectionId);
-            }
-            if (!m_activeSection && !m_sections.isEmpty()) {
-                m_activeSection = m_sections.first();
-            }
+        // Load audio clips
+        if (rootObject.contains("audioClips")) {
+            QJsonArray clipsArray = rootObject["audioClips"].toArray();
 
-            // Set current section to active section (app opens with active soundboard displayed)
-            if (m_activeSection) {
-                selectSection(m_activeSection->id());
-            } else if (!m_sections.isEmpty()) {
-                selectSection(m_sections.first()->id());
-            }
+            for (const QJsonValue& clipVal : clipsArray) {
+                QJsonObject clipObj = clipVal.toObject();
+                QString clipId = clipObj["id"].toString();
+                QString title = clipObj["title"].toString();
+                QString filePath = clipObj["filePath"].toString();
+                QString hotkey = clipObj["hotkey"].toString();
+                qreal volume = clipObj["volume"].toDouble(1.0);
+                qreal trimStart = clipObj["trimStart"].toDouble(0.0);
+                qreal trimEnd = clipObj["trimEnd"].toDouble(-1.0);
+                QString sectionId = clipObj["sectionId"].toString();
+                QString imagePath = clipObj["imagePath"].toString();
 
-            emit sectionsChanged();
-            emit currentSectionChanged();
-            emit activeSectionChanged();
-            qDebug() << "SoundboardView: Active section restored:"
-                     << (m_activeSection ? m_activeSection->name() : "none");
-        } catch (const std::exception& e) {
-            qWarning() << "SoundboardView: Failed to restore active section, using first available. Exception:"
-                       << e.what();
-            if (!m_sections.isEmpty()) {
-                m_activeSection = m_sections.first();
-                selectSection(m_sections.first()->id());
-            }
-        } catch (...) {
-            qWarning() << "SoundboardView: Failed to restore active section, using first available";
-            if (!m_sections.isEmpty()) {
-                m_activeSection = m_sections.first();
-                selectSection(m_sections.first()->id());
+                if (!clipId.isEmpty() && !title.isEmpty() && !filePath.isEmpty()) {
+                    // Check if clip already exists
+                    bool exists = false;
+                    for (AudioClip* c : m_audioManager->audioClips()) {
+                        if (c != nullptr && c->id() == clipId) {
+                            exists = true;
+                            break;
+                        }
+                    }
+
+                    if (!exists) {
+                        AudioClip* clip = m_audioManager->addClip(title, QUrl(filePath), hotkey, sectionId);
+                        if (clip != nullptr) {
+                            clip->setVolume(volume);
+                            clip->setTrimStart(trimStart);
+                            clip->setTrimEnd(trimEnd);
+                            if (!imagePath.isEmpty()) {
+                                clip->setImagePath(imagePath);
+                            }
+                            qDebug() << "SoundboardView: Loaded clip:" << title << "in section:" << sectionId;
+                        }
+                    }
+                }
             }
         }
 
-        qDebug() << "SoundboardView: Loaded" << m_sections.size() << "sections successfully";
+        // Restore active section
+        QString activeSectionId = rootObject["activeSectionId"].toString();
+        if (!activeSectionId.isEmpty()) {
+            m_activeSection = getSection(activeSectionId);
+        }
+        if (m_activeSection == nullptr && !m_sections.isEmpty()) {
+            m_activeSection = m_sections.first();
+        }
+
+        // Set current section to active section
+        if (m_activeSection != nullptr) {
+            selectSection(m_activeSection->id());
+        } else if (!m_sections.isEmpty()) {
+            selectSection(m_sections.first()->id());
+        }
+
+        emit sectionsChanged();
+        emit currentSectionChanged();
+        emit activeSectionChanged();
+        emit currentSectionClipsChanged();
+
+        qDebug() << "SoundboardView: Loaded" << m_sections.size() << "sections and"
+                 << m_audioManager->audioClips().size() << "clips successfully";
 
     } catch (const std::exception& e) {
-        qCritical() << "SoundboardView: Failed to load soundboard data! Exception:" << e.what();
-        // Continue with default sections - don't crash the application
+        qCritical() << "SoundboardView: Exception loading data:" << e.what();
     } catch (...) {
-        qCritical() << "SoundboardView: Failed to load soundboard data! Unknown exception";
-        // Continue with default sections - don't crash the application
+        qCritical() << "SoundboardView: Unknown exception loading data";
     }
 }
 
