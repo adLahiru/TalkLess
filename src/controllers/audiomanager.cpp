@@ -1000,6 +1000,16 @@ void AudioManager::refreshAudioDevices()
         setCurrentOutputDevice(m_outputDevices.first());
     }
 
+    // Ensure device is running after configuration (if input is enabled)
+    if (m_audioEngine && m_inputDeviceEnabled && !m_audioEngine->isDeviceRunning()) {
+        qDebug() << "Starting audio device after configuration...";
+        if (m_audioEngine->startAudioDevice()) {
+            qDebug() << "Audio device started successfully with configured devices";
+        } else {
+            qWarning() << "Failed to start audio device after configuration!";
+        }
+    }
+
     qDebug() << "Audio devices refreshed - Inputs:" << m_inputDevices.size() << "Outputs:" << m_outputDevices.size();
 }
 
@@ -1329,7 +1339,7 @@ qreal AudioManager::getRecordingDuration() const
 
 QString AudioManager::getRecordingsPath() const
 {
-    // Use application data location for recordings
-    QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    return QDir(dataPath).filePath("recordings");
+    // Use Documents/TalkLess for recordings - user-accessible location
+    QString documentsPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    return QDir(documentsPath).filePath("TalkLess");
 }

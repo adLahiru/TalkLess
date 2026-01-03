@@ -82,7 +82,8 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
     }
 
     // Mix microphone input and detect peak level
-    // Handle channel mismatch: capture may be mono while playback is stereo
+    // NOTE: Mic monitoring (routing mic to speakers) is DISABLED to prevent feedback
+    // Recording capture still works separately below
     float micPeak = 0.0f;
     if (mic && captureChannels > 0) {
         for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
@@ -93,12 +94,10 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
             }
             monoSample = (monoSample / captureChannels) * currentMicGain;
 
-            // Distribute to all playback channels
-            for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) {
-                out[frame * playbackChannels + ch] += monoSample;
-            }
+            // NOTE: NOT routing mic to output to prevent feedback
+            // If mic monitoring is needed in future, add a flag to control this
 
-            // Track peak level
+            // Track peak level for UI meters
             float absSample = std::abs(monoSample);
             if (absSample > micPeak) {
                 micPeak = absSample;
@@ -113,6 +112,14 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
 
         // Capture recording if enabled (lock-free check, minimal lock for buffer append)
         if (recording.load(std::memory_order_relaxed)) {
+            // Debug log once at start of recording
+            static bool hasLoggedRecordingStart = false;
+            if (!hasLoggedRecordingStart) {
+                std::cout << "Recording capture active - mic: " << (mic ? "valid" : "NULL")
+                          << ", captureChannels: " << captureChannels << ", micGain: " << currentMicGain << std::endl;
+                hasLoggedRecordingStart = true;
+            }
+
             std::lock_guard<std::mutex> lock(recordingMutex);
             // Store stereo samples (duplicate mono to stereo) - APPLY MIC GAIN
             for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
@@ -125,6 +132,18 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
                 recordingBuffer.push_back(monoSample); // Right
             }
             recordedFrames.fetch_add(frameCount, std::memory_order_relaxed);
+        } else {
+            // Reset log flag when recording stops
+            static bool hasLoggedRecordingStart = false;
+            hasLoggedRecordingStart = false;
+        }
+    } else if (recording.load(std::memory_order_relaxed)) {
+        // Log error if recording is active but no mic input
+        static bool hasLoggedMicError = false;
+        if (!hasLoggedMicError) {
+            std::cerr << "ERROR: Recording active but mic input unavailable! mic=" << (mic ? "valid" : "NULL")
+                      << ", captureChannels=" << captureChannels << std::endl;
+            hasLoggedMicError = true;
         }
     }
 
@@ -577,7 +596,12 @@ bool AudioEngine::initDevice()
         return false;
     }
 
-    std::cout << "Audio device initialized" << std::endl;
+    std::cout << "Audio device initialized:" << std::endl;
+    std::cout << "  Sample rate: " << device->sampleRate << " Hz" << std::endl;
+    std::cout << "  Playback: " << device->playback.name << " (" << device->playback.channels << " channels)"
+              << std::endl;
+    std::cout << "  Capture:  " << device->capture.name << " (" << device->capture.channels << " channels)"
+              << std::endl;
     return true;
 }
 
@@ -729,9 +753,11 @@ std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumerateCaptureDevices()
 
 bool AudioEngine::setPlaybackDevice(const std::string& deviceId)
 {
+    std::cout << "Setting playback device to: " << deviceId << std::endl;
     auto devices = enumeratePlaybackDevices();
     for (const auto& dev : devices) {
         if (dev.id == deviceId || dev.name == deviceId) {
+            std::cout << "Found playback device match: " << dev.name << " (ID: " << dev.id << ")" << std::endl;
             selectedPlaybackDeviceId = dev.id;
             selectedPlaybackDeviceIdStruct = dev.deviceId;
             selectedPlaybackSet = true;
@@ -744,9 +770,11 @@ bool AudioEngine::setPlaybackDevice(const std::string& deviceId)
 
 bool AudioEngine::setCaptureDevice(const std::string& deviceId)
 {
+    std::cout << "Setting capture device to: " << deviceId << std::endl;
     auto devices = enumerateCaptureDevices();
     for (const auto& dev : devices) {
         if (dev.id == deviceId || dev.name == deviceId) {
+            std::cout << "Found capture device match: " << dev.name << " (ID: " << dev.id << ")" << std::endl;
             selectedCaptureDeviceId = dev.id;
             selectedCaptureDeviceIdStruct = dev.deviceId;
             selectedCaptureSet = true;

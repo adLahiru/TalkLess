@@ -20,6 +20,8 @@
     <string>10.14</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>TalkLess needs access to your microphone to record audio for the soundboard.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

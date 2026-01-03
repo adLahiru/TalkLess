@@ -50,10 +50,9 @@ int main(int argc, char* argv[])
             return -1;
         }
 
-        qDebug() << "Starting audio device...";
-        if (!sharedAudioEngine->startAudioDevice()) {
-            qWarning() << "Failed to start audio device, continuing anyway...";
-        }
+        // NOTE: Don't start audio device here!
+        // AudioManager will start it AFTER setting up the correct capture/playback devices
+        qDebug() << "AudioEngine ready (device will start after configuration)";
 
         qDebug() << "Creating controllers...";
         // Create controllers sharing the same AudioEngine
