@@ -99,18 +99,27 @@ QList<AudioClip*> SoundboardView::currentSectionClips() const
     QList<AudioClip*> filteredClips;
 
     if (m_currentSection == nullptr) {
+        qDebug() << "currentSectionClips: m_currentSection is null";
         return filteredClips;
     }
 
     QString currentSectionId = m_currentSection->id();
+    qDebug() << "currentSectionClips: Looking for clips in section:" << currentSectionId << "("
+             << m_currentSection->name() << ")";
+    qDebug() << "  Total clips in audioManager:" << m_audioManager->audioClips().count();
 
     // Filter clips that belong to the current section
     for (AudioClip* clip : m_audioManager->audioClips()) {
-        if (clip != nullptr && clip->sectionId() == currentSectionId) {
-            filteredClips.append(clip);
+        if (clip != nullptr) {
+            qDebug() << "  Clip:" << clip->title() << "sectionId:" << clip->sectionId()
+                     << "matches:" << (clip->sectionId() == currentSectionId);
+            if (clip->sectionId() == currentSectionId) {
+                filteredClips.append(clip);
+            }
         }
     }
 
+    qDebug() << "  Filtered clips count:" << filteredClips.count();
     return filteredClips;
 }
 
@@ -423,4 +432,103 @@ void SoundboardView::loadSoundboardData()
         qCritical() << "SoundboardView: Failed to load soundboard data! Unknown exception";
         // Continue with default sections - don't crash the application
     }
+}
+
+void SoundboardView::copyClip(const QString& clipId)
+{
+    qDebug() << "SoundboardView::copyClip - Copying clip:" << clipId;
+
+    // Verify clip exists
+    AudioClip* clip = nullptr;
+    for (AudioClip* c : m_audioManager->audioClips()) {
+        if (c && c->id() == clipId) {
+            clip = c;
+            break;
+        }
+    }
+
+    if (clip) {
+        m_clipboardClipId = clipId;
+        qDebug() << "SoundboardView::copyClip - Copied to clipboard:" << clip->title();
+        emit clipboardChanged();
+    } else {
+        qWarning() << "SoundboardView::copyClip - Clip not found:" << clipId;
+    }
+}
+
+bool SoundboardView::pasteClip()
+{
+    qDebug() << "SoundboardView::pasteClip - START";
+    qDebug() << "  Clipboard clip ID:" << m_clipboardClipId;
+
+    if (m_clipboardClipId.isEmpty()) {
+        qWarning() << "SoundboardView::pasteClip - Clipboard is empty";
+        return false;
+    }
+
+    if (!m_currentSection) {
+        qWarning() << "SoundboardView::pasteClip - No current section";
+        return false;
+    }
+
+    // Find source clip
+    AudioClip* sourceClip = nullptr;
+    for (AudioClip* clip : m_audioManager->audioClips()) {
+        if (clip && clip->id() == m_clipboardClipId) {
+            sourceClip = clip;
+            break;
+        }
+    }
+
+    if (!sourceClip) {
+        qWarning() << "SoundboardView::pasteClip - Source clip not found:" << m_clipboardClipId;
+        return false;
+    }
+
+    QString targetSectionId = m_currentSection->id();
+    qDebug() << "  Source clip:" << sourceClip->title();
+    qDebug() << "  Target section:" << m_currentSection->name() << "(" << targetSectionId << ")";
+
+    // Check if already exists in this section
+    for (AudioClip* clip : m_audioManager->audioClips()) {
+        if (clip && clip->sectionId() == targetSectionId && clip->filePath() == sourceClip->filePath()) {
+            qDebug() << "SoundboardView::pasteClip - Audio already exists in this section";
+            return false;
+        }
+    }
+
+    // Create new clip with same properties
+    AudioClip* newClip = m_audioManager->addClip(sourceClip->title(), sourceClip->filePath(),
+                                                 "", // No hotkey for pasted clip
+                                                 targetSectionId);
+
+    if (!newClip) {
+        qWarning() << "SoundboardView::pasteClip - Failed to create new clip";
+        return false;
+    }
+
+    qDebug() << "  New clip created with ID:" << newClip->id();
+
+    // Copy additional properties
+    newClip->setVolume(sourceClip->volume());
+    newClip->setImagePath(sourceClip->imagePath());
+    newClip->setTrimStart(sourceClip->trimStart());
+    newClip->setTrimEnd(sourceClip->trimEnd());
+
+    // Emit signals
+    emit clipPasted(newClip->id(), targetSectionId);
+    emit currentSectionClipsChanged();
+
+    // Save
+    saveSoundboardData();
+    m_audioManager->saveSettings();
+
+    qDebug() << "SoundboardView::pasteClip - SUCCESS";
+    return true;
+}
+
+void SoundboardView::clearClipboard()
+{
+    m_clipboardClipId.clear();
+    emit clipboardChanged();
 }

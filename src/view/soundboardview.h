@@ -19,6 +19,8 @@ class SoundboardView : public QObject
     Q_PROPERTY(SoundboardSection* currentSection READ currentSection NOTIFY currentSectionChanged)
     Q_PROPERTY(SoundboardSection* activeSection READ activeSection NOTIFY activeSectionChanged)
     Q_PROPERTY(QList<AudioClip*> currentSectionClips READ currentSectionClips NOTIFY currentSectionClipsChanged)
+    Q_PROPERTY(QString clipboardClipId READ clipboardClipId NOTIFY clipboardChanged)
+    Q_PROPERTY(bool hasClipboard READ hasClipboard NOTIFY clipboardChanged)
 
 public:
     explicit SoundboardView(AudioManager* audioMgr, HotkeyManager* hotkeyMgr, QObject* parent = nullptr);
@@ -29,6 +31,8 @@ public:
     SoundboardSection* currentSection() const { return m_currentSection; }
     SoundboardSection* activeSection() const { return m_activeSection; }
     QList<AudioClip*> currentSectionClips() const;
+    QString clipboardClipId() const { return m_clipboardClipId; }
+    bool hasClipboard() const { return !m_clipboardClipId.isEmpty(); }
 
     // UI-specific methods
     Q_INVOKABLE void playAudioInSlot(int slotIndex);
@@ -42,6 +46,11 @@ public:
     Q_INVOKABLE void selectSection(const QString& sectionId);
     Q_INVOKABLE void setActiveSection(const QString& sectionId);
     Q_INVOKABLE SoundboardSection* getSection(const QString& sectionId) const;
+
+    // Clip clipboard (copy/paste)
+    Q_INVOKABLE void copyClip(const QString& clipId);
+    Q_INVOKABLE bool pasteClip();
+    Q_INVOKABLE void clearClipboard();
 
     // Settings persistence
     Q_INVOKABLE void saveSoundboardData();
@@ -58,6 +67,8 @@ signals:
     void sectionDeleted(const QString& sectionId);
     void sectionRenamed(const QString& sectionId, const QString& newName);
     void currentSectionClipsChanged();
+    void clipboardChanged();
+    void clipPasted(const QString& clipId, const QString& sectionId);
 
 private slots:
     void onClipFinished(const QString& clipId);
@@ -69,6 +80,7 @@ private:
     QList<SoundboardSection*> m_sections;
     SoundboardSection* m_currentSection = nullptr;
     SoundboardSection* m_activeSection = nullptr;
+    QString m_clipboardClipId;
 
     void initializeDefaultSections();
 };

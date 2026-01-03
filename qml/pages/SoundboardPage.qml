@@ -334,6 +334,37 @@ Item {
                         }
                     }
                 }
+                
+                // Right-click area for paste (behind grid items)
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.RightButton
+                    z: -2  // Behind drop area and grid
+                    
+                    onClicked: function(mouse) {
+                        if (soundboardView && soundboardView.hasClipboard) {
+                            gridPasteMenu.popup()
+                        }
+                    }
+                }
+                
+                // Paste context menu
+                Menu {
+                    id: gridPasteMenu
+                    
+                    MenuItem {
+                        text: "Paste"
+                        enabled: soundboardView && soundboardView.hasClipboard
+                        onTriggered: {
+                            if (soundboardView && soundboardView.hasClipboard) {
+                                let success = soundboardView.pasteClip()
+                                if (success) {
+                                    console.log("Audio pasted successfully")
+                                }
+                            }
+                        }
+                    }
+                }
             }
             
             // Selection bar (when slots selected)

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import TalkLess 1.0
 
 Rectangle {
     id: root
@@ -18,7 +19,6 @@ Rectangle {
     signal clicked()
     signal playClicked()
     signal stopClicked()
-    signal menuClicked()
     signal deleteClicked()
     
     width: 160
@@ -32,7 +32,7 @@ Rectangle {
     // Background Image
     Image {
         anchors.fill: parent
-        source: imagePath
+        source: root.imagePath
         fillMode: Image.PreserveAspectCrop
         opacity: 0.8
     }
@@ -50,22 +50,22 @@ Rectangle {
     
     // Tag Label (Morning, etc)
     Rectangle {
-        visible: showTag && tagLabel !== ""
+        visible: root.showTag && root.tagLabel !== ""
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.margins: 8
         height: 22
         width: tagText.width + 16
         radius: 4
-        color: tagColor
+        color: root.tagColor
         
         Text {
             id: tagText
             anchors.centerIn: parent
-            text: tagLabel
+            text: root.tagLabel
             font.pixelSize: 11
             font.weight: Font.Medium
-            color: tagColor === "#EAB308" ? "#000000" : "white"
+            color: root.tagColor === "#EAB308" ? "#000000" : "white"
         }
     }
     
@@ -79,61 +79,90 @@ Rectangle {
         
         // Title
         Text {
-            text: title
+            text: root.title
             font.pixelSize: 13
             font.weight: Font.Medium
             color: "white"
             Layout.fillWidth: true
             elide: Text.ElideRight
-            visible: title !== ""
+            visible: root.title !== ""
         }
         
-        // Bottom row with hotkey and controls
+        // Bottom row with hotkey and action buttons
         RowLayout {
             Layout.fillWidth: true
-            spacing: 6
-            
-            // Play/Pause icon
-            Rectangle {
-                width: 20
-                height: 20
-                radius: 10
-                color: "transparent"
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: isPlaying ? "⏸" : "▶"
-                    font.pixelSize: 10
-                    color: "white"
-                }
-                
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (isPlaying) {
-                            stopClicked()
-                        } else {
-                            playClicked()
-                        }
-                    }
-                }
-            }
+            spacing: 4
             
             // Hotkey
             Text {
-                text: hotkey
+                text: root.hotkey
                 font.pixelSize: 10
                 color: "#9CA3AF"
                 Layout.fillWidth: true
             }
             
-            // Menu icon
+            // Play/Stop button
             Rectangle {
-                width: 20
-                height: 20
+                width: 24
+                height: 24
                 radius: 4
-                color: "transparent"
+                color: playMouseArea.containsMouse ? "#3a3a5e" : "transparent"
+                
+                Text {
+                    anchors.centerIn: parent
+                    text: root.isPlaying ? "⏹" : "▶"
+                    font.pixelSize: 12
+                    color: "#10B981"
+                }
+                
+                MouseArea {
+                    id: playMouseArea
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true
+                    onClicked: {
+                        if (root.isPlaying) {
+                            root.stopClicked()
+                        } else {
+                            root.playClicked()
+                        }
+                    }
+                }
+            }
+            
+            // Copy button
+            Rectangle {
+                width: 24
+                height: 24
+                radius: 4
+                color: copyMouseArea.containsMouse ? "#3a3a5e" : "transparent"
+                
+                Text {
+                    anchors.centerIn: parent
+                    text: "📋"
+                    font.pixelSize: 12
+                }
+                
+                MouseArea {
+                    id: copyMouseArea
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true
+                    onClicked: {
+                        if (root.audioClipId !== "") {
+                            soundboardView.copyClip(root.audioClipId)
+                            console.log("Audio copied to clipboard")
+                        }
+                    }
+                }
+            }
+            
+            // Delete button
+            Rectangle {
+                width: 24
+                height: 24
+                radius: 4
+                color: deleteMouseArea.containsMouse ? "#3a3a5e" : "transparent"
                 
                 Text {
                     anchors.centerIn: parent
@@ -143,17 +172,17 @@ Rectangle {
                 }
                 
                 MouseArea {
+                    id: deleteMouseArea
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        menuClicked()
-                        deleteClicked()
-                    }
+                    hoverEnabled: true
+                    onClicked: root.deleteClicked()
                 }
             }
         }
     }
     
+    // Main click area
     MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
@@ -161,3 +190,4 @@ Rectangle {
         z: -1
     }
 }
+
