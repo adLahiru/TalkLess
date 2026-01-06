@@ -77,6 +77,7 @@ qt_add_qml_module(appTalkLess
         # qml/components/RecordAudioContent.qml
         # Pages
         qml/pages/ApplicationSettingsView.qml
+        qml/pages/SoundboardView.qml
         # qml/pages/AudioDevicesTab.qml
         # qml/pages/HotkeysTab.qml
         # qml/pages/FeaturesTab.qml

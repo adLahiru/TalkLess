@@ -73,16 +73,8 @@ ApplicationWindow {
                     Layout.fillHeight: true
                     currentIndex: 0
 
-                    // Soundboard Page (placeholder)
-                    Rectangle {
-                        color: '#0d0d0d'
-                        radius: 10
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Soundboard"
-                            color: "#666"
-                            font.pixelSize: 32
-                        }
+                    // Soundboard Page
+                    SoundboardView {
                     }
 
                     // Audio Playback Engine (placeholder)
