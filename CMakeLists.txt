@@ -52,6 +52,19 @@ qt_add_qml_module(appTalkLess
         qml/components/HeaderBar.qml
         qml/components/BackgroundBanner.qml
         qml/components/SettingsTabSelector.qml
+        qml/components/ToggleSwitch.qml
+        qml/components/LabeledSlider.qml
+        qml/components/DropdownSelector.qml
+        qml/components/VolumeMeter.qml
+        qml/components/StepIndicator.qml
+        qml/components/ActionButton.qml
+        qml/components/SettingsPanel.qml
+        qml/components/TriangleSlider.qml
+        qml/components/BalanceSlider.qml
+        qml/components/VolumeMeterSlider.qml
+        qml/components/SettingsDropdown.qml
+        qml/components/SettingsToggle.qml
+        qml/components/GradientButton.qml
         # qml/components/SoundboardListItem.qml
         # qml/components/HeaderBar.qml
         # qml/components/SettingsTabBar.qml
@@ -103,6 +116,8 @@ qt_add_qml_module(appTalkLess
         resources/icons/macro.svg
         resources/icons/gear.svg
         resources/icons/stats.svg
+        # resources/icons/mic.svg
+        resources/icons/testMic.svg
         resources/icons/title.png
         resources/icons/sidebarline.svg
         resources/images/background.png
