@@ -50,6 +50,8 @@ qt_add_qml_module(appTalkLess
         # Components
         qml/components/SideBar.qml
         qml/components/HeaderBar.qml
+        qml/components/BackgroundBanner.qml
+        qml/components/SettingsTabSelector.qml
         # qml/components/SoundboardListItem.qml
         # qml/components/HeaderBar.qml
         # qml/components/SettingsTabBar.qml
@@ -74,7 +76,7 @@ qt_add_qml_module(appTalkLess
         # qml/components/AddAudioContent.qml
         # qml/components/RecordAudioContent.qml
         # Pages
-        # qml/pages/SystemSettingsPage.qml
+        qml/pages/ApplicationSettingsView.qml
         # qml/pages/AudioDevicesTab.qml
         # qml/pages/HotkeysTab.qml
         # qml/pages/FeaturesTab.qml
@@ -100,9 +102,9 @@ qt_add_qml_module(appTalkLess
         resources/icons/macro.svg
         resources/icons/gear.svg
         resources/icons/stats.svg
-        resources/icons/title.svg
         resources/icons/title.png
         resources/icons/sidebarline.svg
+        resources/images/background.png
 )
 
 # Add include directories for QML type registration

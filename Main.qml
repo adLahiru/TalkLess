@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "qml/components"
+import "qml/pages"
 
 ApplicationWindow {
     id: mainWindow
@@ -16,7 +17,6 @@ ApplicationWindow {
 
     ColumnLayout {
         anchors.fill: parent
-        // anchors.margins: 10
         spacing: 10
 
        
@@ -109,16 +109,8 @@ ApplicationWindow {
                         }
                     }
 
-                    // Application Settings (placeholder)
-                    Rectangle {
-                        color: "#0d0d0d"
-                        radius: 10
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Application Settings"
-                            color: "#666"
-                            font.pixelSize: 32
-                        }
+                    // Application Settings
+                    ApplicationSettingsView {
                     }
 
                     // Statistics & Reporting (placeholder)
