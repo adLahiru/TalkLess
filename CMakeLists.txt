@@ -9,31 +9,31 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2)
 
-qt_standard_project_setup(REQUIRES 6.8)
+qt_standard_project_setup(REQUIRES 6.5)
 
 qt_add_executable(appTalkLess
-    src/main.cpp
+    src/main_ui_only.cpp
     # Models
-    src/models/audioclip.h
-    src/models/audioclip.cpp
-    src/models/soundboardsection.h
-    src/models/soundboardsection.cpp
-    src/models/audioEngine.h
-    src/models/audioEngine.cpp
-    src/controllers/maincontroller.h
-    src/controllers/maincontroller.cpp
+    # src/models/audioclip.h
+    # src/models/audioclip.cpp
+    # src/models/soundboardsection.h
+    # src/models/soundboardsection.cpp
+    # src/models/audioEngine.h
+    # src/models/audioEngine.cpp
+    # src/controllers/maincontroller.h
+    # src/controllers/maincontroller.cpp
     # Controllers
-    src/controllers/audiomanager.h
-    src/controllers/audiomanager.cpp
-    src/controllers/hotkeymanager.h
-    src/controllers/hotkeymanager.cpp
-    src/controllers/settingsmanager.h
-    src/controllers/settingsmanager.cpp
+    # src/controllers/audiomanager.h
+    # src/controllers/audiomanager.cpp
+    # src/controllers/hotkeymanager.h
+    # src/controllers/hotkeymanager.cpp
+    # src/controllers/settingsmanager.h
+    # src/controllers/settingsmanager.cpp
     # Views
-    src/view/soundboardview.h
-    src/view/soundboardview.cpp
-    src/view/audioplayerview.h
-    src/view/audioplayerview.cpp
+    # src/view/soundboardview.h
+    # src/view/soundboardview.cpp
+    # src/view/audioplayerview.h
+    # src/view/audioplayerview.cpp
 )
 
 # Mark singleton files before adding the QML module
@@ -48,57 +48,61 @@ qt_add_qml_module(appTalkLess
     QML_FILES
         Main.qml
         # Components
-        qml/components/Sidebar.qml
-        qml/components/SidebarItem.qml
-        qml/components/SoundboardListItem.qml
+        qml/components/SideBar.qml
         qml/components/HeaderBar.qml
-        qml/components/SettingsTabBar.qml
-        qml/components/SettingsHeader.qml
-        qml/components/ToggleSwitch.qml
-        qml/components/DropdownSelect.qml
-        qml/components/ActionButton.qml
-        qml/components/HotkeyItem.qml
-        qml/components/FeatureToggleItem.qml
-        qml/components/AudioCard.qml
-        qml/components/AddAudioCard.qml
-        qml/components/AudioTag.qml
-        qml/components/WaveformDisplay.qml
-        qml/components/SettingsImportExport.qml
-        qml/components/AudioPlayer.qml
-        qml/components/VolumeMeter.qml
-        qml/components/AudioDetailsPanel.qml
-        qml/components/AddAudioPanel.qml
-        qml/components/MetersPanel.qml
-        qml/components/TeleprompterPanel.qml
-        qml/components/AudioPanelTabs.qml
-        qml/components/AddAudioContent.qml
-        qml/components/RecordAudioContent.qml
+        # qml/components/SoundboardListItem.qml
+        # qml/components/HeaderBar.qml
+        # qml/components/SettingsTabBar.qml
+        # qml/components/SettingsHeader.qml
+        # qml/components/ToggleSwitch.qml
+        # qml/components/DropdownSelect.qml
+        # qml/components/ActionButton.qml
+        # qml/components/HotkeyItem.qml
+        # qml/components/FeatureToggleItem.qml
+        # qml/components/AudioCard.qml
+        # qml/components/AddAudioCard.qml
+        # qml/components/AudioTag.qml
+        # qml/components/WaveformDisplay.qml
+        # qml/components/SettingsImportExport.qml
+        # qml/components/AudioPlayer.qml
+        # qml/components/VolumeMeter.qml
+        # qml/components/AudioDetailsPanel.qml
+        # qml/components/AddAudioPanel.qml
+        # qml/components/MetersPanel.qml
+        # qml/components/TeleprompterPanel.qml
+        # qml/components/AudioPanelTabs.qml
+        # qml/components/AddAudioContent.qml
+        # qml/components/RecordAudioContent.qml
         # Pages
-        qml/pages/SystemSettingsPage.qml
-        qml/pages/AudioDevicesTab.qml
-        qml/pages/HotkeysTab.qml
-        qml/pages/FeaturesTab.qml
-        qml/pages/UIDisplayTab.qml
-        qml/pages/UpdatesTab.qml
-        qml/pages/SoundboardPage.qml
-        qml/pages/VolumeMixerPage.qml
-        qml/pages/SettingsManagementPage.qml
+        # qml/pages/SystemSettingsPage.qml
+        # qml/pages/AudioDevicesTab.qml
+        # qml/pages/HotkeysTab.qml
+        # qml/pages/FeaturesTab.qml
+        # qml/pages/UIDisplayTab.qml
+        # qml/pages/UpdatesTab.qml
+        # qml/pages/SoundboardPage.qml
+        # qml/pages/VolumeMixerPage.qml
+        # qml/pages/SettingsManagementPage.qml
         # Styles (singletons)
-        qml/styles/Colors.qml
-        qml/styles/Typography.qml
-        qml/styles/Theme.qml
+        # qml/styles/Colors.qml
+        # qml/styles/Typography.qml
+        # qml/styles/Theme.qml
         # Utils (singleton)
-        qml/utils/Functions.qml
+        # qml/utils/Functions.qml
     SOURCES
-        src/view/soundboardview.h
-        src/view/soundboardview.cpp
-        src/view/audioplayerview.h
-        src/view/audioplayerview.cpp
+        # src/view/soundboardview.h
+        # src/view/soundboardview.cpp
+        # src/view/audioplayerview.h
+        # src/view/audioplayerview.cpp
     RESOURCES
-        resources/images/background-51.png
-        resources/images/background-52.png
-        resources/images/background-53.png
-        qml/utils/Functions.js
+        resources/icons/sound.svg
+        resources/icons/play.svg
+        resources/icons/macro.svg
+        resources/icons/gear.svg
+        resources/icons/stats.svg
+        resources/icons/title.svg
+        resources/icons/title.png
+        resources/icons/sidebarline.svg
 )
 
 # Add include directories for QML type registration
