@@ -106,6 +106,7 @@ qt_add_qml_module(appTalkLess
         resources/icons/title.png
         resources/icons/sidebarline.svg
         resources/images/background.png
+        resources/images/splashScreen.png
 )
 
 # Add include directories for QML type registration
