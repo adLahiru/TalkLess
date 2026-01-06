@@ -235,15 +235,57 @@ Rectangle {
         }
 
         // Placeholder content area
-        Item {
+        Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            color: "#0d0d0d"          // ✅ or "transparent"
+            radius: 12
 
-            Text {
-                anchors.centerIn: parent
-                text: "Soundboard content goes here..."
-                color: "#666"
-                font.pixelSize: 18
+
+            GridView {
+                anchors.fill: parent
+                anchors.margins: 24
+
+                cellWidth: 300
+                cellHeight: 290
+
+                readonly property int maxClips: 11
+                readonly property int clipsCount: backend.clipsModel ? backend.clipsModel.count : 0
+
+                model: clipsCount + 1
+
+                delegate: Loader {
+                    width: 280
+                    height: 260
+
+                    sourceComponent: (index === 0) ? addAudioTile : clipTile
+
+                    Component {
+                        id: addAudioTile
+                        AddAudioTile {
+                            enabled: backend.clipsModel.count < clipsGrid.maxClips
+                            onClicked: backend.addClip()
+                        }
+                    }
+
+
+                    Component { id: clipTile
+                        ClipTile {
+                            // clipIndex = index-1 (because 0 is Add tile)
+                            property int clipIndex: index - 1
+                            property var clip: backend.clipsModel.get(clipIndex)
+
+                            title: clip.file_name
+                            imageSource: clip.img_path
+                            hotkeyText: clip.hotkey
+                            tags: clip.tag ? [clip.tag] : []
+
+                            onPlayClicked: backend.playClip(clip.id)
+                            onClicked: backend.openClip(clip.id)
+                        }
+                    }
+                }
+                Component.onCompleted: console.log("clipsCount =", clipsCount, "model items =", model)
             }
         }
     }

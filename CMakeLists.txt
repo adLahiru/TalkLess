@@ -65,6 +65,8 @@ qt_add_qml_module(appTalkLess
         qml/components/SettingsDropdown.qml
         qml/components/SettingsToggle.qml
         qml/components/GradientButton.qml
+        qml/components/DotMeter.qml
+        qml/components/HotkeysTable.qml
         # qml/components/SoundboardListItem.qml
         # qml/components/HeaderBar.qml
         # qml/components/SettingsTabBar.qml
@@ -122,9 +124,11 @@ qt_add_qml_module(appTalkLess
         resources/icons/refresh.svg
         resources/icons/sidebarline.svg
         resources/images/background.png
-        QML_FILES qml/components/DotMeter.qml
         resources/images/splashScreen.png
-        QML_FILES qml/components/HotkeysTable.qml
+        resources/images/audioClipDefaultBackground.png
+        resources/images/addAudioBackground.png
+        QML_FILES qml/components/ClipTile.qml
+        QML_FILES qml/components/AddAudioTile.qml
 )
 
 # Add include directories for QML type registration
