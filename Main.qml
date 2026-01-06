@@ -12,6 +12,7 @@ ApplicationWindow {
     minimumWidth: 800
     minimumHeight: 600
     visible: true
+    visibility: Window.FullScreen  // Always start in full screen
     title: qsTr("TalkLess")
     color: '#000000'
 
@@ -118,6 +119,41 @@ ApplicationWindow {
                     }
                 }
             }
+        }
+    }
+
+    // Splash Screen Overlay
+    Rectangle {
+        id: splashScreen
+        anchors.fill: parent
+        z: 1000  // Always on top
+        color: "#000000"
+        visible: opacity > 0
+
+        Image {
+            anchors.fill: parent
+            source: "qrc:/qt/qml/TalkLess/resources/images/splashScreen.png"
+            fillMode: Image.PreserveAspectCrop
+        }
+
+        // Fade out animation after delay
+        Timer {
+            id: splashTimer
+            interval: 2500  // Show splash for 2.5 seconds
+            running: true
+            onTriggered: {
+                splashFadeOut.start()
+            }
+        }
+
+        NumberAnimation {
+            id: splashFadeOut
+            target: splashScreen
+            property: "opacity"
+            from: 1.0
+            to: 0.0
+            duration: 500  // 0.5 second fade out
+            easing.type: Easing.OutQuad
         }
     }
 }
