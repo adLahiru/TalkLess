@@ -7,12 +7,13 @@ import "qml/pages"
 ApplicationWindow {
     id: mainWindow
     
-    width: 1920
-    height: 1080
+    width: 1280
+    height: 800
     minimumWidth: 800
     minimumHeight: 600
     visible: true
-    visibility: Window.FullScreen  // Always start in full screen
+    // Start in normal windowed mode, not fullscreen
+    visibility: Window.Windowed
     title: qsTr("TalkLess")
     color: '#000000'
 
@@ -139,7 +140,7 @@ ApplicationWindow {
         // Fade out animation after delay
         Timer {
             id: splashTimer
-            interval: 2500  // Show splash for 2.5 seconds
+            interval: 250  // Show splash for 2.5 seconds
             running: true
             onTriggered: {
                 splashFadeOut.start()
