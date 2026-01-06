@@ -1,4 +1,6 @@
 // SettingsTabSelector.qml
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -49,6 +51,7 @@ Rectangle {
         spacing: 8
 
         Repeater {
+            id: tabRepeater
             model: tabModel
 
             delegate: Rectangle {
@@ -57,11 +60,14 @@ Rectangle {
                 Layout.preferredWidth: tabText.implicitWidth + 32
                 radius: 20
                 
-                readonly property bool isSelected: index === root.currentIndex
+                required property int index
+                required property string title
+                
+                readonly property bool isSelected: tabItem.index === root.currentIndex
 
                 // Gradient background for selected tab
-                gradient: isSelected ? selectedGradient : null
-                color: isSelected ? "transparent" : "transparent"
+                gradient: tabItem.isSelected ? selectedGradient : null
+                color: tabItem.isSelected ? "transparent" : "transparent"
 
                 Gradient {
                     id: selectedGradient
@@ -73,7 +79,7 @@ Rectangle {
                 Text {
                     id: tabText
                     anchors.centerIn: parent
-                    text: model.title
+                    text: tabItem.title
                     color: "#FFFFFF"
                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                     font.pixelSize: 14
@@ -87,8 +93,8 @@ Rectangle {
                     hoverEnabled: true
 
                     onClicked: {
-                        root.currentIndex = index
-                        root.tabSelected(index)
+                        root.currentIndex = tabItem.index
+                        root.tabSelected(tabItem.index)
                     }
 
                     onEntered: {

@@ -1,4 +1,6 @@
 // SoundboardView.qml
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -100,7 +102,7 @@ Rectangle {
                     // Popup menu
                     Popup {
                         id: moreOptionsMenu
-                        x: -width + parent.width
+                        x: (parent.width - width) / 2  // Center horizontally under the dots
                         y: parent.height + 5
                         width: 160
                         padding: 8
@@ -119,17 +121,20 @@ Rectangle {
                                 model: ["Select Slots", "Detach Window", "Edit Cover", "Delete"]
 
                                 delegate: Rectangle {
+                                    id: menuItem
                                     width: 144
                                     height: 36
                                     radius: 6
                                     color: menuItemMouse.containsMouse ? "#333333" : "transparent"
+                                    
+                                    required property string modelData
 
                                     Text {
                                         anchors.left: parent.left
                                         anchors.leftMargin: 12
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: modelData
-                                        color: modelData === "Delete" ? "#FF6B6B" : "#FFFFFF"
+                                        text: menuItem.modelData
+                                        color: menuItem.modelData === "Delete" ? "#FF6B6B" : "#FFFFFF"
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 14
                                         font.weight: Font.Normal
@@ -141,7 +146,7 @@ Rectangle {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            console.log("Menu item clicked:", modelData)
+                                            console.log("Menu item clicked:", menuItem.modelData)
                                             moreOptionsMenu.close()
                                         }
                                     }

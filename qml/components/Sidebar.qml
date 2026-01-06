@@ -1,4 +1,6 @@
 // SideBar.qml
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -77,7 +79,12 @@ Rectangle {
                 width: list.width
                 height: 54
 
-                readonly property bool isSelected: (index === root.currentIndex)
+                required property int index
+                required property string title
+                required property string route
+                required property string iconSource
+
+                readonly property bool isSelected: (rowItem.index === root.currentIndex)
 
                 // Highlight pill (selected)
                 Rectangle {
@@ -117,7 +124,7 @@ Rectangle {
                         Image {
                             id: iconImage
                             anchors.centerIn: parent
-                            source: model.iconSource
+                            source: rowItem.iconSource
                             width: 18; height: 18
                             fillMode: Image.PreserveAspectFit
                             visible: false  // Hidden, shown through MultiEffect
@@ -134,7 +141,7 @@ Rectangle {
                     }
 
                     Text {
-                        text: model.title
+                        text: rowItem.title
                         Layout.fillWidth: true
                         elide: Text.ElideRight
                         color: "#FFFFFF"
@@ -150,8 +157,8 @@ Rectangle {
                     anchors.fill: parent
                     hoverEnabled: true
                     onClicked: {
-                        root.currentIndex = index
-                        root.selected(model.route)
+                        root.currentIndex = rowItem.index
+                        root.selected(rowItem.route)
                     }
                 }
             }
