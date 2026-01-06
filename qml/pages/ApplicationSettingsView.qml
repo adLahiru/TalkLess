@@ -932,13 +932,6 @@ Rectangle {
                                     smooth: true
                                 }
 
-                                MultiEffect {
-                                    anchors.fill: undoIcon
-                                    source: undoIcon
-                                    colorization: 1.0
-                                    colorizationColor: "white"
-                                }
-
                                 background: Rectangle {
                                     radius: 8
                                     color: "#0f0f0f"
