@@ -97,16 +97,168 @@ Rectangle {
                 Rectangle {
                     id: audioContent
                     width: parent.width
-                    height: 200
-                    color: "#1F1F1F"
+                    height: 400
+                    color: "#0d0d0d"
                     radius: 12
 
-                    Text {
-                        anchors.centerIn: parent
+
+                    Label {
                         text: "Audio & Devices"
-                        color: "#FFFFFF"
-                        font.pixelSize: 24
-                        font.weight: Font.Medium
+                        color: "#EDEDED"
+                        font.pixelSize: 20
+                        anchors.left: panel.left
+                        anchors.leftMargin: 22
+                        anchors.bottom: panel.top
+                        anchors.bottomMargin: 10
+                    }
+
+                    Rectangle {
+                        id: panel
+                        width: parent.width * 0.92
+                        height: parent.height * 0.85
+                        anchors.centerIn: parent
+                        radius: 10
+                        color: "#101010"
+                        border.color: "#1b1b1b"
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 22
+                            spacing: 22
+
+                            // ---- Row 1: Mic Input ----
+                            RowLayout {
+                                spacing: 18
+                                Layout.fillWidth: true
+
+                                Label {
+                                    text: "Mic Input:"
+                                    color: "#EDEDED"
+                                    font.pixelSize: 14
+                                    Layout.preferredWidth: 110
+                                }
+
+                                ComboBox {
+                                    Layout.preferredWidth: 220
+                                    model: ["Select", "Microphone 1", "Microphone 2"]
+                                    currentIndex: 0
+                                }
+
+                                DotMeter {
+                                    Layout.leftMargin: 10
+                                    activeDots: 3
+                                }
+
+                                Item { Layout.fillWidth: true } // pushes items left
+                            }
+
+                            // ---- Row 2: Speaker Output ----
+                            RowLayout {
+                                spacing: 18
+                                Layout.fillWidth: true
+
+                                Label {
+                                    text: "Speaker Output:"
+                                    color: "#EDEDED"
+                                    font.pixelSize: 14
+                                    Layout.preferredWidth: 110
+                                }
+
+                                ComboBox {
+                                    Layout.preferredWidth: 220
+                                    model: ["Select", "Speakers", "Headphones"]
+                                    currentIndex: 0
+                                }
+
+                                DotMeter {
+                                    Layout.leftMargin: 10
+                                    activeDots: 3
+                                }
+
+                                Item { Layout.fillWidth: true }
+                            }
+
+                            // ---- Row 3: Global Volume ----
+                            RowLayout {
+                                spacing: 18
+                                Layout.fillWidth: true
+
+                                Label {
+                                    text: "Global Volume:"
+                                    color: "#EDEDED"
+                                    font.pixelSize: 14
+                                    Layout.preferredWidth: 110
+                                }
+
+                                Item {
+                                    Layout.preferredWidth: 420   // increase this to make slider longer
+                                    Layout.preferredHeight: 40
+
+                                    Slider {
+                                        id: volumeDbSlider
+                                        anchors.fill: parent
+                                        from: -80
+                                        to: 20
+                                        stepSize: 1
+                                        value: linearToDb(gainLinear)
+
+                                        onMoved: gainLinear = dbToLinear(value)
+
+                                        // smaller handle + moving text
+                                        handle: Rectangle {
+                                            width: 10
+                                            height: 10
+                                            radius: 5
+                                            color: "#EDEDED"
+                                            border.color: "#2A2A2A"
+                                            border.width: 1
+
+                                            x: volumeDbSlider.leftPadding + volumeDbSlider.visualPosition *
+                                               (volumeDbSlider.availableWidth - width)
+                                            y: volumeDbSlider.topPadding + volumeDbSlider.availableHeight / 2 - height / 2
+
+                                            // TEXT that moves with the handle
+                                            Label {
+                                                text: Math.round(volumeDbSlider.value) + " dB"
+                                                color: "#EDEDED"
+                                                font.pixelSize: 12
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                anchors.bottom: parent.top
+                                                anchors.bottomMargin: 6
+
+                                                // optional: little background so it's readable
+                                                background: Rectangle { color: "#1F1F1F"; radius: 4; opacity: 0.85 }
+                                                padding: 4
+                                            }
+                                        }
+
+                                        background: Rectangle {
+                                            x: volumeDbSlider.leftPadding
+                                            y: volumeDbSlider.topPadding + volumeDbSlider.availableHeight / 2 - height / 2
+                                            width: volumeDbSlider.availableWidth
+                                            height: 3
+                                            radius: 1
+                                            color: "#EDEDED"
+                                            opacity: 0.9
+                                        }
+                                    }
+                                }
+                                Item { Layout.fillWidth: true }
+                            }
+
+                            Button {
+                                text: "Refresh Devices"
+                                onClicked: console.log("Refresh Devices clicked")
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: "#EDEDED"
+                                    font.pixelSize: 13
+                                    verticalAlignment: Text.AlignVCenter
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                            }
+                        }
                     }
                 }
             }
