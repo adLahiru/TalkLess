@@ -1,87 +1,163 @@
+// HeaderBar.qml
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
 Rectangle {
     id: root
-    
-    property string userName: "Johnson"
-    property string userInitials: "JD"
-    property string currentPageTitle: ""
-    
     height: 60
     color: "transparent"
-    
-    RowLayout {
-        anchors.fill: parent
-        anchors.leftMargin: 24
-        anchors.rightMargin: 24
-        
-        Item { Layout.fillWidth: true }
-        
-        // Search Bar
-        Rectangle {
-            Layout.preferredWidth: 280
-            Layout.preferredHeight: 40
-            radius: 20
-            color: "#1a1a2e"
-            border.color: "#2a2a3e"
-            border.width: 1
-            
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 16
-                anchors.rightMargin: 16
-                spacing: 8
-                
-                Text {
-                    text: "🔍"
-                    font.pixelSize: 14
-                    opacity: 0.6
-                }
-                
-                TextInput {
-                    Layout.fillWidth: true
-                    color: "white"
-                    font.pixelSize: 14
-                    
-                    Text {
-                        anchors.fill: parent
-                        text: "Search here..."
-                        color: "#666"
+
+    // Load Orelega One font from Google Fonts
+    FontLoader {
+        id: orelegaOneFont
+        source: "https://fonts.gstatic.com/s/orelegaone/v12/3qTpojOggD2XtAdFb-QXZGt61EcYaQ7F.ttf"
+    }
+
+    // Content container with max-width constraint
+    Item {
+        id: contentContainer
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 40, 1400) // Max width of 1400px with 20px margins
+        height: parent.height
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 20
+            anchors.rightMargin: 20
+            spacing: 16
+
+            // Spacer to push content to the right
+            Item {
+                Layout.fillWidth: true
+            }
+
+            // Search Bar
+            Rectangle {
+                id: searchBar
+                Layout.preferredWidth: 320
+                Layout.preferredHeight: 40
+                radius: 20
+                color: "#1F1F1F"
+                border.width: 1
+                border.color: searchInput.activeFocus ? "#6D39FF" : "#2A2C33"
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 12
+                    spacing: 10
+
+                    // Search Icon
+                    Rectangle {
+                        width: 20
+                        height: 20
+                        color: "transparent"
+                        
+                        Text {
+                            anchors.centerIn: parent
+                            text: "🔍"
+                            font.pixelSize: 14
+                            opacity: 0.6
+                        }
+                    }
+
+                    TextField {
+                        id: searchInput
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        placeholderText: "Search..."
+                        placeholderTextColor: "#666666"
+                        color: "#FFFFFF"
                         font.pixelSize: 14
-                        visible: parent.text.length === 0
+                        background: Rectangle {
+                            color: "transparent"
+                        }
+                        verticalAlignment: TextInput.AlignVCenter
+                    }
+
+                    // Clear button (visible when there's text)
+                    Rectangle {
+                        width: 20
+                        height: 20
+                        radius: 10
+                        color: searchInput.text.length > 0 ? "#333" : "transparent"
+                        visible: searchInput.text.length > 0
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "✕"
+                            color: "#888"
+                            font.pixelSize: 10
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: searchInput.text = ""
+                        }
                     }
                 }
-            }
-        }
-        
-        Item { Layout.preferredWidth: 24 }
-        
-        // User Profile
-        RowLayout {
-            spacing: 12
-            
-            Rectangle {
-                width: 40
-                height: 40
-                radius: 20
-                color: "#3B82F6"
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: userInitials
-                    font.pixelSize: 14
-                    font.weight: Font.Bold
-                    color: "white"
+
+                Behavior on border.color {
+                    ColorAnimation { duration: 150 }
                 }
             }
-            
+
+            // Profile Button
+            Rectangle {
+                id: profileButton
+                Layout.preferredWidth: 40
+                Layout.preferredHeight: 40
+                radius: 10
+                color: profileMouseArea.containsMouse ? "#2A2C33" : "#1F1F1F"
+                border.width: 1
+                border.color: "#2A2C33"
+
+                // Gradient overlay for selected/hover state
+                Rectangle {
+                    anchors.fill: parent
+                    radius: parent.radius
+                    visible: profileMouseArea.containsPress
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0.0; color: "#3E66FF" }
+                        GradientStop { position: 1.0; color: "#B44CFF" }
+                    }
+                    opacity: 0.3
+                }
+
+                // Profile Icon (placeholder - user silhouette)
+                Text {
+                    anchors.centerIn: parent
+                    text: "👤"
+                    font.pixelSize: 18
+                }
+
+                MouseArea {
+                    id: profileMouseArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        console.log("Profile clicked")
+                        // TODO: Open profile menu/dialog
+                    }
+                }
+
+                Behavior on color {
+                    ColorAnimation { duration: 150 }
+                }
+            }
+
+            // User Name
             Text {
-                text: userName
-                font.pixelSize: 14
-                font.weight: Font.Medium
-                color: "white"
+                text: "Johnson"
+                color: "#FFFFFF"
+                font.family: orelegaOneFont.status === FontLoader.Ready ? orelegaOneFont.name : "Arial"
+                font.pixelSize: 18
+                font.weight: Font.Normal
+                Layout.alignment: Qt.AlignVCenter
             }
         }
     }
