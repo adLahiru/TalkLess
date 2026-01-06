@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import "../components"
 
 Rectangle {
@@ -273,15 +274,196 @@ Rectangle {
                     id: hotkeysContent
                     width: parent.width
                     height: 200
-                    color: "#1F1F1F"
+                    color: "#0d0d0d"
                     radius: 12
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Hotkeys"
-                        color: "#FFFFFF"
-                        font.pixelSize: 24
-                        font.weight: Font.Medium
+                    property int tabIndex: 0 // 0 system, 1 preference
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 28
+                        spacing: 22
+
+                        // Top row: Tabs (left) + Undo + Save (right)
+                        RowLayout  {
+                            width: parent.width
+                            height: 60
+                            spacing: 20
+
+                            // Tabs group
+                            Rectangle {
+                                height: 55
+                                radius: 8
+                                color: "#0f0f0f"
+                                border.color: "#4a4a4a"
+                                border.width: 1
+
+                                RowLayout  {
+                                    anchors.fill: parent
+                                    spacing: 0
+
+                                    Button {
+                                        text: "System Hotkeys"
+                                        width: 200
+                                        height: parent.height
+                                        checkable: true
+                                        checked: hotkeysContent.tabIndex === 0
+                                        onClicked: hotkeysContent.tabIndex = 0
+
+                                        contentItem: Text {
+                                            text: parent.text
+                                            color: "#EDEDED"
+                                            font.pixelSize: 15
+                                            font.weight: Font.Medium
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+
+                                        background: Rectangle {
+                                            radius: 8
+                                            color: "transparent"
+
+                                            gradient: Gradient {
+                                                GradientStop { position: 0.0; color: "#3C7BFF" }
+                                                GradientStop { position: 1.0; color: "#B400FF" }
+                                            }
+
+                                            // turn gradient on/off
+                                            opacity: parent.checked ? 1.0 : 0.0
+                                        }
+                                    }
+
+                                    Button {
+                                        text: "My Preference"
+                                        width: 200
+                                        height: parent.height
+                                        checkable: true
+                                        checked: hotkeysContent.tabIndex === 1
+                                        onClicked: hotkeysContent.tabIndex = 1
+
+                                        contentItem: Text {
+                                            text: parent.text
+                                            color: "#EDEDED"
+                                            font.pixelSize: 15
+                                            font.weight: Font.Medium
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+
+                                        background: Rectangle {
+                                            radius: 8
+                                            color: "transparent"
+
+                                            gradient: Gradient {
+                                                GradientStop { position: 0.0; color: "#3C7BFF" }
+                                                GradientStop { position: 1.0; color: "#B400FF" }
+                                            }
+
+                                            // turn gradient on/off
+                                            opacity: parent.checked ? 1.0 : 0.0
+                                        }
+                                    }
+                                }
+                            }
+
+                            Item { Layout.fillWidth: true }
+                            // Item { width: parent.width; height: 1 } // push right-side buttons
+
+                            // Undo square button (icon placeholder)
+                            Button {
+                                width: 30
+                                height: 30
+                                onClicked: if (backend.undoHotkeyChanges) backend.undoHotkeyChanges()
+
+                                contentItem: Image {
+                                    id: resetIcon
+                                    source: "qrc:/qt/qml/TalkLess/resources/icons/refresh.svg"
+                                    anchors.centerIn: parent
+                                    width: 18
+                                    height: 18
+                                    fillMode: Image.PreserveAspectFit
+                                    smooth: true
+                                }
+
+                                MultiEffect {
+                                    anchors.fill: undoIcon
+                                    source: undoIcon
+                                    colorization: 1.0
+                                    colorizationColor: "white"
+                                }
+
+                                background: Rectangle {
+                                    radius: 8
+                                    color: "#0f0f0f"
+                                    border.color: "#4a4a4a"
+                                    border.width: 1
+                                }
+                            }
+
+                            // Save gradient button
+                            Button {
+                                width: 170
+                                height: 55
+                                text: "Save"
+                                onClicked: if (backend.saveHotkeys) backend.saveHotkeys()
+
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: "#FFFFFF"
+                                    font.pixelSize: 14
+                                    font.weight: Font.Medium
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                background: Rectangle {
+                                    radius: 10
+                                    gradient: Gradient {
+                                        GradientStop { position: 0.0; color: "#2F7BFF" }
+                                        GradientStop { position: 1.0; color: "#C800FF" }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Content area
+                        Loader {
+                            width: parent.width
+                            sourceComponent: hotkeysContent.tabIndex === 0 ? systemView : prefView
+                        }
+                    }
+
+                    // ----- Tab pages -----
+                    Component {
+                        id: systemView
+                        HotkeysTable {
+                            width: hotkeysContent.width - 56
+                            title: "System Hotkeys"
+                            model: backend.systemHotkeysModel
+                            showHeader: false
+                            showWarning: true
+                            primaryText: "Reassign"
+                            secondaryText: "Reset"
+
+                            onPrimaryClicked: backend.reassignSystem(id)
+                            onSecondaryClicked: backend.resetSystem(id)
+                        }
+                    }
+
+                    Component {
+                        id: prefView
+                        HotkeysTable {
+                            width: hotkeysContent.width - 56
+                            title: "My Preference"
+                            model: backend.preferenceHotkeysModel
+                            showHeader: true
+                            showWarning: false
+                            primaryText: "Reassign"
+                            secondaryText: "Delete"
+
+                            onPrimaryClicked: backend.reassignPreference(id)
+                            onSecondaryClicked: backend.deletePreference(id)
+                        }
                     }
                 }
             }

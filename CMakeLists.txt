@@ -104,10 +104,12 @@ qt_add_qml_module(appTalkLess
         resources/icons/gear.svg
         resources/icons/stats.svg
         resources/icons/title.png
+        resources/icons/refresh.svg
         resources/icons/sidebarline.svg
         resources/images/background.png
         QML_FILES qml/components/DotMeter.qml
         resources/images/splashScreen.png
+        QML_FILES qml/components/HotkeysTable.qml
 )
 
 # Add include directories for QML type registration
