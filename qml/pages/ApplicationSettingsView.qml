@@ -927,7 +927,7 @@ Rectangle {
 
                                 contentItem: Image {
                                     id: resetIcon
-                                    source: "qrc:/qt/qml/TalkLess/resources/icons/refresh.svg"
+                                    source: "qrc:/qt/qml/TalkLess/resources/icons/actions/ic_refresh.svg"
                                     anchors.centerIn: parent
                                     width: 18
                                     height: 18

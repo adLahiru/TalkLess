@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg)
 
 qt_standard_project_setup(REQUIRES 6.5)
 
@@ -70,6 +70,7 @@ qt_add_qml_module(appTalkLess
         qml/components/ClipTile.qml
         qml/components/AddAudioTile.qml
         qml/components/AudioClipPanel.qml
+        qml/components/WaveformDisplay.qml
         # qml/components/SoundboardListItem.qml
         # qml/components/HeaderBar.qml
         # qml/components/SettingsTabBar.qml
@@ -116,16 +117,27 @@ qt_add_qml_module(appTalkLess
         # src/view/audioplayerview.h
         # src/view/audioplayerview.cpp
     RESOURCES
-        resources/icons/sound.svg
-        resources/icons/play.svg
-        resources/icons/macro.svg
-        resources/icons/gear.svg
-        resources/icons/stats.svg
-        # resources/icons/mic.svg
-        resources/icons/testMic.svg
-        resources/icons/title.png
-        resources/icons/refresh.svg
-        resources/icons/sidebarline.svg
+        # Sidebar navigation icons
+        resources/icons/sidebar/ic_logo.png
+        resources/icons/sidebar/ic_nav_soundboard.svg
+        resources/icons/sidebar/ic_play.svg
+        resources/icons/sidebar/ic_nav_macros.svg
+        resources/icons/sidebar/ic_nav_settings.svg
+        resources/icons/sidebar/ic_nav_stats.svg
+        # Decorations
+        resources/icons/decorations/ic_sidebar_divider.svg
+        # Panel tab icons
+        resources/icons/panel/ic_tab_settings.svg
+        resources/icons/panel/ic_tab_add.svg
+        resources/icons/panel/ic_tab_record.svg
+        resources/icons/panel/ic_tab_speaker.svg
+        resources/icons/panel/ic_clipboard.svg
+        resources/icons/panel/ic_scissors.svg
+        # Action icons
+        resources/icons/actions/ic_mic.svg
+        resources/icons/actions/ic_mic_test.svg
+        resources/icons/actions/ic_refresh.svg
+        # Images
         resources/images/background.png
         resources/images/splashScreen.png
         resources/images/audioClipDefaultBackground.png
@@ -155,6 +167,7 @@ target_link_libraries(appTalkLess
     PRIVATE Qt6::Qml
     PRIVATE Qt6::Multimedia
     PRIVATE Qt6::QuickControls2
+    PRIVATE Qt6::Svg
 )
 
 # Link Carbon framework for global hotkeys on macOS

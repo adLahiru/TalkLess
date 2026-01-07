@@ -24,11 +24,11 @@ Rectangle {
     // Menu model: you can replace iconSource with your svg/png
     ListModel {
         id: menuModel
-        ListElement { title: "Soundboard";            route: "soundboard"; iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sound.svg" }
-        ListElement { title: "Audio Playback Engine"; route: "engine";     iconSource: "qrc:/qt/qml/TalkLess/resources/icons/play.svg"  }
-        ListElement { title: "Macros & Automation";   route: "macros";     iconSource: "qrc:/qt/qml/TalkLess/resources/icons/macro.svg" }
-        ListElement { title: "Application Settings";  route: "settings";   iconSource: "qrc:/qt/qml/TalkLess/resources/icons/gear.svg"  }
-        ListElement { title: "Statistics & Reporting";route: "stats";      iconSource: "qrc:/qt/qml/TalkLess/resources/icons/stats.svg" }
+        ListElement { title: "Soundboard";            route: "soundboard"; iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_soundboard.svg" }
+        ListElement { title: "Audio Playback Engine"; route: "engine";     iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_play.svg"  }
+        ListElement { title: "Macros & Automation";   route: "macros";     iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_macros.svg" }
+        ListElement { title: "Application Settings";  route: "settings";   iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_settings.svg"  }
+        ListElement { title: "Statistics & Reporting";route: "stats";      iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_stats.svg" }
     }
 
     ColumnLayout {
@@ -44,7 +44,7 @@ Rectangle {
             // Title logo image
             Image {
                 id: titleImage
-                source: "qrc:/qt/qml/TalkLess/resources/icons/title.png"
+                source: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_logo.png"
                 sourceSize.height: 48
                 fillMode: Image.PreserveAspectFit
                 Layout.preferredHeight: 40
@@ -57,7 +57,7 @@ Rectangle {
 
         // Divider line
         Image {
-            source: "qrc:/qt/qml/TalkLess/resources/icons/sidebarline.svg"
+            source: "qrc:/qt/qml/TalkLess/resources/icons/decorations/ic_sidebar_divider.svg"
             Layout.fillWidth: true
             fillMode: Image.Stretch
             Layout.preferredHeight: 2
