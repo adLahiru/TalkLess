@@ -71,6 +71,8 @@ qt_add_qml_module(appTalkLess
         qml/components/AddAudioTile.qml
         qml/components/AudioClipPanel.qml
         qml/components/WaveformDisplay.qml
+        qml/components/FileDropArea.qml
+        qml/components/TrimWaveform.qml
         # qml/components/SoundboardListItem.qml
         # qml/components/HeaderBar.qml
         # qml/components/SettingsTabBar.qml

@@ -1143,24 +1143,244 @@ Rectangle {
                 ColumnLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    spacing: 12
+                    spacing: 6
                     visible: rightSidebar.currentTabIndex === 1
 
-                    Text {
-                        text: "Add Audio"
-                        color: "#FFFFFF"
-                        font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                        font.pixelSize: 14
-                        font.weight: Font.DemiBold
+                    // Name Audio File Section
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 5
+                        Layout.rightMargin: 5
+                        spacing: 8
+
+                        Text {
+                            text: "Name Audio File"
+                            color: "#FFFFFF"
+                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                            font.pixelSize: 14
+                            font.weight: Font.DemiBold
+                        }
+
+                        // Text Input Field
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 44
+                            color: "#1A1A1A"
+                            radius: 8
+                            border.color: "#3A3A3A"
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 15
+                                anchors.rightMargin: 15
+                                spacing: 4
+
+                                Text {
+                                    text: "Enter Name Here:"
+                                    color: "#808080"
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 13
+                                    visible: uploadAudioNameInput.text === ""
+                                }
+
+                                TextInput {
+                                    id: uploadAudioNameInput
+                                    Layout.fillWidth: true
+                                    color: "#FFFFFF"
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 13
+                                    clip: true
+                                    
+                                    Text {
+                                        anchors.fill: parent
+                                        text: "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _"
+                                        color: "#666666"
+                                        font.family: parent.font.family
+                                        font.pixelSize: parent.font.pixelSize
+                                        visible: !parent.text && !parent.activeFocus
+                                    }
+                                }
+                            }
+                        }
                     }
 
-                    Text {
-                        text: "Import or add audio files here"
-                        color: "#666666"
-                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                        font.pixelSize: 12
+                    // Assign to Slot Section
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 5
+                        Layout.rightMargin: 5 
+                        spacing: 8
+
+                        Text {
+                            text: "Assign to Slot"
+                            color: "#FFFFFF"
+                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                            font.pixelSize: 14
+                            font.weight: Font.DemiBold
+                        }
+
+                        // Dropdown selector
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 44
+                            color: "#1A1A1A"
+                            radius: 8
+                            border.color: "#3A3A3A"
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 15
+                                anchors.rightMargin: 15
+
+                                Text {
+                                    text: "Select Available Slot"
+                                    color: "#AAAAAA"
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 13
+                                    Layout.fillWidth: true
+                                }
+
+                                // Dropdown arrow
+                                Text {
+                                    text: "▼"
+                                    color: "#808080"
+                                    font.pixelSize: 10
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: console.log("Slot dropdown clicked")
+                            }
+                        }
                     }
 
+                    // Spacer
+                    Item { Layout.preferredHeight: 4 }
+
+                    // File Upload Drop Area
+                    FileDropArea {
+                        id: fileDropArea
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 120
+                        Layout.leftMargin: 5
+                        Layout.rightMargin: 5
+                        
+                        onFileDropped: function(filePath, fileName) {
+                            console.log("File dropped:", fileName, filePath)
+                            // Auto-fill the name input if empty
+                            if (uploadAudioNameInput.text === "") {
+                                // Remove extension from filename
+                                var nameWithoutExt = fileName.replace(/\.[^/.]+$/, "")
+                                uploadAudioNameInput.text = nameWithoutExt
+                            }
+                        }
+                        
+                        onFileCleared: {
+                            console.log("File cleared")
+                        }
+                    }
+
+                    // Spacer
+                    Item { Layout.preferredHeight: 4 }
+
+                    // Trim Audio Section
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 5
+                        Layout.rightMargin: 5
+                        spacing: 8
+
+                        Text {
+                            text: "Trim Audio"
+                            color: "#FFFFFF"
+                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                            font.pixelSize: 14
+                            font.weight: Font.DemiBold
+                        }
+
+                        // Waveform Display (without playback controls)
+                        TrimWaveform {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 50
+                            currentTime: 90
+                            totalDuration: 210
+                        }
+                    }
+
+                    // Spacer
+                    Item { Layout.preferredHeight: 6 }
+
+                    // Cancel and Save buttons
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 5
+                        Layout.rightMargin: 5
+                        spacing: 8
+
+                        // Cancel button
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 40
+                            color: uploadCancelBtnArea.containsMouse ? "#4A4A4A" : "#3A3A3A"
+                            radius: 8
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "Cancel"
+                                color: "#FFFFFF"
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 13
+                                font.weight: Font.Medium
+                            }
+
+                            MouseArea {
+                                id: uploadCancelBtnArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: console.log("Upload Cancel clicked")
+                            }
+
+                            Behavior on color {
+                                ColorAnimation { duration: 150 }
+                            }
+                        }
+
+                        // Save button (gradient)
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 40
+                            radius: 8
+                            gradient: Gradient {
+                                orientation: Gradient.Horizontal
+                                GradientStop { position: 0.0; color: uploadSaveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6" }
+                                GradientStop { position: 1.0; color: uploadSaveBtnArea.containsMouse ? "#E040FB" : "#D214FD" }
+                            }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "Save"
+                                color: "#FFFFFF"
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 13
+                                font.weight: Font.Medium
+                            }
+
+                            MouseArea {
+                                id: uploadSaveBtnArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: console.log("Upload Save clicked")
+                            }
+                        }
+                    }
+
+                    // Fill remaining space
                     Item { Layout.fillHeight: true }
                 }
 
