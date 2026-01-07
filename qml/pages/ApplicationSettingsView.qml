@@ -795,11 +795,12 @@ Rectangle {
                             }
 
                             Button {
+                                id: refreshButton
                                 text: "Refresh Devices"
                                 onClicked: console.log("Refresh Devices clicked")
 
                                 contentItem: Text {
-                                    text: parent.text
+                                    text: refreshButton.text
                                     color: "#EDEDED"
                                     font.pixelSize: 13
                                     verticalAlignment: Text.AlignVCenter
@@ -850,6 +851,7 @@ Rectangle {
                                     spacing: 0
 
                                     Button {
+                                        id: systemHotkeysButton
                                         text: "System Hotkeys"
                                         width: 200
                                         height: parent.height
@@ -858,7 +860,7 @@ Rectangle {
                                         onClicked: hotkeysContent.tabIndex = 0
 
                                         contentItem: Text {
-                                            text: parent.text
+                                            text: systemHotkeysButton.text
                                             color: "#EDEDED"
                                             font.pixelSize: 15
                                             font.weight: Font.Medium
@@ -876,11 +878,12 @@ Rectangle {
                                             }
 
                                             // turn gradient on/off
-                                            opacity: parent.checked ? 1.0 : 0.0
+                                            opacity: systemHotkeysButton.checked ? 1.0 : 0.0
                                         }
                                     }
 
                                     Button {
+                                        id: myPreferenceButton
                                         text: "My Preference"
                                         width: 200
                                         height: parent.height
@@ -889,7 +892,7 @@ Rectangle {
                                         onClicked: hotkeysContent.tabIndex = 1
 
                                         contentItem: Text {
-                                            text: parent.text
+                                            text: myPreferenceButton.text
                                             color: "#EDEDED"
                                             font.pixelSize: 15
                                             font.weight: Font.Medium
@@ -907,7 +910,7 @@ Rectangle {
                                             }
 
                                             // turn gradient on/off
-                                            opacity: parent.checked ? 1.0 : 0.0
+                                            opacity: myPreferenceButton.checked ? 1.0 : 0.0
                                         }
                                     }
                                 }
@@ -942,13 +945,14 @@ Rectangle {
 
                             // Save gradient button
                             Button {
+                                id: saveButton
                                 width: 170
                                 height: 55
                                 text: "Save"
                                 onClicked: if (backend.saveHotkeys) backend.saveHotkeys()
 
                                 contentItem: Text {
-                                    text: parent.text
+                                    text: saveButton.text
                                     color: "#FFFFFF"
                                     font.pixelSize: 14
                                     font.weight: Font.Medium

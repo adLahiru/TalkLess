@@ -50,8 +50,8 @@ Rectangle {
 
                     // Search Icon
                     Rectangle {
-                        width: 20
-                        height: 20
+                        Layout.preferredWidth: 20
+                        Layout.preferredHeight: 20
                         color: "transparent"
                         
                         Text {
@@ -78,8 +78,8 @@ Rectangle {
 
                     // Clear button (visible when there's text)
                     Rectangle {
-                        width: 20
-                        height: 20
+                        Layout.preferredWidth: 20
+                        Layout.preferredHeight: 20
                         radius: 10
                         color: searchInput.text.length > 0 ? "#333" : "transparent"
                         visible: searchInput.text.length > 0
@@ -87,7 +87,7 @@ Rectangle {
                         Text {
                             anchors.centerIn: parent
                             text: "✕"
-                            color: "#888"
+                            color: "#888888"
                             font.pixelSize: 10
                         }
 

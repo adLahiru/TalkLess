@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 
 Item {
@@ -15,7 +17,8 @@ Item {
 
         Repeater {
             model: root.dotCount
-            Rectangle {
+            delegate: Rectangle {
+                required property int index
                 width: root.dotSize
                 height: root.dotSize
                 radius: root.dotSize / 2

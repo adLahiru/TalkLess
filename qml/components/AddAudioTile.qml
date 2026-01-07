@@ -3,8 +3,8 @@ import QtQuick.Controls 2.15
 
 Item {
     id: root
-    width: 280
-    height: 220
+    width: 222  // 111:79 aspect ratio (landscape)
+    height: 158
 
     property bool enabled: true
     property string text: enabled ? "Add Audio" : "Limit Reached"
@@ -12,50 +12,62 @@ Item {
 
     signal clicked()
 
-    // Outer frame
+    // Outer frame with light border
     Rectangle {
+        id: outerFrame
         anchors.fill: parent
-        radius: 22
-        color: "#E7E2DF"
+        radius: 16
+        color: "#D5D0CD"
         opacity: root.enabled ? 1.0 : 0.6
-        Image {
+
+        // Inner card with background image
+        Rectangle {
+            id: innerCard
             anchors.fill: parent
-            source: root.backgroundImage
-            visible: source && source !== ""
-            fillMode: Image.PreserveAspectCrop
-            smooth: true
-            opacity: 0.35
-        }
-    }
+            anchors.margins: 6
+            radius: 12
+            color: "transparent"
+            clip: true
 
-    // Inner card
-    Rectangle {
-        anchors.fill: parent
-        anchors.margins: 14
-        radius: 18
-        color: "#514443"
-        opacity: root.enabled ? 1.0 : 0.6
-
-        Column {
-            anchors.centerIn: parent
-            spacing: 12
-
-            Text {
-                text: "+"
-                color: "white"
-                font.pixelSize: 72
-                font.weight: Font.Light
-                horizontalAlignment: Text.AlignHCenter
-                width: parent.width
+            // Background image
+            Image {
+                id: bgImage
+                anchors.fill: parent
+                source: root.backgroundImage
+                fillMode: Image.PreserveAspectCrop
+                smooth: true
             }
 
-            Text {
-                text: root.text
-                color: "white"
-                font.pixelSize: 20
-                font.weight: Font.DemiBold
-                horizontalAlignment: Text.AlignHCenter
-                width: parent.width
+            // Translucent dark overlay
+            Rectangle {
+                anchors.fill: parent
+                radius: 12
+                color: "#000000"
+                opacity: 0.55
+            }
+
+            // Content: + symbol and text
+            Column {
+                anchors.centerIn: parent
+                spacing: 8
+
+                Text {
+                    text: "+"
+                    color: "#FFFFFF"
+                    font.pixelSize: 48
+                    font.weight: Font.Normal
+                    horizontalAlignment: Text.AlignHCenter
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+
+                Text {
+                    text: root.text
+                    color: "#FFFFFF"
+                    font.pixelSize: 14
+                    font.weight: Font.DemiBold
+                    horizontalAlignment: Text.AlignHCenter
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
             }
         }
     }
@@ -63,7 +75,21 @@ Item {
     MouseArea {
         anchors.fill: parent
         enabled: root.enabled
+        hoverEnabled: true
         cursorShape: root.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: root.clicked()
+
+        onEntered: {
+            if (root.enabled) {
+                outerFrame.scale = 1.02
+            }
+        }
+        onExited: {
+            outerFrame.scale = 1.0
+        }
+    }
+
+    Behavior on scale {
+        NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
     }
 }

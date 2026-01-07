@@ -4,143 +4,165 @@ import QtQuick.Layouts 1.15
 
 Item {
     id: root
-    width: 280
-    height: 220
+    width: 222  // 111:79 aspect ratio (landscape)
+    height: 158
 
     // data
-    property string title: "Morning"
+    property string title: ""  // Optional - only shows if not empty (e.g., "Morning")
     property url imageSource: "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
     property string hotkeyText: "Alt+F2+Shift"
-    property var tags: []               // ["Professional", "warm"]
     property bool selected: false
 
     // actions
     signal playClicked()
     signal copyClicked()
     signal clicked()
-    signal tagClicked(string tag)
 
     Rectangle {
         id: card
         anchors.fill: parent
-        radius: 22
+        radius: 16
         color: "#101010"
-        border.width: selected ? 3 : 2
-        border.color: selected ? "#FFFFFF" : "#EDEDED"
-        antialiasing: true
+        border.width: 2
+        border.color: "#EDEDED"
+        clip: true
 
-        // background image
+        // Background image
         Image {
             anchors.fill: parent
             source: root.imageSource
             fillMode: Image.PreserveAspectCrop
             smooth: true
             visible: source && source !== ""
-            clip: true
-            layer.enabled: true
         }
 
-        // dark overlay for readability
-        Rectangle {
-            anchors.fill: parent
-            radius: card.radius
-            color: "#000000"
-            opacity: 0.18
-        }
-
-        // Tag pill (top-left)
-        Rectangle {
+        // Yellowish translucent overlay on left half of tile
+        Item {
             anchors.left: parent.left
             anchors.top: parent.top
-            anchors.leftMargin: 14
-            anchors.topMargin: 14
-            height: 38
-            radius: 18
-            color: "#3C7BFF"
-            opacity: 0.95
+            anchors.bottom: parent.bottom
+            width: parent.width * 0.5  // Left half of tile
+            clip: true
 
-            Text {
-                anchors.centerIn: parent
-                text: root.title
-                color: "white"
-                font.pixelSize: 18
-                font.weight: Font.DemiBold
-                leftPadding: 14
-                rightPadding: 14
+            Rectangle {
+                anchors.fill: parent
+                anchors.rightMargin: -16  // Extend right to hide right-side corners
+                radius: 16  // Match card radius
+                color: "#C4A84D"  // Yellowish/golden color
+                opacity: 0.4  // Transparent so background shows through
             }
         }
 
-        // Bottom hotkey bar
+        // Tag pill (top-left) - starts from left edge, only right corners rounded
+        Item {
+            id: tagPill
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.topMargin: 10
+            height: 28
+            width: tagText.implicitWidth + 20
+            visible: root.title !== ""
+            clip: true
+
+            // Background with right-side rounded corners only
+            Rectangle {
+                anchors.fill: parent
+                anchors.leftMargin: -16  // Extend left to hide left corners
+                radius: 14
+                color: "#3B82F6"
+            }
+
+            Text {
+                id: tagText
+                anchors.centerIn: parent
+                anchors.horizontalCenterOffset: 4  // Slight offset for padding
+                text: root.title
+                color: "#FFFFFF"
+                font.pixelSize: 14
+                font.weight: Font.DemiBold
+            }
+        }
+
+        // Bottom hotkey bar - thin translucent black bar at bottom only
         Rectangle {
             id: hotkeyBar
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 14
-            anchors.rightMargin: 14
-            anchors.bottomMargin: 14
-            height: 56
-            radius: 18
-            color: "#121212"
-            opacity: 0.92
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            anchors.bottomMargin: 6
+            height: 28
+            radius: 10
+            color: "#000000"
+            opacity: 0.7
+        }
+
+        // Hotkey bar content (on top of the translucent background)
+        Item {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            anchors.bottomMargin: 6
+            height: 28
 
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 14
-                anchors.rightMargin: 14
-                spacing: 12
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                spacing: 6
 
-                // Play button
-                Button {
-                    Layout.preferredWidth: 34
-                    Layout.preferredHeight: 34
-                    padding: 0
-                    onClicked: root.playClicked()
+                // Play button - just triangle, no circle
+                Item {
+                    Layout.preferredWidth: 20
+                    Layout.preferredHeight: 20
 
-                    background: Rectangle {
-                        radius: 10
-                        color: "transparent"
+                    Text {
+                        anchors.centerIn: parent
+                        text: "▶"
+                        color: "#FFFFFF"
+                        font.pixelSize: 14
                     }
 
-                    contentItem: Text {
-                        text: "▶"
-                        color: "white"
-                        font.pixelSize: 18
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.playClicked()
                     }
                 }
 
-                // Hotkey text
+                // Hotkey text - centered
                 Text {
                     Layout.fillWidth: true
                     text: root.hotkeyText
-                    color: "#EDEDED"
-                    font.pixelSize: 16
+                    color: "#FFFFFF"
+                    font.pixelSize: 13
                     font.weight: Font.Medium
                     elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
 
-                // Copy button
-                Button {
-                    Layout.preferredWidth: 34
-                    Layout.preferredHeight: 34
-                    padding: 0
-                    onClicked: root.copyClicked()
+                // Copy/Menu button
+                Rectangle {
+                    Layout.preferredWidth: 24
+                    Layout.preferredHeight: 24
+                    radius: 4
+                    color: "transparent"
 
-                    background: Rectangle {
-                        radius: 10
-                        color: "transparent"
+                    Text {
+                        anchors.centerIn: parent
+                        text: "☰"
+                        color: "#FFFFFF"
+                        font.pixelSize: 14
                     }
 
-                    // simple copy glyph; replace with svg if you want
-                    contentItem: Text {
-                        text: "⧉"
-                        color: "white"
-                        font.pixelSize: 16
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.copyClicked()
                     }
                 }
             }
@@ -151,47 +173,18 @@ Item {
             anchors.fill: parent
             onClicked: root.clicked()
             cursorShape: Qt.PointingHandCursor
+            // Don't consume clicks on buttons
+            propagateComposedEvents: true
+        }
+
+        // Selection highlight
+        Rectangle {
+            anchors.fill: parent
+            radius: card.radius
+            color: "transparent"
+            border.width: root.selected ? 3 : 0
+            border.color: "#FFFFFF"
+            visible: root.selected
         }
     }
-
-    // Optional tag chips under the card (like "Professional", "warm")
-    Flow {
-        id: chipRow
-        width: parent.width
-        anchors.top: card.bottom
-        anchors.topMargin: 12
-        spacing: 12
-        visible: root.tags && root.tags.length > 0
-
-        Repeater {
-            model: root.tags
-
-            Button {
-                text: modelData
-                padding: 0
-
-                contentItem: Row {
-                    spacing: 8
-                    anchors.centerIn: parent
-                    Text { text: "🏷"; color: "#BDBDBD"; font.pixelSize: 14 } // simple icon
-                    Text { text: modelData; color: "#EDEDED"; font.pixelSize: 14 }
-                }
-
-                background: Rectangle {
-                    radius: 8
-                    color: "#111111"
-                    border.color: "#3A3A3A"
-                    border.width: 1
-                }
-
-                width: implicitWidth + 22
-                height: 44
-
-                onClicked: root.tagClicked(modelData)
-            }
-        }
-    }
-
-    // Increase overall height if chips are visible
-    implicitHeight: card.height + (chipRow.visible ? (chipRow.implicitHeight + 12) : 0)
 }

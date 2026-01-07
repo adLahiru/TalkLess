@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
@@ -103,6 +105,10 @@ Item {
         model: root.model
 
         delegate: Rectangle {
+            id: delegateRoot
+            required property int index
+            required property var model
+            
             width: ListView.view.width
             height: 62
             radius: 12
@@ -120,7 +126,7 @@ Item {
 
                 Text {
                     width: root.col1Width
-                    text: model[root.nameRole]
+                    text: delegateRoot.model[root.nameRole]
                     color: "#EDEDED"
                     font.pixelSize: 14
                     elide: Text.ElideRight
@@ -129,7 +135,7 @@ Item {
 
                 Text {
                     width: root.col2Width
-                    text: model[root.hotkeyRole]
+                    text: delegateRoot.model[root.hotkeyRole]
                     color: "#EDEDED"
                     font.pixelSize: 14
                     elide: Text.ElideRight
@@ -144,11 +150,12 @@ Item {
 
                     // Reassign (gradient)
                     Button {
+                        id: primaryButton
                         text: root.primaryText
-                        onClicked: root.primaryClicked(model[root.idRole])
+                        onClicked: root.primaryClicked(delegateRoot.model[root.idRole])
 
                         contentItem: Text {
-                            text: parent.text
+                            text: primaryButton.text
                             color: "#FFFFFF"
                             font.pixelSize: 13
                             font.weight: Font.Medium
@@ -167,11 +174,12 @@ Item {
 
                     // Reset/Delete (dark)
                     Button {
+                        id: secondaryButton
                         text: root.secondaryText
-                        onClicked: root.secondaryClicked(model[root.idRole])
+                        onClicked: root.secondaryClicked(delegateRoot.model[root.idRole])
 
                         contentItem: Text {
-                            text: parent.text
+                            text: secondaryButton.text
                             color: "#EDEDED"
                             font.pixelSize: 13
                             font.weight: Font.Medium

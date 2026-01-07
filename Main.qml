@@ -86,7 +86,7 @@ ApplicationWindow {
                         Text {
                             anchors.centerIn: parent
                             text: "Audio Playback Engine"
-                            color: "#666"
+                            color: "#666666"
                             font.pixelSize: 32
                         }
                     }
@@ -98,7 +98,7 @@ ApplicationWindow {
                         Text {
                             anchors.centerIn: parent
                             text: "Macros & Automation"
-                            color: "#666"
+                            color: "#666666"
                             font.pixelSize: 32
                         }
                     }
@@ -114,7 +114,7 @@ ApplicationWindow {
                         Text {
                             anchors.centerIn: parent
                             text: "Statistics & Reporting"
-                            color: "#666"
+                            color: "#666666"
                             font.pixelSize: 32
                         }
                     }

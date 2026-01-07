@@ -234,58 +234,223 @@ Rectangle {
             }
         }
 
-        // Placeholder content area
-        Rectangle {
+        // Action Buttons Bar - centered below banner
+        Item {
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            color: "#0d0d0d"          // ✅ or "transparent"
-            radius: 12
+            Layout.preferredHeight: 36
+            Layout.topMargin: -10
 
+            Rectangle {
+                id: actionButtonsBar
+                // Center under the banner (which is 70% of parent width)
+                x: (parent.width * 0.7 - width) / 2
+                width: 160
+                height: 36
+                radius: 8
+                color: "#1A1A1A"
+                border.color: "#2A2A2A"
+                border.width: 0
 
-            GridView {
-                anchors.fill: parent
-                anchors.margins: 24
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 4
 
-                cellWidth: 300
-                cellHeight: 290
+                    // Play Button
+                    Rectangle {
+                        width: 32
+                        height: 32
+                        radius: 6
+                        color: playMouseArea.containsMouse ? "#333333" : "transparent"
 
-                readonly property int maxClips: 11
-                readonly property int clipsCount: backend.clipsModel ? backend.clipsModel.count : 0
+                        Text {
+                            anchors.centerIn: parent
+                            text: "▶️"
+                            font.pixelSize: 16
+                        }
 
-                model: clipsCount + 1
+                        MouseArea {
+                            id: playMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: console.log("Play all clicked")
+                        }
 
-                delegate: Loader {
-                    width: 280
-                    height: 260
-
-                    sourceComponent: (index === 0) ? addAudioTile : clipTile
-
-                    Component {
-                        id: addAudioTile
-                        AddAudioTile {
-                            enabled: backend.clipsModel.count < clipsGrid.maxClips
-                            onClicked: backend.addClip()
+                        Behavior on color {
+                            ColorAnimation { duration: 150 }
                         }
                     }
 
+                    // Globe/Web Button
+                    Rectangle {
+                        width: 32
+                        height: 32
+                        radius: 6
+                        color: globeMouseArea.containsMouse ? "#333333" : "transparent"
 
-                    Component { id: clipTile
-                        ClipTile {
-                            // clipIndex = index-1 (because 0 is Add tile)
-                            property int clipIndex: index - 1
-                            property var clip: backend.clipsModel.get(clipIndex)
+                        Text {
+                            anchors.centerIn: parent
+                            text: "🌐"
+                            font.pixelSize: 16
+                        }
 
-                            title: clip.file_name
-                            imageSource: clip.img_path
-                            hotkeyText: clip.hotkey
-                            tags: clip.tag ? [clip.tag] : []
+                        MouseArea {
+                            id: globeMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: console.log("Web/Share clicked")
+                        }
 
-                            onPlayClicked: backend.playClip(clip.id)
-                            onClicked: backend.openClip(clip.id)
+                        Behavior on color {
+                            ColorAnimation { duration: 150 }
+                        }
+                    }
+
+                    // Edit/Pencil Button
+                    Rectangle {
+                        width: 32
+                        height: 32
+                        radius: 6
+                        color: editMouseArea.containsMouse ? "#333333" : "transparent"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "✏️"
+                            font.pixelSize: 16
+                        }
+
+                        MouseArea {
+                            id: editMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: console.log("Edit clicked")
+                        }
+
+                        Behavior on color {
+                            ColorAnimation { duration: 150 }
+                        }
+                    }
+
+                    // Delete/Trash Button
+                    Rectangle {
+                        width: 32
+                        height: 32
+                        radius: 6
+                        color: deleteMouseArea.containsMouse ? "#333333" : "transparent"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "🗑️"
+                            font.pixelSize: 16
+                        }
+
+                        MouseArea {
+                            id: deleteMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: console.log("Delete clicked")
+                        }
+
+                        Behavior on color {
+                            ColorAnimation { duration: 150 }
                         }
                     }
                 }
-                Component.onCompleted: console.log("clipsCount =", clipsCount, "model items =", model)
+            }
+        }
+
+        // Soundboard content area
+        Rectangle {
+            id: contentArea
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            color: "#0d0d0d"
+            radius: 12
+
+            // Tile sizing properties
+            readonly property real tileSpacing: 15
+            readonly property real tilePadding: 20
+            // Width calculation: (banner_width - padding*2 - spacing*3) / 4
+            // Banner is 70% of parent, so tile width = (parent.width * 0.7 - 40 - 45) / 4
+            readonly property real tileWidth: (width * 0.7 - tilePadding * 2 - tileSpacing * 3) / 4
+            readonly property real tileHeight: tileWidth * 79 / 111  // 111:79 aspect ratio
+
+            // Dummy clips data
+            ListModel {
+                id: dummyClipsModel
+                ListElement { modelTitle: "Morning"; modelHotkeyText: "Alt+F2+Shift"; hasTag: true }
+                ListElement { modelTitle: "Morning"; modelHotkeyText: "Alt+F2+Shift"; hasTag: true }
+                ListElement { modelTitle: "Morning"; modelHotkeyText: "Alt+F2+Shift"; hasTag: true }
+                ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
+                ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
+                ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
+                ListElement { modelTitle: "Morning"; modelHotkeyText: "Alt+F2+Shift"; hasTag: true }
+                ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
+                ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
+                ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
+                ListElement { modelTitle: "Morning"; modelHotkeyText: "Alt+F2+Shift"; hasTag: true }
+            }
+
+            // Flickable area for scrolling - constrained to banner width
+            Flickable {
+                id: clipsFlickable
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.margins: contentArea.tilePadding
+                // Constrain width to match banner (70% of parent)
+                width: parent.width * 0.7 - contentArea.tilePadding * 2
+                contentWidth: width
+                contentHeight: clipsGrid.implicitHeight
+                clip: true
+                flickableDirection: Flickable.VerticalFlick
+
+                // Grid layout for tiles - constrained to banner width
+                Flow {
+                    id: clipsGrid
+                    width: parent.width
+                    spacing: contentArea.tileSpacing
+
+                    // Add Audio Tile (first item)
+                    AddAudioTile {
+                        id: addAudioTile
+                        width: contentArea.tileWidth
+                        height: contentArea.tileHeight
+                        enabled: true
+                        onClicked: {
+                            console.log("Add Audio clicked")
+                        }
+                    }
+
+                    // Dummy Clip Tiles
+                    Repeater {
+                        model: dummyClipsModel
+
+                        ClipTile {
+                            required property string modelTitle
+                            required property string modelHotkeyText
+                            required property bool hasTag
+
+                            width: contentArea.tileWidth
+                            height: contentArea.tileHeight
+                            title: hasTag ? modelTitle : ""
+                            hotkeyText: modelHotkeyText
+                            imageSource: "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
+
+                            onClicked: console.log("Clip clicked:", modelTitle)
+                            onPlayClicked: console.log("Play clicked:", modelTitle)
+                            onCopyClicked: console.log("Copy clicked:", modelTitle)
+                        }
+                    }
+                }
+
+                // Scrollbar
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                }
             }
         }
     }
