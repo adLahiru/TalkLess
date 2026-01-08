@@ -16,6 +16,11 @@ Rectangle {
         source: "https://fonts.gstatic.com/s/outfit/v11/QGYyz_MVcBeNP4NjuGObqx1XmO1I4TC1C4G-EiAou6Y.ttf"
     }
 
+    FontLoader {
+        id: poppinsFont
+        source: "https://fonts.gstatic.com/s/poppins/v21/pxiByp8kv8JHgFVrLCz7Z1JlFc-K.ttf"  // Poppins SemiBold
+    }
+
     property int currentIndex: 0
     property int editingBoardId: -1
     property int selectedBoardId: -1  // Track which board is selected (for viewing)
@@ -155,12 +160,13 @@ Rectangle {
             }
         }
 
-        // Divider before soundboards
-        Image {
-            source: "qrc:/qt/qml/TalkLess/resources/icons/decorations/ic_sidebar_divider.svg"
+        // 2px dividing line before soundboards - full width
+        Rectangle {
             Layout.fillWidth: true
-            fillMode: Image.Stretch
             Layout.preferredHeight: 2
+            Layout.leftMargin: -18  // Extend to edge
+            Layout.rightMargin: -18  // Extend to edge
+            color: "#2D2D2D"
         }
 
         // ==========================
@@ -168,28 +174,8 @@ Rectangle {
         // ==========================
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: 10
-
-            // title row
-            RowLayout {
-                Layout.fillWidth: true
-
-                Text {
-                    text: "Soundboards"
-                    color: "#B3FFFFFF"
-                    font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
-                    font.pixelSize: 12
-                    font.weight: Font.DemiBold
-                }
-
-                Item { Layout.fillWidth: true }
-
-                // Optional: quick refresh
-                ToolButton {
-                    text: "⟳"
-                    onClicked: soundboardsModel.reload()
-                }
-            }
+            Layout.topMargin: 8
+            spacing: 8
 
             // Soundboards list
             Item {
@@ -207,7 +193,7 @@ Rectangle {
                     delegate: Item {
                         id: boardRow
                         width: boardsList.width
-                        height: 56
+                        height: 56  // Reduced height
 
                         // from model roles - use required property for ComponentBehavior: Bound
                         required property int index
@@ -299,29 +285,60 @@ Rectangle {
                                 }
                             }
 
-                            // image (optional)
-                            Rectangle {
-                                width: 38; height: 38
-                                radius: 10
-                                color: "#141414"
-                                border.width: 1
-                                border.color: "#2D2D2D"
+                            // Soundboard image - rounded corners with layer mask
+                            Item {
+                                width: 44; height: 44
+
+                                Rectangle {
+                                    id: imageMask
+                                    anchors.fill: parent
+                                    radius: 12
+                                    visible: false
+                                }
 
                                 Image {
+                                    id: soundboardImg
                                     anchors.fill: parent
-                                    anchors.margins: 2
                                     fillMode: Image.PreserveAspectCrop
                                     source: (boardRow.boardImage && boardRow.boardImage.length > 0)
                                             ? boardRow.boardImage
-                                            : "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
+                                            : "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
+                                    visible: false
+                                }
+
+                                // Use ShaderEffectSource and OpacityMask via layer
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 12
+                                    color: "#141414"
+                                    
+                                    Image {
+                                        anchors.fill: parent
+                                        fillMode: Image.PreserveAspectCrop
+                                        source: (boardRow.boardImage && boardRow.boardImage.length > 0)
+                                                ? boardRow.boardImage
+                                                : "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
+                                        layer.enabled: true
+                                        layer.effect: MultiEffect {
+                                            maskEnabled: true
+                                            maskSource: ShaderEffectSource {
+                                                sourceItem: Rectangle {
+                                                    width: 44
+                                                    height: 44
+                                                    radius: 12
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
+                            // Soundboard name with Poppins SemiBold 14px
                             ColumnLayout {
                                 Layout.fillWidth: true
-                                spacing: 4
+                                spacing: 2
 
-                                // Display mode (Text)
+                                // Display mode (Text) - Poppins SemiBold 14px
                                 Text {
                                     id: nameLabel
                                     visible: root.editingBoardId !== boardRow.boardId
@@ -330,12 +347,9 @@ Rectangle {
                                     color: "#FFFFFF"
                                     font.pixelSize: 14
                                     font.weight: Font.DemiBold
-                                    font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
+                                    font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
+                                    lineHeight: 1.0
                                     Layout.fillWidth: true
-                                    
-                                    Component.onCompleted: {
-                                        console.log("Name label created for board:", boardRow.boardId, "name:", boardRow.boardName)
-                                    }
                                 }
 
                                 // Edit mode (TextField)
@@ -356,7 +370,7 @@ Rectangle {
                                     
                                     color: "#FFFFFF"
                                     font.pixelSize: 14
-                                    font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
+                                    font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
                                     
                                     // Prevent clicks from propagating
                                     MouseArea {
@@ -391,16 +405,6 @@ Rectangle {
                                         text = boardRow.boardName
                                         root.editingBoardId = -1
                                     }
-                                }
-
-                                // Hotkey pill (optional)
-                                Text {
-                                    text: boardRow.boardHotkey && boardRow.boardHotkey.length > 0 ? ("Hotkey: " + boardRow.boardHotkey) : ""
-                                    visible: text.length > 0 && root.editingBoardId !== boardRow.boardId
-                                    elide: Text.ElideRight
-                                    color: "#B3FFFFFF"
-                                    font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
-                                    font.pixelSize: 11
                                 }
                             }
 
@@ -450,43 +454,44 @@ Rectangle {
                 }
             }
 
-            // Add Soundboard
+            // Add audio button - matches design
             Button {
                 Layout.fillWidth: true
-                text: "Add soundboard"
+                Layout.preferredHeight: 48
+                text: "Add audio"
 
                 background: Rectangle {
-                    radius: 14
-                    color: "#1B1D24"
-                    border.width: 1
-                    border.color: "#2D2D2D"
+                    radius: 12
+                    color: "#3D2F2F"  // Brown/maroon background
                 }
 
                 contentItem: RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 12
                     anchors.rightMargin: 12
-                    spacing: 10
+                    spacing: 12
 
+                    // Plus icon in rounded square
                     Rectangle {
-                        width: 28; height: 28
-                        radius: 10
-                        color: "#262626"
+                        width: 52; height: 36
+                        radius: 8
+                        color: "#4F3B3B"
+
                         Text {
                             anchors.centerIn: parent
                             text: "+"
                             color: "#FFFFFF"
-                            font.pixelSize: 18
-                            font.weight: Font.DemiBold
+                            font.pixelSize: 20
+                            font.weight: Font.Normal
                         }
                     }
 
                     Text {
-                        text: "Add soundboard"
+                        text: "Add audio"
                         color: "#FFFFFF"
-                        font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
-                        font.pixelSize: 13
-                        font.weight: Font.Medium
+                        font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
+                        font.pixelSize: 14
+                        font.weight: Font.DemiBold
                         Layout.fillWidth: true
                     }
                 }

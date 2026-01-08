@@ -21,6 +21,10 @@ qt_add_executable(appTalkLess
     src/models/AppSettings.h
     src/models/AppState.h
 
+    # Audio Engine
+    src/audioEngine.h
+    src/audioEngine.cpp
+
     # Controllers
 
 
@@ -146,6 +150,7 @@ qt_add_qml_module(appTalkLess
         resources/images/splashScreen.png
         resources/images/audioClipDefaultBackground.png
         resources/images/addAudioBackground.png
+        resources/images/sondboard.jpg
 )
 
 # Add include directories for QML type registration

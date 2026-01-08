@@ -12,9 +12,11 @@ Item {
     property url imageSource: "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
     property string hotkeyText: "Alt+F2+Shift"
     property bool selected: false
+    property bool isPlaying: false  // Track playback state
 
     // actions
     signal playClicked()
+    signal stopClicked()
     signal copyClicked()
     signal clicked()
 
@@ -60,7 +62,8 @@ Item {
             anchors.top: parent.top
             anchors.topMargin: 10
             height: 28
-            width: tagText.implicitWidth + 20
+            // Width is content-based but limited to 60% of tile width
+            width: Math.min(tagText.implicitWidth + 20, parent.width * 0.6)
             visible: root.title !== ""
             clip: true
 
@@ -76,10 +79,13 @@ Item {
                 id: tagText
                 anchors.centerIn: parent
                 anchors.horizontalCenterOffset: 4  // Slight offset for padding
+                width: parent.width - 16  // Leave padding on both sides
                 text: root.title
                 color: "#FFFFFF"
                 font.pixelSize: 14
                 font.weight: Font.DemiBold
+                elide: Text.ElideRight  // Truncate with ellipsis if text is too long
+                horizontalAlignment: Text.AlignHCenter
             }
         }
 
@@ -114,22 +120,29 @@ Item {
                 anchors.rightMargin: 8
                 spacing: 6
 
-                // Play button - just triangle, no circle
+                // Play/Stop button - toggles based on playing state
                 Item {
                     Layout.preferredWidth: 20
                     Layout.preferredHeight: 20
 
                     Text {
                         anchors.centerIn: parent
-                        text: "▶"
-                        color: "#FFFFFF"
+                        text: root.isPlaying ? "■" : "▶"  // Stop or Play icon
+                        color: root.isPlaying ? "#FF6B6B" : "#FFFFFF"  // Red when playing
                         font.pixelSize: 14
                     }
 
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.playClicked()
+                        onClicked: function(mouse) {
+                            if (root.isPlaying) {
+                                root.stopClicked()
+                            } else {
+                                root.playClicked()
+                            }
+                            mouse.accepted = true
+                        }
                     }
                 }
 
@@ -162,29 +175,21 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.copyClicked()
+                        onClicked: function(mouse) {
+                            root.copyClicked()
+                            mouse.accepted = true
+                        }
                     }
                 }
             }
         }
 
-        // Whole card click (for selecting/opening)
+        // Whole card click (for selecting/opening) - BELOW the buttons in z-order
         MouseArea {
             anchors.fill: parent
+            z: -1  // Lower z so buttons get clicks first
             onClicked: root.clicked()
             cursorShape: Qt.PointingHandCursor
-            // Don't consume clicks on buttons
-            propagateComposedEvents: true
-        }
-
-        // Selection highlight
-        Rectangle {
-            anchors.fill: parent
-            radius: card.radius
-            color: "transparent"
-            border.width: root.selected ? 3 : 0
-            border.color: "#3B82F6" // Vibrant Blue
-            visible: root.selected
         }
     }
 }

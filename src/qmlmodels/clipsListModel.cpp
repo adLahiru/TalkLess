@@ -1,9 +1,6 @@
 #include "clipsListModel.h"
 
-ClipsListModel::ClipsListModel(QObject* parent)
-    : QAbstractListModel(parent)
-{
-}
+ClipsListModel::ClipsListModel(QObject* parent) : QAbstractListModel(parent) {}
 
 void ClipsListModel::setService(SoundboardService* service)
 {
@@ -17,10 +14,8 @@ void ClipsListModel::setService(SoundboardService* service)
     m_service = service;
 
     if (m_service) {
-        connect(m_service, &SoundboardService::activeClipsChanged,
-                this, &ClipsListModel::onActiveClipsChanged);
-        connect(m_service, &SoundboardService::activeBoardChanged,
-                this, &ClipsListModel::onActiveClipsChanged);
+        connect(m_service, &SoundboardService::activeClipsChanged, this, &ClipsListModel::onActiveClipsChanged);
+        connect(m_service, &SoundboardService::activeBoardChanged, this, &ClipsListModel::onActiveClipsChanged);
 
         // If no board ID is set, load the active board
         if (m_boardId < 0) {
@@ -72,33 +67,44 @@ QVariant ClipsListModel::data(const QModelIndex& index, int role) const
     const Clip& c = m_cache[row];
 
     switch (role) {
-    case IdRole:         return c.id;
-    case FilePathRole:   return c.filePath;
-    case ImgPathRole:    return c.imgPath;
-    case HotkeyRole:     return c.hotkey;
-    case TitleRole:      return c.title;
-    case TrimStartMsRole:return c.trimStartMs;
-    case TrimEndMsRole:  return c.trimEndMs;
-    case IsPlayingRole:  return c.isPlaying;
-    case IsRepeatRole:   return c.isRepeat;
-    case LockedRole:     return c.locked;
-    default:             return {};
+    case IdRole:
+        return c.id;
+    case FilePathRole:
+        return c.filePath;
+    case ImgPathRole:
+        return c.imgPath;
+    case HotkeyRole:
+        return c.hotkey;
+    case TitleRole:
+        return c.title;
+    case TrimStartMsRole:
+        return c.trimStartMs;
+    case TrimEndMsRole:
+        return c.trimEndMs;
+    case IsPlayingRole:
+        return c.isPlaying;
+    case IsRepeatRole:
+        return c.isRepeat;
+    case LockedRole:
+        return c.locked;
+    default:
+        return {};
     }
 }
 
 QHash<int, QByteArray> ClipsListModel::roleNames() const
 {
     return {
-        { IdRole, "clipId" },
-        { FilePathRole, "filePath" },
-        { ImgPathRole, "imgPath" },
-        { HotkeyRole, "hotkey" },
-        { TitleRole, "clipTitle" },
-        { TrimStartMsRole, "trimStartMs" },
-        { TrimEndMsRole, "trimEndMs" },
-        { IsPlayingRole, "isPlaying" },
-        { IsRepeatRole, "isRepeat" },
-        { LockedRole, "locked" }
+        {         IdRole,        "clipId"},
+        {   FilePathRole,      "filePath"},
+        {    ImgPathRole,       "imgPath"},
+        {     HotkeyRole,        "hotkey"},
+        {      TitleRole,     "clipTitle"},
+        {TrimStartMsRole,   "trimStartMs"},
+        {  TrimEndMsRole,     "trimEndMs"},
+        {  IsPlayingRole, "clipIsPlaying"},
+        {   IsRepeatRole,      "isRepeat"},
+        {     LockedRole,        "locked"}
     };
 }
 
@@ -108,7 +114,7 @@ void ClipsListModel::reload()
         return;
 
     beginResetModel();
-    
+
     if (m_boardId >= 0) {
         m_cache = m_service->getClipsForBoard(m_boardId);
     } else {

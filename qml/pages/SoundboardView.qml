@@ -298,7 +298,12 @@ Rectangle {
                                 hoverEnabled: true
                                 enabled: root.selectedClipId !== -1
                                 cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                onClicked: console.log("Play clip clicked:", root.selectedClipId)
+                                onClicked: {
+                                    console.log("Play clip clicked:", root.selectedClipId)
+                                    if (root.selectedClipId !== -1) {
+                                        soundboardService.playClip(root.selectedClipId)
+                                    }
+                                }
                             }
 
                             Behavior on color {
@@ -442,8 +447,8 @@ Rectangle {
                             height: contentArea.tileHeight
                             enabled: true
                             onClicked: {
-                                console.log("Add Audio clicked - opening file dialog")
-                                audioFileDialog.open()
+                                console.log("Add Audio clicked - opening add audio panel")
+                                rightSidebar.currentTabIndex = 1
                             }
                         }
 
@@ -458,6 +463,7 @@ Rectangle {
                                 required property string hotkey
                                 required property string imgPath
                                 required property string filePath
+                                required property bool clipIsPlaying  // Renamed to avoid shadowing
 
                                 width: contentArea.tileWidth
                                 height: contentArea.tileHeight
@@ -467,7 +473,8 @@ Rectangle {
                                     ? imgPath 
                                     : "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
                                 
-                                selected: root.selectedClipId === clipId
+                                // Bind isPlaying from model to component
+                                isPlaying: clipIsPlaying
 
                                 onClicked: {
                                     console.log("Clip clicked:", clipId, clipTitle)
@@ -477,7 +484,14 @@ Rectangle {
                                         root.selectedClipId = clipId
                                     }
                                 }
-                                onPlayClicked: console.log("Play clicked:", clipId, clipTitle)
+                                onPlayClicked: {
+                                    console.log("Play clicked:", clipId, clipTitle)
+                                    soundboardService.playClip(clipId)
+                                }
+                                onStopClicked: {
+                                    console.log("Stop clicked:", clipId, clipTitle)
+                                    soundboardService.stopClip(clipId)
+                                }
                                 onCopyClicked: console.log("Copy clicked:", clipId, clipTitle)
                             }
                         }
@@ -1427,7 +1441,44 @@ Rectangle {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Upload Save clicked")
+                                onClicked: {
+                                    console.log("Upload Save clicked")
+                                    
+                                    // Check if a file has been dropped/selected
+                                    if (fileDropArea.droppedFilePath === "") {
+                                        console.log("No file selected")
+                                        return
+                                    }
+                                    
+                                    // Get the board ID
+                                    const boardId = clipsModel.boardId
+                                    if (boardId < 0) {
+                                        console.log("No board selected")
+                                        return
+                                    }
+                                    
+                                    // Save the clip with the user-entered title (or auto-generated one)
+                                    const filePath = "file://" + fileDropArea.droppedFilePath
+                                    const title = uploadAudioNameInput.text
+                                    
+                                    const success = soundboardService.addClipWithTitle(boardId, filePath, title)
+                                    
+                                    if (success) {
+                                        console.log("Clip saved successfully")
+                                        // Reload the clips model
+                                        clipsModel.reload()
+                                        
+                                        // Clear the form
+                                        fileDropArea.droppedFilePath = ""
+                                        fileDropArea.droppedFileName = ""
+                                        uploadAudioNameInput.text = ""
+                                        
+                                        // Return to Settings tab (main tab)
+                                        rightSidebar.currentTabIndex = 0
+                                    } else {
+                                        console.log("Failed to save clip")
+                                    }
+                                }
                             }
                         }
                     }

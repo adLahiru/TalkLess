@@ -1,11 +1,18 @@
 #include "soundboardService.h"
 
+#include "audioEngine.h"
+
+#include <QDebug>
 #include <QFileInfo>
 #include <QUrl>
 
-SoundboardService::SoundboardService(QObject* parent)
-  : QObject(parent)
+SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
+    // Initialize audio engine
+    if (!m_audioEngine->startAudioDevice()) {
+        qWarning() << "Failed to start audio device";
+    }
+
     // 1) Load index (might not exist)
     m_state = m_repo.loadIndex();
 
@@ -31,6 +38,16 @@ SoundboardService::SoundboardService(QObject* parent)
     emit activeClipsChanged();
 }
 
+SoundboardService::~SoundboardService()
+{
+    // Stop all clips before shutting down
+    if (m_audioEngine) {
+        for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it) {
+            m_audioEngine->stopClip(it.value());
+        }
+        m_audioEngine->stopAudioDevice();
+    }
+}
 
 void SoundboardService::reloadIndex()
 {
@@ -66,7 +83,8 @@ void SoundboardService::setMicGainDb(double db)
 QString SoundboardService::getBoardName(int boardId) const
 {
     for (const auto& b : m_state.soundboards) {
-        if (b.id == boardId) return b.name;
+        if (b.id == boardId)
+            return b.name;
     }
     return QString();
 }
@@ -79,7 +97,8 @@ bool SoundboardService::activate(int boardId)
     }
 
     auto loaded = m_repo.loadBoard(boardId);
-    if (!loaded) return false;
+    if (!loaded)
+        return false;
 
     m_active = *loaded;
     rebuildHotkeyIndex();
@@ -96,7 +115,8 @@ bool SoundboardService::activate(int boardId)
 
 bool SoundboardService::saveActive()
 {
-    if (!m_active) return false;
+    if (!m_active)
+        return false;
 
     const bool ok = m_repo.saveBoard(*m_active);
     if (ok) {
@@ -115,7 +135,8 @@ QString SoundboardService::normalizeHotkey(const QString& hotkey)
 void SoundboardService::rebuildHotkeyIndex()
 {
     m_hotkeyToClipId.clear();
-    if (!m_active) return;
+    if (!m_active)
+        return;
 
     for (const auto& c : m_active->clips) {
         const QString hk = normalizeHotkey(c.hotkey);
@@ -128,22 +149,26 @@ void SoundboardService::rebuildHotkeyIndex()
 int SoundboardService::findActiveClipIdByHotkey(const QString& hotkey) const
 {
     const QString hk = normalizeHotkey(hotkey);
-    if (hk.isEmpty()) return -1;
+    if (hk.isEmpty())
+        return -1;
     return m_hotkeyToClipId.value(hk, -1);
 }
 
 Clip* SoundboardService::findActiveClipById(int clipId)
 {
-    if (!m_active) return nullptr;
+    if (!m_active)
+        return nullptr;
     for (auto& c : m_active->clips) {
-        if (c.id == clipId) return &c;
+        if (c.id == clipId)
+            return &c;
     }
     return nullptr;
 }
 
 QVector<Clip> SoundboardService::getActiveClips() const
 {
-    if (!m_active) return {};
+    if (!m_active)
+        return {};
     return m_active->clips;
 }
 
@@ -156,14 +181,16 @@ QVector<Clip> SoundboardService::getClipsForBoard(int boardId) const
 
     // Otherwise load from repository
     auto loaded = m_repo.loadBoard(boardId);
-    if (!loaded) return {};
+    if (!loaded)
+        return {};
     return loaded->clips;
 }
 
 bool SoundboardService::setClipPlaying(int clipId, bool playing)
 {
     Clip* c = findActiveClipById(clipId);
-    if (!c) return false;
+    if (!c)
+        return false;
 
     c->isPlaying = playing;
     c->locked = playing;
@@ -173,18 +200,37 @@ bool SoundboardService::setClipPlaying(int clipId, bool playing)
 
 bool SoundboardService::addClip(int boardId, const QString& filePath)
 {
-    if (filePath.isEmpty()) return false;
-    
+    if (filePath.isEmpty())
+        return false;
+
     QString localPath = filePath;
     if (localPath.startsWith("file:")) {
         localPath = QUrl(localPath).toLocalFile();
     }
-    
+
     Clip draft;
     draft.filePath = localPath;
     draft.title = QFileInfo(draft.filePath).baseName();
     // other defaults are handled inside addClipToBoard
-    
+
+    return addClipToBoard(boardId, draft);
+}
+
+bool SoundboardService::addClipWithTitle(int boardId, const QString& filePath, const QString& title)
+{
+    if (filePath.isEmpty())
+        return false;
+
+    QString localPath = filePath;
+    if (localPath.startsWith("file:")) {
+        localPath = QUrl(localPath).toLocalFile();
+    }
+
+    Clip draft;
+    draft.filePath = localPath;
+    // Use custom title if provided, otherwise fall back to filename
+    draft.title = title.trimmed().isEmpty() ? QFileInfo(draft.filePath).baseName() : title.trimmed();
+
     return addClipToBoard(boardId, draft);
 }
 
@@ -195,14 +241,16 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
         bool found = false;
         for (int i = 0; i < m_active->clips.size(); ++i) {
             if (m_active->clips[i].id == clipId) {
-                if (m_active->clips[i].locked) return false; // can't delete playing
+                if (m_active->clips[i].locked)
+                    return false; // can't delete playing
                 m_active->clips.removeAt(i);
                 found = true;
                 break;
             }
         }
-        if (!found) return false;
-        
+        if (!found)
+            return false;
+
         rebuildHotkeyIndex();
         emit activeClipsChanged();
         return saveActive();
@@ -210,7 +258,8 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
 
     // inactive board: load -> modify -> save
     auto loaded = m_repo.loadBoard(boardId);
-    if (!loaded) return false;
+    if (!loaded)
+        return false;
 
     Soundboard b = *loaded;
     bool found = false;
@@ -221,7 +270,8 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
             break;
         }
     }
-    if (!found) return false;
+    if (!found)
+        return false;
 
     const bool ok = m_repo.saveBoard(b);
     if (ok) {
@@ -233,7 +283,8 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
 
 bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
 {
-    if (draft.filePath.trimmed().isEmpty()) return false;
+    if (draft.filePath.trimmed().isEmpty())
+        return false;
 
     // if adding to active board (in memory)
     if (m_active && m_active->id == boardId) {
@@ -252,7 +303,8 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
 
         // generate clip id (simple)
         int maxId = 0;
-        for (const auto& x : m_active->clips) maxId = std::max(maxId, x.id);
+        for (const auto& x : m_active->clips)
+            maxId = std::max(maxId, x.id);
         c.id = maxId + 1;
 
         m_active->clips.push_back(c);
@@ -264,17 +316,20 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
 
     // inactive board: load -> modify -> save
     auto loaded = m_repo.loadBoard(boardId);
-    if (!loaded) return false;
+    if (!loaded)
+        return false;
 
     Soundboard b = *loaded;
 
     Clip c = draft;
-    if (c.title.trimmed().isEmpty()) c.title = QFileInfo(c.filePath).baseName();
+    if (c.title.trimmed().isEmpty())
+        c.title = QFileInfo(c.filePath).baseName();
     c.isPlaying = false;
     c.locked = false;
 
     int maxId = 0;
-    for (const auto& x : b.clips) maxId = std::max(maxId, x.id);
+    for (const auto& x : b.clips)
+        maxId = std::max(maxId, x.id);
     c.id = maxId + 1;
 
     b.clips.push_back(c);
@@ -292,13 +347,16 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
     // active board update (enforce locked)
     if (m_active && m_active->id == boardId) {
         for (auto& c : m_active->clips) {
-            if (c.id != clipId) continue;
-            if (c.locked) return false;
+            if (c.id != clipId)
+                continue;
+            if (c.locked)
+                return false;
 
             Clip n = updatedClip;
             n.id = clipId;
 
-            if (n.title.trimmed().isEmpty()) n.title = QFileInfo(n.filePath).baseName();
+            if (n.title.trimmed().isEmpty())
+                n.title = QFileInfo(n.filePath).baseName();
             n.isPlaying = c.isPlaying;
             n.locked = c.locked;
 
@@ -313,15 +371,18 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
 
     // inactive board update
     auto loaded = m_repo.loadBoard(boardId);
-    if (!loaded) return false;
+    if (!loaded)
+        return false;
 
     Soundboard b = *loaded;
     for (auto& c : b.clips) {
-        if (c.id != clipId) continue;
+        if (c.id != clipId)
+            continue;
 
         Clip n = updatedClip;
         n.id = clipId;
-        if (n.title.trimmed().isEmpty()) n.title = QFileInfo(n.filePath).baseName();
+        if (n.title.trimmed().isEmpty())
+            n.title = QFileInfo(n.filePath).baseName();
         n.isPlaying = false;
         n.locked = false;
 
@@ -340,7 +401,8 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
 int SoundboardService::createBoard(const QString& name)
 {
     QString finalName = name.trimmed();
-    if (finalName.isEmpty()) finalName = "New Soundboard";
+    if (finalName.isEmpty())
+        finalName = "New Soundboard";
 
     // Create board on disk + update index
     int id = m_repo.createBoard(finalName);
@@ -351,7 +413,6 @@ int SoundboardService::createBoard(const QString& name)
 
     return id;
 }
-
 
 bool SoundboardService::renameBoard(int boardId, const QString& newName)
 {
@@ -412,4 +473,193 @@ bool SoundboardService::deleteBoard(int boardId)
         emit activeBoardChanged();
     }
     return ok;
+}
+
+// ============================================================================
+// AUDIO PLAYBACK
+// ============================================================================
+
+void SoundboardService::playClip(int clipId)
+{
+    if (!m_audioEngine) {
+        qWarning() << "AudioEngine not initialized";
+        return;
+    }
+
+    // Find the clip in the active board
+    Clip* clip = findActiveClipById(clipId);
+    if (!clip) {
+        qWarning() << "Clip not found:" << clipId;
+        return;
+    }
+
+    if (clip->filePath.isEmpty()) {
+        qWarning() << "Clip has no file path:" << clipId;
+        return;
+    }
+
+    // Get or assign a slot for this clip
+    int slotId = getOrAssignSlot(clipId);
+
+    // Load the clip if not already loaded
+    std::string filePath = clip->filePath.toStdString();
+    if (!m_audioEngine->loadClip(slotId, filePath)) {
+        qWarning() << "Failed to load clip:" << clip->filePath;
+        return;
+    }
+
+    // Play the clip
+    m_audioEngine->playClip(slotId);
+
+    // Update state
+    clip->isPlaying = true;
+    emit activeClipsChanged();
+    emit clipPlaybackStarted(clipId);
+
+    qDebug() << "Playing clip" << clipId << "in slot" << slotId << ":" << clip->filePath;
+}
+
+void SoundboardService::stopClip(int clipId)
+{
+    if (!m_audioEngine) {
+        return;
+    }
+
+    // Check if this clip has a slot assigned
+    if (!m_clipIdToSlot.contains(clipId)) {
+        return;
+    }
+
+    int slotId = m_clipIdToSlot[clipId];
+    m_audioEngine->stopClip(slotId);
+
+    // Update state
+    Clip* clip = findActiveClipById(clipId);
+    if (clip) {
+        clip->isPlaying = false;
+        emit activeClipsChanged();
+    }
+
+    emit clipPlaybackStopped(clipId);
+    qDebug() << "Stopped clip" << clipId << "in slot" << slotId;
+}
+
+void SoundboardService::stopAllClips()
+{
+    if (!m_audioEngine) {
+        return;
+    }
+
+    for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it) {
+        m_audioEngine->stopClip(it.value());
+
+        Clip* clip = findActiveClipById(it.key());
+        if (clip) {
+            clip->isPlaying = false;
+        }
+    }
+
+    emit activeClipsChanged();
+    qDebug() << "Stopped all clips";
+}
+
+bool SoundboardService::isClipPlaying(int clipId) const
+{
+    if (!m_audioEngine) {
+        return false;
+    }
+
+    if (!m_clipIdToSlot.contains(clipId)) {
+        return false;
+    }
+
+    int slotId = m_clipIdToSlot[clipId];
+    return m_audioEngine->isClipPlaying(slotId);
+}
+
+int SoundboardService::getOrAssignSlot(int clipId)
+{
+    // Check if clip already has a slot
+    if (m_clipIdToSlot.contains(clipId)) {
+        return m_clipIdToSlot[clipId];
+    }
+
+    // Assign a new slot (wrap around if we exceed MAX_CLIPS)
+    int slotId = m_nextSlot % 16; // MAX_CLIPS is 16
+    m_clipIdToSlot[clipId] = slotId;
+    m_nextSlot++;
+
+    return slotId;
+}
+
+// ============================================================================
+// AUDIO DEVICE SELECTION
+// ============================================================================
+
+QVariantList SoundboardService::getInputDevices() const
+{
+    QVariantList result;
+    if (!m_audioEngine) {
+        return result;
+    }
+
+    auto devices = m_audioEngine->enumerateCaptureDevices();
+    for (const auto& device : devices) {
+        QVariantMap deviceMap;
+        deviceMap["id"] = QString::fromStdString(device.id);
+        deviceMap["name"] = QString::fromStdString(device.name);
+        deviceMap["isDefault"] = device.isDefault;
+        result.append(deviceMap);
+    }
+    return result;
+}
+
+QVariantList SoundboardService::getOutputDevices() const
+{
+    QVariantList result;
+    if (!m_audioEngine) {
+        return result;
+    }
+
+    auto devices = m_audioEngine->enumeratePlaybackDevices();
+    for (const auto& device : devices) {
+        QVariantMap deviceMap;
+        deviceMap["id"] = QString::fromStdString(device.id);
+        deviceMap["name"] = QString::fromStdString(device.name);
+        deviceMap["isDefault"] = device.isDefault;
+        result.append(deviceMap);
+    }
+    return result;
+}
+
+bool SoundboardService::setInputDevice(const QString& deviceId)
+{
+    if (!m_audioEngine) {
+        qWarning() << "AudioEngine not initialized";
+        return false;
+    }
+
+    bool success = m_audioEngine->setCaptureDevice(deviceId.toStdString());
+    if (success) {
+        qDebug() << "Input device set to:" << deviceId;
+    } else {
+        qWarning() << "Failed to set input device:" << deviceId;
+    }
+    return success;
+}
+
+bool SoundboardService::setOutputDevice(const QString& deviceId)
+{
+    if (!m_audioEngine) {
+        qWarning() << "AudioEngine not initialized";
+        return false;
+    }
+
+    bool success = m_audioEngine->setPlaybackDevice(deviceId.toStdString());
+    if (success) {
+        qDebug() << "Output device set to:" << deviceId;
+    } else {
+        qWarning() << "Failed to set output device:" << deviceId;
+    }
+    return success;
 }

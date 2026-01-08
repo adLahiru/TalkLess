@@ -296,15 +296,36 @@ void AudioEngine::decoderThreadFunc(ClipSlot* slot, int slotId)
             }
         }
 
-        void* pWrite = nullptr;
-        ma_uint32 framesToWrite = static_cast<ma_uint32>(framesRead);
-        if (ma_pcm_rb_acquire_write(&slot->ringBuffer, &framesToWrite, &pWrite) == MA_SUCCESS && framesToWrite > 0) {
-            std::memcpy(pWrite, decodeBuffer, framesToWrite * 2 * sizeof(float));
-            ma_pcm_rb_commit_write(&slot->ringBuffer, framesToWrite);
-            framesWritten += static_cast<int>(framesToWrite);
-            if (framesWritten < 5000) {
-                std::cout << "[Decoder " << slotId << "] Wrote " << framesToWrite << " frames to ring buffer"
-                          << std::endl;
+        // Write to ring buffer with back-pressure (wait if buffer is full)
+        ma_uint32 framesRemaining = static_cast<ma_uint32>(framesRead);
+        float* pReadCursor = decodeBuffer;
+
+        while (framesRemaining > 0) {
+            // Check for stop request
+            if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping) {
+                break;
+            }
+
+            void* pWrite = nullptr;
+            ma_uint32 framesToWrite = framesRemaining;
+
+            ma_result result = ma_pcm_rb_acquire_write(&slot->ringBuffer, &framesToWrite, &pWrite);
+
+            if (result == MA_SUCCESS && framesToWrite > 0) {
+                std::memcpy(pWrite, pReadCursor, framesToWrite * 2 * sizeof(float));
+                ma_pcm_rb_commit_write(&slot->ringBuffer, framesToWrite);
+
+                pReadCursor += framesToWrite * 2; // Advance by samples (frames * 2 channels)
+                framesRemaining -= framesToWrite;
+                framesWritten += static_cast<int>(framesToWrite);
+
+                if (framesWritten < 5000) {
+                    std::cout << "[Decoder " << slotId << "] Wrote " << framesToWrite << " frames to ring buffer"
+                              << std::endl;
+                }
+            } else {
+                // Ring buffer is full, wait a bit and retry
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
         }
     }

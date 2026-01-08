@@ -1,11 +1,12 @@
 #pragma once
 
-#include <QString>
-#include <optional>
+#include "models/AppState.h"
+#include "models/clip.h"       // your Clip
+#include "models/soundboard.h" // your Soundboard (contains QVector<Clip>)
 
-#include "models/appState.h"
-#include "models/soundboard.h"   // your Soundboard (contains QVector<Clip>)
-#include "models/clip.h"         // your Clip
+#include <QString>
+
+#include <optional>
 
 class StorageRepository
 {
@@ -21,16 +22,16 @@ public:
 
     // ---- board_<id>.json ----
     std::optional<Soundboard> loadBoard(int boardId) const;
-    bool saveBoard(const Soundboard& board);     // updates index.json name + clipCount too
+    bool saveBoard(const Soundboard& board); // updates index.json name + clipCount too
 
     // ---- helpers ----
-    int createBoard(const QString& name);        // creates board file and updates index
-    bool deleteBoard(int boardId);               // deletes board file and updates index
+    int createBoard(const QString& name); // creates board file and updates index
+    bool deleteBoard(int boardId);        // deletes board file and updates index
 
 private:
-    QString baseDir() const;        // AppDataLocation/TalkLess/soundboards
-    QString indexPath() const;      // .../index.json
-    QString boardsDir() const;      // .../boards
+    QString baseDir() const;              // AppDataLocation/TalkLess/soundboards
+    QString indexPath() const;            // .../index.json
+    QString boardsDir() const;            // .../boards
     QString boardPath(int boardId) const; // .../boards/board_<id>.json
 
     bool ensureDirs() const;

@@ -1,7 +1,8 @@
 #pragma once
-#include <QVector>
-#include "appSettings.h"
+#include "AppSettings.h"
 #include "soundboardInfo.h"
+
+#include <QVector>
 
 struct AppState
 {

@@ -89,47 +89,29 @@ Rectangle {
                                 font.weight: Font.DemiBold
                             }
 
-                            // Select Input Dropdown
-                            Rectangle {
+                            // Select Input Dropdown - using DropdownSelector
+                            DropdownSelector {
+                                id: inputDeviceDropdown
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 50
-                                color: "#2A2A2A"
-                                radius: 12
-                                border.width: 1
-                                border.color: "#3A3A3A"
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 16
-                                    anchors.rightMargin: 16
-                                    spacing: 12
-
-                                    // Mic icon
-                                    Text {
-                                        text: "🎤"
-                                        font.pixelSize: 18
-                                    }
-
-                                    Text {
-                                        text: "Select Input"
-                                        color: "#AAAAAA"
-                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                        font.pixelSize: 15
-                                        Layout.fillWidth: true
-                                    }
-
-                                    // Dropdown arrow
-                                    Text {
-                                        text: "▼"
-                                        color: "#666666"
-                                        font.pixelSize: 12
+                                icon: "🎤"
+                                placeholder: "Select Input Device"
+                                model: soundboardService.getInputDevices()
+                                
+                                Component.onCompleted: {
+                                    // Set default device if available
+                                    var devices = soundboardService.getInputDevices()
+                                    for (var i = 0; i < devices.length; i++) {
+                                        if (devices[i].isDefault) {
+                                            selectedId = devices[i].id
+                                            selectedValue = devices[i].name
+                                            break
+                                        }
                                     }
                                 }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: console.log("Select input clicked")
+                                
+                                onItemSelected: function(id, name) {
+                                    console.log("Input device selected:", name, "(id:", id, ")")
+                                    soundboardService.setInputDevice(id)
                                 }
                             }
 
@@ -686,10 +668,27 @@ Rectangle {
                                     Layout.preferredWidth: 110
                                 }
 
-                                ComboBox {
-                                    Layout.preferredWidth: 220
-                                    model: ["Select", "Microphone 1", "Microphone 2"]
-                                    currentIndex: 0
+                                DropdownSelector {
+                                    id: micInputDropdown
+                                    Layout.preferredWidth: 280
+                                    placeholder: "Select Input Device"
+                                    model: soundboardService.getInputDevices()
+                                    
+                                    Component.onCompleted: {
+                                        var devices = soundboardService.getInputDevices()
+                                        for (var i = 0; i < devices.length; i++) {
+                                            if (devices[i].isDefault) {
+                                                selectedId = devices[i].id
+                                                selectedValue = devices[i].name
+                                                break
+                                            }
+                                        }
+                                    }
+                                    
+                                    onItemSelected: function(id, name) {
+                                        console.log("Mic input selected:", name)
+                                        soundboardService.setInputDevice(id)
+                                    }
                                 }
 
                                 DotMeter {
@@ -712,10 +711,27 @@ Rectangle {
                                     Layout.preferredWidth: 110
                                 }
 
-                                ComboBox {
-                                    Layout.preferredWidth: 220
-                                    model: ["Select", "Speakers", "Headphones"]
-                                    currentIndex: 0
+                                DropdownSelector {
+                                    id: speakerOutputDropdown
+                                    Layout.preferredWidth: 280
+                                    placeholder: "Select Output Device"
+                                    model: soundboardService.getOutputDevices()
+                                    
+                                    Component.onCompleted: {
+                                        var devices = soundboardService.getOutputDevices()
+                                        for (var i = 0; i < devices.length; i++) {
+                                            if (devices[i].isDefault) {
+                                                selectedId = devices[i].id
+                                                selectedValue = devices[i].name
+                                                break
+                                            }
+                                        }
+                                    }
+                                    
+                                    onItemSelected: function(id, name) {
+                                        console.log("Speaker output selected:", name)
+                                        soundboardService.setOutputDevice(id)
+                                    }
                                 }
 
                                 DotMeter {
