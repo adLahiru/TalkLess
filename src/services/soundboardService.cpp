@@ -32,7 +32,15 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
     if (idToActivate >= 0)
         activate(idToActivate);
 
-    // 4) Notify UI
+    // 4) Apply saved audio settings
+    if (m_audioEngine) {
+        m_audioEngine->setMasterGainDB(static_cast<float>(m_state.settings.masterGainDb));
+        m_audioEngine->setMicGainDB(static_cast<float>(m_state.settings.micGainDb));
+        qDebug() << "Applied saved audio settings - Master:" << m_state.settings.masterGainDb 
+                 << "dB, Mic:" << m_state.settings.micGainDb << "dB";
+    }
+
+    // 5) Notify UI
     emit boardsChanged();
     emit activeBoardChanged();
     emit activeClipsChanged();
@@ -70,6 +78,12 @@ void SoundboardService::setMasterGainDb(double db)
 {
     m_state.settings.masterGainDb = db;
     m_repo.saveIndex(m_state);
+    
+    // Apply to audio engine
+    if (m_audioEngine) {
+        m_audioEngine->setMasterGainDB(static_cast<float>(db));
+    }
+    
     emit settingsChanged();
 }
 
@@ -77,6 +91,12 @@ void SoundboardService::setMicGainDb(double db)
 {
     m_state.settings.micGainDb = db;
     m_repo.saveIndex(m_state);
+    
+    // Apply to audio engine
+    if (m_audioEngine) {
+        m_audioEngine->setMicGainDB(static_cast<float>(db));
+    }
+    
     emit settingsChanged();
 }
 
@@ -681,3 +701,99 @@ bool SoundboardService::setMonitorOutputDevice(const QString& deviceId)
     return success;
 }
 
+// ============================================================================
+// AUDIO LEVEL MONITORING
+// ============================================================================
+
+float SoundboardService::getMicPeakLevel() const
+{
+    if (!m_audioEngine) {
+        return 0.0f;
+    }
+    return m_audioEngine->getMicPeakLevel();
+}
+
+float SoundboardService::getMasterPeakLevel() const
+{
+    if (!m_audioEngine) {
+        return 0.0f;
+    }
+    return m_audioEngine->getMasterPeakLevel();
+}
+
+void SoundboardService::resetPeakLevels()
+{
+    if (m_audioEngine) {
+        m_audioEngine->resetPeakLevels();
+    }
+}
+
+// ============================================================================
+// MIXER CONTROLS
+// ============================================================================
+
+void SoundboardService::setMicSoundboardBalance(float balance)
+{
+    if (!m_audioEngine) {
+        return;
+    }
+    
+    // Clamp balance to 0.0-1.0 range
+    balance = std::max(0.0f, std::min(1.0f, balance));
+    
+    // Balance affects mic and clip gains inversely
+    // At balance = 0.0: mic = 100%, clips = 0%
+    // At balance = 0.5: mic = 100%, clips = 100% (both full)
+    // At balance = 1.0: mic = 0%, clips = 100%
+    
+    // Use a crossfade curve: mic reduces as balance goes up, clips are always at balance level
+    float micMultiplier = 1.0f - balance;  // 1.0 at 0, 0.0 at 1.0
+    
+    // Apply the mic gain based on balance
+    // We'll use a linear mix for now - mic fades out as balance increases
+    m_audioEngine->setMicSoundboardBalance(balance);
+    
+    qDebug() << "Mic/Soundboard balance set to:" << balance;
+}
+
+float SoundboardService::getMicSoundboardBalance() const
+{
+    if (!m_audioEngine) {
+        return 0.5f;  // Default to center
+    }
+    return m_audioEngine->getMicSoundboardBalance();
+}
+
+void SoundboardService::setMicPassthroughEnabled(bool enabled)
+{
+    if (!m_audioEngine) {
+        return;
+    }
+    m_audioEngine->setMicPassthroughEnabled(enabled);
+    qDebug() << "Mic passthrough" << (enabled ? "enabled" : "disabled");
+}
+
+bool SoundboardService::isMicPassthroughEnabled() const
+{
+    if (!m_audioEngine) {
+        return true;
+    }
+    return m_audioEngine->isMicPassthroughEnabled();
+}
+
+void SoundboardService::setMicEnabled(bool enabled)
+{
+    if (!m_audioEngine) {
+        return;
+    }
+    m_audioEngine->setMicEnabled(enabled);
+    qDebug() << "Mic enabled:" << enabled;
+}
+
+bool SoundboardService::isMicEnabled() const
+{
+    if (!m_audioEngine) {
+        return true;
+    }
+    return m_audioEngine->isMicEnabled();
+}

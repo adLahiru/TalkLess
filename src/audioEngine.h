@@ -94,6 +94,18 @@ public:
     float getMicPeakLevel() const;
     float getMasterPeakLevel() const;
     void resetPeakLevels();
+    
+           // Mic control
+    void setMicEnabled(bool enabled);
+    bool isMicEnabled() const;
+
+    // Mic passthrough control
+    void setMicPassthroughEnabled(bool enabled);
+    bool isMicPassthroughEnabled() const;
+    
+    // Mic/Soundboard balance control
+    void setMicSoundboardBalance(float balance);  // 0.0 = full mic, 1.0 = full soundboard
+    float getMicSoundboardBalance() const;
 
            // Event callbacks
     void setClipFinishedCallback(ClipFinishedCallback callback);
@@ -171,6 +183,11 @@ private:
            // Peak monitoring
     std::atomic<float> micPeakLevel{0.0f};
     std::atomic<float> masterPeakLevel{0.0f};
+    
+    // Mic control
+    std::atomic<bool> micEnabled{true};
+    std::atomic<bool> micPassthroughEnabled{true};
+    std::atomic<float> micBalance{0.5f}; // 0.0 = full mic, 1.0 = full soundboard
 
            // Callbacks
     std::mutex callbackMutex;

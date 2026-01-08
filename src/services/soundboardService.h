@@ -67,6 +67,19 @@ public:
     Q_INVOKABLE bool setOutputDevice(const QString& deviceId);
     Q_INVOKABLE bool setMonitorOutputDevice(const QString& deviceId);
 
+    // ---- Audio Level Monitoring ----
+    Q_INVOKABLE float getMicPeakLevel() const;
+    Q_INVOKABLE float getMasterPeakLevel() const;
+    Q_INVOKABLE void resetPeakLevels();
+
+    // ---- Mixer Controls ----
+    Q_INVOKABLE void setMicSoundboardBalance(float balance);  // 0.0 = full mic, 1.0 = full soundboard
+    Q_INVOKABLE float getMicSoundboardBalance() const;
+    Q_INVOKABLE void setMicPassthroughEnabled(bool enabled);  // Enable/disable mic in output
+    Q_INVOKABLE bool isMicPassthroughEnabled() const;
+    Q_INVOKABLE void setMicEnabled(bool enabled);             // Enable/disable capture
+    Q_INVOKABLE bool isMicEnabled() const;
+
     // ---- Hotkey (active only) ----
     int findActiveClipIdByHotkey(const QString& hotkey) const;
 

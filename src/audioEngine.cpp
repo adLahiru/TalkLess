@@ -79,27 +79,47 @@ void AudioEngine::processAudio(void* output,
     const auto* mic = static_cast<const float*>(input);
 
     const float currentMicGain = micGain.load(std::memory_order_relaxed);
+    const float currentBalance = micBalance.load(std::memory_order_relaxed);
+    
+    // Calculate factors: 0.0 = full mic, 1.0 = full soundboard. 0.5 = full both.
+    const float micFactor = std::min(1.0f, (1.0f - currentBalance) * 2.0f);
+    const float clipFactor = std::min(1.0f, currentBalance * 2.0f);
 
     const ma_uint32 totalOutputSamples = frameCount * playbackChannels;
     for (ma_uint32 i = 0; i < totalOutputSamples; ++i) out[i] = 0.0f;
 
-           // Mic peak + recording capture (mic is NOT routed to output)
+    // Mic processing: peak monitoring, recording, and passthrough to output
     float micPeak = 0.0f;
-    if (mic && captureChannels > 0) {
+    const bool passthroughEnabled = micPassthroughEnabled.load(std::memory_order_relaxed);
+    const bool enabled = micEnabled.load(std::memory_order_relaxed);
+    
+    if (mic && captureChannels > 0 && enabled) {
         for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
+            // Calculate mono sample from all capture channels
             float monoSample = 0.0f;
             for (ma_uint32 ch = 0; ch < captureChannels; ++ch) {
                 monoSample += mic[frame * captureChannels + ch];
             }
             monoSample = (monoSample / static_cast<float>(captureChannels)) * currentMicGain;
 
+            // Peak level tracking
             float absSample = std::abs(monoSample);
             if (absSample > micPeak) micPeak = absSample;
+            
+            // Route mic to output if passthrough is enabled
+            if (passthroughEnabled) {
+                ma_uint32 outIdx = frame * playbackChannels;
+                for (ma_uint32 ch = 0; ch < playbackChannels && (outIdx + ch) < totalOutputSamples; ++ch) {
+                    out[outIdx + ch] += monoSample * micFactor;
+                }
+            }
         }
 
+        // Update peak level
         float currentPeak = micPeakLevel.load(std::memory_order_relaxed);
         if (micPeak > currentPeak) micPeakLevel.store(micPeak, std::memory_order_relaxed);
 
+        // Recording capture
         if (recording.load(std::memory_order_relaxed)) {
             std::lock_guard<std::mutex> lock(recordingMutex);
             for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
@@ -116,12 +136,13 @@ void AudioEngine::processAudio(void* output,
         }
     }
 
-           // Mix clips from MAIN ring buffers
+    // Mix clips from MAIN ring buffers
     for (int slotId = 0; slotId < MAX_CLIPS; ++slotId) {
         ClipSlot& slot = clips[slotId];
         if (slot.state.load(std::memory_order_relaxed) != ClipState::Playing) continue;
 
         const float clipGain = slot.gain.load(std::memory_order_relaxed);
+        const float finalClipGain = clipGain * clipFactor;
 
         void* pReadBuffer = nullptr;
         ma_uint32 availableFrames = frameCount;
@@ -130,19 +151,19 @@ void AudioEngine::processAudio(void* output,
         if (result == MA_SUCCESS && availableFrames > 0 && pReadBuffer) {
             auto* clipSamples = static_cast<float*>(pReadBuffer);
 
-                   // ring buffer stereo (2ch)
+            // ring buffer stereo (2ch)
             if (playbackChannels == 2) {
                 for (ma_uint32 frame = 0; frame < availableFrames; ++frame) {
                     const ma_uint32 outIdx = frame * 2;
                     if (outIdx + 1 < totalOutputSamples) {
-                        out[outIdx]     += clipSamples[frame * 2]     * clipGain;
-                        out[outIdx + 1] += clipSamples[frame * 2 + 1] * clipGain;
+                        out[outIdx]     += clipSamples[frame * 2]     * finalClipGain;
+                        out[outIdx + 1] += clipSamples[frame * 2 + 1] * finalClipGain;
                     }
                 }
             } else {
                 for (ma_uint32 frame = 0; frame < availableFrames; ++frame) {
-                    float left  = clipSamples[frame * 2]     * clipGain;
-                    float right = clipSamples[frame * 2 + 1] * clipGain;
+                    float left  = clipSamples[frame * 2]     * finalClipGain;
+                    float right = clipSamples[frame * 2 + 1] * finalClipGain;
                     float mono  = (left + right) * 0.5f;
 
                     ma_uint32 outIdx = frame * playbackChannels;
@@ -545,6 +566,36 @@ void AudioEngine::resetPeakLevels()
     masterPeakLevel.store(0.0f, std::memory_order_relaxed);
 }
 
+void AudioEngine::setMicEnabled(bool enabled)
+{
+    micEnabled.store(enabled, std::memory_order_relaxed);
+}
+
+bool AudioEngine::isMicEnabled() const
+{
+    return micEnabled.load(std::memory_order_relaxed);
+}
+
+void AudioEngine::setMicPassthroughEnabled(bool enabled)
+{
+    micPassthroughEnabled.store(enabled, std::memory_order_relaxed);
+}
+
+bool AudioEngine::isMicPassthroughEnabled() const
+{
+    return micPassthroughEnabled.load(std::memory_order_relaxed);
+}
+
+void AudioEngine::setMicSoundboardBalance(float balance)
+{
+    micBalance.store(balance, std::memory_order_relaxed);
+}
+
+float AudioEngine::getMicSoundboardBalance() const
+{
+    return micBalance.load(std::memory_order_relaxed);
+}
+
 // ============================================================================
 // CALLBACK SETTERS
 // ============================================================================
@@ -580,29 +631,75 @@ bool AudioEngine::initContext()
 
 bool AudioEngine::initDevice()
 {
-    if (device) return true;
-    if (!initContext()) return false;
-
-    device = new ma_device();
-
-    ma_device_config config = ma_device_config_init(ma_device_type_duplex);
-    config.playback.format = ma_format_f32;
-    config.playback.channels = 2;
-    config.capture.format = ma_format_f32;
-    config.capture.channels = 2;
-    config.sampleRate = 48000;
-    config.dataCallback = AudioEngine::audioCallback;
-    config.pUserData = this;
-
-    applyDeviceSelection(config);
-
-    if (ma_device_init(context, &config, device) != MA_SUCCESS) {
-        delete device;
-        device = nullptr;
+    qDebug() << "AudioEngine::initDevice called";
+    
+    if (device) {
+        qDebug() << "Device already exists, reusing";
+        return true;
+    }
+    if (!initContext()) {
+        qWarning() << "Failed to initialize context";
         return false;
     }
 
-    return true;
+    device = new ma_device();
+
+    // Try multiple configurations in order of preference
+    struct DeviceConfig {
+        ma_format captureFormat;
+        ma_uint32 captureChannels;
+        ma_uint32 sampleRate;
+        const char* description;
+    };
+    
+    // Configuration attempts - from most specific to most flexible
+    DeviceConfig configs[] = {
+        { ma_format_f32, 2, 48000, "48kHz stereo f32" },
+        { ma_format_f32, 1, 48000, "48kHz mono f32" },
+        { ma_format_f32, 2, 44100, "44.1kHz stereo f32" },
+        { ma_format_f32, 1, 44100, "44.1kHz mono f32" },
+        { ma_format_s16, 2, 48000, "48kHz stereo s16" },
+        { ma_format_s16, 1, 48000, "48kHz mono s16" },
+        { ma_format_s16, 2, 44100, "44.1kHz stereo s16" },
+        { ma_format_s16, 1, 44100, "44.1kHz mono s16" },
+        { ma_format_unknown, 0, 0, "auto-detect all" },  // Let miniaudio pick everything
+    };
+    
+    ma_result result = MA_ERROR;
+    
+    for (const auto& cfg : configs) {
+        ma_device_config config = ma_device_config_init(ma_device_type_duplex);
+        config.playback.format = ma_format_f32;
+        config.playback.channels = 2;
+        config.capture.format = cfg.captureFormat;
+        config.capture.channels = cfg.captureChannels;
+        config.sampleRate = cfg.sampleRate;
+        config.dataCallback = AudioEngine::audioCallback;
+        config.pUserData = this;
+
+        applyDeviceSelection(config);
+        
+        qDebug() << "Trying device config:" << cfg.description;
+
+        result = ma_device_init(context, &config, device);
+        if (result == MA_SUCCESS) {
+            qDebug() << "ma_device_init succeeded with config:" << cfg.description;
+            qDebug() << "  Playback device:" << device->playback.name;
+            qDebug() << "  Capture device:" << device->capture.name;
+            qDebug() << "  Sample rate:" << device->sampleRate;
+            qDebug() << "  Capture channels:" << device->capture.channels;
+            qDebug() << "  Capture format:" << device->capture.format;
+            return true;
+        }
+        
+        qDebug() << "  Failed with result:" << result;
+    }
+    
+    // All configurations failed
+    qWarning() << "All device configurations failed! Last error:" << result;
+    delete device;
+    device = nullptr;
+    return false;
 }
 
 bool AudioEngine::startAudioDevice()
@@ -639,25 +736,42 @@ bool AudioEngine::applyDeviceSelection(ma_device_config& config)
 
 bool AudioEngine::reinitializeDevice(bool restart)
 {
+    qDebug() << "AudioEngine::reinitializeDevice called, restart:" << restart;
+    
     static std::mutex reinitMutex;
     std::lock_guard<std::mutex> lock(reinitMutex);
 
     bool wasRunning = deviceRunning.load(std::memory_order_acquire);
+    qDebug() << "Device was running:" << wasRunning;
 
     if (wasRunning) {
+        qDebug() << "Stopping audio device...";
         stopAudioDevice();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     if (device) {
+        qDebug() << "Uninitializing existing device...";
         ma_device_uninit(device);
         delete device;
         device = nullptr;
     }
 
-    if (!initDevice()) return false;
+    qDebug() << "Initializing new device with capture device set:" << selectedCaptureSet
+             << "playback device set:" << selectedPlaybackSet;
+    
+    if (!initDevice()) {
+        qWarning() << "Failed to initialize device!";
+        return false;
+    }
+    
+    qDebug() << "Device initialized successfully";
 
-    if (restart || wasRunning) return startAudioDevice();
+    if (restart || wasRunning) {
+        bool started = startAudioDevice();
+        qDebug() << "Started audio device:" << started;
+        return started;
+    }
     return true;
 }
 
@@ -780,7 +894,7 @@ std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumeratePlaybackDevices(
     for (ma_uint32 i = 0; i < playbackCount; ++i) {
         AudioDeviceInfo info;
         info.name = std::string(pPlaybackInfos[i].name);
-        info.id = std::to_string(i);
+        info.id = info.name;  // Use name as ID for stable identification
         info.isDefault = pPlaybackInfos[i].isDefault;
         info.deviceId = pPlaybackInfos[i].id;
         devices.push_back(info);
@@ -806,7 +920,7 @@ std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumerateCaptureDevices()
     for (ma_uint32 i = 0; i < captureCount; ++i) {
         AudioDeviceInfo info;
         info.name = std::string(pCaptureInfos[i].name);
-        info.id = std::to_string(i);
+        info.id = info.name;  // Use name as ID for stable identification
         info.isDefault = pCaptureInfos[i].isDefault;
         info.deviceId = pCaptureInfos[i].id;
         devices.push_back(info);
@@ -831,15 +945,28 @@ bool AudioEngine::setPlaybackDevice(const std::string& deviceId)
 
 bool AudioEngine::setCaptureDevice(const std::string& deviceId)
 {
+    qDebug() << "AudioEngine::setCaptureDevice called with deviceId:" << QString::fromStdString(deviceId);
+    
     auto devices = enumerateCaptureDevices();
+    qDebug() << "Found" << devices.size() << "capture devices:";
+    for (const auto& dev : devices) {
+        qDebug() << "  Device id:" << QString::fromStdString(dev.id)
+                 << "name:" << QString::fromStdString(dev.name)
+                 << "isDefault:" << dev.isDefault;
+    }
+    
     for (const auto& dev : devices) {
         if (dev.id == deviceId || dev.name == deviceId) {
+            qDebug() << "Found matching device:" << QString::fromStdString(dev.name);
             selectedCaptureDeviceId = dev.id;
             selectedCaptureDeviceIdStruct = dev.deviceId;
             selectedCaptureSet = true;
-            return reinitializeDevice(true);
+            bool result = reinitializeDevice(true);
+            qDebug() << "reinitializeDevice result:" << result;
+            return result;
         }
     }
+    qWarning() << "Capture device not found with id:" << QString::fromStdString(deviceId);
     return false;
 }
 

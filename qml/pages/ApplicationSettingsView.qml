@@ -12,6 +12,24 @@ Rectangle {
     // Properties for dynamic banner text
     property string bannerMainText: "Microphone Control & Mixer"
     property string bannerSecondaryText: "Manage and trigger your sound clips"
+    
+    // Audio level properties
+    property real micPeakLevel: 0.0
+    property real masterPeakLevel: 0.0
+    
+    // Timer to update audio levels
+    Timer {
+        id: levelUpdateTimer
+        interval: 50  // Update 20 times per second
+        running: true
+        repeat: true
+        onTriggered: {
+            root.micPeakLevel = soundboardService.getMicPeakLevel()
+            root.masterPeakLevel = soundboardService.getMasterPeakLevel()
+            // Reset peak levels for next measurement
+            soundboardService.resetPeakLevels()
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -128,7 +146,8 @@ Rectangle {
                                     radius: 14
                                     color: alwaysOnToggle.isOn ? "#22C55E" : "#3A3A3A"
 
-                                    property bool isOn: true
+                                    property bool isOn: soundboardService.isMicEnabled()
+                                    onIsOnChanged: soundboardService.setMicEnabled(isOn)
 
                                     Rectangle {
                                         width: 22
@@ -159,26 +178,6 @@ Rectangle {
                                     color: "#FFFFFF"
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 15
-                                }
-                            }
-
-                            // Live Mic Volume Meter
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 10
-
-                                Text {
-                                    text: "Live Mic Volume Meter"
-                                    color: "#FFFFFF"
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 15
-                                }
-
-                                // Volume bar - using VolumeMeterSlider component
-                                VolumeMeterSlider {
-                                    Layout.fillWidth: true
-                                    value: 0.45
-                                    dbValue: -15
                                 }
                             }
 
@@ -246,9 +245,6 @@ Rectangle {
                                     spacing: 20
 
                                     // Label aligned with slider bar
-                                    // TriangleSlider bar center is vertically centered in 92px height
-                                    // But visually the bar is at center.
-                                    // Text needs to be vertically centered in the RowLayout to match the centered bar.
                                     Text {
                                         text: "Mic Level:"
                                         color: "#FFFFFF"
@@ -257,14 +253,18 @@ Rectangle {
                                         Layout.alignment: Qt.AlignVCenter
                                     }
 
-                                    // TriangleSlider - bar is vertically centered
+                                    // TriangleSlider - connected to backend
                                     TriangleSlider {
+                                        id: micLevelSlider
                                         Layout.fillWidth: true
-                                        // Internal labels removed, just values
                                         from: -60
                                         to: 0
-                                        value: -16
+                                        value: soundboardService.micGainDb()
                                         unit: "dB"
+                                        
+                                        onSliderMoved: function(newValue) {
+                                            soundboardService.setMicGainDb(newValue)
+                                        }
                                     }
                                 }
 
@@ -275,10 +275,14 @@ Rectangle {
                                 }
                             }
 
-                            // Leveling Intensity - label and squares on same line
+                            // Leveling Intensity - linked to mic peak level
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 4
+                                
+                                // Calculate how many squares should be lit based on mic peak (0.0-1.0)
+                                // We use 12 squares, so multiply peak by 12
+                                property int activeSquares: Math.min(12, Math.floor(root.micPeakLevel * 12))
 
                                 // Label and squares on same row
                                 RowLayout {
@@ -287,7 +291,7 @@ Rectangle {
 
                                     // Label aligned with squares
                                     Text {
-                                        text: "Leveling Intensity:"
+                                        text: "Mic Level Meter:"
                                         color: "#FFFFFF"
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 14
@@ -311,10 +315,23 @@ Rectangle {
                                                     width: 13
                                                     height: 13
                                                     radius: 0
-                                                    // Green for active (intensity), gray for inactive
-                                                    color: index < 5 ? "#22C55E" : "#AAAAAA"
+                                                    // Color based on position and mic level
+                                                    // Green for active (mic peak), gray for inactive
+                                                    // Last 2 squares turn red when clipping (near max)
+                                                    color: {
+                                                        if (index < parent.parent.parent.parent.activeSquares) {
+                                                            if (index >= 10) return "#EF4444"  // Red for clipping
+                                                            if (index >= 8) return "#F59E0B"   // Orange/yellow for high
+                                                            return "#22C55E"  // Green for normal
+                                                        }
+                                                        return "#3A3A3A"  // Dark gray for inactive
+                                                    }
                                                     
                                                     required property int index
+                                                    
+                                                    Behavior on color {
+                                                        ColorAnimation { duration: 50 }
+                                                    }
                                                 }
                                             }
                                         }
@@ -342,7 +359,7 @@ Rectangle {
                                 }
 
                                 Text {
-                                    text: "Controls how aggressively volume leveling is applied"
+                                    text: "Shows real-time microphone input level"
                                     color: "#666666"
                                     font.pixelSize: 12
                                 }
@@ -368,7 +385,8 @@ Rectangle {
                                     radius: 14
                                     color: outputToggle.isOn ? "#22C55E" : "#FFFFFF"
 
-                                    property bool isOn: true
+                                    property bool isOn: soundboardService.isMicPassthroughEnabled()
+                                    onIsOnChanged: soundboardService.setMicPassthroughEnabled(isOn)
 
                                     Rectangle {
                                         width: 22
@@ -421,7 +439,8 @@ Rectangle {
                                     Layout.fillWidth: true
                                     leftLabel: "0% mic"
                                     rightLabel: "100% soundboard"
-                                    value: 0.5
+                                    value: soundboardService.getMicSoundboardBalance()
+                                    onBalanceChanged: (newValue) => soundboardService.setMicSoundboardBalance(newValue)
                                 }
 
                                 Text {
@@ -656,48 +675,48 @@ Rectangle {
                             anchors.margins: 22
                             spacing: 22
 
-                            // ---- Row 1: Mic Input ----
-                            RowLayout {
-                                spacing: 18
-                                Layout.fillWidth: true
+                            // // ---- Row 1: Mic Input ----
+                            // RowLayout {
+                            //     spacing: 18
+                            //     Layout.fillWidth: true
 
-                                Label {
-                                    text: "Mic Input:"
-                                    color: "#EDEDED"
-                                    font.pixelSize: 14
-                                    Layout.preferredWidth: 110
-                                }
+                            //     Label {
+                            //         text: "Mic Input:"
+                            //         color: "#EDEDED"
+                            //         font.pixelSize: 14
+                            //         Layout.preferredWidth: 110
+                            //     }
 
-                                DropdownSelector {
-                                    id: micInputDropdown
-                                    Layout.preferredWidth: 280
-                                    placeholder: "Select Input Device"
-                                    model: soundboardService.getInputDevices()
+                            //     DropdownSelector {
+                            //         id: micInputDropdown
+                            //         Layout.preferredWidth: 280
+                            //         placeholder: "Select Input Device"
+                            //         model: soundboardService.getInputDevices()
                                     
-                                    Component.onCompleted: {
-                                        var devices = soundboardService.getInputDevices()
-                                        for (var i = 0; i < devices.length; i++) {
-                                            if (devices[i].isDefault) {
-                                                selectedId = devices[i].id
-                                                selectedValue = devices[i].name
-                                                break
-                                            }
-                                        }
-                                    }
+                            //         Component.onCompleted: {
+                            //             var devices = soundboardService.getInputDevices()
+                            //             for (var i = 0; i < devices.length; i++) {
+                            //                 if (devices[i].isDefault) {
+                            //                     selectedId = devices[i].id
+                            //                     selectedValue = devices[i].name
+                            //                     break
+                            //                 }
+                            //             }
+                            //         }
                                     
-                                    onItemSelected: function(id, name) {
-                                        console.log("Mic input selected:", name)
-                                        soundboardService.setInputDevice(id)
-                                    }
-                                }
+                            //         onItemSelected: function(id, name) {
+                            //             console.log("Mic input selected:", name)
+                            //             soundboardService.setInputDevice(id)
+                            //         }
+                            //     }
 
-                                DotMeter {
-                                    Layout.leftMargin: 10
-                                    activeDots: 3
-                                }
+                            //     DotMeter {
+                            //         Layout.leftMargin: 10
+                            //         activeDots: 3
+                            //     }
 
-                                Item { Layout.fillWidth: true } // pushes items left
-                            }
+                            //     Item { Layout.fillWidth: true } // pushes items left
+                            // }
 
                             // ---- Row 2: Speaker Output ----
                             RowLayout {
@@ -742,13 +761,13 @@ Rectangle {
                                 Item { Layout.fillWidth: true }
                             }
 
-                            // second output device
+                            // Monitor output device
                             RowLayout {
                                 spacing: 18
                                 Layout.fillWidth: true
 
                                 Label {
-                                    text: "Speaker Output:"
+                                    text: "Monitor Output:"
                                     color: "#EDEDED"
                                     font.pixelSize: 14
                                     Layout.preferredWidth: 110
@@ -791,27 +810,28 @@ Rectangle {
                                 Layout.fillWidth: true
 
                                 Label {
-                                    text: "Global Volume:"
+                                    text: "Master Volume:"
                                     color: "#EDEDED"
                                     font.pixelSize: 14
                                     Layout.preferredWidth: 110
                                 }
 
                                 Item {
-                                    Layout.preferredWidth: 420   // increase this to make slider longer
+                                    Layout.preferredWidth: 420
                                     Layout.preferredHeight: 40
 
                                     Slider {
-                                        id: volumeDbSlider
+                                        id: masterVolumeSlider
                                         anchors.fill: parent
-                                        from: -80
-                                        to: 20
+                                        from: -60
+                                        to: 0
                                         stepSize: 1
-                                        value: linearToDb(gainLinear)
+                                        value: soundboardService.masterGainDb()
 
-                                        onMoved: gainLinear = dbToLinear(value)
+                                        onMoved: {
+                                            soundboardService.setMasterGainDb(value)
+                                        }
 
-                                        // smaller handle + moving text
                                         handle: Rectangle {
                                             width: 10
                                             height: 10
@@ -820,29 +840,27 @@ Rectangle {
                                             border.color: "#2A2A2A"
                                             border.width: 1
 
-                                            x: volumeDbSlider.leftPadding + volumeDbSlider.visualPosition *
-                                               (volumeDbSlider.availableWidth - width)
-                                            y: volumeDbSlider.topPadding + volumeDbSlider.availableHeight / 2 - height / 2
+                                            x: masterVolumeSlider.leftPadding + masterVolumeSlider.visualPosition *
+                                               (masterVolumeSlider.availableWidth - width)
+                                            y: masterVolumeSlider.topPadding + masterVolumeSlider.availableHeight / 2 - height / 2
 
-                                            // TEXT that moves with the handle
                                             Label {
-                                                text: Math.round(volumeDbSlider.value) + " dB"
+                                                text: Math.round(masterVolumeSlider.value) + " dB"
                                                 color: "#EDEDED"
                                                 font.pixelSize: 12
                                                 anchors.horizontalCenter: parent.horizontalCenter
                                                 anchors.bottom: parent.top
                                                 anchors.bottomMargin: 6
 
-                                                // optional: little background so it's readable
                                                 background: Rectangle { color: "#1F1F1F"; radius: 4; opacity: 0.85 }
                                                 padding: 4
                                             }
                                         }
 
                                         background: Rectangle {
-                                            x: volumeDbSlider.leftPadding
-                                            y: volumeDbSlider.topPadding + volumeDbSlider.availableHeight / 2 - height / 2
-                                            width: volumeDbSlider.availableWidth
+                                            x: masterVolumeSlider.leftPadding
+                                            y: masterVolumeSlider.topPadding + masterVolumeSlider.availableHeight / 2 - height / 2
+                                            width: masterVolumeSlider.availableWidth
                                             height: 3
                                             radius: 1
                                             color: "#EDEDED"
