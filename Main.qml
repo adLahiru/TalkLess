@@ -54,6 +54,13 @@ ApplicationWindow {
                             break
                     }
                 }
+
+                // When a soundboard is selected, load its clips
+                onSoundboardSelected: (boardId) => {
+                    console.log("Soundboard selected:", boardId)
+                    clipsModel.boardId = boardId
+                    clipsModel.reload()
+                }
             }
 
             // Main content area - header + pages in column

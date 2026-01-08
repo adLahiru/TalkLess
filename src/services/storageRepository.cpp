@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QFileInfo>
 #include <algorithm>
+#include <QCoreApplication>
 
 // ------------------ JSON helpers ------------------
 
@@ -132,9 +133,24 @@ StorageRepository::StorageRepository()
 
 QString StorageRepository::baseDir() const
 {
-    // .../AppData/Roaming/TalkLess/soundboards  (Windows example)
-    const QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    return QDir(root).filePath("soundboards");
+    QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+
+    // If Qt returns empty (can happen if app name not set early)
+    if (root.isEmpty()) {
+        root = QDir::homePath() + "/.TalkLess"; // fallback
+    }
+
+    // Put your data inside a TalkLess folder (clean + predictable)
+    // This also avoids weird paths when org/app names change.
+    QDir dir(root);
+    dir.mkpath(".");  // ensure root exists
+
+    // Final folder
+    const QString finalPath = dir.filePath("soundboards");
+    QDir(finalPath).mkpath(".");
+    qDebug() << "AppDataLocation =" << QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    qDebug() << "Storage baseDir =" << finalPath;
+    return QDir::cleanPath(finalPath);
 }
 
 QString StorageRepository::indexPath() const

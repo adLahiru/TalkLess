@@ -132,6 +132,25 @@ Clip* SoundboardService::findActiveClipById(int clipId)
     return nullptr;
 }
 
+QVector<Clip> SoundboardService::getActiveClips() const
+{
+    if (!m_active) return {};
+    return m_active->clips;
+}
+
+QVector<Clip> SoundboardService::getClipsForBoard(int boardId) const
+{
+    // If it's the active board, return from memory
+    if (m_active && m_active->id == boardId) {
+        return m_active->clips;
+    }
+
+    // Otherwise load from repository
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded) return {};
+    return loaded->clips;
+}
+
 bool SoundboardService::setClipPlaying(int clipId, bool playing)
 {
     Clip* c = findActiveClipById(clipId);
@@ -247,4 +266,81 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
         return ok;
     }
     return false;
+}
+
+int SoundboardService::createBoard(const QString& name)
+{
+    QString finalName = name.trimmed();
+    if (finalName.isEmpty()) finalName = "New Soundboard";
+
+    // Create board on disk + update index
+    int id = m_repo.createBoard(finalName);
+
+    // Reload index in memory and notify UI
+    m_state = m_repo.loadIndex();
+    emit boardsChanged();
+
+    return id;
+}
+
+
+bool SoundboardService::renameBoard(int boardId, const QString& newName)
+{
+    const QString name = newName.trimmed();
+    if (name.isEmpty())
+        return false;
+
+    // If renaming active board (in memory)
+    if (m_active && m_active->id == boardId) {
+        m_active->name = name;
+        // saveActive() will call emit activeBoardChanged, emit boardsChanged, and reload index
+        return saveActive();
+    }
+
+    // Otherwise load -> rename -> save
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded)
+        return false;
+
+    Soundboard b = *loaded;
+    b.name = name;
+
+    const bool ok = m_repo.saveBoard(b); // should update index name + clipCount
+    if (ok) {
+        m_state = m_repo.loadIndex(); // IMPORTANT: Reload index in memory!
+        emit boardsChanged();
+    }
+    return ok;
+}
+
+bool SoundboardService::deleteBoard(int boardId)
+{
+    // Don't allow deleting the last board
+    if (m_state.soundboards.size() <= 1)
+        return false;
+
+    // If deleting the active board, switch to another first
+    if (m_active && m_active->id == boardId) {
+        // Find another board to activate
+        int newActiveId = -1;
+        for (const auto& info : m_state.soundboards) {
+            if (info.id != boardId) {
+                newActiveId = info.id;
+                break;
+            }
+        }
+        if (newActiveId >= 0) {
+            activate(newActiveId);
+        }
+        m_active.reset();
+    }
+
+    // Delete from repository
+    const bool ok = m_repo.deleteBoard(boardId);
+    if (ok) {
+        m_state = m_repo.loadIndex();
+        emit boardsChanged();
+        emit activeBoardChanged();
+    }
+    return ok;
 }

@@ -373,21 +373,8 @@ Rectangle {
                 readonly property real tileWidth: (width - tilePadding * 2 - tileSpacing * 3) / 4
                 readonly property real tileHeight: tileWidth * 79 / 111  // 111:79 aspect ratio
 
-                // Dummy clips data
-                ListModel {
-                    id: dummyClipsModel
-                    ListElement { modelTitle: "Morning"; modelHotkeyText: "Alt+F2+Shift"; hasTag: true }
-                    ListElement { modelTitle: "Morning"; modelHotkeyText: "Alt+F2+Shift"; hasTag: true }
-                    ListElement { modelTitle: "Morning"; modelHotkeyText: "Alt+F2+Shift"; hasTag: true }
-                    ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
-                    ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
-                    ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
-                    ListElement { modelTitle: "Morning"; modelHotkeyText: "Alt+F2+Shift"; hasTag: true }
-                    ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
-                    ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
-                    ListElement { modelTitle: ""; modelHotkeyText: "Alt+F2+Shift"; hasTag: false }
-                    ListElement { modelTitle: "Morning"; modelHotkeyText: "Alt+F2+Shift"; hasTag: true }
-                }
+                // Dummy clips data - REMOVED, now using real clipsModel
+                // The clipsModel is exposed from C++ and updated when a soundboard is selected
 
                 // Flickable area for scrolling
                 Flickable {
@@ -416,24 +403,29 @@ Rectangle {
                             }
                         }
 
-                        // Dummy Clip Tiles
+                        // Real Clip Tiles from clipsModel
                         Repeater {
-                            model: dummyClipsModel
+                            model: clipsModel
 
                             ClipTile {
-                                required property string modelTitle
-                                required property string modelHotkeyText
-                                required property bool hasTag
+                                required property int index
+                                required property int clipId
+                                required property string title
+                                required property string hotkey
+                                required property string imgPath
+                                required property string filePath
 
                                 width: contentArea.tileWidth
                                 height: contentArea.tileHeight
-                                title: hasTag ? modelTitle : ""
-                                hotkeyText: modelHotkeyText
-                                imageSource: "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
+                                title: title.length > 0 ? title : ("Clip " + (index + 1))
+                                hotkeyText: hotkey
+                                imageSource: imgPath.length > 0 
+                                    ? imgPath 
+                                    : "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
 
-                                onClicked: console.log("Clip clicked:", modelTitle)
-                                onPlayClicked: console.log("Play clicked:", modelTitle)
-                                onCopyClicked: console.log("Copy clicked:", modelTitle)
+                                onClicked: console.log("Clip clicked:", clipId, title)
+                                onPlayClicked: console.log("Play clicked:", clipId, title)
+                                onCopyClicked: console.log("Copy clicked:", clipId, title)
                             }
                         }
                     }

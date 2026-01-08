@@ -24,7 +24,11 @@ qt_add_executable(appTalkLess
     # Controllers
 
 
-    # Views
+    # QML Models
+    src/qmlmodels/soundboardsListModel.h
+    src/qmlmodels/soundboardsListModel.cpp
+    src/qmlmodels/clipsListModel.h
+    src/qmlmodels/clipsListModel.cpp
 
 
     # services

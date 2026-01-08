@@ -1,0 +1,135 @@
+#include "clipsListModel.h"
+
+ClipsListModel::ClipsListModel(QObject* parent)
+    : QAbstractListModel(parent)
+{
+}
+
+void ClipsListModel::setService(SoundboardService* service)
+{
+    if (m_service == service)
+        return;
+
+    if (m_service) {
+        disconnect(m_service, nullptr, this, nullptr);
+    }
+
+    m_service = service;
+
+    if (m_service) {
+        connect(m_service, &SoundboardService::activeClipsChanged,
+                this, &ClipsListModel::onActiveClipsChanged);
+        connect(m_service, &SoundboardService::activeBoardChanged,
+                this, &ClipsListModel::onActiveClipsChanged);
+
+        // If no board ID is set, load the active board
+        if (m_boardId < 0) {
+            loadActiveBoard();
+        } else {
+            reload();
+        }
+    } else {
+        beginResetModel();
+        m_cache.clear();
+        endResetModel();
+    }
+}
+
+void ClipsListModel::setBoardId(int id)
+{
+    if (m_boardId == id)
+        return;
+
+    m_boardId = id;
+    emit boardIdChanged();
+    reload();
+}
+
+int ClipsListModel::rowCount(const QModelIndex& parent) const
+{
+    if (parent.isValid())
+        return 0;
+    return m_cache.size();
+}
+
+QVariant ClipsListModel::data(const QModelIndex& index, int role) const
+{
+    if (!index.isValid())
+        return {};
+
+    const int row = index.row();
+    if (row < 0 || row >= m_cache.size())
+        return {};
+
+    const Clip& c = m_cache[row];
+
+    switch (role) {
+    case IdRole:         return c.id;
+    case FilePathRole:   return c.filePath;
+    case ImgPathRole:    return c.imgPath;
+    case HotkeyRole:     return c.hotkey;
+    case TitleRole:      return c.title;
+    case TrimStartMsRole:return c.trimStartMs;
+    case TrimEndMsRole:  return c.trimEndMs;
+    case IsPlayingRole:  return c.isPlaying;
+    case IsRepeatRole:   return c.isRepeat;
+    case LockedRole:     return c.locked;
+    default:             return {};
+    }
+}
+
+QHash<int, QByteArray> ClipsListModel::roleNames() const
+{
+    return {
+        { IdRole, "clipId" },
+        { FilePathRole, "filePath" },
+        { ImgPathRole, "imgPath" },
+        { HotkeyRole, "hotkey" },
+        { TitleRole, "title" },
+        { TrimStartMsRole, "trimStartMs" },
+        { TrimEndMsRole, "trimEndMs" },
+        { IsPlayingRole, "isPlaying" },
+        { IsRepeatRole, "isRepeat" },
+        { LockedRole, "locked" }
+    };
+}
+
+void ClipsListModel::reload()
+{
+    if (!m_service)
+        return;
+
+    beginResetModel();
+    
+    if (m_boardId >= 0) {
+        m_cache = m_service->getClipsForBoard(m_boardId);
+    } else {
+        // If no board ID specified, use active board
+        m_cache = m_service->getActiveClips();
+    }
+
+    endResetModel();
+    emit clipsChanged();
+}
+
+void ClipsListModel::loadActiveBoard()
+{
+    if (!m_service)
+        return;
+
+    int activeId = m_service->activeBoardId();
+    if (activeId >= 0) {
+        m_boardId = activeId;
+        emit boardIdChanged();
+    }
+
+    reload();
+}
+
+void ClipsListModel::onActiveClipsChanged()
+{
+    // If we're showing the active board, reload
+    if (m_service && m_boardId == m_service->activeBoardId()) {
+        reload();
+    }
+}

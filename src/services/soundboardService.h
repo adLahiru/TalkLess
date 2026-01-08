@@ -24,6 +24,9 @@ public:
     Q_INVOKABLE double micGainDb() const { return m_state.settings.micGainDb; }
     Q_INVOKABLE void setMasterGainDb(double db);
     Q_INVOKABLE void setMicGainDb(double db);
+    Q_INVOKABLE int createBoard(const QString& name);
+    Q_INVOKABLE bool renameBoard(int boardId, const QString& newName);
+    Q_INVOKABLE bool deleteBoard(int boardId);
 
     QVector<SoundboardInfo> listBoards() const { return m_state.soundboards; }
     Q_INVOKABLE void reloadIndex();          // re-read index.json
@@ -38,6 +41,8 @@ public:
     // ---- Clip operations (board-wise) ----
     bool addClipToBoard(int boardId, const Clip& draft);
     bool updateClipInBoard(int boardId, int clipId, const Clip& updatedClip);
+    QVector<Clip> getClipsForBoard(int boardId) const;  // Get all clips for a board
+    QVector<Clip> getActiveClips() const;  // Get clips from active board
 
     // ---- Hotkey (active only) ----
     int findActiveClipIdByHotkey(const QString& hotkey) const;
