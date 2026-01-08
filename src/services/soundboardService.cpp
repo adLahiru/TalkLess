@@ -86,7 +86,7 @@ QString SoundboardService::getBoardName(int boardId) const
         if (b.id == boardId)
             return b.name;
     }
-    return QString();
+    return QString("");
 }
 
 bool SoundboardService::activate(int boardId)
@@ -481,6 +481,7 @@ bool SoundboardService::deleteBoard(int boardId)
 
 void SoundboardService::playClip(int clipId)
 {
+
     if (!m_audioEngine) {
         qWarning() << "AudioEngine not initialized";
         return;
@@ -660,6 +661,22 @@ bool SoundboardService::setOutputDevice(const QString& deviceId)
         qDebug() << "Output device set to:" << deviceId;
     } else {
         qWarning() << "Failed to set output device:" << deviceId;
+    }
+    return success;
+}
+
+bool SoundboardService::setSecondaryOutputDevice(const QString& deviceId)
+{
+    if (!m_audioEngine) {
+        qWarning() << "AudioEngine not initialized";
+        return false;
+    }
+
+    bool success = m_audioEngine->setSecondaryPlaybackDevice(deviceId.toStdString());
+    if (success) {
+        qDebug() << "Secondary output device set to:" << deviceId;
+    } else {
+        qWarning() << "Failed to set secondary output device:" << deviceId;
     }
     return success;
 }

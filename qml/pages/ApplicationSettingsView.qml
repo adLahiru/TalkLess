@@ -742,6 +742,49 @@ Rectangle {
                                 Item { Layout.fillWidth: true }
                             }
 
+                            // second output device
+                            RowLayout {
+                                spacing: 18
+                                Layout.fillWidth: true
+
+                                Label {
+                                    text: "Speaker Output:"
+                                    color: "#EDEDED"
+                                    font.pixelSize: 14
+                                    Layout.preferredWidth: 110
+                                }
+
+                                DropdownSelector {
+                                    id: secondOutputDropdown
+                                    Layout.preferredWidth: 280
+                                    placeholder: "Select Output Device"
+                                    model: soundboardService.getOutputDevices()
+
+                                    Component.onCompleted: {
+                                        var devices = soundboardService.getOutputDevices()
+                                        for (var i = 0; i < devices.length; i++) {
+                                            if (devices[i].isDefault) {
+                                                selectedId = devices[i].id
+                                                selectedValue = devices[i].name
+                                                break
+                                            }
+                                        }
+                                    }
+
+                                    onItemSelected: function(id, name) {
+                                        console.log("Speaker output selected:", name)
+                                        soundboardService.setSecondaryOutputDevice(id)
+                                    }
+                                }
+
+                                DotMeter {
+                                    Layout.leftMargin: 10
+                                    activeDots: 3
+                                }
+
+                                Item { Layout.fillWidth: true }
+                            }
+
                             // ---- Row 3: Global Volume ----
                             RowLayout {
                                 spacing: 18
