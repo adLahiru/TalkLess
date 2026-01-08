@@ -16,6 +16,7 @@ Rectangle {
     // Audio level properties
     property real micPeakLevel: 0.0
     property real masterPeakLevel: 0.0
+    property real monitorPeakLevel: 0.0
     
     // Timer to update audio levels
     Timer {
@@ -26,6 +27,7 @@ Rectangle {
         onTriggered: {
             root.micPeakLevel = soundboardService.getMicPeakLevel()
             root.masterPeakLevel = soundboardService.getMasterPeakLevel()
+            root.monitorPeakLevel = soundboardService.getMonitorPeakLevel()
             // Reset peak levels for next measurement
             soundboardService.resetPeakLevels()
         }
@@ -755,7 +757,7 @@ Rectangle {
 
                                 DotMeter {
                                     Layout.leftMargin: 10
-                                    activeDots: 3
+                                    activeDots: Math.floor(Math.min(1.0, root.masterPeakLevel) * 10)
                                 }
 
                                 Item { Layout.fillWidth: true }
@@ -798,7 +800,7 @@ Rectangle {
 
                                 DotMeter {
                                     Layout.leftMargin: 10
-                                    activeDots: 3
+                                    activeDots: Math.floor(Math.min(1.0, root.monitorPeakLevel) * 10)
                                 }
 
                                 Item { Layout.fillWidth: true }

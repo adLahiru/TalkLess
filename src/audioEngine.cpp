@@ -261,11 +261,21 @@ void AudioEngine::processMonitorAudio(void* output, ma_uint32 frameCount, ma_uin
     }
 
     const float g = monitorGain.load(std::memory_order_relaxed);
+    float outputPeak = 0.0f;
+
     for (ma_uint32 i = 0; i < totalOutputSamples; ++i) {
         out[i] *= g;
+        
+        float absSample = std::abs(out[i]);
+        if (absSample > outputPeak) outputPeak = absSample;
+
+        // Simple limiter
         if (out[i] > 1.0f) out[i] = 1.0f;
         if (out[i] < -1.0f) out[i] = -1.0f;
     }
+
+    float currentPeak = monitorPeakLevel.load(std::memory_order_relaxed);
+    if (outputPeak > currentPeak) monitorPeakLevel.store(outputPeak, std::memory_order_relaxed);
 }
 
 // ============================================================================
@@ -560,10 +570,16 @@ float AudioEngine::getMasterPeakLevel() const
     return masterPeakLevel.load(std::memory_order_relaxed);
 }
 
+float AudioEngine::getMonitorPeakLevel() const
+{
+    return monitorPeakLevel.load(std::memory_order_relaxed);
+}
+
 void AudioEngine::resetPeakLevels()
 {
     micPeakLevel.store(0.0f, std::memory_order_relaxed);
     masterPeakLevel.store(0.0f, std::memory_order_relaxed);
+    monitorPeakLevel.store(0.0f, std::memory_order_relaxed);
 }
 
 void AudioEngine::setMicEnabled(bool enabled)

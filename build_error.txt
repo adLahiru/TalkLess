@@ -1,0 +1,86 @@
+﻿MSBuild version 17.14.18+a338add32 for .NET Framework
+
+  1>Automatic MOC and UIC for target appTalkLess
+  Running AUTOMOC file extraction for target appTalkLess
+  Running moc --collect-json for target appTalkLess
+  Automatic QML type registration for target appTalkLess
+  Generating .rcc/qmlcache/appTalkLess_Main_qml.cpp, .rcc/qmlcache/appTalkLess_Main_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/Sidebar_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/Sidebar_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/HeaderBar_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/HeaderBar_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/BackgroundBanner_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/BackgroundBanner_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/SettingsTabSelector_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/SettingsTabSelector_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/ToggleSwitch_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/ToggleSwitch_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/LabeledSlider_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/LabeledSlider_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/DropdownSelector_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/DropdownSelector_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/VolumeMeter_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/VolumeMeter_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/StepIndicator_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/StepIndicator_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/ActionButton_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/ActionButton_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/SettingsPanel_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/SettingsPanel_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/TriangleSlider_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/TriangleSlider_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/BalanceSlider_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/BalanceSlider_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/VolumeMeterSlider_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/VolumeMeterSlider_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/SettingsDropdown_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/SettingsDropdown_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/SettingsToggle_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/SettingsToggle_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/GradientButton_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/GradientButton_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/DotMeter_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/DotMeter_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/HotkeysTable_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/HotkeysTable_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/ClipTile_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/ClipTile_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/AddAudioTile_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/AddAudioTile_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/AudioClipPanel_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/AudioClipPanel_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/WaveformDisplay_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/WaveformDisplay_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/FileDropArea_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/FileDropArea_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/components/TrimWaveform_qml.cpp, .rcc/qmlcache/appTalkLess_qml/components/TrimWaveform_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/pages/ApplicationSettingsView_qml.cpp, .rcc/qmlcache/appTalkLess_qml/pages/ApplicationSettingsView_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/pages/SoundboardView_qml.cpp, .rcc/qmlcache/appTalkLess_qml/pages/SoundboardView_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/styles/Colors_qml.cpp, .rcc/qmlcache/appTalkLess_qml/styles/Colors_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/styles/Typography_qml.cpp, .rcc/qmlcache/appTalkLess_qml/styles/Typography_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/styles/Theme_qml.cpp, .rcc/qmlcache/appTalkLess_qml/styles/Theme_qml.cpp.aotstats
+  Generating .rcc/qmlcache/appTalkLess_qml/utils/Functions_qml.cpp, .rcc/qmlcache/appTalkLess_qml/utils/Functions_qml.cpp.aotstats
+  main.cpp
+  audioEngine.cpp
+E:\Projects\TalkLess\src\audioEngine.h(127,10): error C2535: 'bool AudioEngine::setMonitorPlaybackDevice(const std::string &)': member function already defined or declared [E:\Projects\TalkLess\build\appTalkLess.vcxproj]
+  (compiling source file '../src/audioEngine.cpp')
+      E:\Projects\TalkLess\src\audioEngine.h(66,10):
+      see declaration of 'AudioEngine::setMonitorPlaybackDevice'
+  
+  soundboardService.cpp
+E:\Projects\TalkLess\src\audioEngine.h(127,10): error C2535: 'bool AudioEngine::setMonitorPlaybackDevice(const std::string &)': member function already defined or declared [E:\Projects\TalkLess\build\appTalkLess.vcxproj]
+  (compiling source file '../src/services/soundboardService.cpp')
+      E:\Projects\TalkLess\src\audioEngine.h(66,10):
+      see declaration of 'AudioEngine::setMonitorPlaybackDevice'
+  
+  appTalkLess_Main_qml.cpp
+  Sidebar_qml.cpp
+  HeaderBar_qml.cpp
+  BackgroundBanner_qml.cpp
+  SettingsTabSelector_qml.cpp
+  ToggleSwitch_qml.cpp
+  LabeledSlider_qml.cpp
+  DropdownSelector_qml.cpp
+  VolumeMeter_qml.cpp
+  StepIndicator_qml.cpp
+  ActionButton_qml.cpp
+  SettingsPanel_qml.cpp
+  TriangleSlider_qml.cpp
+  BalanceSlider_qml.cpp
+  VolumeMeterSlider_qml.cpp
+  SettingsDropdown_qml.cpp
+  SettingsToggle_qml.cpp
+  Generating Code...
+  Compiling...
+  GradientButton_qml.cpp
+  DotMeter_qml.cpp
+  HotkeysTable_qml.cpp
+  ClipTile_qml.cpp
+  AddAudioTile_qml.cpp
+  AudioClipPanel_qml.cpp
+  WaveformDisplay_qml.cpp
+  FileDropArea_qml.cpp
+  TrimWaveform_qml.cpp
+  ApplicationSettingsView_qml.cpp
+  SoundboardView_qml.cpp
+  Colors_qml.cpp
+  Typography_qml.cpp
+  Theme_qml.cpp
+  Functions_qml.cpp
+  Generating Code...

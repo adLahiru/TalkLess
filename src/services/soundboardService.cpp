@@ -721,6 +721,14 @@ float SoundboardService::getMasterPeakLevel() const
     return m_audioEngine->getMasterPeakLevel();
 }
 
+float SoundboardService::getMonitorPeakLevel() const
+{
+    if (!m_audioEngine) {
+        return 0.0f;
+    }
+    return m_audioEngine->getMonitorPeakLevel();
+}
+
 void SoundboardService::resetPeakLevels()
 {
     if (m_audioEngine) {

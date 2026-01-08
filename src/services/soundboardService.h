@@ -70,6 +70,7 @@ public:
     // ---- Audio Level Monitoring ----
     Q_INVOKABLE float getMicPeakLevel() const;
     Q_INVOKABLE float getMasterPeakLevel() const;
+    Q_INVOKABLE float getMonitorPeakLevel() const;
     Q_INVOKABLE void resetPeakLevels();
 
     // ---- Mixer Controls ----

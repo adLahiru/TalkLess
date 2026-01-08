@@ -93,6 +93,7 @@ public:
            // Peak monitoring
     float getMicPeakLevel() const;
     float getMasterPeakLevel() const;
+    float getMonitorPeakLevel() const;
     void resetPeakLevels();
     
            // Mic control
@@ -183,6 +184,7 @@ private:
            // Peak monitoring
     std::atomic<float> micPeakLevel{0.0f};
     std::atomic<float> masterPeakLevel{0.0f};
+    std::atomic<float> monitorPeakLevel{0.0f};
     
     // Mic control
     std::atomic<bool> micEnabled{true};
