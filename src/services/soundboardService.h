@@ -65,6 +65,7 @@ public:
     Q_INVOKABLE QVariantList getOutputDevices() const;
     Q_INVOKABLE bool setInputDevice(const QString& deviceId);
     Q_INVOKABLE bool setOutputDevice(const QString& deviceId);
+    Q_INVOKABLE bool setMonitorOutputDevice(const QString& deviceId);
 
     // ---- Hotkey (active only) ----
     int findActiveClipIdByHotkey(const QString& hotkey) const;

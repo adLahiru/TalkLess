@@ -665,14 +665,14 @@ bool SoundboardService::setOutputDevice(const QString& deviceId)
     return success;
 }
 
-bool SoundboardService::setSecondaryOutputDevice(const QString& deviceId)
+bool SoundboardService::setMonitorOutputDevice(const QString& deviceId)
 {
     if (!m_audioEngine) {
         qWarning() << "AudioEngine not initialized";
         return false;
     }
 
-    bool success = m_audioEngine->setSecondaryPlaybackDevice(deviceId.toStdString());
+    bool success = m_audioEngine->setMonitorPlaybackDevice(deviceId.toStdString());
     if (success) {
         qDebug() << "Secondary output device set to:" << deviceId;
     } else {
@@ -680,3 +680,4 @@ bool SoundboardService::setSecondaryOutputDevice(const QString& deviceId)
     }
     return success;
 }
+

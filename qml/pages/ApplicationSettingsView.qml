@@ -757,7 +757,7 @@ Rectangle {
                                 DropdownSelector {
                                     id: secondOutputDropdown
                                     Layout.preferredWidth: 280
-                                    placeholder: "Select Output Device"
+                                    placeholder: "Select Monitor Device"
                                     model: soundboardService.getOutputDevices()
 
                                     Component.onCompleted: {
@@ -772,8 +772,8 @@ Rectangle {
                                     }
 
                                     onItemSelected: function(id, name) {
-                                        console.log("Speaker output selected:", name)
-                                        soundboardService.setSecondaryOutputDevice(id)
+                                        console.log("Monitor output selected:", name)
+                                        soundboardService.setMonitorOutputDevice(id)
                                     }
                                 }
 

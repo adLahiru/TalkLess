@@ -3,7 +3,6 @@
 
 #include <atomic>
 #include <functional>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -15,39 +14,36 @@ using ClipErrorCallback = std::function<void(int slotId, const std::string& erro
 
 // Maximum number of simultaneous clips
 #define MAX_CLIPS 16
-// Ring buffer size (in frames) - ~1 second at 48kHz stereo
+// Ring buffer size (in frames)
 #define RING_BUFFER_SIZE_IN_FRAMES (48000 * 2)
 
 enum class ClipState {
     Stopped = 0,
     Playing = 1,
-    Stopping = 2 // Decoder should stop
+    Stopping = 2
 };
 
-// Per-clip data structure
+// Two ring buffers are required because reads consume data.
+// - ringBufferMain: consumed by main device callback
+// - ringBufferMon : consumed by monitor device callback
 struct ClipSlot
 {
-    // Ring buffer for decoded audio (lock-free)
-    ma_pcm_rb ringBuffer;
-    void* ringBufferData; // Backing memory
+    ma_pcm_rb ringBufferMain{};
+    void* ringBufferMainData = nullptr;
 
-    // Decoder thread
+    ma_pcm_rb ringBufferMon{};
+    void* ringBufferMonData = nullptr;
+
     std::thread decoderThread;
 
-    // Atomic state flags (safe to read/write from any thread)
-    std::atomic<ClipState> state;
-    std::atomic<bool> loop;
-    std::atomic<float> gain; // Linear gain
+    std::atomic<ClipState> state{ClipState::Stopped};
+    std::atomic<bool> loop{false};
+    std::atomic<float> gain{1.0f};
 
-    // File path (set before starting decoder thread, read-only after)
     std::string filePath;
 
-    // Format info (set by decoder thread)
-    std::atomic<int> sampleRate;
-    std::atomic<int> channels;
-
-    ClipSlot() : ringBufferData(nullptr), state(ClipState::Stopped), loop(false), gain(1.0f), sampleRate(0), channels(0)
-    {}
+    std::atomic<int> sampleRate{0};
+    std::atomic<int> channels{0};
 };
 
 class AudioEngine
@@ -57,104 +53,131 @@ public:
     explicit AudioEngine(void* parent);
     ~AudioEngine();
 
-    // Device control
+           // Main device control (duplex)
     bool startAudioDevice();
     bool stopAudioDevice();
     bool isDeviceRunning() const;
 
-    // Clip control (thread-safe, can call from Qt UI)
-    // UI manages slot assignments - just pass slotId and filepath
-    bool loadClip(int slotId, const std::string& filepath); // Returns true on success
+           // Monitor device control (playback-only, clips-only)
+    bool startMonitorDevice();
+    bool stopMonitorDevice();
+    bool isMonitorRunning() const;
+
+    bool setMonitorPlaybackDevice(const std::string& deviceId);
+    void setMonitorGainDB(float gainDB);
+    float getMonitorGainDB() const;
+
+           // Clip control
+    bool loadClip(int slotId, const std::string& filepath);
     void playClip(int slotId);
     void stopClip(int slotId);
     void setClipLoop(int slotId, bool loop);
     void setClipGain(int slotId, float gainDB);
-    float getClipGain(int slotId) const; // Returns gain in dB
+    float getClipGain(int slotId) const;
     bool isClipPlaying(int slotId) const;
-    void unloadClip(int slotId); // Stop and free resources
+    void unloadClip(int slotId);
 
-    // Microphone gain
+           // Microphone gain
     void setMicGainDB(float gainDB);
     float getMicGainDB() const;
 
-    // Master output gain (affects all audio)
+           // Master output gain
     void setMasterGainDB(float gainDB);
     float getMasterGainDB() const;
 
-    // Expose linear gains for UI sliders (0.0 - 1.0 typical, but not clamped)
     void setMasterGainLinear(float linear);
     float getMasterGainLinear() const;
     void setMicGainLinear(float linear);
     float getMicGainLinear() const;
 
-    // Real-time audio level monitoring (peak detection)
-    float getMicPeakLevel() const;    // Returns 0.0 to 1.0
-    float getMasterPeakLevel() const; // Returns 0.0 to 1.0
+           // Peak monitoring
+    float getMicPeakLevel() const;
+    float getMasterPeakLevel() const;
     void resetPeakLevels();
 
-    // Event callbacks
+           // Event callbacks
     void setClipFinishedCallback(ClipFinishedCallback callback);
     void setClipErrorCallback(ClipErrorCallback callback);
 
-    // Device enumeration
+           // Device enumeration
     struct AudioDeviceInfo
     {
-        std::string id; // simple index-based id as string
+        std::string id;       // simple index-based id as string
         std::string name;
         bool isDefault;
         ma_device_id deviceId; // concrete device id for selection
     };
+
     std::vector<AudioDeviceInfo> enumeratePlaybackDevices();
     std::vector<AudioDeviceInfo> enumerateCaptureDevices();
     bool setPlaybackDevice(const std::string& deviceId);
     bool setCaptureDevice(const std::string& deviceId);
 
-    // Recording functionality
+           // Recording
     bool startRecording(const std::string& outputPath);
-    bool stopRecording(); // Returns true on success, file path set via startRecording
+    bool stopRecording();
     bool isRecording() const;
-    float getRecordingDuration() const; // Returns duration in seconds
+    float getRecordingDuration() const;
 
 private:
-    // Audio callback (REAL-TIME SAFE)
+    // Main callback (duplex)
     static void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
-    void processAudio(void* output, const void* input, ma_uint32 frameCount, ma_uint32 playbackChannels,
+    void processAudio(void* output,
+                      const void* input,
+                      ma_uint32 frameCount,
+                      ma_uint32 playbackChannels,
                       ma_uint32 captureChannels);
 
-    // Decoder thread function (runs in background)
+           // Monitor callback (playback-only, clips-only)
+    static void monitorCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
+    void processMonitorAudio(void* output, ma_uint32 frameCount, ma_uint32 playbackChannels);
+
+           // Decoder thread
     static void decoderThreadFunc(ClipSlot* slot, int slotId);
 
-    // Helper functions
+           // Helpers
     bool initContext();
     bool initDevice();
+    bool initMonitorDevice();
     float dBToLinear(float db);
 
-    // Miniaudio members
-    ma_device* device;
-    ma_context* context;
-    std::atomic<bool> deviceRunning;
+    bool reinitializeDevice(bool restart = true);
+    bool applyDeviceSelection(ma_device_config& config);
 
-    // Clip slots
+    bool reinitializeMonitorDevice(bool restart = true);
+
+           // Miniaudio main
+    ma_device* device = nullptr;
+    ma_context* context = nullptr;
+    std::atomic<bool> deviceRunning{false};
+
+           // Miniaudio monitor
+    ma_device* monitorDevice = nullptr;
+    std::atomic<bool> monitorRunning{false};
+
+           // Clip slots
     ClipSlot clips[MAX_CLIPS];
 
-    // Mic gain (atomic for thread-safety)
-    std::atomic<float> micGain;
-    std::atomic<float> micGainDB;
+           // Gains
+    std::atomic<float> micGain{1.0f};
+    std::atomic<float> micGainDB{0.0f};
 
-    // Master gain (atomic for thread-safety)
-    std::atomic<float> masterGain;
-    std::atomic<float> masterGainDB;
+    std::atomic<float> masterGain{1.0f};
+    std::atomic<float> masterGainDB{0.0f};
 
-    // Peak level monitoring (atomic for thread-safety)
-    std::atomic<float> micPeakLevel;
-    std::atomic<float> masterPeakLevel;
+    std::atomic<float> monitorGain{1.0f};
+    std::atomic<float> monitorGainDB{0.0f};
 
-    // Event callbacks (protected by mutex)
+           // Peak monitoring
+    std::atomic<float> micPeakLevel{0.0f};
+    std::atomic<float> masterPeakLevel{0.0f};
+
+           // Callbacks
     std::mutex callbackMutex;
     ClipFinishedCallback clipFinishedCallback;
     ClipErrorCallback clipErrorCallback;
 
-    // Device selection
+           // Main device selection
     std::string selectedPlaybackDeviceId;
     std::string selectedCaptureDeviceId;
     ma_device_id selectedPlaybackDeviceIdStruct{};
@@ -162,16 +185,17 @@ private:
     bool selectedPlaybackSet = false;
     bool selectedCaptureSet = false;
 
-    bool reinitializeDevice(bool restart = true);
-    bool applyDeviceSelection(ma_device_config& config);
+           // Monitor device selection
+    std::string selectedMonitorPlaybackDeviceId;
+    ma_device_id selectedMonitorPlaybackDeviceIdStruct{};
+    bool selectedMonitorPlaybackSet = false;
 
-    // Recording state
-    std::atomic<bool> recording;
+           // Recording state
+    std::atomic<bool> recording{false};
     std::string recordingOutputPath;
     std::vector<float> recordingBuffer;
     std::mutex recordingMutex;
-    std::atomic<uint64_t> recordedFrames;
+    std::atomic<uint64_t> recordedFrames{0};
 
-    // Write recording to WAV file
     bool writeWavFile(const std::string& path, const std::vector<float>& samples, int sampleRate, int channels);
 };
