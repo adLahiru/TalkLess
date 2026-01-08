@@ -1,0 +1,317 @@
+#include "storageRepository.h"
+
+#include <QStandardPaths>
+#include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QFileInfo>
+#include <algorithm>
+
+// ------------------ JSON helpers ------------------
+
+static QJsonObject settingsToJson(const AppSettings& s)
+{
+    QJsonObject o;
+    o["masterGainDb"] = s.masterGainDb;
+    o["micGainDb"] = s.micGainDb;
+    o["selectedPlaybackDeviceId"] = s.selectedPlaybackDeviceId;
+    o["selectedCaptureDeviceId"] = s.selectedCaptureDeviceId;
+    o["theme"] = s.theme;
+    o["hotkeyMode"] = s.hotkeyMode;
+    return o;
+}
+
+static AppSettings settingsFromJson(const QJsonObject& o)
+{
+    AppSettings s;
+    s.masterGainDb = o.value("masterGainDb").toDouble(0.0);
+    s.micGainDb = o.value("micGainDb").toDouble(0.0);
+    s.selectedPlaybackDeviceId = o.value("selectedPlaybackDeviceId").toString();
+    s.selectedCaptureDeviceId = o.value("selectedCaptureDeviceId").toString();
+    s.theme = o.value("theme").toString("Dark");
+    s.hotkeyMode = o.value("hotkeyMode").toString("ActiveBoardOnly");
+    return s;
+}
+
+static QJsonObject soundboardInfoToJson(const SoundboardInfo& i)
+{
+    QJsonObject o;
+    o["id"] = i.id;
+    o["name"] = i.name;
+    o["clipCount"] = i.clipCount;
+    return o;
+}
+
+static SoundboardInfo soundboardInfoFromJson(const QJsonObject& o)
+{
+    SoundboardInfo i;
+    i.id = o.value("id").toInt(-1);
+    i.name = o.value("name").toString();
+    i.clipCount = o.value("clipCount").toInt(0);
+    return i;
+}
+
+static QJsonObject clipToJson(const Clip& c)
+{
+    QJsonObject o;
+    o["id"] = c.id;
+    o["filePath"] = c.filePath;
+    o["imgPath"] = c.imgPath;
+    o["hotkey"] = c.hotkey;
+
+    QJsonArray tags;
+    for (const auto& t : c.tags) tags.append(t);
+    o["tags"] = tags;
+
+    o["trimStartMs"] = static_cast<qint64>(c.trimStartMs);
+    o["trimEndMs"] = static_cast<qint64>(c.trimEndMs);
+
+    o["title"] = c.title;
+    o["isRepeat"] = c.isRepeat;
+
+    // runtime-only (do not save): isPlaying, locked
+    return o;
+}
+
+static Clip clipFromJson(const QJsonObject& o)
+{
+    Clip c;
+    c.id = o.value("id").toInt(-1);
+    c.filePath = o.value("filePath").toString();
+    c.imgPath = o.value("imgPath").toString();
+    c.hotkey = o.value("hotkey").toString();
+
+    const auto tagsArr = o.value("tags").toArray();
+    for (const auto& v : tagsArr) c.tags.push_back(v.toString());
+
+    c.trimStartMs = o.value("trimStartMs").toVariant().toLongLong();
+    c.trimEndMs = o.value("trimEndMs").toVariant().toLongLong();
+
+    c.title = o.value("title").toString();
+    c.isRepeat = o.value("isRepeat").toBool(false);
+
+    // runtime defaults
+    c.isPlaying = false;
+    c.locked = false;
+    return c;
+}
+
+static QJsonObject soundboardToJson(const Soundboard& b)
+{
+    QJsonObject root;
+    root["id"] = b.id;
+    root["name"] = b.name;
+
+    QJsonArray clipsArr;
+    for (const auto& c : b.clips) clipsArr.append(clipToJson(c));
+    root["clips"] = clipsArr;
+
+    return root;
+}
+
+static Soundboard soundboardFromJson(const QJsonObject& root)
+{
+    Soundboard b;
+    b.id = root.value("id").toInt(-1);
+    b.name = root.value("name").toString();
+
+    const auto clipsArr = root.value("clips").toArray();
+    for (const auto& v : clipsArr) b.clips.push_back(clipFromJson(v.toObject()));
+
+    return b;
+}
+
+// ------------------ StorageRepository ------------------
+
+StorageRepository::StorageRepository()
+{
+    ensureDirs();
+}
+
+QString StorageRepository::baseDir() const
+{
+    // .../AppData/Roaming/TalkLess/soundboards  (Windows example)
+    const QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return QDir(root).filePath("soundboards");
+}
+
+QString StorageRepository::indexPath() const
+{
+    return QDir(baseDir()).filePath("index.json");
+}
+
+QString StorageRepository::boardsDir() const
+{
+    return QDir(baseDir()).filePath("boards");
+}
+
+QString StorageRepository::boardPath(int boardId) const
+{
+    return QDir(boardsDir()).filePath(QString("board_%1.json").arg(boardId));
+}
+
+bool StorageRepository::ensureDirs() const
+{
+    QDir d(baseDir());
+    if (!d.exists() && !d.mkpath(".")) return false;
+
+    QDir b(boardsDir());
+    if (!b.exists() && !b.mkpath(".")) return false;
+
+    return true;
+}
+
+int StorageRepository::nextBoardId(const QVector<SoundboardInfo>& items) const
+{
+    int maxId = 0;
+    for (const auto& i : items) maxId = std::max(maxId, i.id);
+    return maxId + 1;
+}
+
+AppState StorageRepository::loadIndex() const
+{
+    AppState state;
+    ensureDirs();
+
+    QFile f(indexPath());
+    if (!f.exists()) {
+        // No index yet -> defaults
+        return state;
+    }
+    if (!f.open(QIODevice::ReadOnly)) {
+        return state;
+    }
+
+    const auto doc = QJsonDocument::fromJson(f.readAll());
+    if (!doc.isObject()) return state;
+
+    const auto root = doc.object();
+    state.version = root.value("version").toInt(1);
+    state.activeBoardId = root.value("activeBoardId").toInt(-1);
+
+    if (root.contains("settings") && root.value("settings").isObject()) {
+        state.settings = settingsFromJson(root.value("settings").toObject());
+    }
+
+    const auto boardsArr = root.value("soundboards").toArray();
+    for (const auto& v : boardsArr) {
+        const auto info = soundboardInfoFromJson(v.toObject());
+        if (info.id >= 0) state.soundboards.push_back(info);
+    }
+
+    return state;
+}
+
+bool StorageRepository::saveIndex(const AppState& state) const
+{
+    ensureDirs();
+
+    QJsonObject root;
+    root["version"] = state.version;
+    root["activeBoardId"] = state.activeBoardId;
+    root["settings"] = settingsToJson(state.settings);
+
+    QJsonArray boardsArr;
+    for (const auto& b : state.soundboards) boardsArr.append(soundboardInfoToJson(b));
+    root["soundboards"] = boardsArr;
+
+    QFile f(indexPath());
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) return false;
+    f.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+    return true;
+}
+
+QVector<SoundboardInfo> StorageRepository::listBoards() const
+{
+    return loadIndex().soundboards;
+}
+
+std::optional<Soundboard> StorageRepository::loadBoard(int boardId) const
+{
+    ensureDirs();
+
+    QFile f(boardPath(boardId));
+    if (!f.exists()) return std::nullopt;
+    if (!f.open(QIODevice::ReadOnly)) return std::nullopt;
+
+    const auto doc = QJsonDocument::fromJson(f.readAll());
+    if (!doc.isObject()) return std::nullopt;
+
+    return soundboardFromJson(doc.object());
+}
+
+bool StorageRepository::saveBoard(const Soundboard& board)
+{
+    ensureDirs();
+
+    // 1) Save board_<id>.json
+    QFile f(boardPath(board.id));
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) return false;
+    f.write(QJsonDocument(soundboardToJson(board)).toJson(QJsonDocument::Indented));
+
+    // 2) Update index.json: name + clipCount for this board
+    AppState state = loadIndex();
+
+    bool found = false;
+    for (auto& info : state.soundboards) {
+        if (info.id == board.id) {
+            info.name = board.name;
+            info.clipCount = board.clips.size();
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        SoundboardInfo info;
+        info.id = board.id;
+        info.name = board.name;
+        info.clipCount = board.clips.size();
+        state.soundboards.push_back(info);
+    }
+
+    return saveIndex(state);
+}
+
+int StorageRepository::createBoard(const QString& name)
+{
+    AppState state = loadIndex();
+    const int id = nextBoardId(state.soundboards);
+
+    Soundboard b;
+    b.id = id;
+    b.name = name;
+
+    // Save board file + index update
+    saveBoard(b);
+
+    // Ensure activeBoardId has a value if none exists
+    state = loadIndex();
+    if (state.activeBoardId < 0) {
+        state.activeBoardId = id;
+        saveIndex(state);
+    }
+
+    return id;
+}
+
+bool StorageRepository::deleteBoard(int boardId)
+{
+    ensureDirs();
+
+    QFile::remove(boardPath(boardId));
+
+    AppState state = loadIndex();
+    for (int i = 0; i < state.soundboards.size(); ++i) {
+        if (state.soundboards[i].id == boardId) {
+            state.soundboards.removeAt(i);
+            break;
+        }
+    }
+    if (state.activeBoardId == boardId) {
+        state.activeBoardId = state.soundboards.isEmpty() ? -1 : state.soundboards.first().id;
+    }
+
+    return saveIndex(state);
+}

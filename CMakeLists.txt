@@ -12,28 +12,26 @@ find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Sv
 qt_standard_project_setup(REQUIRES 6.5)
 
 qt_add_executable(appTalkLess
-    src/main_ui_only.cpp
+    src/main.cpp
+
     # Models
-    # src/models/audioclip.h
-    # src/models/audioclip.cpp
-    # src/models/soundboardsection.h
-    # src/models/soundboardsection.cpp
-    # src/models/audioEngine.h
-    # src/models/audioEngine.cpp
-    # src/controllers/maincontroller.h
-    # src/controllers/maincontroller.cpp
+    src/models/clip.h
+    src/models/soundboard.h
+    src/models/soundboardInfo.h
+    src/models/AppSettings.h
+    src/models/AppState.h
+
     # Controllers
-    # src/controllers/audiomanager.h
-    # src/controllers/audiomanager.cpp
-    # src/controllers/hotkeymanager.h
-    # src/controllers/hotkeymanager.cpp
-    # src/controllers/settingsmanager.h
-    # src/controllers/settingsmanager.cpp
+
+
     # Views
-    # src/view/soundboardview.h
-    # src/view/soundboardview.cpp
-    # src/view/audioplayerview.h
-    # src/view/audioplayerview.cpp
+
+
+    # services
+    src/services/storageRepository.h
+    src/services/storageRepository.cpp
+    src/services/soundboardService.h
+    src/services/soundboardService.cpp
 )
 
 # Mark singleton files before adding the QML module
@@ -148,7 +146,7 @@ qt_add_qml_module(appTalkLess
 
 # Add include directories for QML type registration
 target_include_directories(appTalkLess PRIVATE 
-                        src/view
+                        ${CMAKE_SOURCE_DIR}/src
                         lib
                     )
 
