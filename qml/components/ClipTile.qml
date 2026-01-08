@@ -183,7 +183,7 @@ Item {
             radius: card.radius
             color: "transparent"
             border.width: root.selected ? 3 : 0
-            border.color: "#FFFFFF"
+            border.color: "#3B82F6" // Vibrant Blue
             visible: root.selected
         }
     }

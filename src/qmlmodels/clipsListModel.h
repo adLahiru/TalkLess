@@ -10,6 +10,7 @@ class ClipsListModel : public QAbstractListModel
 {
     Q_OBJECT
     Q_PROPERTY(int boardId READ boardId WRITE setBoardId NOTIFY boardIdChanged)
+    Q_PROPERTY(QString boardName READ boardName NOTIFY boardNameChanged)
     Q_PROPERTY(int count READ count NOTIFY clipsChanged)
 
 public:
@@ -34,6 +35,8 @@ public:
     int boardId() const { return m_boardId; }
     void setBoardId(int id);
 
+    QString boardName() const;
+
     // Model interface
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
@@ -47,6 +50,7 @@ public:
 
 signals:
     void boardIdChanged();
+    void boardNameChanged();
     void clipsChanged();
 
 private slots:

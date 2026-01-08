@@ -1,6 +1,7 @@
 #include "soundboardService.h"
 
 #include <QFileInfo>
+#include <QUrl>
 
 SoundboardService::SoundboardService(QObject* parent)
   : QObject(parent)
@@ -60,6 +61,14 @@ void SoundboardService::setMicGainDb(double db)
     m_state.settings.micGainDb = db;
     m_repo.saveIndex(m_state);
     emit settingsChanged();
+}
+
+QString SoundboardService::getBoardName(int boardId) const
+{
+    for (const auto& b : m_state.soundboards) {
+        if (b.id == boardId) return b.name;
+    }
+    return QString();
 }
 
 bool SoundboardService::activate(int boardId)
@@ -160,6 +169,66 @@ bool SoundboardService::setClipPlaying(int clipId, bool playing)
     c->locked = playing;
     emit activeClipsChanged();
     return true;
+}
+
+bool SoundboardService::addClip(int boardId, const QString& filePath)
+{
+    if (filePath.isEmpty()) return false;
+    
+    QString localPath = filePath;
+    if (localPath.startsWith("file:")) {
+        localPath = QUrl(localPath).toLocalFile();
+    }
+    
+    Clip draft;
+    draft.filePath = localPath;
+    draft.title = QFileInfo(draft.filePath).baseName();
+    // other defaults are handled inside addClipToBoard
+    
+    return addClipToBoard(boardId, draft);
+}
+
+bool SoundboardService::deleteClip(int boardId, int clipId)
+{
+    // if deleting from active board (in memory)
+    if (m_active && m_active->id == boardId) {
+        bool found = false;
+        for (int i = 0; i < m_active->clips.size(); ++i) {
+            if (m_active->clips[i].id == clipId) {
+                if (m_active->clips[i].locked) return false; // can't delete playing
+                m_active->clips.removeAt(i);
+                found = true;
+                break;
+            }
+        }
+        if (!found) return false;
+        
+        rebuildHotkeyIndex();
+        emit activeClipsChanged();
+        return saveActive();
+    }
+
+    // inactive board: load -> modify -> save
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded) return false;
+
+    Soundboard b = *loaded;
+    bool found = false;
+    for (int i = 0; i < b.clips.size(); ++i) {
+        if (b.clips[i].id == clipId) {
+            b.clips.removeAt(i);
+            found = true;
+            break;
+        }
+    }
+    if (!found) return false;
+
+    const bool ok = m_repo.saveBoard(b);
+    if (ok) {
+        m_state = m_repo.loadIndex();
+        emit boardsChanged();
+    }
+    return ok;
 }
 
 bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)

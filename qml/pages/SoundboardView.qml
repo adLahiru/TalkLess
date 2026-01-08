@@ -6,12 +6,39 @@ import QtQuick.Controls
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import QtQuick.Effects
+import QtQuick.Dialogs
 import "../components"
 
 Rectangle {
     id: root
     color: "#0d0d0d"
     radius: 10
+
+    property int selectedClipId: -1  // Keep track of which clip is selected
+
+    // File picking logic
+    FileDialog {
+        id: audioFileDialog
+        title: "Select Audio File"
+        nameFilters: ["Audio files (*.mp3 *.wav *.ogg *.m4a)", "All files (*)"]
+        onAccepted: {
+            console.log("File selected:", selectedFile)
+            const boardId = clipsModel.boardId
+            if (boardId >= 0) {
+                const success = soundboardService.addClip(boardId, selectedFile.toString())
+                if (success) {
+                    clipsModel.reload()
+                }
+            }
+        }
+    }
+
+    Connections {
+        target: clipsModel
+        function onBoardIdChanged() {
+            root.selectedClipId = -1
+        }
+    }
 
     // Load fonts at root level
     FontLoader {
@@ -176,7 +203,7 @@ Rectangle {
 
                         // Main text
                         Text {
-                            text: "Soundboard Test"
+                            text: clipsModel.boardName || "Soundboard"
                             color: "#FFFFFF"
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 28
@@ -257,6 +284,7 @@ Rectangle {
                             height: 32
                             radius: 6
                             color: playMouseArea.containsMouse ? "#333333" : "transparent"
+                            opacity: root.selectedClipId !== -1 ? 1.0 : 0.4
 
                             Text {
                                 anchors.centerIn: parent
@@ -268,8 +296,9 @@ Rectangle {
                                 id: playMouseArea
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Play all clicked")
+                                enabled: root.selectedClipId !== -1
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: console.log("Play clip clicked:", root.selectedClipId)
                             }
 
                             Behavior on color {
@@ -309,6 +338,7 @@ Rectangle {
                             height: 32
                             radius: 6
                             color: editMouseArea.containsMouse ? "#333333" : "transparent"
+                            opacity: root.selectedClipId !== -1 ? 1.0 : 0.4
 
                             Text {
                                 anchors.centerIn: parent
@@ -320,8 +350,9 @@ Rectangle {
                                 id: editMouseArea
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Edit clicked")
+                                enabled: root.selectedClipId !== -1
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: console.log("Edit clip clicked:", root.selectedClipId)
                             }
 
                             Behavior on color {
@@ -346,9 +377,21 @@ Rectangle {
                                 id: deleteMouseArea
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Delete clicked")
+                                enabled: root.selectedClipId !== -1
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: {
+                                    console.log("Delete clip clicked:", root.selectedClipId)
+                                    if (root.selectedClipId !== -1) {
+                                        const success = soundboardService.deleteClip(clipsModel.boardId, root.selectedClipId)
+                                        if (success) {
+                                            root.selectedClipId = -1
+                                            clipsModel.reload()
+                                        }
+                                    }
+                                }
                             }
+
+                            opacity: root.selectedClipId !== -1 ? 1.0 : 0.4
 
                             Behavior on color {
                                 ColorAnimation { duration: 150 }
@@ -399,7 +442,8 @@ Rectangle {
                             height: contentArea.tileHeight
                             enabled: true
                             onClicked: {
-                                console.log("Add Audio clicked")
+                                console.log("Add Audio clicked - opening file dialog")
+                                audioFileDialog.open()
                             }
                         }
 
@@ -410,24 +454,40 @@ Rectangle {
                             ClipTile {
                                 required property int index
                                 required property int clipId
-                                required property string title
+                                required property string clipTitle
                                 required property string hotkey
                                 required property string imgPath
                                 required property string filePath
 
                                 width: contentArea.tileWidth
                                 height: contentArea.tileHeight
-                                title: title.length > 0 ? title : ("Clip " + (index + 1))
+                                title: clipTitle.length > 0 ? clipTitle : ("Clip " + (index + 1))
                                 hotkeyText: hotkey
                                 imageSource: imgPath.length > 0 
                                     ? imgPath 
                                     : "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
+                                
+                                selected: root.selectedClipId === clipId
 
-                                onClicked: console.log("Clip clicked:", clipId, title)
-                                onPlayClicked: console.log("Play clicked:", clipId, title)
-                                onCopyClicked: console.log("Copy clicked:", clipId, title)
+                                onClicked: {
+                                    console.log("Clip clicked:", clipId, clipTitle)
+                                    if (root.selectedClipId === clipId) {
+                                        root.selectedClipId = -1
+                                    } else {
+                                        root.selectedClipId = clipId
+                                    }
+                                }
+                                onPlayClicked: console.log("Play clicked:", clipId, clipTitle)
+                                onCopyClicked: console.log("Copy clicked:", clipId, clipTitle)
                             }
                         }
+                    }
+
+                    // Clicking empty space deselects
+                    MouseArea {
+                        anchors.fill: parent
+                        z: -1
+                        onClicked: root.selectedClipId = -1
                     }
 
                     // Scrollbar

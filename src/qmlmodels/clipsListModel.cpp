@@ -42,7 +42,15 @@ void ClipsListModel::setBoardId(int id)
 
     m_boardId = id;
     emit boardIdChanged();
+    emit boardNameChanged();
     reload();
+}
+
+QString ClipsListModel::boardName() const
+{
+    if (!m_service || m_boardId < 0)
+        return QString();
+    return m_service->getBoardName(m_boardId);
 }
 
 int ClipsListModel::rowCount(const QModelIndex& parent) const
@@ -85,7 +93,7 @@ QHash<int, QByteArray> ClipsListModel::roleNames() const
         { FilePathRole, "filePath" },
         { ImgPathRole, "imgPath" },
         { HotkeyRole, "hotkey" },
-        { TitleRole, "title" },
+        { TitleRole, "clipTitle" },
         { TrimStartMsRole, "trimStartMs" },
         { TrimEndMsRole, "trimEndMs" },
         { IsPlayingRole, "isPlaying" },
