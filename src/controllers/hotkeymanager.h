@@ -1,19 +1,21 @@
 #pragma once
 
-#include <QObject>
 #include <QHash>
 #include <QKeySequence>
+#include <QObject>
 #include <QVector>
 
 class QHotkey;
 
-class HotkeyManager : public QObject {
+class HotkeyManager : public QObject
+{
     Q_OBJECT
 
 public:
-    struct HotkeyDef {
-        QString sequence;   // e.g. "Ctrl+Alt+P"
-        QString actionId;   // e.g. "feature.print"
+    struct HotkeyDef
+    {
+        QString sequence; // e.g. "Ctrl+Alt+P"
+        QString actionId; // e.g. "feature.print"
         bool enabled = true;
     };
 
@@ -31,9 +33,11 @@ signals:
     void hotkeyRegistrationFailed(QString sequenceText, QString actionId);
 
 private:
-    struct Entry {
+    struct Entry
+    {
         QString actionId;
         QHotkey* hotkey = nullptr;
+        bool enabled = true;
     };
 
     QHash<QString, Entry> m_entries; // key: normalized sequence (PortableText)

@@ -89,6 +89,7 @@ qt_add_qml_module(appTalkLess
         qml/components/WaveformDisplay.qml
         qml/components/FileDropArea.qml
         qml/components/TrimWaveform.qml
+        qml/components/AudioPlayerCard.qml
         # qml/components/SoundboardListItem.qml
         # qml/components/HeaderBar.qml
         # qml/components/SettingsTabBar.qml
@@ -161,6 +162,7 @@ qt_add_qml_module(appTalkLess
         resources/images/audioClipDefaultBackground.png
         resources/images/addAudioBackground.png
         resources/images/sondboard.jpg
+        resources/images/Subtract.svg
 )
 
 # Add include directories for QML type registration

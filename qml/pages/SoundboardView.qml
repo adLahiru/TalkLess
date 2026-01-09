@@ -510,6 +510,26 @@ Rectangle {
                     }
                 }
             }
+
+            // Audio Player Card - below the clips grid
+            AudioPlayerCard {
+                id: audioPlayerCard
+                Layout.preferredWidth: 228
+                Layout.preferredHeight: 140
+                Layout.alignment: Qt.AlignHCenter
+                Layout.bottomMargin: 10
+                
+                // Default values - will be connected to selected clip later
+                songName: "Greetings"
+                hotkeyText: "Press F1 to play"
+                imageSource: "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
+                
+                onPlayClicked: console.log("Audio Player: Play clicked")
+                onPauseClicked: console.log("Audio Player: Pause clicked")
+                onPreviousClicked: console.log("Audio Player: Previous clicked")
+                onNextClicked: console.log("Audio Player: Next clicked")
+                onMuteClicked: console.log("Audio Player: Mute toggled, muted:", isMuted)
+            }
         }
 
         // RIGHT COLUMN: Sidebar (gray placeholder)
