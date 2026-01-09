@@ -15,6 +15,41 @@ Rectangle {
     radius: 10
 
     property int selectedClipId: -1  // Keep track of which clip is selected
+    property int playingClipId: -1   // Last started clip that is still playing
+    property var displayedClipData: null // Data currently shown in the player card
+
+    // Helper function to find clip data by ID in the model
+    function getClipDataById(clipId) {
+        if (clipId === -1) return null
+        for (let i = 0; i < clipsModel.count; i++) {
+            const index = clipsModel.index(i, 0)
+            const id = clipsModel.data(index, 257)  // IdRole = 257
+            if (id === clipId) {
+                return {
+                    clipId: id,
+                    title: clipsModel.data(index, 261),     // TitleRole
+                    hotkey: clipsModel.data(index, 260),    // HotkeyRole
+                    imgPath: clipsModel.data(index, 259),   // ImgPathRole
+                    isPlaying: clipsModel.data(index, 263)  // IsPlayingRole
+                }
+            }
+        }
+        return null
+    }
+
+    // Update what's shown in the player card
+    function updateDisplayedClipData() {
+        // Priority: Playing Clip > Selected Clip
+        let data = getClipDataById(playingClipId)
+        if (!data) {
+            data = getClipDataById(selectedClipId)
+        }
+        displayedClipData = data
+    }
+
+    // Refresh when core IDs change
+    onSelectedClipIdChanged: updateDisplayedClipData()
+    onPlayingClipIdChanged: updateDisplayedClipData()
 
     // File picking logic
     FileDialog {
@@ -37,22 +72,45 @@ Rectangle {
         target: clipsModel
         function onBoardIdChanged() {
             root.selectedClipId = -1
+            root.playingClipId = -1
+        }
+        function onClipsChanged() {
+            root.updateDisplayedClipData()
         }
     }
 
-    // Handle play/pause hotkey from soundboardService
+    // Handle play/pause hotkey and playback state from soundboardService
     Connections {
         target: soundboardService
         function onPlaySelectedRequested() {
             console.log("Play selected hotkey triggered, selectedClipId:", root.selectedClipId)
             if (root.selectedClipId !== -1) {
-                // Toggle play/stop based on current state
                 if (soundboardService.isClipPlaying(root.selectedClipId)) {
                     soundboardService.stopClip(root.selectedClipId)
                 } else {
                     soundboardService.playClip(root.selectedClipId)
                 }
             }
+        }
+        
+        function onClipPlaybackStarted(clipId) {
+            root.playingClipId = clipId
+        }
+        
+        function onClipPlaybackStopped(clipId) {
+            if (root.playingClipId === clipId) {
+                // Find if any other clip is still playing
+                let foundPlaying = -1
+                for (let i = 0; i < clipsModel.count; i++) {
+                    const index = clipsModel.index(i, 0)
+                    if (clipsModel.data(index, 263)) { // IsPlayingRole
+                        foundPlaying = clipsModel.data(index, 257) // IdRole
+                        break
+                    }
+                }
+                root.playingClipId = foundPlaying
+            }
+            root.updateDisplayedClipData()
         }
     }
 
@@ -535,16 +593,83 @@ Rectangle {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.bottomMargin: 10
                 
-                // Default values - will be connected to selected clip later
-                songName: "Greetings"
-                hotkeyText: "Press F1 to play"
-                imageSource: "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
+                // Visible only when a clip is selected or playing
+                visible: root.displayedClipData !== null
                 
-                onPlayClicked: console.log("Audio Player: Play clicked")
-                onPauseClicked: console.log("Audio Player: Pause clicked")
-                onPreviousClicked: console.log("Audio Player: Previous clicked")
-                onNextClicked: console.log("Audio Player: Next clicked")
-                onMuteClicked: console.log("Audio Player: Mute toggled, muted:", isMuted)
+                // Bind to displayed clip data (prioritizes playing clip)
+                songName: (root.displayedClipData && root.displayedClipData.title) ? root.displayedClipData.title : "No clip selected"
+                hotkeyText: (root.displayedClipData && root.displayedClipData.hotkey) ? "Press " + root.displayedClipData.hotkey + " to play" : "No hotkey assigned"
+                imageSource: (root.displayedClipData && root.displayedClipData.imgPath) ? root.displayedClipData.imgPath : "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
+                
+                // Bind isPlaying state
+                isPlaying: root.displayedClipData ? root.displayedClipData.isPlaying : false
+                
+                // Play/Pause the displayed clip
+                onPlayClicked: {
+                    if (root.displayedClipData) {
+                        soundboardService.playClip(root.displayedClipData.clipId)
+                    }
+                }
+                onPauseClicked: {
+                    if (root.displayedClipData) {
+                        soundboardService.stopClip(root.displayedClipData.clipId)
+                    }
+                }
+                
+                // Navigate to previous/next clip in the list
+                onPreviousClicked: {
+                    console.log("Audio Player: Previous clicked")
+                    if (clipsModel.count === 0) return
+                    
+                    // Find current index and go to previous
+                    let currentIndex = -1
+                    for (let i = 0; i < clipsModel.count; i++) {
+                        const index = clipsModel.index(i, 0)
+                        const id = clipsModel.data(index, 257)
+                        if (id === root.selectedClipId) {
+                            currentIndex = i
+                            break
+                        }
+                    }
+                    
+                    if (currentIndex > 0) {
+                        const prevIndex = clipsModel.index(currentIndex - 1, 0)
+                        root.selectedClipId = clipsModel.data(prevIndex, 257)
+                    } else if (currentIndex === 0 && clipsModel.count > 0) {
+                        // Wrap to last clip
+                        const lastIndex = clipsModel.index(clipsModel.count - 1, 0)
+                        root.selectedClipId = clipsModel.data(lastIndex, 257)
+                    }
+                }
+                onNextClicked: {
+                    console.log("Audio Player: Next clicked")
+                    if (clipsModel.count === 0) return
+                    
+                    // Find current index and go to next
+                    let currentIndex = -1
+                    for (let i = 0; i < clipsModel.count; i++) {
+                        const index = clipsModel.index(i, 0)
+                        const id = clipsModel.data(index, 257)
+                        if (id === root.selectedClipId) {
+                            currentIndex = i
+                            break
+                        }
+                    }
+                    
+                    if (currentIndex >= 0 && currentIndex < clipsModel.count - 1) {
+                        const nextIndex = clipsModel.index(currentIndex + 1, 0)
+                        root.selectedClipId = clipsModel.data(nextIndex, 257)
+                    } else if (currentIndex === clipsModel.count - 1) {
+                        // Wrap to first clip
+                        const firstIndex = clipsModel.index(0, 0)
+                        root.selectedClipId = clipsModel.data(firstIndex, 257)
+                    }
+                }
+                isMuted: !soundboardService.isMicEnabled()
+                onMuteClicked: {
+                    console.log("Audio Player: Mute toggled, muted:", isMuted)
+                    soundboardService.setMicEnabled(!isMuted)
+                }
             }
         }
 
