@@ -2,10 +2,12 @@
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QQmlContext>
+#include <QDebug>
 
 #include "services/soundboardService.h"
 #include "qmlmodels/soundboardsListModel.h"
 #include "qmlmodels/clipsListModel.h"
+#include "controllers/hotkeymanager.h"
 
 int main(int argc, char* argv[])
 {
@@ -15,6 +17,30 @@ int main(int argc, char* argv[])
     QGuiApplication::setOrganizationName("TalkLess");
     QGuiApplication::setOrganizationDomain("talkless.app");
     QGuiApplication::setApplicationName("TalkLess");
+    // Keep process alive even if window closes/minimizes
+    app.setQuitOnLastWindowClosed(false);
+
+    HotkeyManager manager;
+
+    QVector<HotkeyManager::HotkeyDef> defs = {
+        { "Ctrl++P",          "feature.print", true },
+        { "Ctrl+Shift+S",        "feature.save",  true },
+        { "Ctrl+Shift+Alt+F12",  "feature.test",  true }  // good test
+    };
+
+    manager.setHotkeys(defs);
+
+    QObject::connect(&manager, &HotkeyManager::hotkeyTriggered,
+                     [](const QString& seq, const QString& actionId) {
+        qDebug() << "Triggered:" << seq << actionId;
+        // Dispatch to your feature system here
+    });
+
+    QObject::connect(&manager, &HotkeyManager::hotkeyRegistrationFailed,
+                     [](const QString& seq, const QString& actionId) {
+        qDebug() << "FAILED to register:" << seq << actionId;
+    });
+
 
            // Create QML engine FIRST
     QQmlApplicationEngine engine;

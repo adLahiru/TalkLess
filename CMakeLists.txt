@@ -2,12 +2,21 @@ cmake_minimum_required(VERSION 3.16)
 
 project(TalkLess VERSION 0.1 LANGUAGES CXX)
 
+include(FetchContent)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
+set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "" FORCE) 
 
 find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg)
+
+FetchContent_Declare(QHotkey
+  GIT_REPOSITORY https://github.com/Skycoder42/QHotkey.git
+  GIT_TAG 1.5.0
+)
+FetchContent_MakeAvailable(QHotkey)
 
 qt_standard_project_setup(REQUIRES 6.5)
 
@@ -26,7 +35,8 @@ qt_add_executable(appTalkLess
     src/audioEngine.cpp
 
     # Controllers
-
+    src/controllers/hotkeyManager.h 
+    src/controllers/hotkeyManager.cpp
 
     # QML Models
     src/qmlmodels/soundboardsListModel.h
@@ -177,6 +187,7 @@ target_link_libraries(appTalkLess
     PRIVATE Qt6::Multimedia
     PRIVATE Qt6::QuickControls2
     PRIVATE Qt6::Svg
+    PRIVATE QHotkey::QHotkey
 )
 
 # Link Carbon framework for global hotkeys on macOS
