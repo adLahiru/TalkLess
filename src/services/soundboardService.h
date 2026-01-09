@@ -87,6 +87,10 @@ public:
     // ---- Playback state (active only) ----
     bool setClipPlaying(int clipId, bool playing);
 
+    // ---- Hotkey Action Handler ----
+    // Connect this to HotkeyManager::actionTriggered for modular action handling
+    Q_INVOKABLE void handleHotkeyAction(const QString& actionId);
+
 signals:
     void boardsChanged();
     void activeBoardChanged();
@@ -94,6 +98,9 @@ signals:
     void settingsChanged();
     void clipPlaybackStarted(int clipId);
     void clipPlaybackStopped(int clipId);
+    
+    // Emitted when play-selected hotkey is pressed - QML handles this since it knows selected clip
+    void playSelectedRequested();
 
 private:
     void rebuildHotkeyIndex();

@@ -40,6 +40,22 @@ Rectangle {
         }
     }
 
+    // Handle play/pause hotkey from soundboardService
+    Connections {
+        target: soundboardService
+        function onPlaySelectedRequested() {
+            console.log("Play selected hotkey triggered, selectedClipId:", root.selectedClipId)
+            if (root.selectedClipId !== -1) {
+                // Toggle play/stop based on current state
+                if (soundboardService.isClipPlaying(root.selectedClipId)) {
+                    soundboardService.stopClip(root.selectedClipId)
+                } else {
+                    soundboardService.playClip(root.selectedClipId)
+                }
+            }
+        }
+    }
+
     // Load fonts at root level
     FontLoader {
         id: poppinsFont

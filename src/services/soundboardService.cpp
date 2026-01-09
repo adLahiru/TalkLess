@@ -805,3 +805,45 @@ bool SoundboardService::isMicEnabled() const
     }
     return m_audioEngine->isMicEnabled();
 }
+
+// ============================================================================
+// HOTKEY ACTION HANDLER
+// ============================================================================
+
+void SoundboardService::handleHotkeyAction(const QString& actionId)
+{
+    qDebug() << "Hotkey action received:" << actionId;
+    
+    if (actionId == "sys.toggleMute") {
+        // Toggle mic enabled state
+        bool currentState = isMicEnabled();
+        setMicEnabled(!currentState);
+        qDebug() << "Mic toggled to:" << !currentState;
+    } 
+    else if (actionId == "sys.stopAll") {
+        stopAllClips();
+        qDebug() << "All clips stopped via hotkey";
+    } 
+    else if (actionId == "sys.playSelected") {
+        // Emit signal for QML to handle - it knows the selected clip
+        emit playSelectedRequested();
+        qDebug() << "Play selected signal emitted";
+    } 
+    else if (actionId.startsWith("clip.")) {
+        // Handle clip-specific hotkeys (e.g., "clip.123" plays clip 123)
+        bool ok;
+        int clipId = actionId.mid(5).toInt(&ok);
+        if (ok) {
+            // Toggle play/stop for this clip
+            if (isClipPlaying(clipId)) {
+                stopClip(clipId);
+            } else {
+                playClip(clipId);
+            }
+            qDebug() << "Clip hotkey triggered for clip:" << clipId;
+        }
+    }
+    else {
+        qDebug() << "Unknown hotkey action:" << actionId;
+    }
+}

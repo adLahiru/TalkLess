@@ -1002,7 +1002,7 @@ Rectangle {
                             Button {
                                 width: 30
                                 height: 30
-                                onClicked: if (backend.undoHotkeyChanges) backend.undoHotkeyChanges()
+                                onClicked: hotkeyManager.undoHotkeyChanges()
 
                                 contentItem: Image {
                                     id: resetIcon
@@ -1028,7 +1028,7 @@ Rectangle {
                                 width: 170
                                 height: 55
                                 text: "Save"
-                                onClicked: if (backend.saveHotkeys) backend.saveHotkeys()
+                                onClicked: hotkeyManager.saveHotkeys()
 
                                 contentItem: Text {
                                     text: saveButton.text
@@ -1062,14 +1062,14 @@ Rectangle {
                         HotkeysTable {
                             width: hotkeysContent.width - 56
                             title: "System Hotkeys"
-                            model: backend.systemHotkeysModel
+                            model: hotkeyManager.systemHotkeysModel
                             showHeader: false
                             showWarning: true
                             primaryText: "Reassign"
                             secondaryText: "Reset"
 
-                            onPrimaryClicked: backend.reassignSystem(id)
-                            onSecondaryClicked: backend.resetSystem(id)
+                            onPrimaryClicked: hotkeyManager.reassignSystem(id)
+                            onSecondaryClicked: hotkeyManager.resetSystem(id)
                         }
                     }
 
@@ -1078,14 +1078,14 @@ Rectangle {
                         HotkeysTable {
                             width: hotkeysContent.width - 56
                             title: "My Preference"
-                            model: backend.preferenceHotkeysModel
+                            model: hotkeyManager.preferenceHotkeysModel
                             showHeader: true
                             showWarning: false
                             primaryText: "Reassign"
                             secondaryText: "Delete"
 
-                            onPrimaryClicked: backend.reassignPreference(id)
-                            onSecondaryClicked: backend.deletePreference(id)
+                            onPrimaryClicked: hotkeyManager.reassignPreference(id)
+                            onSecondaryClicked: hotkeyManager.deletePreference(id)
                         }
                     }
                 }

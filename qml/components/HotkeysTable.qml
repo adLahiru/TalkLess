@@ -25,7 +25,7 @@ Item {
 
     // role names from C++ model
     property string idRole: "id"
-    property string nameRole: "name"
+    property string nameRole: "title"
     property string hotkeyRole: "hotkey"
 
     signal primaryClicked(string id)

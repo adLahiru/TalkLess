@@ -1,115 +1,273 @@
 #include "hotkeyManager.h"
 #include <QHotkey>
-
-#include <QDateTime>
-#include <QDir>
-#include <QFile>
-#include <QStandardPaths>
-#include <QTextStream>
 #include <QDebug>
 
 HotkeyManager::HotkeyManager(QObject* parent) : QObject(parent) {
-    logLine("HotkeyManager created");
+    loadDefaults();
+    loadUserSettings();
+    snapshotForUndo();
+    rebuildRegistrations();
 }
 
-HotkeyManager::~HotkeyManager() {
-    clearAll();
+QString HotkeyManager::toPortable(const QString& text) {
+    return QKeySequence(text).toString(QKeySequence::PortableText);
+}
+QString HotkeyManager::toNative(const QString& text) {
+    return QKeySequence(text).toString(QKeySequence::NativeText);
 }
 
-QString HotkeyManager::normalize(const QString& sequenceText) {
-    QKeySequence ks(sequenceText);
-    return ks.toString(QKeySequence::PortableText);
+bool HotkeyManager::isValidHotkey(const QString& text) const {
+    return !toPortable(text).isEmpty();
 }
 
-void HotkeyManager::logLine(const QString& s) {
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(dir);
+void HotkeyManager::loadDefaults() {
+    QVector<HotkeyItem> sys = {
+        {1, "Microphone Mute / Unmute",          "Ctrl+Alt+U",     "Ctrl+Alt+U",     "sys.toggleMute",  true, true},
+        {2, "Stop all clips",       "Ctrl+Alt+L",     "Ctrl+Alt+L",     "sys.stopAll",     true, true},
+        {3, "Play / Pause",   "Ctrl+Space",     "Ctrl+Space",     "sys.playSelected",true, true},
+    };
 
-    QFile f(dir + "/hotkey_manager.log");
-    if (f.open(QIODevice::Append | QIODevice::Text)) {
-        QTextStream ts(&f);
-        ts << QDateTime::currentDateTime().toString(Qt::ISODate) << "  " << s << "\n";
-    }
+    m_system.setItems(sys);
+
+    // Start preference empty by default (you can load from settings)
+    m_pref.setItems({});
+    m_nextPrefId = 1000;
 }
 
-void HotkeyManager::clearAll() {
-    // Delete all QHotkey objects (they are parented to this, but we also remove mapping)
-    for (auto it = m_entries.begin(); it != m_entries.end(); ++it) {
-        if (it.value().hotkey) {
-            it.value().hotkey->setRegistered(false);
-            it.value().hotkey->deleteLater();
-            it.value().hotkey = nullptr;
+void HotkeyManager::snapshotForUndo() {
+    m_systemOriginal = m_system.items();
+    m_prefOriginal = m_pref.items();
+
+    // also keep next id consistent
+    for (const auto& it : m_pref.items())
+        m_nextPrefId = qMax(m_nextPrefId, it.id + 1);
+}
+
+void HotkeyManager::loadUserSettings() {
+    QSettings s("TalkLess", "TalkLess");
+
+    // System hotkey overrides
+    s.beginGroup("hotkeys/system");
+    for (const auto& it : m_system.items()) {
+        const QString key = QString::number(it.id);
+        if (s.contains(key)) {
+            m_system.setHotkeyById(it.id, s.value(key).toString());
         }
     }
-    m_entries.clear();
-    logLine("Cleared all hotkeys");
+    s.endGroup();
+
+    // Preference hotkeys list
+    QVector<HotkeyItem> pref;
+
+    int count = s.value("hotkeys/pref/count", 0).toInt();
+    for (int i = 0; i < count; ++i) {
+        s.beginGroup(QString("hotkeys/pref/%1").arg(i));
+        HotkeyItem item;
+        item.id = s.value("id").toInt();
+        item.title = s.value("title").toString();
+        item.hotkey = s.value("hotkey").toString();
+        item.defaultHotkey = ""; // preference has no default
+        item.actionId = s.value("actionId").toString();
+        item.isSystem = false;
+        item.enabled = s.value("enabled", true).toBool();
+        s.endGroup();
+
+        if (item.id > 0 && !item.actionId.isEmpty()) {
+            pref.push_back(item);
+            m_nextPrefId = qMax(m_nextPrefId, item.id + 1);
+        }
+    }
+
+    if (!pref.isEmpty())
+        m_pref.setItems(pref);
 }
 
-bool HotkeyManager::registerOne(const HotkeyManager::HotkeyDef& def) {
-    const QString key = normalize(def.sequence);
-    if (key.isEmpty()) {
-        logLine(QString("Invalid hotkey: '%1'").arg(def.sequence));
-        emit hotkeyRegistrationFailed(def.sequence, def.actionId);
-        return false;
+void HotkeyManager::saveUserSettings() {
+    QSettings s("TalkLess", "TalkLess");
+
+    // Save system shortcuts
+    s.beginGroup("hotkeys/system");
+    s.remove("");
+    for (const auto& it : m_system.items())
+        s.setValue(QString::number(it.id), it.hotkey);
+    s.endGroup();
+
+    // Save preference list
+    // We'll store as indexed groups to keep it simple
+    s.remove("hotkeys/pref");
+    const auto& pref = m_pref.items();
+    s.setValue("hotkeys/pref/count", pref.size());
+    for (int i = 0; i < pref.size(); ++i) {
+        s.beginGroup(QString("hotkeys/pref/%1").arg(i));
+        s.setValue("id", pref[i].id);
+        s.setValue("title", pref[i].title);
+        s.setValue("hotkey", pref[i].hotkey);
+        s.setValue("actionId", pref[i].actionId);
+        s.setValue("enabled", pref[i].enabled);
+        s.endGroup();
     }
-
-    if (m_entries.contains(key)) {
-        logLine(QString("Duplicate hotkey ignored: '%1' -> '%2'").arg(key, def.actionId));
-        return false;
-    }
-
-    auto* hk = new QHotkey(this);
-    const bool ok = hk->setShortcut(QKeySequence(def.sequence), true /*autoRegister*/);
-
-    logLine(QString("Register '%1' (norm '%2') -> %3")
-                .arg(def.sequence, key, ok ? "OK" : "FAILED"));
-
-    if (!ok || !hk->isRegistered()) {
-        hk->deleteLater();
-        emit hotkeyRegistrationFailed(def.sequence, def.actionId);
-        return false;
-    }
-
-    // If you want per-hotkey enable/disable:
-    if (!def.enabled) {
-        hk->setRegistered(false);
-    }
-
-    Entry e;
-    e.actionId = def.actionId;
-    e.enabled = def.enabled;
-    e.hotkey = hk;
-    m_entries.insert(key, e);
-
-    connect(hk, &QHotkey::activated, this, [this, key]() {
-        const auto it = m_entries.find(key);
-        if (it == m_entries.end()) return;
-
-        // It was registered, so this tells you exactly which hotkey fired:
-        emit hotkeyTriggered(key, it.value().actionId);
-        logLine(QString("ACTIVATED '%1' -> '%2'").arg(key, it.value().actionId));
-    });
-
-    return true;
 }
 
-bool HotkeyManager::setHotkeys(const QVector<HotkeyDef>& defs) {
-    clearAll();
-
-    bool allOk = true;
-    for (const auto& d : defs) {
-        allOk = registerOne(d) && allOk;
+void HotkeyManager::clearRegistrations() {
+    for (auto* hk : m_registered) {
+        if (hk) {
+            hk->setRegistered(false);
+            hk->deleteLater();
+        }
     }
-    return allOk;
+    m_registered.clear();
 }
 
-bool HotkeyManager::setHotkeyEnabled(const QString& sequence, bool enabled) {
-    const QString key = normalize(sequence);
-    auto it = m_entries.find(key);
-    if (it == m_entries.end() || !it.value().hotkey) return false;
+void HotkeyManager::rebuildRegistrations() {
+    clearRegistrations();
 
-    it.value().enabled = enabled;
-    it.value().hotkey->setRegistered(enabled);
-    logLine(QString("SetEnabled '%1' -> %2").arg(key, enabled ? "true" : "false"));
-    return true;
+    auto registerItem = [&](const HotkeyItem& it) {
+        if (!it.enabled) return;
+        if (it.hotkey.trimmed().isEmpty()) return;
+        if (!isValidHotkey(it.hotkey)) return;
+
+        const QString portable = toPortable(it.hotkey);
+
+        // Prevent duplicates at registration stage
+        if (m_registered.contains(portable)) return;
+
+        auto* hk = new QHotkey(this);
+        const bool ok = hk->setShortcut(QKeySequence(it.hotkey), true /* autoRegister */);
+
+        if (!ok || !hk->isRegistered()) {
+            hk->deleteLater();
+            emit showMessage(QString("OS refused hotkey: %1").arg(toNative(it.hotkey)));
+            return;
+        }
+
+        m_registered.insert(portable, hk);
+
+        connect(hk, &QHotkey::activated, this, [this, it]() {
+            emit actionTriggered(it.actionId);
+        });
+    };
+
+    for (const auto& it : m_system.items()) registerItem(it);
+    for (const auto& it : m_pref.items()) registerItem(it);
+}
+
+bool HotkeyManager::hasConflictPortable(const QString& portableKey, int ignoreId, CaptureTarget ignoreTarget, QString* conflictTitle) const {
+    auto check = [&](const HotkeysModel& model, CaptureTarget target) -> const HotkeyItem* {
+        for (const auto& it : model.items()) {
+            if (target == ignoreTarget && it.id == ignoreId) continue;
+            if (!it.enabled) continue;
+            if (toPortable(it.hotkey) == portableKey) return &it;
+        }
+        return nullptr;
+    };
+
+    if (auto* c = check(m_system, CaptureTarget::System)) {
+        if (conflictTitle) *conflictTitle = c->title;
+        return true;
+    }
+    if (auto* c = check(m_pref, CaptureTarget::Preference)) {
+        if (conflictTitle) *conflictTitle = c->title;
+        return true;
+    }
+    return false;
+}
+
+// ------------------ UI functions ------------------
+
+void HotkeyManager::reassignSystem(int id) {
+    const auto* it = m_system.findById(id);
+    if (!it) return;
+
+    m_target = CaptureTarget::System;
+    m_targetId = id;
+    emit requestCapture(QString("Reassign: %1").arg(it->title));
+}
+
+void HotkeyManager::resetSystem(int id) {
+    if (m_system.resetToDefaultById(id)) {
+        rebuildRegistrations();
+        emit showMessage("System hotkey reset.");
+    }
+}
+
+void HotkeyManager::reassignPreference(int id) {
+    const auto* it = m_pref.findById(id);
+    if (!it) return;
+
+    m_target = CaptureTarget::Preference;
+    m_targetId = id;
+    emit requestCapture(QString("Reassign: %1").arg(it->title));
+}
+
+void HotkeyManager::deletePreference(int id) {
+    if (m_pref.removeById(id)) {
+        rebuildRegistrations();
+        emit showMessage("Preference hotkey deleted.");
+    }
+}
+
+void HotkeyManager::undoHotkeyChanges() {
+    m_system.setItems(m_systemOriginal);
+    m_pref.setItems(m_prefOriginal);
+    rebuildRegistrations();
+    emit showMessage("Hotkey changes undone.");
+}
+
+void HotkeyManager::saveHotkeys() {
+    saveUserSettings();
+    snapshotForUndo();
+    emit showMessage("Hotkeys saved.");
+}
+
+int HotkeyManager::addPreferenceHotkey(const QString& title, const QString& actionId) {
+    if (actionId.trimmed().isEmpty()) return -1;
+
+    auto pref = m_pref.items();
+    HotkeyItem it;
+    it.id = m_nextPrefId++;
+    it.title = title.isEmpty() ? QString("Preference %1").arg(it.id) : title;
+    it.hotkey = ""; // will be assigned by capture
+    it.defaultHotkey = "";
+    it.actionId = actionId;
+    it.isSystem = false;
+    it.enabled = true;
+    pref.push_back(it);
+
+    m_pref.setItems(pref);
+    emit showMessage("Preference hotkey added.");
+    return it.id;
+}
+
+void HotkeyManager::applyCapturedHotkey(const QString& hotkeyText) {
+    if (m_target == CaptureTarget::None || m_targetId < 0) return;
+
+    if (!isValidHotkey(hotkeyText)) {
+        emit showMessage("Invalid hotkey.");
+        return;
+    }
+
+    const QString portableKey = toPortable(hotkeyText);
+
+    QString conflict;
+    if (hasConflictPortable(portableKey, m_targetId, m_target, &conflict)) {
+        emit showMessage(QString("Conflict: already used by '%1'").arg(conflict));
+        return;
+    }
+
+    if (m_target == CaptureTarget::System) {
+        m_system.setHotkeyById(m_targetId, hotkeyText);
+    } else {
+        m_pref.setHotkeyById(m_targetId, hotkeyText);
+    }
+
+    rebuildRegistrations();
+    emit showMessage(QString("Assigned: %1").arg(toNative(hotkeyText)));
+
+    m_target = CaptureTarget::None;
+    m_targetId = -1;
+}
+
+void HotkeyManager::cancelCapture() {
+    m_target = CaptureTarget::None;
+    m_targetId = -1;
 }

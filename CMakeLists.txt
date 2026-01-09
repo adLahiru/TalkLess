@@ -12,9 +12,12 @@ set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "" FORCE)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg)
 
+# Fix for QHotkey's outdated cmake_minimum_required with newer CMake versions
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
+
 FetchContent_Declare(QHotkey
   GIT_REPOSITORY https://github.com/Skycoder42/QHotkey.git
-  GIT_TAG 1.5.0
+  GIT_TAG master
 )
 FetchContent_MakeAvailable(QHotkey)
 
@@ -43,6 +46,8 @@ qt_add_executable(appTalkLess
     src/qmlmodels/soundboardsListModel.cpp
     src/qmlmodels/clipsListModel.h
     src/qmlmodels/clipsListModel.cpp
+    src/qmlmodels/hotkeysModel.h
+    src/qmlmodels/hotkeysModel.cpp
 
 
     # services
