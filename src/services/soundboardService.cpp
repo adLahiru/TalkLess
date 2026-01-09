@@ -4,10 +4,10 @@
 
 #include <QDebug>
 #include <QFileInfo>
-#include <QUrl>
-#include <QJsonObject>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QJsonValue>
+#include <QUrl>
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
@@ -39,7 +39,7 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
     if (m_audioEngine) {
         m_audioEngine->setMasterGainDB(static_cast<float>(m_state.settings.masterGainDb));
         m_audioEngine->setMicGainDB(static_cast<float>(m_state.settings.micGainDb));
-        
+
         if (!m_state.settings.selectedCaptureDeviceId.isEmpty()) {
             m_audioEngine->setCaptureDevice(m_state.settings.selectedCaptureDeviceId.toStdString());
         }
@@ -54,7 +54,7 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
         m_audioEngine->setMicPassthroughEnabled(m_state.settings.micPassthroughEnabled);
         m_audioEngine->setMicSoundboardBalance(m_state.settings.micSoundboardBalance);
 
-        qDebug() << "Applied saved audio settings - Master:" << m_state.settings.masterGainDb 
+        qDebug() << "Applied saved audio settings - Master:" << m_state.settings.masterGainDb
                  << "dB, Mic:" << m_state.settings.micGainDb << "dB";
     }
 
@@ -96,12 +96,12 @@ void SoundboardService::setMasterGainDb(double db)
 {
     m_state.settings.masterGainDb = db;
     m_repo.saveIndex(m_state);
-    
+
     // Apply to audio engine
     if (m_audioEngine) {
         m_audioEngine->setMasterGainDB(static_cast<float>(db));
     }
-    
+
     emit settingsChanged();
 }
 
@@ -109,12 +109,12 @@ void SoundboardService::setMicGainDb(double db)
 {
     m_state.settings.micGainDb = db;
     m_repo.saveIndex(m_state);
-    
+
     // Apply to audio engine
     if (m_audioEngine) {
         m_audioEngine->setMicGainDB(static_cast<float>(db));
     }
-    
+
     emit settingsChanged();
 }
 
@@ -436,7 +436,8 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
     return false;
 }
 
-bool SoundboardService::updateClipInBoard(int boardId, int clipId, const QString& title, const QString& hotkey, const QStringList& tags)
+bool SoundboardService::updateClipInBoard(int boardId, int clipId, const QString& title, const QString& hotkey,
+                                          const QStringList& tags)
 {
     // active board update
     if (m_active && m_active->id == boardId) {
@@ -472,6 +473,54 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const QString
         c.title = title.trimmed().isEmpty() ? QFileInfo(c.filePath).baseName() : title.trimmed();
         c.hotkey = hotkey;
         c.tags = tags;
+
+        const bool ok = m_repo.saveBoard(b);
+        if (ok) {
+            m_state = m_repo.loadIndex();
+            emit boardsChanged();
+        }
+        return ok;
+    }
+    return false;
+}
+
+bool SoundboardService::updateClipImage(int boardId, int clipId, const QString& imagePath)
+{
+    // Convert file:// URL to local path if needed
+    QString localPath = imagePath;
+    if (localPath.startsWith("file:")) {
+        localPath = QUrl(localPath).toLocalFile();
+    }
+
+    // active board update
+    if (m_active && m_active->id == boardId) {
+        for (auto& c : m_active->clips) {
+            if (c.id != clipId)
+                continue;
+            if (c.locked)
+                return false;
+
+            // Update image path
+            c.imgPath = localPath;
+
+            emit activeClipsChanged();
+            return saveActive();
+        }
+        return false;
+    }
+
+    // inactive board update
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded)
+        return false;
+
+    Soundboard b = *loaded;
+    for (auto& c : b.clips) {
+        if (c.id != clipId)
+            continue;
+
+        // Update image path
+        c.imgPath = localPath;
 
         const bool ok = m_repo.saveBoard(b);
         if (ok) {
@@ -566,7 +615,6 @@ bool SoundboardService::deleteBoard(int boardId)
 
 void SoundboardService::playClip(int clipId)
 {
-
     if (!m_audioEngine) {
         qWarning() << "AudioEngine not initialized";
         return;
@@ -819,25 +867,25 @@ void SoundboardService::setMicSoundboardBalance(float balance)
     if (!m_audioEngine) {
         return;
     }
-    
+
     // Clamp balance to 0.0-1.0 range
     balance = std::max(0.0f, std::min(1.0f, balance));
-    
+
     // Balance affects mic and clip gains inversely
     // At balance = 0.0: mic = 100%, clips = 0%
     // At balance = 0.5: mic = 100%, clips = 100% (both full)
     // At balance = 1.0: mic = 0%, clips = 100%
-    
+
     // Use a crossfade curve: mic reduces as balance goes up, clips are always at balance level
-    float micMultiplier = 1.0f - balance;  // 1.0 at 0, 0.0 at 1.0
-    
+    float micMultiplier = 1.0f - balance; // 1.0 at 0, 0.0 at 1.0
+
     // Apply the mic gain based on balance
     // We'll use a linear mix for now - mic fades out as balance increases
     m_audioEngine->setMicSoundboardBalance(balance);
-    
+
     m_state.settings.micSoundboardBalance = balance;
     m_repo.saveIndex(m_state);
-    
+
     qDebug() << "Mic/Soundboard balance set to:" << balance;
     emit settingsChanged();
 }
@@ -845,7 +893,7 @@ void SoundboardService::setMicSoundboardBalance(float balance)
 float SoundboardService::getMicSoundboardBalance() const
 {
     if (!m_audioEngine) {
-        return 0.5f;  // Default to center
+        return 0.5f; // Default to center
     }
     return m_audioEngine->getMicSoundboardBalance();
 }
@@ -912,7 +960,7 @@ bool SoundboardService::setBoardHotkey(int boardId, const QString& hotkey)
             break;
         }
     }
-    
+
     // If it's the active board, update in memory too
     if (m_active && m_active->id == boardId) {
         m_active->hotkey = hotkey;
@@ -925,11 +973,11 @@ bool SoundboardService::setBoardHotkey(int boardId, const QString& hotkey)
             m_repo.saveBoard(*loaded);
         }
     }
-    
+
     // Save index
     m_repo.saveIndex(m_state);
     emit boardsChanged();
-    
+
     return true;
 }
 
@@ -940,23 +988,20 @@ bool SoundboardService::setBoardHotkey(int boardId, const QString& hotkey)
 void SoundboardService::handleHotkeyAction(const QString& actionId)
 {
     qDebug() << "Hotkey action received:" << actionId;
-    
+
     if (actionId == "sys.toggleMute") {
         // Toggle mic enabled state
         bool currentState = isMicEnabled();
         setMicEnabled(!currentState);
         qDebug() << "Mic toggled to:" << !currentState;
-    } 
-    else if (actionId == "sys.stopAll") {
+    } else if (actionId == "sys.stopAll") {
         stopAllClips();
         qDebug() << "All clips stopped via hotkey";
-    } 
-    else if (actionId == "sys.playSelected") {
+    } else if (actionId == "sys.playSelected") {
         // Emit signal for QML to handle - it knows the selected clip
         emit playSelectedRequested();
         qDebug() << "Play selected signal emitted";
-    } 
-    else if (actionId.startsWith("board.")) {
+    } else if (actionId.startsWith("board.")) {
         // Handle soundboard activation hotkeys (e.g., "board.1" activates board 1)
         bool ok;
         int boardId = actionId.mid(6).toInt(&ok);
@@ -964,8 +1009,7 @@ void SoundboardService::handleHotkeyAction(const QString& actionId)
             activate(boardId);
             qDebug() << "Soundboard activated via hotkey:" << boardId;
         }
-    }
-    else if (actionId.startsWith("clip.")) {
+    } else if (actionId.startsWith("clip.")) {
         // Handle clip-specific hotkeys (e.g., "clip.123" plays clip 123)
         bool ok;
         int clipId = actionId.mid(5).toInt(&ok);
@@ -980,15 +1024,15 @@ void SoundboardService::handleHotkeyAction(const QString& actionId)
             }
             qDebug() << "Clip hotkey triggered for clip:" << clipId;
         }
-    }
-    else {
+    } else {
         qDebug() << "Unknown hotkey action:" << actionId;
     }
 }
 
 void SoundboardService::setTheme(const QString& theme)
 {
-    if (m_state.settings.theme == theme) return;
+    if (m_state.settings.theme == theme)
+        return;
     m_state.settings.theme = theme;
     m_repo.saveIndex(m_state);
     emit settingsChanged();
@@ -996,7 +1040,8 @@ void SoundboardService::setTheme(const QString& theme)
 
 void SoundboardService::setAccentColor(const QString& color)
 {
-    if (m_state.settings.accentColor == color) return;
+    if (m_state.settings.accentColor == color)
+        return;
     m_state.settings.accentColor = color;
     m_repo.saveIndex(m_state);
     emit settingsChanged();
@@ -1004,7 +1049,8 @@ void SoundboardService::setAccentColor(const QString& color)
 
 void SoundboardService::setSlotSize(const QString& size)
 {
-    if (m_state.settings.slotSize == size) return;
+    if (m_state.settings.slotSize == size)
+        return;
     m_state.settings.slotSize = size;
     m_repo.saveIndex(m_state);
     emit settingsChanged();
@@ -1012,7 +1058,8 @@ void SoundboardService::setSlotSize(const QString& size)
 
 void SoundboardService::setLanguage(const QString& lang)
 {
-    if (m_state.settings.language == lang) return;
+    if (m_state.settings.language == lang)
+        return;
     m_state.settings.language = lang;
     m_repo.saveIndex(m_state);
     emit settingsChanged();
@@ -1020,7 +1067,8 @@ void SoundboardService::setLanguage(const QString& lang)
 
 void SoundboardService::setHotkeyMode(const QString& mode)
 {
-    if (m_state.settings.hotkeyMode == mode) return;
+    if (m_state.settings.hotkeyMode == mode)
+        return;
     m_state.settings.hotkeyMode = mode;
     m_repo.saveIndex(m_state);
     emit settingsChanged();
@@ -1048,7 +1096,7 @@ bool SoundboardService::exportSettings(const QString& filePath)
     settings["micEnabled"] = m_state.settings.micEnabled;
     settings["micPassthroughEnabled"] = m_state.settings.micPassthroughEnabled;
     settings["micSoundboardBalance"] = m_state.settings.micSoundboardBalance;
-    
+
     root["settings"] = settings;
     root["version"] = m_state.version;
 
@@ -1076,28 +1124,34 @@ bool SoundboardService::importSettings(const QString& filePath)
     }
 
     QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-    if (doc.isNull()) return false;
+    if (doc.isNull())
+        return false;
 
     QJsonObject root = doc.object();
     if (root.contains("settings")) {
         QJsonObject s = root.value("settings").toObject();
         m_state.settings.masterGainDb = s.value("masterGainDb").toDouble(m_state.settings.masterGainDb);
         m_state.settings.micGainDb = s.value("micGainDb").toDouble(m_state.settings.micGainDb);
-        m_state.settings.selectedPlaybackDeviceId = s.value("selectedPlaybackDeviceId").toString(m_state.settings.selectedPlaybackDeviceId);
-        m_state.settings.selectedCaptureDeviceId = s.value("selectedCaptureDeviceId").toString(m_state.settings.selectedCaptureDeviceId);
-        m_state.settings.selectedMonitorDeviceId = s.value("selectedMonitorDeviceId").toString(m_state.settings.selectedMonitorDeviceId);
+        m_state.settings.selectedPlaybackDeviceId =
+            s.value("selectedPlaybackDeviceId").toString(m_state.settings.selectedPlaybackDeviceId);
+        m_state.settings.selectedCaptureDeviceId =
+            s.value("selectedCaptureDeviceId").toString(m_state.settings.selectedCaptureDeviceId);
+        m_state.settings.selectedMonitorDeviceId =
+            s.value("selectedMonitorDeviceId").toString(m_state.settings.selectedMonitorDeviceId);
         m_state.settings.theme = s.value("theme").toString(m_state.settings.theme);
         m_state.settings.accentColor = s.value("accentColor").toString(m_state.settings.accentColor);
         m_state.settings.slotSize = s.value("slotSize").toString(m_state.settings.slotSize);
         m_state.settings.language = s.value("language").toString(m_state.settings.language);
         m_state.settings.hotkeyMode = s.value("hotkeyMode").toString(m_state.settings.hotkeyMode);
         m_state.settings.micEnabled = s.value("micEnabled").toBool(m_state.settings.micEnabled);
-        m_state.settings.micPassthroughEnabled = s.value("micPassthroughEnabled").toBool(m_state.settings.micPassthroughEnabled);
-        m_state.settings.micSoundboardBalance = (float)s.value("micSoundboardBalance").toDouble(m_state.settings.micSoundboardBalance);
+        m_state.settings.micPassthroughEnabled =
+            s.value("micPassthroughEnabled").toBool(m_state.settings.micPassthroughEnabled);
+        m_state.settings.micSoundboardBalance =
+            (float)s.value("micSoundboardBalance").toDouble(m_state.settings.micSoundboardBalance);
 
         // Save updated state
         m_repo.saveIndex(m_state);
-        
+
         // Apply settings
         if (m_audioEngine) {
             m_audioEngine->setMasterGainDB(static_cast<float>(m_state.settings.masterGainDb));
@@ -1108,7 +1162,7 @@ bool SoundboardService::importSettings(const QString& filePath)
                 m_audioEngine->setPlaybackDevice(m_state.settings.selectedPlaybackDeviceId.toStdString());
             if (!m_state.settings.selectedMonitorDeviceId.isEmpty())
                 m_audioEngine->setMonitorPlaybackDevice(m_state.settings.selectedMonitorDeviceId.toStdString());
-            
+
             m_audioEngine->setMicEnabled(m_state.settings.micEnabled);
             m_audioEngine->setMicPassthroughEnabled(m_state.settings.micPassthroughEnabled);
             m_audioEngine->setMicSoundboardBalance(m_state.settings.micSoundboardBalance);

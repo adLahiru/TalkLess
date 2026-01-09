@@ -36,31 +36,33 @@ public:
     Q_PROPERTY(QString selectedPlaybackDeviceId READ selectedPlaybackDeviceId NOTIFY settingsChanged)
     Q_PROPERTY(QString selectedMonitorDeviceId READ selectedMonitorDeviceId NOTIFY settingsChanged)
     Q_PROPERTY(bool micEnabled READ isMicEnabled WRITE setMicEnabled NOTIFY settingsChanged)
-    Q_PROPERTY(bool micPassthroughEnabled READ isMicPassthroughEnabled WRITE setMicPassthroughEnabled NOTIFY settingsChanged)
-    Q_PROPERTY(float micSoundboardBalance READ getMicSoundboardBalance WRITE setMicSoundboardBalance NOTIFY settingsChanged)
+    Q_PROPERTY(
+        bool micPassthroughEnabled READ isMicPassthroughEnabled WRITE setMicPassthroughEnabled NOTIFY settingsChanged)
+    Q_PROPERTY(
+        float micSoundboardBalance READ getMicSoundboardBalance WRITE setMicSoundboardBalance NOTIFY settingsChanged)
 
     // ---- Index / Settings ----
     double masterGainDb() const { return m_state.settings.masterGainDb; }
     double micGainDb() const { return m_state.settings.micGainDb; }
-    
+
     QString selectedCaptureDeviceId() const { return m_state.settings.selectedCaptureDeviceId; }
     QString selectedPlaybackDeviceId() const { return m_state.settings.selectedPlaybackDeviceId; }
     QString selectedMonitorDeviceId() const { return m_state.settings.selectedMonitorDeviceId; }
     Q_INVOKABLE void setMasterGainDb(double db);
     Q_INVOKABLE void setMicGainDb(double db);
-    
+
     QString theme() const { return m_state.settings.theme; }
     Q_INVOKABLE void setTheme(const QString& theme);
-    
+
     QString accentColor() const { return m_state.settings.accentColor; }
     Q_INVOKABLE void setAccentColor(const QString& color);
-    
+
     QString slotSize() const { return m_state.settings.slotSize; }
     Q_INVOKABLE void setSlotSize(const QString& size);
-    
+
     QString language() const { return m_state.settings.language; }
     Q_INVOKABLE void setLanguage(const QString& lang);
-    
+
     QString hotkeyMode() const { return m_state.settings.hotkeyMode; }
     Q_INVOKABLE void setHotkeyMode(const QString& mode);
 
@@ -91,7 +93,9 @@ public:
     Q_INVOKABLE bool deleteClip(int boardId, int clipId);
     bool addClipToBoard(int boardId, const Clip& draft);
     bool updateClipInBoard(int boardId, int clipId, const Clip& updatedClip);
-    Q_INVOKABLE bool updateClipInBoard(int boardId, int clipId, const QString& title, const QString& hotkey, const QStringList& tags);
+    Q_INVOKABLE bool updateClipInBoard(int boardId, int clipId, const QString& title, const QString& hotkey,
+                                       const QStringList& tags);
+    Q_INVOKABLE bool updateClipImage(int boardId, int clipId, const QString& imagePath);
     QVector<Clip> getClipsForBoard(int boardId) const; // Get all clips for a board
     QVector<Clip> getActiveClips() const;              // Get clips from active board
 
@@ -115,11 +119,11 @@ public:
     Q_INVOKABLE void resetPeakLevels();
 
     // ---- Mixer Controls ----
-    Q_INVOKABLE void setMicSoundboardBalance(float balance);  // 0.0 = full mic, 1.0 = full soundboard
+    Q_INVOKABLE void setMicSoundboardBalance(float balance); // 0.0 = full mic, 1.0 = full soundboard
     Q_INVOKABLE float getMicSoundboardBalance() const;
-    Q_INVOKABLE void setMicPassthroughEnabled(bool enabled);  // Enable/disable mic in output
+    Q_INVOKABLE void setMicPassthroughEnabled(bool enabled); // Enable/disable mic in output
     Q_INVOKABLE bool isMicPassthroughEnabled() const;
-    Q_INVOKABLE void setMicEnabled(bool enabled);             // Enable/disable capture
+    Q_INVOKABLE void setMicEnabled(bool enabled); // Enable/disable capture
     Q_INVOKABLE bool isMicEnabled() const;
 
     // ---- Hotkey (active only) ----
@@ -139,7 +143,7 @@ signals:
     void settingsChanged();
     void clipPlaybackStarted(int clipId);
     void clipPlaybackStopped(int clipId);
-    
+
     // Emitted when play-selected hotkey is pressed - QML handles this since it knows selected clip
     void playSelectedRequested();
 

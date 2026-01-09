@@ -69,6 +69,32 @@ Rectangle {
         }
     }
 
+    // Track which clip is being edited for background image
+    property int clipToEditImageId: -1
+
+    // Image file dialog for background image selection
+    FileDialog {
+        id: imageFileDialog
+        title: "Select Background Image"
+        nameFilters: ["Image files (*.png *.jpg *.jpeg *.gif *.webp *.bmp)", "All files (*)"]
+        onAccepted: {
+            console.log("Image selected:", selectedFile, "for clip:", root.clipToEditImageId)
+            if (root.clipToEditImageId >= 0) {
+                const success = clipsModel.updateClipImage(root.clipToEditImageId, selectedFile.toString())
+                if (success) {
+                    console.log("Background image updated successfully")
+                    clipsModel.reload()  // Reload to show new image
+                } else {
+                    console.log("Failed to update background image")
+                }
+                root.clipToEditImageId = -1
+            }
+        }
+        onRejected: {
+            root.clipToEditImageId = -1
+        }
+    }
+
     Connections {
         target: clipsModel
         function onBoardIdChanged() {
@@ -544,9 +570,17 @@ Rectangle {
                                 height: contentArea.tileHeight
                                 title: clipTitle.length > 0 ? clipTitle : ("Clip " + (index + 1))
                                 hotkeyText: hotkey
-                                imageSource: imgPath.length > 0 
-                                    ? imgPath 
-                                    : "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
+                                // Convert local path to file:// URL if needed for QML Image
+                                imageSource: {
+                                    if (imgPath.length === 0) {
+                                        return "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
+                                    } else if (imgPath.startsWith("qrc:") || imgPath.startsWith("file:") || imgPath.startsWith("http")) {
+                                        return imgPath
+                                    } else {
+                                        // Local path - convert to file:// URL
+                                        return "file://" + imgPath
+                                    }
+                                }
                                 
                                 // Bind isPlaying from model to component
                                 isPlaying: clipIsPlaying
@@ -568,6 +602,11 @@ Rectangle {
                                     soundboardService.stopClip(clipId)
                                 }
                                 onCopyClicked: console.log("Copy clicked:", clipId, clipTitle)
+                                onEditBackgroundClicked: {
+                                    console.log("Edit background clicked:", clipId, clipTitle)
+                                    root.clipToEditImageId = clipId
+                                    imageFileDialog.open()
+                                }
                             }
                         }
                     }
@@ -600,7 +639,18 @@ Rectangle {
                 // Bind to displayed clip data (prioritizes playing clip)
                 songName: (root.displayedClipData && root.displayedClipData.title) ? root.displayedClipData.title : "No clip selected"
                 hotkeyText: (root.displayedClipData && root.displayedClipData.hotkey) ? "Press " + root.displayedClipData.hotkey + " to play" : "No hotkey assigned"
-                imageSource: (root.displayedClipData && root.displayedClipData.imgPath) ? root.displayedClipData.imgPath : "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
+                // Convert local path to file:// URL if needed for QML Image
+                imageSource: {
+                    const imgPath = (root.displayedClipData && root.displayedClipData.imgPath) ? root.displayedClipData.imgPath : ""
+                    if (imgPath.length === 0) {
+                        return "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
+                    } else if (imgPath.startsWith("qrc:") || imgPath.startsWith("file:") || imgPath.startsWith("http")) {
+                        return imgPath
+                    } else {
+                        // Local path - convert to file:// URL
+                        return "file://" + imgPath
+                    }
+                }
                 
                 // Bind isPlaying state
                 isPlaying: root.displayedClipData ? root.displayedClipData.isPlaying : false

@@ -1,10 +1,10 @@
 #pragma once
 
+#include "models/clip.h"
+#include "services/soundboardService.h"
+
 #include <QAbstractListModel>
 #include <QVector>
-
-#include "services/soundboardService.h"
-#include "models/clip.h"
 
 class ClipsListModel : public QAbstractListModel
 {
@@ -47,8 +47,9 @@ public:
 
     // Invokable methods for QML
     Q_INVOKABLE void reload();
-    Q_INVOKABLE void loadActiveBoard();  // Load clips from the currently active board
+    Q_INVOKABLE void loadActiveBoard(); // Load clips from the currently active board
     Q_INVOKABLE bool updateClip(int clipId, const QString& title, const QString& hotkey, const QStringList& tags);
+    Q_INVOKABLE bool updateClipImage(int clipId, const QString& imagePath);
 
 signals:
     void boardIdChanged();

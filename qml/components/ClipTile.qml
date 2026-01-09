@@ -1,6 +1,9 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Effects
 
 Item {
     id: root
@@ -19,6 +22,7 @@ Item {
     signal stopClicked()
     signal copyClicked()
     signal clicked()
+    signal editBackgroundClicked()
 
     Rectangle {
         id: card
@@ -29,13 +33,41 @@ Item {
         border.color: "#EDEDED"
         clip: true
 
-        // Background image
-        Image {
+        // Background image with rounded corners
+        Item {
+            id: imageContainer
             anchors.fill: parent
-            source: root.imageSource
-            fillMode: Image.PreserveAspectCrop
-            smooth: true
-            visible: source && source !== ""
+            anchors.margins: 2  // Account for border
+
+            // The actual image (hidden, used as source for masking)
+            Image {
+                id: backgroundImage
+                anchors.fill: parent
+                source: root.imageSource
+                fillMode: Image.PreserveAspectCrop
+                smooth: true
+                visible: false  // Hidden, used as source for MultiEffect
+            }
+
+            // Mask shape
+            Rectangle {
+                id: imageMask
+                anchors.fill: parent
+                radius: 14  // Slightly less than card radius to account for border
+                visible: false
+            }
+
+            // Apply the mask using MultiEffect
+            MultiEffect {
+                anchors.fill: backgroundImage
+                source: backgroundImage
+                maskEnabled: true
+                maskSource: ShaderEffectSource {
+                    sourceItem: imageMask
+                    live: false
+                }
+                visible: backgroundImage.status === Image.Ready
+            }
         }
 
         // Yellowish translucent overlay on left half of tile
@@ -50,8 +82,8 @@ Item {
                 anchors.fill: parent
                 anchors.rightMargin: -16  // Extend right to hide right-side corners
                 radius: 16  // Match card radius
-                color: "#C4A84D"  // Yellowish/golden color
-                opacity: 0.4  // Transparent so background shows through
+                color: "#D9D9D938"  // Yellowish/golden color
+                opacity: 0.2  // Transparent so background shows through
             }
         }
 
@@ -86,6 +118,64 @@ Item {
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight  // Truncate with ellipsis if text is too long
                 horizontalAlignment: Text.AlignHCenter
+            }
+        }
+
+        // Edit background button - top right corner (white circular button)
+        Rectangle {
+            id: editBackgroundButton
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 8
+            anchors.rightMargin: 8
+            width: 24
+            height: 24
+            radius: 12  // Circular button
+            color: editBgMouseArea.containsMouse ? "#FFFFFF" : "#E0E0E0"
+            z: 10  // Above other elements
+
+            // Drop shadow effect for visibility on any background
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: -1
+                radius: parent.radius + 1
+                color: "#40000000"
+                z: -1
+            }
+
+            Image {
+                id: editIcon
+                anchors.centerIn: parent
+                source: "qrc:/qt/qml/TalkLess/resources/icons/uil_edit.svg"
+                width: 14
+                height: 14
+                fillMode: Image.PreserveAspectFit
+                visible: false  // Hidden, used as source for MultiEffect
+            }
+
+            // Color the icon dark for visibility on white button
+            MultiEffect {
+                source: editIcon
+                anchors.centerIn: parent
+                width: editIcon.width
+                height: editIcon.height
+                colorization: 1.0
+                colorizationColor: "#333333"
+            }
+
+            MouseArea {
+                id: editBgMouseArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: function(mouse) {
+                    root.editBackgroundClicked()
+                    mouse.accepted = true
+                }
+            }
+
+            Behavior on color {
+                ColorAnimation { duration: 150 }
             }
         }
 

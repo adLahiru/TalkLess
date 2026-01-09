@@ -162,6 +162,8 @@ qt_add_qml_module(appTalkLess
         resources/icons/actions/ic_mic.svg
         resources/icons/actions/ic_mic_test.svg
         resources/icons/actions/ic_refresh.svg
+        # Edit icon
+        resources/icons/uil_edit.svg
         # Images
         resources/images/background.png
         resources/images/splashScreen.png

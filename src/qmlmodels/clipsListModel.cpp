@@ -1,5 +1,7 @@
 #include "clipsListModel.h"
 
+#include <QUrl>
+
 ClipsListModel::ClipsListModel(QObject* parent) : QAbstractListModel(parent) {}
 
 void ClipsListModel::setService(SoundboardService* service)
@@ -107,7 +109,7 @@ QHash<int, QByteArray> ClipsListModel::roleNames() const
         {  IsPlayingRole, "clipIsPlaying"},
         {   IsRepeatRole,      "isRepeat"},
         {     LockedRole,        "locked"},
-        {      TagsRole,         "tags"}
+        {       TagsRole,          "tags"}
     };
 }
 
@@ -155,7 +157,7 @@ bool ClipsListModel::updateClip(int clipId, const QString& title, const QString&
 {
     if (!m_service || m_boardId < 0)
         return false;
-    
+
     bool success = m_service->updateClipInBoard(m_boardId, clipId, title, hotkey, tags);
     if (success) {
         // Update cache
@@ -164,6 +166,34 @@ bool ClipsListModel::updateClip(int clipId, const QString& title, const QString&
                 c.title = title;
                 c.hotkey = hotkey;
                 c.tags = tags;
+                break;
+            }
+        }
+        emit clipsChanged();
+    }
+    return success;
+}
+
+bool ClipsListModel::updateClipImage(int clipId, const QString& imagePath)
+{
+    if (!m_service || m_boardId < 0)
+        return false;
+
+    bool success = m_service->updateClipImage(m_boardId, clipId, imagePath);
+    if (success) {
+        // Update cache and emit dataChanged for the specific row
+        for (int i = 0; i < m_cache.size(); ++i) {
+            if (m_cache[i].id == clipId) {
+                // Convert file:// URL to local path for storage consistency
+                QString localPath = imagePath;
+                if (localPath.startsWith("file:")) {
+                    localPath = QUrl(localPath).toLocalFile();
+                }
+                m_cache[i].imgPath = localPath;
+
+                // Emit dataChanged for the specific row and role
+                QModelIndex idx = index(i, 0);
+                emit dataChanged(idx, idx, {ImgPathRole});
                 break;
             }
         }
