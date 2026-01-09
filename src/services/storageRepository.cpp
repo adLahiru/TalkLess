@@ -41,6 +41,7 @@ static QJsonObject soundboardInfoToJson(const SoundboardInfo& i)
     QJsonObject o;
     o["id"] = i.id;
     o["name"] = i.name;
+    o["hotkey"] = i.hotkey;
     o["clipCount"] = i.clipCount;
     return o;
 }
@@ -50,6 +51,7 @@ static SoundboardInfo soundboardInfoFromJson(const QJsonObject& o)
     SoundboardInfo i;
     i.id = o.value("id").toInt(-1);
     i.name = o.value("name").toString();
+    i.hotkey = o.value("hotkey").toString();
     i.clipCount = o.value("clipCount").toInt(0);
     return i;
 }
@@ -104,6 +106,7 @@ static QJsonObject soundboardToJson(const Soundboard& b)
     QJsonObject root;
     root["id"] = b.id;
     root["name"] = b.name;
+    root["hotkey"] = b.hotkey;
 
     QJsonArray clipsArr;
     for (const auto& c : b.clips) clipsArr.append(clipToJson(c));
@@ -117,6 +120,7 @@ static Soundboard soundboardFromJson(const QJsonObject& root)
     Soundboard b;
     b.id = root.value("id").toInt(-1);
     b.name = root.value("name").toString();
+    b.hotkey = root.value("hotkey").toString();
 
     const auto clipsArr = root.value("clips").toArray();
     for (const auto& v : clipsArr) b.clips.push_back(clipFromJson(v.toObject()));
@@ -274,6 +278,7 @@ bool StorageRepository::saveBoard(const Soundboard& board)
     for (auto& info : state.soundboards) {
         if (info.id == board.id) {
             info.name = board.name;
+            info.hotkey = board.hotkey;
             info.clipCount = board.clips.size();
             found = true;
             break;

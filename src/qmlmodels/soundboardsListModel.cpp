@@ -57,20 +57,7 @@ QVariant SoundboardsListModel::data(const QModelIndex& index, int role) const
     case ClipCountRole: return b.clipCount;
 
     case HotkeyRole:
-        // If you add b.hotkey later, compile with -DTALKLESS_BOARD_HAS_HOTKEY
-        #ifdef TALKLESS_BOARD_HAS_HOTKEY
-            return b.hotkey;
-        #else
-            return QString();
-        #endif
-
-    case ImagePathRole:
-        // If you add b.imagePath later, compile with -DTALKLESS_BOARD_HAS_IMAGE
-        #ifdef TALKLESS_BOARD_HAS_IMAGE
-            return b.imagePath;
-        #else
-            return QString();
-        #endif
+        return b.hotkey;
 
     case IsActiveRole:
         if (!m_service) return false;

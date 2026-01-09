@@ -87,6 +87,8 @@ QVariant ClipsListModel::data(const QModelIndex& index, int role) const
         return c.isRepeat;
     case LockedRole:
         return c.locked;
+    case TagsRole:
+        return c.tags;
     default:
         return {};
     }
@@ -104,7 +106,8 @@ QHash<int, QByteArray> ClipsListModel::roleNames() const
         {  TrimEndMsRole,     "trimEndMs"},
         {  IsPlayingRole, "clipIsPlaying"},
         {   IsRepeatRole,      "isRepeat"},
-        {     LockedRole,        "locked"}
+        {     LockedRole,        "locked"},
+        {      TagsRole,         "tags"}
     };
 }
 
@@ -146,4 +149,25 @@ void ClipsListModel::onActiveClipsChanged()
     if (m_service && m_boardId == m_service->activeBoardId()) {
         reload();
     }
+}
+
+bool ClipsListModel::updateClip(int clipId, const QString& title, const QString& hotkey, const QStringList& tags)
+{
+    if (!m_service || m_boardId < 0)
+        return false;
+    
+    bool success = m_service->updateClipInBoard(m_boardId, clipId, title, hotkey, tags);
+    if (success) {
+        // Update cache
+        for (auto& c : m_cache) {
+            if (c.id == clipId) {
+                c.title = title;
+                c.hotkey = hotkey;
+                c.tags = tags;
+                break;
+            }
+        }
+        emit clipsChanged();
+    }
+    return success;
 }

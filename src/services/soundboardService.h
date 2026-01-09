@@ -36,6 +36,8 @@ public:
 
     QVector<SoundboardInfo> listBoards() const { return m_state.soundboards; }
     Q_INVOKABLE QString getBoardName(int boardId) const;
+    Q_INVOKABLE QString getBoardHotkey(int boardId) const;
+    Q_INVOKABLE bool setBoardHotkey(int boardId, const QString& hotkey);
     Q_INVOKABLE void reloadIndex(); // re-read index.json
 
     // ---- Active board ----
@@ -51,6 +53,7 @@ public:
     Q_INVOKABLE bool deleteClip(int boardId, int clipId);
     bool addClipToBoard(int boardId, const Clip& draft);
     bool updateClipInBoard(int boardId, int clipId, const Clip& updatedClip);
+    Q_INVOKABLE bool updateClipInBoard(int boardId, int clipId, const QString& title, const QString& hotkey, const QStringList& tags);
     QVector<Clip> getClipsForBoard(int boardId) const; // Get all clips for a board
     QVector<Clip> getActiveClips() const;              // Get clips from active board
 

@@ -24,7 +24,8 @@ public:
         TrimEndMsRole,
         IsPlayingRole,
         IsRepeatRole,
-        LockedRole
+        LockedRole,
+        TagsRole
     };
 
     explicit ClipsListModel(QObject* parent = nullptr);
@@ -47,6 +48,7 @@ public:
     // Invokable methods for QML
     Q_INVOKABLE void reload();
     Q_INVOKABLE void loadActiveBoard();  // Load clips from the currently active board
+    Q_INVOKABLE bool updateClip(int clipId, const QString& title, const QString& hotkey, const QStringList& tags);
 
 signals:
     void boardIdChanged();

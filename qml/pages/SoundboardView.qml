@@ -30,7 +30,8 @@ Rectangle {
                     title: clipsModel.data(index, 261),     // TitleRole
                     hotkey: clipsModel.data(index, 260),    // HotkeyRole
                     imgPath: clipsModel.data(index, 259),   // ImgPathRole
-                    isPlaying: clipsModel.data(index, 263)  // IsPlayingRole
+                    isPlaying: clipsModel.data(index, 263), // IsPlayingRole
+                    tags: clipsModel.data(index, 268) || [] // TagsRole
                 }
             }
         }
@@ -1341,29 +1342,426 @@ Rectangle {
                     Item { Layout.fillHeight: true }
                 }
 
-                // Settings Tab Content (Tab 0)
+                // Settings Tab Content (Tab 0) - Clip Editor
                 ColumnLayout {
+                    id: clipEditorTab
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.leftMargin: 8
+                    Layout.rightMargin: 8
                     spacing: 12
                     visible: rightSidebar.currentTabIndex === 0
-
-                    Text {
-                        text: "Settings"
-                        color: "#FFFFFF"
-                        font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                        font.pixelSize: 14
-                        font.weight: Font.DemiBold
+                    
+                    // Properties for editing
+                    property string editingClipName: ""
+                    property string editingClipHotkey: ""
+                    property var editingClipTags: []
+                    property bool hasUnsavedChanges: false
+                    
+                    // Update when selected clip changes
+                    Connections {
+                        target: root
+                        function onSelectedClipIdChanged() {
+                            if (root.selectedClipId !== -1) {
+                                const data = root.getClipDataById(root.selectedClipId)
+                                if (data) {
+                                    clipEditorTab.editingClipName = data.title || ""
+                                    clipEditorTab.editingClipHotkey = data.hotkey || ""
+                                    clipEditorTab.editingClipTags = data.tags || []
+                                    clipNameInput.text = clipEditorTab.editingClipName
+                                    tagsInput.text = clipEditorTab.editingClipTags.join(", ")
+                                    clipEditorTab.hasUnsavedChanges = false
+                                }
+                            } else {
+                                clipEditorTab.editingClipName = ""
+                                clipEditorTab.editingClipHotkey = ""
+                                clipEditorTab.editingClipTags = []
+                                clipNameInput.text = ""
+                                tagsInput.text = ""
+                                clipEditorTab.hasUnsavedChanges = false
+                            }
+                        }
                     }
-
-                    Text {
-                        text: "Panel settings will appear here"
-                        color: "#666666"
-                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                        font.pixelSize: 12
+                    
+                    // Show "No clip selected" message when no clip is selected
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: root.selectedClipId === -1
+                        spacing: 8
+                        
+                        Item { Layout.fillHeight: true }
+                        
+                        Text {
+                            text: "No Clip Selected"
+                            color: "#888888"
+                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                            font.pixelSize: 14
+                            font.weight: Font.DemiBold
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+                        
+                        Text {
+                            text: "Select a clip to edit its\nname and hotkey"
+                            color: "#666666"
+                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                            font.pixelSize: 12
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+                        
+                        Item { Layout.fillHeight: true }
                     }
-
-                    Item { Layout.fillHeight: true }
+                    
+                    // Clip Editor Content - visible when clip is selected
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        spacing: 12
+                        visible: root.selectedClipId !== -1
+                        
+                        // Header
+                        Text {
+                            text: "Edit Clip"
+                            color: "#FFFFFF"
+                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                            font.pixelSize: 14
+                            font.weight: Font.DemiBold
+                        }
+                        
+                        // Clip Name Section
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            
+                            Text {
+                                text: "Clip Name"
+                                color: "#AAAAAA"
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 11
+                                font.weight: Font.Medium
+                            }
+                            
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                color: "#1A1A1A"
+                                radius: 8
+                                border.color: clipNameInput.activeFocus ? "#3B82F6" : "#3A3A3A"
+                                border.width: 1
+                                
+                                TextInput {
+                                    id: clipNameInput
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    color: "#FFFFFF"
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 13
+                                    clip: true
+                                    selectByMouse: true
+                                    
+                                    onTextChanged: {
+                                        if (text !== clipEditorTab.editingClipName) {
+                                            clipEditorTab.hasUnsavedChanges = true
+                                        }
+                                    }
+                                    
+                                    Text {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 0
+                                        verticalAlignment: Text.AlignVCenter
+                                        text: "Enter clip name..."
+                                        color: "#666666"
+                                        font: parent.font
+                                        visible: !parent.text && !parent.activeFocus
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Hotkey Section
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            
+                            Text {
+                                text: "Hotkey"
+                                color: "#AAAAAA"
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 11
+                                font.weight: Font.Medium
+                            }
+                            
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                
+                                // Hotkey display
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 40
+                                    color: "#1A1A1A"
+                                    radius: 8
+                                    border.color: "#3A3A3A"
+                                    border.width: 1
+                                    
+                                    Text {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 12
+                                        verticalAlignment: Text.AlignVCenter
+                                        text: clipEditorTab.editingClipHotkey || "No hotkey assigned"
+                                        color: clipEditorTab.editingClipHotkey ? "#FFFFFF" : "#666666"
+                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                        font.pixelSize: 13
+                                    }
+                                }
+                                
+                                // Assign hotkey button
+                                Rectangle {
+                                    Layout.preferredWidth: 80
+                                    Layout.preferredHeight: 40
+                                    radius: 8
+                                    color: assignHotkeyArea.containsMouse ? "#444444" : "#333333"
+                                    border.color: "#4A4A4A"
+                                    border.width: 1
+                                    
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: clipEditorTab.editingClipHotkey ? "Change" : "Assign"
+                                        color: "#FFFFFF"
+                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                        font.pixelSize: 12
+                                        font.weight: Font.Medium
+                                    }
+                                    
+                                    MouseArea {
+                                        id: assignHotkeyArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            // Open the hotkey capture popup
+                                            clipHotkeyPopup.open()
+                                        }
+                                    }
+                                    
+                                    Behavior on color {
+                                        ColorAnimation { duration: 150 }
+                                    }
+                                }
+                            }
+                            
+                            // Clear hotkey button (only shown when hotkey exists)
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 32
+                                visible: clipEditorTab.editingClipHotkey !== ""
+                                color: clearHotkeyArea.containsMouse ? "#3A2A2A" : "transparent"
+                                radius: 6
+                                
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Clear Hotkey"
+                                    color: "#FF6B6B"
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 11
+                                }
+                                
+                                MouseArea {
+                                    id: clearHotkeyArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        clipEditorTab.editingClipHotkey = ""
+                                        clipEditorTab.hasUnsavedChanges = true
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Tags Section
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            
+                            Text {
+                                text: "Tags (comma-separated)"
+                                color: "#AAAAAA"
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 11
+                                font.weight: Font.Medium
+                            }
+                            
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                color: "#1A1A1A"
+                                radius: 8
+                                border.color: tagsInput.activeFocus ? "#3B82F6" : "#3A3A3A"
+                                border.width: 1
+                                
+                                TextInput {
+                                    id: tagsInput
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    color: "#FFFFFF"
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 12
+                                    clip: true
+                                    selectByMouse: true
+                                    
+                                    onTextChanged: {
+                                        // Parse tags from comma-separated string
+                                        const tagsArray = text.split(",").map(t => t.trim()).filter(t => t.length > 0)
+                                        if (JSON.stringify(tagsArray) !== JSON.stringify(clipEditorTab.editingClipTags)) {
+                                            clipEditorTab.hasUnsavedChanges = true
+                                        }
+                                    }
+                                    
+                                    Text {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 0
+                                        verticalAlignment: Text.AlignVCenter
+                                        text: "e.g., funny, reaction, meme"
+                                        color: "#666666"
+                                        font: parent.font
+                                        visible: !parent.text && !parent.activeFocus
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Spacer
+                        Item { Layout.fillHeight: true }
+                        
+                        // Unsaved changes indicator
+                        Text {
+                            visible: clipEditorTab.hasUnsavedChanges
+                            text: "• Unsaved changes"
+                            color: "#FFAA00"
+                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                            font.pixelSize: 10
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+                        
+                        // Save and Cancel buttons
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            
+                            // Cancel button
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 38
+                                color: cancelClipArea.containsMouse ? "#444444" : "#333333"
+                                radius: 8
+                                
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Cancel"
+                                    color: "#FFFFFF"
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 12
+                                    font.weight: Font.Medium
+                                }
+                                
+                                MouseArea {
+                                    id: cancelClipArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        // Reset to original values
+                                        const data = root.getClipDataById(root.selectedClipId)
+                                        if (data) {
+                                            clipNameInput.text = data.title || ""
+                                            clipEditorTab.editingClipHotkey = data.hotkey || ""
+                                            clipEditorTab.editingClipTags = data.tags || []
+                                            tagsInput.text = clipEditorTab.editingClipTags.join(", ")
+                                        }
+                                        clipEditorTab.hasUnsavedChanges = false
+                                    }
+                                }
+                                
+                                Behavior on color {
+                                    ColorAnimation { duration: 150 }
+                                }
+                            }
+                            
+                            // Save button
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 38
+                                radius: 8
+                                opacity: clipEditorTab.hasUnsavedChanges ? 1.0 : 0.5
+                                
+                                gradient: Gradient {
+                                    orientation: Gradient.Horizontal
+                                    GradientStop { position: 0.0; color: saveClipArea.containsMouse && clipEditorTab.hasUnsavedChanges ? "#4A9AF7" : "#3B82F6" }
+                                    GradientStop { position: 1.0; color: saveClipArea.containsMouse && clipEditorTab.hasUnsavedChanges ? "#E040FB" : "#D214FD" }
+                                }
+                                
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Save"
+                                    color: "#FFFFFF"
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 12
+                                    font.weight: Font.Medium
+                                }
+                                
+                                MouseArea {
+                                    id: saveClipArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: clipEditorTab.hasUnsavedChanges ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    enabled: clipEditorTab.hasUnsavedChanges
+                                    onClicked: {
+                                        // Save the clip changes
+                                        if (root.selectedClipId !== -1) {
+                                            // Parse tags from comma-separated string
+                                            const tagsArray = tagsInput.text.split(",").map(t => t.trim()).filter(t => t.length > 0)
+                                            
+                                            // Update clip via service with name, hotkey, and tags
+                                            const success = clipsModel.updateClip(root.selectedClipId, clipNameInput.text, clipEditorTab.editingClipHotkey, tagsArray)
+                                            
+                                            if (success) {
+                                                console.log("Clip saved successfully")
+                                                clipEditorTab.editingClipName = clipNameInput.text
+                                                clipEditorTab.editingClipTags = tagsArray
+                                                clipEditorTab.hasUnsavedChanges = false
+                                                clipsModel.reload()
+                                            } else {
+                                                console.log("Failed to save clip")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Hotkey Capture Popup for clip
+                    HotkeyCapturePopup {
+                        id: clipHotkeyPopup
+                        title: "Assign Clip Hotkey"
+                        anchors.centerIn: Overlay.overlay
+                        
+                        onHotkeyConfirmed: function(hotkeyText) {
+                            clipEditorTab.editingClipHotkey = hotkeyText
+                            clipEditorTab.hasUnsavedChanges = true
+                        }
+                        
+                        onCancelled: {
+                            console.log("Hotkey capture cancelled")
+                        }
+                    }
                 }
 
                 // Add Tab Content (Tab 1)

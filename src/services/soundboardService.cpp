@@ -418,6 +418,53 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
     return false;
 }
 
+bool SoundboardService::updateClipInBoard(int boardId, int clipId, const QString& title, const QString& hotkey, const QStringList& tags)
+{
+    // active board update
+    if (m_active && m_active->id == boardId) {
+        for (auto& c : m_active->clips) {
+            if (c.id != clipId)
+                continue;
+            if (c.locked)
+                return false;
+
+            // Update title, hotkey, and tags
+            c.title = title.trimmed().isEmpty() ? QFileInfo(c.filePath).baseName() : title.trimmed();
+            c.hotkey = hotkey;
+            c.tags = tags;
+
+            rebuildHotkeyIndex();
+            emit activeClipsChanged();
+            return saveActive();
+        }
+        return false;
+    }
+
+    // inactive board update
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded)
+        return false;
+
+    Soundboard b = *loaded;
+    for (auto& c : b.clips) {
+        if (c.id != clipId)
+            continue;
+
+        // Update title, hotkey, and tags
+        c.title = title.trimmed().isEmpty() ? QFileInfo(c.filePath).baseName() : title.trimmed();
+        c.hotkey = hotkey;
+        c.tags = tags;
+
+        const bool ok = m_repo.saveBoard(b);
+        if (ok) {
+            m_state = m_repo.loadIndex();
+            emit boardsChanged();
+        }
+        return ok;
+    }
+    return false;
+}
+
 int SoundboardService::createBoard(const QString& name)
 {
     QString finalName = name.trimmed();
@@ -807,6 +854,49 @@ bool SoundboardService::isMicEnabled() const
 }
 
 // ============================================================================
+// SOUNDBOARD HOTKEY MANAGEMENT
+// ============================================================================
+
+QString SoundboardService::getBoardHotkey(int boardId) const
+{
+    for (const auto& b : m_state.soundboards) {
+        if (b.id == boardId)
+            return b.hotkey;
+    }
+    return QString("");
+}
+
+bool SoundboardService::setBoardHotkey(int boardId, const QString& hotkey)
+{
+    // Update in m_state (index)
+    for (auto& info : m_state.soundboards) {
+        if (info.id == boardId) {
+            info.hotkey = hotkey;
+            break;
+        }
+    }
+    
+    // If it's the active board, update in memory too
+    if (m_active && m_active->id == boardId) {
+        m_active->hotkey = hotkey;
+        m_repo.saveBoard(*m_active);
+    } else {
+        // Load, update, save the board
+        auto loaded = m_repo.loadBoard(boardId);
+        if (loaded) {
+            loaded->hotkey = hotkey;
+            m_repo.saveBoard(*loaded);
+        }
+    }
+    
+    // Save index
+    m_repo.saveIndex(m_state);
+    emit boardsChanged();
+    
+    return true;
+}
+
+// ============================================================================
 // HOTKEY ACTION HANDLER
 // ============================================================================
 
@@ -829,15 +919,26 @@ void SoundboardService::handleHotkeyAction(const QString& actionId)
         emit playSelectedRequested();
         qDebug() << "Play selected signal emitted";
     } 
+    else if (actionId.startsWith("board.")) {
+        // Handle soundboard activation hotkeys (e.g., "board.1" activates board 1)
+        bool ok;
+        int boardId = actionId.mid(6).toInt(&ok);
+        if (ok) {
+            activate(boardId);
+            qDebug() << "Soundboard activated via hotkey:" << boardId;
+        }
+    }
     else if (actionId.startsWith("clip.")) {
         // Handle clip-specific hotkeys (e.g., "clip.123" plays clip 123)
         bool ok;
         int clipId = actionId.mid(5).toInt(&ok);
         if (ok) {
-            // Toggle play/stop for this clip
+            // If already playing, stop EXCLUSIVELY this clip (toggle behavior)
             if (isClipPlaying(clipId)) {
                 stopClip(clipId);
             } else {
+                // If not playing, stop ALL clips and play this one (exclusive trigger behavior)
+                stopAllClips();
                 playClip(clipId);
             }
             qDebug() << "Clip hotkey triggered for clip:" << clipId;
@@ -847,3 +948,4 @@ void SoundboardService::handleHotkeyAction(const QString& actionId)
         qDebug() << "Unknown hotkey action:" << actionId;
     }
 }
+

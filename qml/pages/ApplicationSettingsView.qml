@@ -893,21 +893,31 @@ Rectangle {
 
             // Tab 3: Hotkeys
             Flickable {
+                id: hotkeysFlickable
                 contentWidth: width
-                contentHeight: hotkeysContent.height
+                contentHeight: hotkeysContent.implicitHeight + 40
                 clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                
+                // Show scrollbar when needed
+                ScrollBar.vertical: ScrollBar {
+                    policy: hotkeysFlickable.contentHeight > hotkeysFlickable.height ? ScrollBar.AlwaysOn : ScrollBar.AsNeeded
+                }
 
                 Rectangle {
                     id: hotkeysContent
-                    width: parent.width
-                    height: 200
+                    width: parent.width - 20  // Leave room for scrollbar
+                    implicitHeight: hotkeysColumn.implicitHeight + 56  // Column height + margins
                     color: "#0d0d0d"
                     radius: 12
 
                     property int tabIndex: 0 // 0 system, 1 preference
 
                     Column {
-                        anchors.fill: parent
+                        id: hotkeysColumn
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
                         anchors.margins: 28
                         spacing: 22
 
@@ -1049,8 +1059,9 @@ Rectangle {
                             }
                         }
 
-                        // Content area
+                        // Content area - HotkeysTable with dynamic height
                         Loader {
+                            id: hotkeysTableLoader
                             width: parent.width
                             sourceComponent: hotkeysContent.tabIndex === 0 ? systemView : prefView
                         }
@@ -1077,7 +1088,7 @@ Rectangle {
                         id: prefView
                         HotkeysTable {
                             width: hotkeysContent.width - 56
-                            title: "My Preference"
+                            title: "Soundboard Hotkeys"
                             model: hotkeyManager.preferenceHotkeysModel
                             showHeader: true
                             showWarning: false

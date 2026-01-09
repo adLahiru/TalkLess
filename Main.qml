@@ -17,6 +17,76 @@ ApplicationWindow {
     title: qsTr("TalkLess")
     color: '#000000'
 
+    // ---- Hotkey Capture Popup ----
+    HotkeyCapturePopup {
+        id: hotkeyCapturePopup
+        
+        onHotkeyConfirmed: function(hotkeyText) {
+            hotkeyManager.applyCapturedHotkey(hotkeyText)
+        }
+        
+        onCancelled: {
+            hotkeyManager.cancelCapture()
+        }
+    }
+    
+    // Connect to hotkeyManager signals
+    Connections {
+        target: hotkeyManager
+        
+        function onRequestCapture(title) {
+            hotkeyCapturePopup.title = title
+            hotkeyCapturePopup.open()
+        }
+        
+        function onShowMessage(text) {
+            toastMessage.text = text
+            toastMessage.show()
+        }
+    }
+    
+    // ---- Toast Notification ----
+    Rectangle {
+        id: toastMessage
+        property string text: ""
+        
+        function show() {
+            opacity = 1.0
+            toastTimer.restart()
+        }
+        
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 60
+        width: toastText.implicitWidth + 40
+        height: 48
+        radius: 24
+        color: "#1A1A1A"
+        border.width: 1
+        border.color: "#333333"
+        opacity: 0
+        z: 999
+        
+        Behavior on opacity {
+            NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
+        }
+        
+        Text {
+            id: toastText
+            anchors.centerIn: parent
+            text: toastMessage.text
+            color: "#FFFFFF"
+            font.pixelSize: 14
+            font.weight: Font.Medium
+        }
+        
+        Timer {
+            id: toastTimer
+            interval: 3000
+            onTriggered: toastMessage.opacity = 0
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 10

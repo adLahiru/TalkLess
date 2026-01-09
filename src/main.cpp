@@ -36,10 +36,18 @@ int main(int argc, char* argv[])
 
            // Hotkey Manager
     HotkeyManager hotkeyManager;
+    
+           // Connect hotkey manager to soundboard service for soundboard hotkeys
+    hotkeyManager.setSoundboardService(&soundboardService);
 
            // Connect hotkey actions to soundboard service (modular signal-slot connection)
     QObject::connect(&hotkeyManager, &HotkeyManager::actionTriggered,
                      &soundboardService, &SoundboardService::handleHotkeyAction);
+
+           // Auto-save hotkeys when application closes
+    QObject::connect(&app, &QGuiApplication::aboutToQuit, [&hotkeyManager]() {
+        hotkeyManager.saveHotkeysOnClose();
+    });
 
            // Expose to QML
     engine.rootContext()->setContextProperty("soundboardService", &soundboardService);

@@ -1,4 +1,5 @@
 #include "hotkeyManager.h"
+#include "services/soundboardService.h"
 #include <QHotkey>
 #include <QDebug>
 
@@ -7,6 +8,138 @@ HotkeyManager::HotkeyManager(QObject* parent) : QObject(parent) {
     loadUserSettings();
     snapshotForUndo();
     rebuildRegistrations();
+}
+
+void HotkeyManager::setSoundboardService(SoundboardService* service) {
+    if (m_soundboardService) {
+        disconnect(m_soundboardService, nullptr, this, nullptr);
+    }
+    
+    m_soundboardService = service;
+    
+    if (m_soundboardService) {
+        // Reload soundboard hotkeys when boards change
+        connect(m_soundboardService, &SoundboardService::boardsChanged,
+                this, &HotkeyManager::reloadSoundboardHotkeys);
+        
+        // Reload clip hotkeys when active board changes
+        connect(m_soundboardService, &SoundboardService::activeBoardChanged,
+                this, &HotkeyManager::reloadClipHotkeys);
+        connect(m_soundboardService, &SoundboardService::activeClipsChanged,
+                this, &HotkeyManager::reloadClipHotkeys);
+        
+        // Initial load
+        reloadSoundboardHotkeys();
+        reloadClipHotkeys();
+    }
+}
+
+void HotkeyManager::reloadSoundboardHotkeys() {
+    // Don't reload during shutdown to avoid accessing destroyed objects
+    if (m_isShuttingDown) return;
+    if (!m_soundboardService) return;
+    
+    // Build new preference list from soundboards
+    QVector<HotkeyItem> pref;
+    
+    const auto boards = m_soundboardService->listBoards();
+    for (const auto& board : boards) {
+        HotkeyItem item;
+        item.id = board.id;  // Use board ID as hotkey item ID
+        item.title = QString("Activate: %1").arg(board.name);
+        item.hotkey = board.hotkey;
+        item.defaultHotkey = "";  // Preference has no default
+        item.actionId = QString("board.%1").arg(board.id);
+        item.isSystem = false;
+        item.enabled = true;
+        pref.push_back(item);
+    }
+    
+    m_pref.setItems(pref);
+    m_nextPrefId = 1000;  // Soundboards use their own IDs
+    
+    // Update undo snapshot and rebuild registrations
+    snapshotForUndo();
+    rebuildRegistrations();
+}
+
+void HotkeyManager::reloadClipHotkeys() {
+    // Don't reload during shutdown
+    if (m_isShuttingDown) return;
+    if (!m_soundboardService) return;
+    
+    // Clear old clip hotkeys
+    clearClipRegistrations();
+    
+    // Get clips from active soundboard
+    const auto clips = m_soundboardService->getActiveClips();
+    
+    for (const auto& clip : clips) {
+        if (!clip.hotkey.isEmpty()) {
+            const QString portable = toPortable(clip.hotkey);
+            if (portable.isEmpty()) continue;
+            
+            // Create action ID for clip
+            QString actionId = QString("clip.%1").arg(clip.id);
+            
+            // Check if already registered in system/board hotkeys (avoid overrides)
+            if (m_registered.contains(portable)) {
+                qDebug() << "Clip hotkey conflict with system/board hotkey:" << portable;
+                continue;
+            }
+
+            // Check if already registered as another clip (avoid duplicates)
+            if (m_clipRegistered.contains(portable)) continue;
+            
+            // Register the hotkey
+            QHotkey* hk = new QHotkey(QKeySequence(portable), true, this);
+            if (hk->isRegistered()) {
+                connect(hk, &QHotkey::activated, this, [this, actionId]() {
+                    emit actionTriggered(actionId);
+                });
+                m_clipRegistered[portable] = hk;
+                qDebug() << "Registered clip hotkey:" << portable << "->" << actionId;
+            } else {
+                qDebug() << "Failed to register clip hotkey:" << portable;
+                delete hk;
+            }
+        }
+    }
+}
+
+void HotkeyManager::clearClipRegistrations() {
+    for (auto* hk : m_clipRegistered) {
+        delete hk;
+    }
+    m_clipRegistered.clear();
+}
+
+void HotkeyManager::saveHotkeysOnClose() {
+    // Set shutdown flag to prevent reload during save
+    m_isShuttingDown = true;
+    
+    // Disconnect from soundboard service to prevent signals during shutdown
+    if (m_soundboardService) {
+        disconnect(m_soundboardService, nullptr, this, nullptr);
+    }
+    
+    // Save system hotkeys to QSettings
+    saveUserSettings();
+    
+    // Save soundboard hotkeys directly (without emitting signals that trigger reload)
+    if (m_soundboardService) {
+        for (const auto& item : m_pref.items()) {
+            if (item.actionId.startsWith("board.")) {
+                bool ok;
+                int boardId = item.actionId.mid(6).toInt(&ok);
+                if (ok) {
+                    m_soundboardService->setBoardHotkey(boardId, item.hotkey);
+                }
+            }
+        }
+    }
+    
+    qDebug() << "Hotkeys saved on close";
 }
 
 QString HotkeyManager::toPortable(const QString& text) {
@@ -200,10 +333,14 @@ void HotkeyManager::reassignPreference(int id) {
 }
 
 void HotkeyManager::deletePreference(int id) {
-    if (m_pref.removeById(id)) {
-        rebuildRegistrations();
-        emit showMessage("Preference hotkey deleted.");
+    // Clear the hotkey in soundboard service first
+    if (m_soundboardService) {
+        m_soundboardService->setBoardHotkey(id, "");
     }
+    
+    // The model will be refreshed when boardsChanged is emitted
+    rebuildRegistrations();
+    emit showMessage("Soundboard hotkey deleted.");
 }
 
 void HotkeyManager::undoHotkeyChanges() {
@@ -215,6 +352,21 @@ void HotkeyManager::undoHotkeyChanges() {
 
 void HotkeyManager::saveHotkeys() {
     saveUserSettings();
+    
+    // Also save preference hotkeys to soundboard service
+    if (m_soundboardService) {
+        for (const auto& item : m_pref.items()) {
+            // Extract board ID from actionId (format: "board.123")
+            if (item.actionId.startsWith("board.")) {
+                bool ok;
+                int boardId = item.actionId.mid(6).toInt(&ok);
+                if (ok) {
+                    m_soundboardService->setBoardHotkey(boardId, item.hotkey);
+                }
+            }
+        }
+    }
+    
     snapshotForUndo();
     emit showMessage("Hotkeys saved.");
 }
@@ -258,6 +410,18 @@ void HotkeyManager::applyCapturedHotkey(const QString& hotkeyText) {
         m_system.setHotkeyById(m_targetId, hotkeyText);
     } else {
         m_pref.setHotkeyById(m_targetId, hotkeyText);
+        
+        // For preference hotkeys (soundboards), also save to service immediately
+        if (m_soundboardService) {
+            const auto* item = m_pref.findById(m_targetId);
+            if (item && item->actionId.startsWith("board.")) {
+                bool ok;
+                int boardId = item->actionId.mid(6).toInt(&ok);
+                if (ok) {
+                    m_soundboardService->setBoardHotkey(boardId, hotkeyText);
+                }
+            }
+        }
     }
 
     rebuildRegistrations();
