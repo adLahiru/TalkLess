@@ -553,59 +553,134 @@ Rectangle {
                             }
                         }
 
-                        // Real Clip Tiles from clipsModel
+                        // Real Clip Tiles from clipsModel with drag-and-drop reordering
                         Repeater {
+                            id: clipsRepeater
                             model: clipsModel
 
-                            ClipTile {
+                            Item {
+                                id: clipWrapper
                                 required property int index
                                 required property int clipId
                                 required property string clipTitle
                                 required property string hotkey
                                 required property string imgPath
                                 required property string filePath
-                                required property bool clipIsPlaying  // Renamed to avoid shadowing
+                                required property bool clipIsPlaying
 
                                 width: contentArea.tileWidth
                                 height: contentArea.tileHeight
-                                title: clipTitle.length > 0 ? clipTitle : ("Clip " + (index + 1))
-                                hotkeyText: hotkey
-                                // Convert local path to file:// URL if needed for QML Image
-                                imageSource: {
-                                    if (imgPath.length === 0) {
-                                        return "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
-                                    } else if (imgPath.startsWith("qrc:") || imgPath.startsWith("file:") || imgPath.startsWith("http")) {
-                                        return imgPath
-                                    } else {
-                                        // Local path - convert to file:// URL
-                                        return "file://" + imgPath
-                                    }
-                                }
-                                
-                                // Bind isPlaying from model to component
-                                isPlaying: clipIsPlaying
 
-                                onClicked: {
-                                    console.log("Clip clicked:", clipId, clipTitle)
-                                    if (root.selectedClipId === clipId) {
-                                        root.selectedClipId = -1
-                                    } else {
-                                        root.selectedClipId = clipId
+                                // Store original position for drag reset
+                                property real startX: 0
+                                property real startY: 0
+
+                                // For drag-drop visual feedback
+                                Drag.active: dragHandler.active
+                                Drag.hotSpot.x: width / 2
+                                Drag.hotSpot.y: height / 2
+
+                                ClipTile {
+                                    id: clipTile
+                                    anchors.fill: parent
+                                    
+                                    title: clipWrapper.clipTitle.length > 0 ? clipWrapper.clipTitle : ("Clip " + (clipWrapper.index + 1))
+                                    hotkeyText: clipWrapper.hotkey
+                                    imageSource: {
+                                        if (clipWrapper.imgPath.length === 0) {
+                                            return "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
+                                        } else if (clipWrapper.imgPath.startsWith("qrc:") || clipWrapper.imgPath.startsWith("file:") || clipWrapper.imgPath.startsWith("http")) {
+                                            return clipWrapper.imgPath
+                                        } else {
+                                            return "file://" + clipWrapper.imgPath
+                                        }
+                                    }
+                                    isPlaying: clipWrapper.clipIsPlaying
+                                    
+                                    // Make tile semi-transparent when dragging
+                                    opacity: dragHandler.active ? 0.7 : 1.0
+
+                                    onClicked: {
+                                        console.log("Clip clicked:", clipWrapper.clipId, clipWrapper.clipTitle)
+                                        if (root.selectedClipId === clipWrapper.clipId) {
+                                            root.selectedClipId = -1
+                                        } else {
+                                            root.selectedClipId = clipWrapper.clipId
+                                        }
+                                    }
+                                    onPlayClicked: {
+                                        console.log("Play clicked:", clipWrapper.clipId, clipWrapper.clipTitle)
+                                        soundboardService.playClip(clipWrapper.clipId)
+                                    }
+                                    onStopClicked: {
+                                        console.log("Stop clicked:", clipWrapper.clipId, clipWrapper.clipTitle)
+                                        soundboardService.stopClip(clipWrapper.clipId)
+                                    }
+                                    onCopyClicked: console.log("Copy clicked:", clipWrapper.clipId, clipWrapper.clipTitle)
+                                    onEditBackgroundClicked: {
+                                        console.log("Edit background clicked:", clipWrapper.clipId, clipWrapper.clipTitle)
+                                        root.clipToEditImageId = clipWrapper.clipId
+                                        imageFileDialog.open()
                                     }
                                 }
-                                onPlayClicked: {
-                                    console.log("Play clicked:", clipId, clipTitle)
-                                    soundboardService.playClip(clipId)
+
+                                // Drag handler for reordering
+                                DragHandler {
+                                    id: dragHandler
+                                    target: clipWrapper.parent === clipsGrid ? null : clipWrapper
+                                    
+                                    onActiveChanged: {
+                                        if (active) {
+                                            // Store the starting position
+                                            clipWrapper.startX = clipWrapper.x
+                                            clipWrapper.startY = clipWrapper.y
+                                            // Reparent to root for dragging above other items
+                                            clipWrapper.parent = clipsFlickable
+                                            clipWrapper.z = 100
+                                        } else {
+                                            // Find drop target based on position
+                                            var dropIndex = -1
+                                            var centerX = clipWrapper.x + clipWrapper.width / 2
+                                            var centerY = clipWrapper.y + clipWrapper.height / 2
+                                            
+                                            for (var i = 0; i < clipsRepeater.count; i++) {
+                                                if (i === clipWrapper.index) continue
+                                                var item = clipsRepeater.itemAt(i)
+                                                if (item) {
+                                                    var itemPos = item.mapToItem(clipsFlickable, 0, 0)
+                                                    if (centerX >= itemPos.x && centerX <= itemPos.x + item.width &&
+                                                        centerY >= itemPos.y && centerY <= itemPos.y + item.height) {
+                                                        dropIndex = i
+                                                        break
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // Reparent back to grid
+                                            clipWrapper.parent = clipsGrid
+                                            clipWrapper.z = 0
+                                            
+                                            // If dropped on a valid position, reorder
+                                            if (dropIndex >= 0 && dropIndex !== clipWrapper.index) {
+                                                console.log("Moving clip from", clipWrapper.index, "to", dropIndex)
+                                                soundboardService.moveClip(soundboardService.activeBoardId, clipWrapper.index, dropIndex)
+                                                clipsModel.reload()
+                                            }
+                                        }
+                                    }
                                 }
-                                onStopClicked: {
-                                    console.log("Stop clicked:", clipId, clipTitle)
-                                    soundboardService.stopClip(clipId)
-                                }
-                                onCopyClicked: console.log("Copy clicked:", clipId, clipTitle)
-                                onEditBackgroundClicked: {
-                                    console.log("Edit background clicked:", clipId, clipTitle)
-                                    root.clipToEditImageId = clipId
-                                    imageFileDialog.open()
+
+                                // Drop area for receiving dragged items
+                                DropArea {
+                                    anchors.fill: parent
+                                    
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        color: parent.containsDrag ? "#4400FF00" : "transparent"
+                                        radius: 16
+                                        border.width: parent.containsDrag ? 2 : 0
+                                        border.color: "#00FF00"
+                                    }
                                 }
                             }
                         }

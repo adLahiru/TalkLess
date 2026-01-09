@@ -96,8 +96,9 @@ public:
     Q_INVOKABLE bool updateClipInBoard(int boardId, int clipId, const QString& title, const QString& hotkey,
                                        const QStringList& tags);
     Q_INVOKABLE bool updateClipImage(int boardId, int clipId, const QString& imagePath);
-    QVector<Clip> getClipsForBoard(int boardId) const; // Get all clips for a board
-    QVector<Clip> getActiveClips() const;              // Get clips from active board
+    Q_INVOKABLE bool moveClip(int boardId, int fromIndex, int toIndex); // Reorder clips with drag-drop
+    QVector<Clip> getClipsForBoard(int boardId) const;                  // Get all clips for a board
+    QVector<Clip> getActiveClips() const;                               // Get clips from active board
 
     // ---- Audio Playback ----
     Q_INVOKABLE void playClip(int clipId);

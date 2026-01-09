@@ -532,6 +532,46 @@ bool SoundboardService::updateClipImage(int boardId, int clipId, const QString& 
     return false;
 }
 
+bool SoundboardService::moveClip(int boardId, int fromIndex, int toIndex)
+{
+    // Validate indices
+    if (fromIndex < 0 || toIndex < 0 || fromIndex == toIndex)
+        return false;
+
+    // Active board update
+    if (m_active && m_active->id == boardId) {
+        if (fromIndex >= m_active->clips.size() || toIndex >= m_active->clips.size())
+            return false;
+
+        // Move clip within the vector
+        Clip clip = m_active->clips.takeAt(fromIndex);
+        m_active->clips.insert(toIndex, clip);
+
+        emit activeClipsChanged();
+        return saveActive();
+    }
+
+    // Inactive board update
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded)
+        return false;
+
+    Soundboard b = *loaded;
+    if (fromIndex >= b.clips.size() || toIndex >= b.clips.size())
+        return false;
+
+    // Move clip within the vector
+    Clip clip = b.clips.takeAt(fromIndex);
+    b.clips.insert(toIndex, clip);
+
+    const bool ok = m_repo.saveBoard(b);
+    if (ok) {
+        m_state = m_repo.loadIndex();
+        emit boardsChanged();
+    }
+    return ok;
+}
+
 int SoundboardService::createBoard(const QString& name)
 {
     QString finalName = name.trimmed();
