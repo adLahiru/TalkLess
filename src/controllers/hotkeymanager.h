@@ -55,9 +55,11 @@ public:
     // --- Called when app is closing (saves without triggering reload) ---
     void saveHotkeysOnClose();
 
+    Q_INVOKABLE void showMessage(const QString& text) { emit showMessageSignal(text); }
+
 signals:
     void requestCapture(QString title);
-    void showMessage(QString text);
+    void showMessageSignal(QString text);
 
     // Fired when a global hotkey is pressed (minimized ok)
     void actionTriggered(QString actionId);

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
+import QtQuick.Dialogs
 import "../components"
 
 Rectangle {
@@ -18,6 +19,11 @@ Rectangle {
     property real masterPeakLevel: 0.0
     property real monitorPeakLevel: 0.0
     
+    function restartUI() {
+        mainLoader.active = false
+        mainLoader.active = true
+    }
+
     // Timer to update audio levels
     Timer {
         id: levelUpdateTimer
@@ -32,6 +38,45 @@ Rectangle {
             soundboardService.resetPeakLevels()
         }
     }
+
+    FileDialog {
+        id: exportSettingsDialog
+        title: "Export Settings"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["JSON files (*.json)"]
+        onAccepted: {
+            if (soundboardService.exportSettings(selectedFile)) {
+                hotkeyManager.showMessage("Settings exported successfully")
+            } else {
+                hotkeyManager.showMessage("Failed to export settings")
+            }
+        }
+    }
+
+    FileDialog {
+        id: importSettingsDialog
+        title: "Import Settings"
+        fileMode: FileDialog.OpenFile
+        nameFilters: ["JSON files (*.json)"]
+        onAccepted: {
+            if (soundboardService.importSettings(selectedFile)) {
+                hotkeyManager.showMessage("Settings imported successfully")
+                restartUI()
+            } else {
+                hotkeyManager.showMessage("Failed to import settings")
+            }
+        }
+    }
+
+    Loader {
+        id: mainLoader
+        anchors.fill: parent
+        sourceComponent: mainContent
+        active: true
+    }
+
+    Component {
+        id: mainContent
 
     ColumnLayout {
         anchors.fill: parent
@@ -53,6 +98,14 @@ Rectangle {
 
             onTabSelected: function(index) {
                 contentStack.currentIndex = index
+            }
+        }
+
+        // Connection to handle settings import / external changes
+        Connections {
+            target: soundboardService
+            function onSettingsChanged() {
+                console.log("Settings changed, UI updating via bindings")
             }
         }
 
@@ -116,18 +169,7 @@ Rectangle {
                                 icon: "🎤"
                                 placeholder: "Select Input Device"
                                 model: soundboardService.getInputDevices()
-                                
-                                Component.onCompleted: {
-                                    // Set default device if available
-                                    var devices = soundboardService.getInputDevices()
-                                    for (var i = 0; i < devices.length; i++) {
-                                        if (devices[i].isDefault) {
-                                            selectedId = devices[i].id
-                                            selectedValue = devices[i].name
-                                            break
-                                        }
-                                    }
-                                }
+                                selectedId: soundboardService.selectedCaptureDeviceId
                                 
                                 onItemSelected: function(id, name) {
                                     console.log("Input device selected:", name, "(id:", id, ")")
@@ -148,8 +190,11 @@ Rectangle {
                                     radius: 14
                                     color: alwaysOnToggle.isOn ? "#22C55E" : "#3A3A3A"
 
-                                    property bool isOn: soundboardService.isMicEnabled()
-                                    onIsOnChanged: soundboardService.setMicEnabled(isOn)
+                                    property bool isOn: soundboardService.micEnabled
+                                    onIsOnChanged: {
+                                        if (isOn !== soundboardService.micEnabled)
+                                            soundboardService.setMicEnabled(isOn)
+                                    }
 
                                     Rectangle {
                                         width: 22
@@ -261,7 +306,7 @@ Rectangle {
                                         Layout.fillWidth: true
                                         from: -60
                                         to: 0
-                                        value: soundboardService.micGainDb()
+                                        value: soundboardService.micGainDb
                                         unit: "dB"
                                         
                                         onSliderMoved: function(newValue) {
@@ -387,8 +432,11 @@ Rectangle {
                                     radius: 14
                                     color: outputToggle.isOn ? "#22C55E" : "#FFFFFF"
 
-                                    property bool isOn: soundboardService.isMicPassthroughEnabled()
-                                    onIsOnChanged: soundboardService.setMicPassthroughEnabled(isOn)
+                                    property bool isOn: soundboardService.micPassthroughEnabled
+                                    onIsOnChanged: {
+                                        if (isOn !== soundboardService.micPassthroughEnabled)
+                                            soundboardService.setMicPassthroughEnabled(isOn)
+                                    }
 
                                     Rectangle {
                                         width: 22
@@ -441,7 +489,7 @@ Rectangle {
                                     Layout.fillWidth: true
                                     leftLabel: "0% mic"
                                     rightLabel: "100% soundboard"
-                                    value: soundboardService.getMicSoundboardBalance()
+                                    value: soundboardService.micSoundboardBalance
                                     onBalanceChanged: (newValue) => soundboardService.setMicSoundboardBalance(newValue)
                                 }
 
@@ -618,23 +666,204 @@ Rectangle {
 
             // Tab 1: Language & Theme
             Flickable {
+                id: languageFlickable
                 contentWidth: width
-                contentHeight: languageContent.height
+                contentHeight: languageContentLayout.implicitHeight + 40
                 clip: true
 
-                Rectangle {
-                    id: languageContent
-                    width: parent.width
-                    height: 200
-                    color: "#1F1F1F"
-                    radius: 12
+                ColumnLayout {
+                    id: languageContentLayout
+                    width: parent.width - 40
+                    x: 20
+                    y: 20
+                    spacing: 24
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Language & Theme"
-                        color: "#FFFFFF"
-                        font.pixelSize: 24
-                        font.weight: Font.Medium
+                    RowLayout {
+                        spacing: 24
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignTop
+
+                        // Left Pane: Theme & Language
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: leftPaneColumn.implicitHeight + 40
+                            color: "#1A1A1A"
+                            radius: 16
+                            border.color: "#2A2A2A"
+
+                            ColumnLayout {
+                                id: leftPaneColumn
+                                anchors.fill: parent
+                                anchors.margins: 20
+                                spacing: 20
+
+                                ColumnLayout {
+                                    spacing: 8
+                                    Text { text: "Language Selection"; color: "#FFFFFF"; font.pixelSize: 14; font.weight: Font.Medium }
+                                    DropdownSelector {
+                                        id: langDropdown
+                                        Layout.fillWidth: true
+                                        model: [{id: "English", name: "English", isDefault: true}, {id: "Spanish", name: "Spanish"}]
+                                        selectedId: soundboardService.language
+                                        onItemSelected: (id) => soundboardService.setLanguage(id)
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 12
+                                    Text { text: "Theme Mode"; color: "#FFFFFF"; font.pixelSize: 14; font.weight: Font.Medium }
+                                    RowLayout {
+                                        spacing: 20
+                                        Repeater {
+                                            model: ["Light", "Dark"]
+                                            delegate: RowLayout {
+                                                spacing: 8
+                                                Rectangle {
+                                                    width: 16; height: 16; radius: 8
+                                                    color: "transparent"; border.color: "#FFFFFF"; border.width: 1
+                                                    Rectangle {
+                                                        anchors.centerIn: parent
+                                                        width: 8; height: 8; radius: 4
+                                                        color: "#3B82F6"
+                                                        visible: soundboardService.theme === modelData
+                                                    }
+                                                }
+                                                Text { text: modelData; color: "#FFFFFF"; font.pixelSize: 14 }
+                                                MouseArea { anchors.fill: parent; onClicked: soundboardService.setTheme(modelData) }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 12
+                                    Text { text: "Base Theme Color"; color: "#FFFFFF"; font.pixelSize: 14; font.weight: Font.Medium }
+                                    Text { text: "Choose your primary accent color for buttons, highlights, and icons."; color: "#888888"; font.pixelSize: 12; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                                    RowLayout {
+                                        spacing: 12
+                                        Repeater {
+                                            model: ["#EF4444", "#D946EF", "#22C55E", "#EAB308", "#06B6D4", "#F97316"]
+                                            delegate: Rectangle {
+                                                width: 32; height: 32; radius: 16
+                                                color: modelData
+                                                border.color: "#FFFFFF"
+                                                border.width: soundboardService.accentColor === modelData ? 2 : 0
+                                                MouseArea { anchors.fill: parent; onClicked: soundboardService.setAccentColor(modelData) }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 8
+                                    Text { text: "Custom Color Picker"; color: "#FFFFFF"; font.pixelSize: 14; font.weight: Font.Medium }
+                                    RowLayout {
+                                        spacing: 8
+                                        Rectangle {
+                                            Layout.fillWidth: true; height: 36; color: "#0D0D0D"; radius: 6; border.color: "#333333"
+                                            TextInput {
+                                                id: customColorInput
+                                                anchors.fill: parent; anchors.leftMargin: 10; verticalAlignment: Text.AlignVCenter
+                                                color: "#FFFFFF"; font.pixelSize: 13; text: soundboardService.accentColor
+                                            }
+                                        }
+                                        Rectangle {
+                                            width: 60; height: 36; color: "#2A2A2A"; radius: 6; border.color: "#3A3A3A"
+                                            Text { anchors.centerIn: parent; text: "Apply"; color: "#FFFFFF"; font.pixelSize: 12 }
+                                            MouseArea { anchors.fill: parent; onClicked: soundboardService.setAccentColor(customColorInput.text) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Right Pane: Slot Size & Preview
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: rightPaneColumn.implicitHeight + 40
+                            color: "#1A1A1A"
+                            radius: 16
+                            border.color: "#2A2A2A"
+
+                            ColumnLayout {
+                                id: rightPaneColumn
+                                anchors.fill: parent
+                                anchors.margins: 20
+                                spacing: 24
+
+                                ColumnLayout {
+                                    spacing: 12
+                                    Text { text: "Slot Size"; color: "#FFFFFF"; font.pixelSize: 14; font.weight: Font.Medium }
+                                    RowLayout {
+                                        spacing: 12
+                                        Text { text: "Small"; color: "#888888"; font.pixelSize: 12 }
+                                        Slider {
+                                            Layout.fillWidth: true
+                                            from: 0; to: 2; stepSize: 1
+                                            value: soundboardService.slotSize === "Compact" ? 0 : (soundboardService.slotSize === "Comfortable" ? 2 : 1)
+                                            onMoved: {
+                                                if (value === 0) soundboardService.setSlotSize("Compact")
+                                                else if (value === 1) soundboardService.setSlotSize("Standard")
+                                                else soundboardService.setSlotSize("Comfortable")
+                                            }
+                                        }
+                                        Text { text: "Large"; color: "#888888"; font.pixelSize: 12 }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 12
+                                    Text { text: "Slot Size Presets"; color: "#FFFFFF"; font.pixelSize: 14; font.weight: Font.Medium }
+                                    Repeater {
+                                        model: ["Compact", "Standard", "Comfortable"]
+                                        delegate: RowLayout {
+                                            spacing: 10
+                                            Rectangle {
+                                                width: 16; height: 16; radius: 8
+                                                color: "transparent"; border.color: "#FFFFFF"; border.width: 1
+                                                Rectangle {
+                                                    anchors.centerIn: parent
+                                                    width: 8; height: 8; radius: 4
+                                                    color: "#3B82F6"
+                                                    visible: soundboardService.slotSize === modelData
+                                                }
+                                            }
+                                            Text { text: modelData; color: "#FFFFFF"; font.pixelSize: 14 }
+                                            MouseArea { anchors.fill: parent; onClicked: soundboardService.setSlotSize(modelData) }
+                                        }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 12
+                                    Text { text: "Preview"; color: "#888888"; font.pixelSize: 12 }
+
+                                    // Mockup Clip Card
+                                    Rectangle {
+                                        Layout.preferredWidth: 200
+                                        Layout.preferredHeight: soundboardService.slotSize === "Compact" ? 120 : (soundboardService.slotSize === "Comfortable" ? 180 : 150)
+                                        color: "#2A2A2A"; radius: 12; clip: true
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            color: soundboardService.accentColor; opacity: 0.1
+                                        }
+
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 8
+                                            Rectangle {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                width: 40; height: 40; radius: 20; color: soundboardService.accentColor
+                                                Text { anchors.centerIn: parent; text: "▶"; color: "#FFFFFF"; font.pixelSize: 16 }
+                                            }
+                                            Text { text: "Morning"; color: "#FFFFFF"; font.pixelSize: 14; font.weight: Font.Bold; Layout.alignment: Qt.AlignHCenter }
+                                            Text { text: "Alt+F2+Shift"; color: "#888888"; font.pixelSize: 12; Layout.alignment: Qt.AlignHCenter }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -737,17 +966,7 @@ Rectangle {
                                     Layout.preferredWidth: 280
                                     placeholder: "Select Output Device"
                                     model: soundboardService.getOutputDevices()
-                                    
-                                    Component.onCompleted: {
-                                        var devices = soundboardService.getOutputDevices()
-                                        for (var i = 0; i < devices.length; i++) {
-                                            if (devices[i].isDefault) {
-                                                selectedId = devices[i].id
-                                                selectedValue = devices[i].name
-                                                break
-                                            }
-                                        }
-                                    }
+                                    selectedId: soundboardService.selectedPlaybackDeviceId
                                     
                                     onItemSelected: function(id, name) {
                                         console.log("Speaker output selected:", name)
@@ -780,17 +999,7 @@ Rectangle {
                                     Layout.preferredWidth: 280
                                     placeholder: "Select Monitor Device"
                                     model: soundboardService.getOutputDevices()
-
-                                    Component.onCompleted: {
-                                        var devices = soundboardService.getOutputDevices()
-                                        for (var i = 0; i < devices.length; i++) {
-                                            if (devices[i].isDefault) {
-                                                selectedId = devices[i].id
-                                                selectedValue = devices[i].name
-                                                break
-                                            }
-                                        }
-                                    }
+                                    selectedId: soundboardService.selectedMonitorDeviceId
 
                                     onItemSelected: function(id, name) {
                                         console.log("Monitor output selected:", name)
@@ -828,7 +1037,7 @@ Rectangle {
                                         from: -60
                                         to: 0
                                         stepSize: 1
-                                        value: soundboardService.masterGainDb()
+                                        value: soundboardService.masterGainDb
 
                                         onMoved: {
                                             soundboardService.setMasterGainDb(value)
@@ -1128,86 +1337,53 @@ Rectangle {
             // Tab 5: Preferences
             Flickable {
                 contentWidth: width
-                contentHeight: preferencesContent.height
+                contentHeight: preferencesContent.implicitHeight + 40
                 clip: true
 
-                Rectangle {
+                ColumnLayout {
                     id: preferencesContent
-                    width: parent.width
-                    height: 200
-                    color: "#1F1F1F"
-                    radius: 12
+                    width: parent.width - 40
+                    x: 20
+                    y: 20
+                    spacing: 24
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Preferences"
-                        color: "#FFFFFF"
-                        font.pixelSize: 24
-                        font.weight: Font.Medium
+                    // Data Management Section
+                    ColumnLayout {
+                        spacing: 16
+                        Layout.fillWidth: true
+
+                        Text { text: "Data Management"; color: "#FFFFFF"; font.pixelSize: 20; font.weight: Font.DemiBold }
+                        
+                        Rectangle {
+                            Layout.fillWidth: true; Layout.preferredHeight: 120; color: "#1A1A1A"; radius: 16
+                            RowLayout {
+                                anchors.fill: parent; anchors.margins: 20; spacing: 20
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    Text { text: "Export & Import Settings"; color: "#FFFFFF"; font.pixelSize: 16; font.weight: Font.Medium }
+                                    Text { text: "Save or load your application settings (audio devices, volumes, theme)."; color: "#888888"; font.pixelSize: 12 }
+                                }
+                                RowLayout {
+                                    spacing: 12
+                                    Rectangle {
+                                        width: 120; height: 40; color: "#2A2A2A"; radius: 8; border.color: "#3A3A3A"
+                                        Text { anchors.centerIn: parent; text: "📤 Export"; color: "#FFFFFF" }
+                                        MouseArea { anchors.fill: parent; onClicked: exportSettingsDialog.open() }
+                                    }
+                                    Rectangle {
+                                        width: 120; height: 40; color: "#2A2A2A"; radius: 8; border.color: "#3A3A3A"
+                                        Text { anchors.centerIn: parent; text: "📥 Import"; color: "#FFFFFF" }
+                                        MouseArea { anchors.fill: parent; onClicked: importSettingsDialog.open() }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
-            }
-        }
 
-        // Bottom buttons - Cancel and Save
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.rightMargin: 20
-            Layout.bottomMargin: 20
-            spacing: 12
-
-            Item { Layout.fillWidth: true }  // Spacer to push buttons to right
-
-            // Cancel button
-            Rectangle {
-                width: 80
-                height: 40
-                color: "#2A2A2A"
-                radius: 8
-                border.width: 1
-                border.color: "#3A3A3A"
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "Cancel"
-                    color: "#FFFFFF"
-                    font.pixelSize: 14
-                    font.weight: Font.Medium
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: console.log("Cancel clicked")
-                }
-            }
-
-            // Save button with gradient
-            Rectangle {
-                width: 80
-                height: 40
-                radius: 8
-
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: "#3B82F6" }  // Blue
-                    GradientStop { position: 1.0; color: "#D946EF" }  // Purple/Magenta
-                }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "Save"
-                    color: "#FFFFFF"
-                    font.pixelSize: 14
-                    font.weight: Font.Medium
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: console.log("Save clicked")
+                    Item { Layout.preferredHeight: 40 } // Spacer
                 }
             }
         }
     }
+}
 }

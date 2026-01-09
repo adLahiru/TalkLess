@@ -32,6 +32,26 @@ Rectangle {
             }
         }
         internalModel = items
+        
+        // Update selected name if models change
+        updateSelectedName()
+    }
+
+    onSelectedIdChanged: updateSelectedName()
+
+    function updateSelectedName() {
+        if (!selectedId) {
+            selectedValue = ""
+            return
+        }
+        for (var i = 0; i < internalModel.length; i++) {
+            if (internalModel[i].id === selectedId) {
+                selectedValue = internalModel[i].name
+                return
+            }
+        }
+        // If not found in model, it might still be loading or model not yet populated
+        // We don't clear selectedValue here to avoid flickering if it was already set
     }
     
     height: 50

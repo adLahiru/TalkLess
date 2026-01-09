@@ -5,6 +5,9 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <QUrl>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QJsonValue>
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
@@ -36,6 +39,21 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
     if (m_audioEngine) {
         m_audioEngine->setMasterGainDB(static_cast<float>(m_state.settings.masterGainDb));
         m_audioEngine->setMicGainDB(static_cast<float>(m_state.settings.micGainDb));
+        
+        if (!m_state.settings.selectedCaptureDeviceId.isEmpty()) {
+            m_audioEngine->setCaptureDevice(m_state.settings.selectedCaptureDeviceId.toStdString());
+        }
+        if (!m_state.settings.selectedPlaybackDeviceId.isEmpty()) {
+            m_audioEngine->setPlaybackDevice(m_state.settings.selectedPlaybackDeviceId.toStdString());
+        }
+        if (!m_state.settings.selectedMonitorDeviceId.isEmpty()) {
+            m_audioEngine->setMonitorPlaybackDevice(m_state.settings.selectedMonitorDeviceId.toStdString());
+        }
+
+        m_audioEngine->setMicEnabled(m_state.settings.micEnabled);
+        m_audioEngine->setMicPassthroughEnabled(m_state.settings.micPassthroughEnabled);
+        m_audioEngine->setMicSoundboardBalance(m_state.settings.micSoundboardBalance);
+
         qDebug() << "Applied saved audio settings - Master:" << m_state.settings.masterGainDb 
                  << "dB, Mic:" << m_state.settings.micGainDb << "dB";
     }
@@ -709,7 +727,10 @@ bool SoundboardService::setInputDevice(const QString& deviceId)
 
     bool success = m_audioEngine->setCaptureDevice(deviceId.toStdString());
     if (success) {
+        m_state.settings.selectedCaptureDeviceId = deviceId;
+        m_repo.saveIndex(m_state);
         qDebug() << "Input device set to:" << deviceId;
+        emit settingsChanged();
     } else {
         qWarning() << "Failed to set input device:" << deviceId;
     }
@@ -725,7 +746,10 @@ bool SoundboardService::setOutputDevice(const QString& deviceId)
 
     bool success = m_audioEngine->setPlaybackDevice(deviceId.toStdString());
     if (success) {
+        m_state.settings.selectedPlaybackDeviceId = deviceId;
+        m_repo.saveIndex(m_state);
         qDebug() << "Output device set to:" << deviceId;
+        emit settingsChanged();
     } else {
         qWarning() << "Failed to set output device:" << deviceId;
     }
@@ -741,7 +765,10 @@ bool SoundboardService::setMonitorOutputDevice(const QString& deviceId)
 
     bool success = m_audioEngine->setMonitorPlaybackDevice(deviceId.toStdString());
     if (success) {
+        m_state.settings.selectedMonitorDeviceId = deviceId;
+        m_repo.saveIndex(m_state);
         qDebug() << "Secondary output device set to:" << deviceId;
+        emit settingsChanged();
     } else {
         qWarning() << "Failed to set secondary output device:" << deviceId;
     }
@@ -808,7 +835,11 @@ void SoundboardService::setMicSoundboardBalance(float balance)
     // We'll use a linear mix for now - mic fades out as balance increases
     m_audioEngine->setMicSoundboardBalance(balance);
     
+    m_state.settings.micSoundboardBalance = balance;
+    m_repo.saveIndex(m_state);
+    
     qDebug() << "Mic/Soundboard balance set to:" << balance;
+    emit settingsChanged();
 }
 
 float SoundboardService::getMicSoundboardBalance() const
@@ -825,7 +856,10 @@ void SoundboardService::setMicPassthroughEnabled(bool enabled)
         return;
     }
     m_audioEngine->setMicPassthroughEnabled(enabled);
+    m_state.settings.micPassthroughEnabled = enabled;
+    m_repo.saveIndex(m_state);
     qDebug() << "Mic passthrough" << (enabled ? "enabled" : "disabled");
+    emit settingsChanged();
 }
 
 bool SoundboardService::isMicPassthroughEnabled() const
@@ -842,7 +876,10 @@ void SoundboardService::setMicEnabled(bool enabled)
         return;
     }
     m_audioEngine->setMicEnabled(enabled);
-    qDebug() << "Mic enabled:" << enabled;
+    m_state.settings.micEnabled = enabled;
+    m_repo.saveIndex(m_state);
+    qDebug() << "Mic capture" << (enabled ? "enabled" : "disabled");
+    emit settingsChanged();
 }
 
 bool SoundboardService::isMicEnabled() const
@@ -949,3 +986,137 @@ void SoundboardService::handleHotkeyAction(const QString& actionId)
     }
 }
 
+void SoundboardService::setTheme(const QString& theme)
+{
+    if (m_state.settings.theme == theme) return;
+    m_state.settings.theme = theme;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
+void SoundboardService::setAccentColor(const QString& color)
+{
+    if (m_state.settings.accentColor == color) return;
+    m_state.settings.accentColor = color;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
+void SoundboardService::setSlotSize(const QString& size)
+{
+    if (m_state.settings.slotSize == size) return;
+    m_state.settings.slotSize = size;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
+void SoundboardService::setLanguage(const QString& lang)
+{
+    if (m_state.settings.language == lang) return;
+    m_state.settings.language = lang;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
+void SoundboardService::setHotkeyMode(const QString& mode)
+{
+    if (m_state.settings.hotkeyMode == mode) return;
+    m_state.settings.hotkeyMode = mode;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
+bool SoundboardService::exportSettings(const QString& filePath)
+{
+    QString path = filePath;
+    if (path.startsWith("file:///")) {
+        path = QUrl(filePath).toLocalFile();
+    }
+
+    QJsonObject root;
+    QJsonObject settings;
+    settings["masterGainDb"] = m_state.settings.masterGainDb;
+    settings["micGainDb"] = m_state.settings.micGainDb;
+    settings["selectedPlaybackDeviceId"] = m_state.settings.selectedPlaybackDeviceId;
+    settings["selectedCaptureDeviceId"] = m_state.settings.selectedCaptureDeviceId;
+    settings["selectedMonitorDeviceId"] = m_state.settings.selectedMonitorDeviceId;
+    settings["theme"] = m_state.settings.theme;
+    settings["accentColor"] = m_state.settings.accentColor;
+    settings["slotSize"] = m_state.settings.slotSize;
+    settings["language"] = m_state.settings.language;
+    settings["hotkeyMode"] = m_state.settings.hotkeyMode;
+    settings["micEnabled"] = m_state.settings.micEnabled;
+    settings["micPassthroughEnabled"] = m_state.settings.micPassthroughEnabled;
+    settings["micSoundboardBalance"] = m_state.settings.micSoundboardBalance;
+    
+    root["settings"] = settings;
+    root["version"] = m_state.version;
+
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
+        qWarning() << "Failed to open file for export:" << path;
+        return false;
+    }
+
+    file.write(QJsonDocument(root).toJson());
+    return true;
+}
+
+bool SoundboardService::importSettings(const QString& filePath)
+{
+    QString path = filePath;
+    if (path.startsWith("file:///")) {
+        path = QUrl(filePath).toLocalFile();
+    }
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "Failed to open file for import:" << path;
+        return false;
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    if (doc.isNull()) return false;
+
+    QJsonObject root = doc.object();
+    if (root.contains("settings")) {
+        QJsonObject s = root.value("settings").toObject();
+        m_state.settings.masterGainDb = s.value("masterGainDb").toDouble(m_state.settings.masterGainDb);
+        m_state.settings.micGainDb = s.value("micGainDb").toDouble(m_state.settings.micGainDb);
+        m_state.settings.selectedPlaybackDeviceId = s.value("selectedPlaybackDeviceId").toString(m_state.settings.selectedPlaybackDeviceId);
+        m_state.settings.selectedCaptureDeviceId = s.value("selectedCaptureDeviceId").toString(m_state.settings.selectedCaptureDeviceId);
+        m_state.settings.selectedMonitorDeviceId = s.value("selectedMonitorDeviceId").toString(m_state.settings.selectedMonitorDeviceId);
+        m_state.settings.theme = s.value("theme").toString(m_state.settings.theme);
+        m_state.settings.accentColor = s.value("accentColor").toString(m_state.settings.accentColor);
+        m_state.settings.slotSize = s.value("slotSize").toString(m_state.settings.slotSize);
+        m_state.settings.language = s.value("language").toString(m_state.settings.language);
+        m_state.settings.hotkeyMode = s.value("hotkeyMode").toString(m_state.settings.hotkeyMode);
+        m_state.settings.micEnabled = s.value("micEnabled").toBool(m_state.settings.micEnabled);
+        m_state.settings.micPassthroughEnabled = s.value("micPassthroughEnabled").toBool(m_state.settings.micPassthroughEnabled);
+        m_state.settings.micSoundboardBalance = (float)s.value("micSoundboardBalance").toDouble(m_state.settings.micSoundboardBalance);
+
+        // Save updated state
+        m_repo.saveIndex(m_state);
+        
+        // Apply settings
+        if (m_audioEngine) {
+            m_audioEngine->setMasterGainDB(static_cast<float>(m_state.settings.masterGainDb));
+            m_audioEngine->setMicGainDB(static_cast<float>(m_state.settings.micGainDb));
+            if (!m_state.settings.selectedCaptureDeviceId.isEmpty())
+                m_audioEngine->setCaptureDevice(m_state.settings.selectedCaptureDeviceId.toStdString());
+            if (!m_state.settings.selectedPlaybackDeviceId.isEmpty())
+                m_audioEngine->setPlaybackDevice(m_state.settings.selectedPlaybackDeviceId.toStdString());
+            if (!m_state.settings.selectedMonitorDeviceId.isEmpty())
+                m_audioEngine->setMonitorPlaybackDevice(m_state.settings.selectedMonitorDeviceId.toStdString());
+            
+            m_audioEngine->setMicEnabled(m_state.settings.micEnabled);
+            m_audioEngine->setMicPassthroughEnabled(m_state.settings.micPassthroughEnabled);
+            m_audioEngine->setMicSoundboardBalance(m_state.settings.micSoundboardBalance);
+        }
+
+        emit settingsChanged();
+        return true;
+    }
+
+    return false;
+}

@@ -25,11 +25,49 @@ public:
     ~SoundboardService();
 
     // ---- Index / Settings ----
-    AppSettings settings() const { return m_state.settings; }
-    Q_INVOKABLE double masterGainDb() const { return m_state.settings.masterGainDb; }
-    Q_INVOKABLE double micGainDb() const { return m_state.settings.micGainDb; }
+    Q_PROPERTY(double masterGainDb READ masterGainDb WRITE setMasterGainDb NOTIFY settingsChanged)
+    Q_PROPERTY(double micGainDb READ micGainDb WRITE setMicGainDb NOTIFY settingsChanged)
+    Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY settingsChanged)
+    Q_PROPERTY(QString accentColor READ accentColor WRITE setAccentColor NOTIFY settingsChanged)
+    Q_PROPERTY(QString slotSize READ slotSize WRITE setSlotSize NOTIFY settingsChanged)
+    Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY settingsChanged)
+    Q_PROPERTY(QString hotkeyMode READ hotkeyMode WRITE setHotkeyMode NOTIFY settingsChanged)
+    Q_PROPERTY(QString selectedCaptureDeviceId READ selectedCaptureDeviceId NOTIFY settingsChanged)
+    Q_PROPERTY(QString selectedPlaybackDeviceId READ selectedPlaybackDeviceId NOTIFY settingsChanged)
+    Q_PROPERTY(QString selectedMonitorDeviceId READ selectedMonitorDeviceId NOTIFY settingsChanged)
+    Q_PROPERTY(bool micEnabled READ isMicEnabled WRITE setMicEnabled NOTIFY settingsChanged)
+    Q_PROPERTY(bool micPassthroughEnabled READ isMicPassthroughEnabled WRITE setMicPassthroughEnabled NOTIFY settingsChanged)
+    Q_PROPERTY(float micSoundboardBalance READ getMicSoundboardBalance WRITE setMicSoundboardBalance NOTIFY settingsChanged)
+
+    // ---- Index / Settings ----
+    double masterGainDb() const { return m_state.settings.masterGainDb; }
+    double micGainDb() const { return m_state.settings.micGainDb; }
+    
+    QString selectedCaptureDeviceId() const { return m_state.settings.selectedCaptureDeviceId; }
+    QString selectedPlaybackDeviceId() const { return m_state.settings.selectedPlaybackDeviceId; }
+    QString selectedMonitorDeviceId() const { return m_state.settings.selectedMonitorDeviceId; }
     Q_INVOKABLE void setMasterGainDb(double db);
     Q_INVOKABLE void setMicGainDb(double db);
+    
+    QString theme() const { return m_state.settings.theme; }
+    Q_INVOKABLE void setTheme(const QString& theme);
+    
+    QString accentColor() const { return m_state.settings.accentColor; }
+    Q_INVOKABLE void setAccentColor(const QString& color);
+    
+    QString slotSize() const { return m_state.settings.slotSize; }
+    Q_INVOKABLE void setSlotSize(const QString& size);
+    
+    QString language() const { return m_state.settings.language; }
+    Q_INVOKABLE void setLanguage(const QString& lang);
+    
+    QString hotkeyMode() const { return m_state.settings.hotkeyMode; }
+    Q_INVOKABLE void setHotkeyMode(const QString& mode);
+
+    Q_INVOKABLE bool exportSettings(const QString& filePath);
+    Q_INVOKABLE bool importSettings(const QString& filePath);
+    Q_INVOKABLE void triggerSettingsChanged() { emit settingsChanged(); }
+
     Q_INVOKABLE int createBoard(const QString& name);
     Q_INVOKABLE bool renameBoard(int boardId, const QString& newName);
     Q_INVOKABLE bool deleteBoard(int boardId);

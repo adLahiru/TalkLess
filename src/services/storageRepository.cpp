@@ -19,8 +19,15 @@ static QJsonObject settingsToJson(const AppSettings& s)
     o["micGainDb"] = s.micGainDb;
     o["selectedPlaybackDeviceId"] = s.selectedPlaybackDeviceId;
     o["selectedCaptureDeviceId"] = s.selectedCaptureDeviceId;
+    o["selectedMonitorDeviceId"] = s.selectedMonitorDeviceId;
     o["theme"] = s.theme;
+    o["accentColor"] = s.accentColor;
+    o["slotSize"] = s.slotSize;
+    o["language"] = s.language;
     o["hotkeyMode"] = s.hotkeyMode;
+    o["micEnabled"] = s.micEnabled;
+    o["micPassthroughEnabled"] = s.micPassthroughEnabled;
+    o["micSoundboardBalance"] = s.micSoundboardBalance;
     return o;
 }
 
@@ -31,8 +38,15 @@ static AppSettings settingsFromJson(const QJsonObject& o)
     s.micGainDb = o.value("micGainDb").toDouble(0.0);
     s.selectedPlaybackDeviceId = o.value("selectedPlaybackDeviceId").toString();
     s.selectedCaptureDeviceId = o.value("selectedCaptureDeviceId").toString();
+    s.selectedMonitorDeviceId = o.value("selectedMonitorDeviceId").toString();
     s.theme = o.value("theme").toString("Dark");
+    s.accentColor = o.value("accentColor").toString("#3B82F6");
+    s.slotSize = o.value("slotSize").toString("Standard");
+    s.language = o.value("language").toString("English");
     s.hotkeyMode = o.value("hotkeyMode").toString("ActiveBoardOnly");
+    s.micEnabled = o.value("micEnabled").toBool(true);
+    s.micPassthroughEnabled = o.value("micPassthroughEnabled").toBool(true);
+    s.micSoundboardBalance = (float)o.value("micSoundboardBalance").toDouble(0.5);
     return s;
 }
 

@@ -39,7 +39,7 @@ ApplicationWindow {
             hotkeyCapturePopup.open()
         }
         
-        function onShowMessage(text) {
+        function onShowMessageSignal(text) {
             toastMessage.text = text
             toastMessage.show()
         }

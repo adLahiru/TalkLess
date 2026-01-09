@@ -8,7 +8,15 @@ struct AppSettings
 
     QString selectedPlaybackDeviceId; 
     QString selectedCaptureDeviceId;
+    QString selectedMonitorDeviceId;
 
-    QString theme = "Dark";
+    QString theme = "Dark"; // "Dark" or "Light"
+    QString accentColor = "#3B82F6"; // Default blue
+    QString slotSize = "Standard"; // "Compact", "Standard", "Comfortable"
+    QString language = "English";
     QString hotkeyMode = "ActiveBoardOnly";
+
+    bool micEnabled = true;
+    bool micPassthroughEnabled = true;
+    float micSoundboardBalance = 0.5f;
 };
