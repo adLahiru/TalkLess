@@ -1,19 +1,27 @@
 #pragma once
-#include <QObject>
 #include <QHash>
 #include <QKeySequence>
+#include <QObject>
 #include <QSettings>
 
 #include "qmlmodels/hotkeysModel.h"
 
 class QHotkey;
 
-class HotkeyManager : public QObject {
+class HotkeyManager : public QObject
+{
     Q_OBJECT
     Q_PROPERTY(HotkeysModel* systemHotkeysModel READ systemHotkeysModel CONSTANT)
     Q_PROPERTY(HotkeysModel* preferenceHotkeysModel READ preferenceHotkeysModel CONSTANT)
 
 public:
+    struct HotkeyDef
+    {
+        QString sequence; // e.g. "Ctrl+Alt+P"
+        QString actionId; // e.g. "feature.print"
+        bool enabled = true;
+    };
+
     explicit HotkeyManager(QObject* parent = nullptr);
 
     HotkeysModel* systemHotkeysModel() { return &m_system; }
