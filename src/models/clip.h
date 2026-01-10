@@ -27,6 +27,6 @@ struct Clip
     bool isRepeat  = false;   // loop flag
     bool locked    = false;   // read-only while playing
     
-    // Reproduction mode (0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop)
-    int reproductionMode = 0;  // Defaults to Overlay mode
+    // Reproduction mode (0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Loop/Repeat)
+    int reproductionMode = 1;  // Defaults to Play/Pause mode
 };

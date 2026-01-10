@@ -91,6 +91,7 @@ static QJsonObject clipToJson(const Clip& c)
 
     o["title"] = c.title;
     o["isRepeat"] = c.isRepeat;
+    o["reproductionMode"] = c.reproductionMode;
 
     // runtime-only (do not save): isPlaying, locked
     return o;
@@ -116,6 +117,7 @@ static Clip clipFromJson(const QJsonObject& o)
 
     c.title = o.value("title").toString();
     c.isRepeat = o.value("isRepeat").toBool(false);
+    c.reproductionMode = o.value("reproductionMode").toInt(1); // Default to Play/Pause
 
     // runtime defaults
     c.isPlaying = false;

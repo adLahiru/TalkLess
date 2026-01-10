@@ -116,6 +116,7 @@ public:
     Q_INVOKABLE void stopClip(int clipId);      // Stop playback of the given clip
     Q_INVOKABLE void stopAllClips();            // Stop all currently playing clips
     Q_INVOKABLE bool isClipPlaying(int clipId) const;
+    Q_INVOKABLE QVariantList playingClipIDs() const;
 
     // ---- Audio Device Selection ----
     Q_INVOKABLE QVariantList getInputDevices() const;
@@ -165,7 +166,7 @@ private:
     void rebuildHotkeyIndex();
     Clip* findActiveClipById(int clipId);
     int getOrAssignSlot(int clipId); // Get audio engine slot for clip
-
+    void reproductionPlayingClip(const QVariantList &playingClipIds, int mode);
     static QString normalizeHotkey(const QString& hotkey);
 
 private:

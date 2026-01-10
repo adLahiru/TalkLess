@@ -75,6 +75,9 @@ Rectangle {
     function pushToEditor(data) {
         if (!data)
             return;
+
+        console.log("pushToEditor: Updating editor with clip", data.clipId, "mode:", data.reproductionMode, "volume:", data.clipVolume);
+
         clipEditorTab.editingClipName = data.title || "";
         clipEditorTab.editingClipHotkey = data.hotkey || "";
         clipEditorTab.editingClipTags = data.tags || [];
@@ -83,10 +86,15 @@ Rectangle {
         clipEditorTab.clipSpeed = data.clipSpeed !== undefined ? data.clipSpeed : 1.0;
         clipEditorTab.clipIsRepeat = data.isRepeat || false;
 
-        if (typeof modeSelectorRow !== 'undefined') {
+        // Update reproduction mode - set both properties to ensure sync
+        const newMode = data.reproductionMode !== undefined ? data.reproductionMode : 1;
+        clipEditorTab.reproductionMode = newMode;
+
+        // Directly update the mode selector UI if it exists
+        if (typeof modeSelectorRow !== 'undefined' && modeSelectorRow !== null) {
             modeSelectorRow.ignoreNextChange = true;
+            modeSelectorRow.selectedMode = newMode;
         }
-        clipEditorTab.reproductionMode = data.reproductionMode !== undefined ? data.reproductionMode : 0;
 
         clipTitleInput.text = data.title || "";
     }
@@ -94,6 +102,17 @@ Rectangle {
     // Refresh when core IDs change
     onSelectedClipIdChanged: updateDisplayedClipData()
     onPlayingClipIdChanged: updateDisplayedClipData()
+
+    // Refresh editor when model data changes (e.g., after saving settings)
+    Connections {
+        target: clipsModel
+        function onClipsChanged() {
+            // Re-fetch and push data to editor when model reloads
+            if (root.selectedClipId !== -1) {
+                updateDisplayedClipData();
+            }
+        }
+    }
 
     // File picking logic
     FileDialog {
@@ -212,7 +231,7 @@ Rectangle {
         ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.maximumWidth: 900
+            // Removed maximumWidth to allow pushing sidebar to the right
             spacing: 20
 
             // Background Banner
@@ -826,36 +845,23 @@ Rectangle {
         // RIGHT COLUMN: Modern Sidebar with Premium Styling
         Rectangle {
             id: rightSidebar
-            Layout.preferredWidth: 260
-            Layout.preferredHeight: 600
-            Layout.alignment: Qt.AlignTop
-            Layout.topMargin: 20
-            Layout.rightMargin: 10
+            Layout.preferredWidth: 300
+            Layout.fillHeight: true
+            Layout.alignment: Qt.AlignRight
+            Layout.topMargin: 0
+            Layout.rightMargin: 0
 
-            // Modern gradient background
-            gradient: Gradient {
-                GradientStop {
-                    position: 0.0
-                    color: "#1F1F1F"
-                }
-                GradientStop {
-                    position: 1.0
-                    color: "#151515"
-                }
-            }
-            radius: 16
-            border.color: "#3A3A3A"
+            // Glassmorphism effect
+            color: "#161618"
+            border.color: "#2D2D30"
             border.width: 1
 
-            // Subtle shadow effect with layered rectangles
-            layer.enabled: true
-            layer.effect: ShaderEffect {
-                fragmentShader: ""
-            }
+            // Rounded only on left side if desired, but let's keep it simple and clean
+            radius: 0 // Flush to the right side edge looks better for fixed sidebar
 
             // Tab state: 0=Settings, 1=Plus, 2=Record, 3=Teleprompter, 4=Speaker
-            property int currentTabIndex: 2  // Default to Record tab
-
+            property int currentTabIndex: 0  // Default to Record tab
+            property var tabState: ["Settings", "Add Audio", "Record", "Teleprompter", "Outputs"]
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 12
@@ -866,20 +872,15 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 56
 
-                    // Subtle gradient for header
-                    gradient: Gradient {
-                        GradientStop {
-                            position: 0.0
-                            color: Qt.rgba(0.2, 0.2, 0.25, 0.3)
-                        }
-                        GradientStop {
-                            position: 1.0
-                            color: Qt.rgba(0.15, 0.15, 0.2, 0.2)
-                        }
+                    // Header background with very subtle bottom border
+                    color: "transparent"
+
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        width: parent.width
+                        height: 1
+                        color: "#2D2D30"
                     }
-                    radius: 12
-                    border.color: Qt.rgba(1, 1, 1, 0.05)
-                    border.width: 1
 
                     RowLayout {
                         anchors.fill: parent
@@ -887,13 +888,13 @@ Rectangle {
                         anchors.rightMargin: 8
                         spacing: 6
 
-                        // F1 Label
+                        // Current Tab Title
                         Text {
-                            text: "F1"
-                            color: "#FFFFFF"
-                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                            text: tabState[currentTabIndex]
+                            color: Colors.textPrimary
+                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 18
-                            font.weight: Font.Medium
+                            font.weight: Font.Bold
                             Layout.alignment: Qt.AlignVCenter
                         }
 
@@ -903,218 +904,34 @@ Rectangle {
 
                         // Icon buttons row
                         Row {
-                            spacing: 4
+                            spacing: 8
                             Layout.alignment: Qt.AlignVCenter
 
-                            // Settings button (Tab 0)
-                            Rectangle {
-                                width: 26
-                                height: 26
-                                radius: 5
-                                color: rightSidebar.currentTabIndex === 0 ? "#3B82F6" : (settingsMouseArea.containsMouse ? "#333333" : "#2A2A2A")
-                                border.color: rightSidebar.currentTabIndex === 0 ? "#3B82F6" : "#3A3A3A"
-                                border.width: 1
-
-                                Image {
-                                    id: settingsIcon
-                                    anchors.centerIn: parent
-                                    source: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_tab_settings.svg"
-                                    width: 12
-                                    height: 12
-                                    fillMode: Image.PreserveAspectFit
-                                    visible: false
-                                }
-
-                                MultiEffect {
-                                    source: settingsIcon
-                                    anchors.fill: settingsIcon
-                                    colorization: 1.0
-                                    colorizationColor: "#FFFFFF"
-                                }
-
-                                MouseArea {
-                                    id: settingsMouseArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: rightSidebar.currentTabIndex = 0
-                                }
-
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: 150
-                                    }
-                                }
+                            TabButton {
+                                index: 0
+                                iconSource: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_tab_settings.svg"
                             }
-
-                            // Plus button (Tab 1)
-                            Rectangle {
-                                width: 26
-                                height: 26
-                                radius: 5
-                                color: rightSidebar.currentTabIndex === 1 ? "#3B82F6" : (plusMouseArea.containsMouse ? "#333333" : "#2A2A2A")
-                                border.color: rightSidebar.currentTabIndex === 1 ? "#3B82F6" : "#3A3A3A"
-                                border.width: 1
-
-                                Image {
-                                    id: plusIcon
-                                    anchors.centerIn: parent
-                                    source: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_tab_add.svg"
-                                    width: 14
-                                    height: 14
-                                    fillMode: Image.PreserveAspectFit
-                                    visible: false
-                                }
-
-                                MultiEffect {
-                                    source: plusIcon
-                                    anchors.centerIn: parent
-                                    width: plusIcon.width
-                                    height: plusIcon.height
-                                    colorization: 1.0
-                                    colorizationColor: "#FFFFFF"
-                                }
-
-                                MouseArea {
-                                    id: plusMouseArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: rightSidebar.currentTabIndex = 1
-                                }
-
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: 150
-                                    }
-                                }
+                            TabButton {
+                                index: 1
+                                iconSource: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_tab_add.svg"
                             }
-
-                            // Record button (Tab 2)
-                            Rectangle {
-                                width: 26
-                                height: 26
-                                radius: 5
-                                color: rightSidebar.currentTabIndex === 2 ? "#3B82F6" : (recordMouseArea.containsMouse ? "#333333" : "#2A2A2A")
-                                border.color: rightSidebar.currentTabIndex === 2 ? "#3B82F6" : "#3A3A3A"
-                                border.width: 1
-
-                                Image {
-                                    id: recordIcon
-                                    anchors.centerIn: parent
-                                    source: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_tab_record.svg"
-                                    width: 12
-                                    height: 12
-                                    fillMode: Image.PreserveAspectFit
-                                    visible: false
-                                }
-
-                                MultiEffect {
-                                    source: recordIcon
-                                    anchors.centerIn: parent
-                                    width: recordIcon.width
-                                    height: recordIcon.height
-                                    colorization: 1.0
-                                    colorizationColor: "#FFFFFF"
-                                }
-
-                                MouseArea {
-                                    id: recordMouseArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: rightSidebar.currentTabIndex = 2
-                                }
-
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: 150
-                                    }
-                                }
+                            TabButton {
+                                index: 2
+                                iconSource: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_tab_record.svg"
                             }
-
-                            // Teleprompter button (Tab 3)
-                            Rectangle {
-                                width: 26
-                                height: 26
-                                radius: 5
-                                color: rightSidebar.currentTabIndex === 3 ? "#3B82F6" : (teleprompterMouseArea.containsMouse ? "#333333" : "#2A2A2A")
-                                border.color: rightSidebar.currentTabIndex === 3 ? "#3B82F6" : "#3A3A3A"
-                                border.width: 1
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "📄"
-                                    font.pixelSize: 12
-                                }
-
-                                MouseArea {
-                                    id: teleprompterMouseArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: rightSidebar.currentTabIndex = 3
-                                }
-
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: 150
-                                    }
-                                }
+                            TabButton {
+                                index: 3
+                                emoji: "📄"
                             }
-
-                            // Speaker button (Tab 4)
-                            Rectangle {
-                                width: 26
-                                height: 26
-                                radius: 5
-                                color: rightSidebar.currentTabIndex === 4 ? "#3B82F6" : (speakerMouseArea.containsMouse ? "#333333" : "#2A2A2A")
-                                border.color: rightSidebar.currentTabIndex === 4 ? "#3B82F6" : "#3A3A3A"
-                                border.width: 1
-
-                                Image {
-                                    id: speakerIcon
-                                    anchors.centerIn: parent
-                                    source: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_tab_speaker.svg"
-                                    width: 14
-                                    height: 13
-                                    fillMode: Image.PreserveAspectFit
-                                    visible: false
-                                }
-
-                                MultiEffect {
-                                    source: speakerIcon
-                                    anchors.centerIn: parent
-                                    width: speakerIcon.width
-                                    height: speakerIcon.height
-                                    colorization: 1.0
-                                    colorizationColor: "#FFFFFF"
-                                }
-
-                                MouseArea {
-                                    id: speakerMouseArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: rightSidebar.currentTabIndex = 4
-                                }
-
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: 150
-                                    }
-                                }
+                            TabButton {
+                                index: 4
+                                iconSource: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_tab_speaker.svg"
                             }
                         }
                     }
                 }
 
-                // Separator line
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 2
-                    color: "#3A3A3A"
-                }
+                // Modern Header Separator is now part of the header rectangle above
 
                 // Recording Tab Content (Tab 2)
                 ColumnLayout {
@@ -2323,7 +2140,12 @@ Rectangle {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
+                                                modeSelectorRow.selectedMode = 0;
                                                 clipEditorTab.reproductionMode = 0;
+                                                if (root.selectedClipId !== -1) {
+                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 0);
+                                                    console.log("Mode set to Overlay (0)");
+                                                }
                                             }
                                         }
                                     }
@@ -2351,7 +2173,12 @@ Rectangle {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
+                                                modeSelectorRow.selectedMode = 1;
                                                 clipEditorTab.reproductionMode = 1;
+                                                if (root.selectedClipId !== -1) {
+                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 1);
+                                                    console.log("Mode set to Play/Pause (1)");
+                                                }
                                             }
                                         }
                                     }
@@ -2379,7 +2206,12 @@ Rectangle {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
+                                                modeSelectorRow.selectedMode = 2;
                                                 clipEditorTab.reproductionMode = 2;
+                                                if (root.selectedClipId !== -1) {
+                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 2);
+                                                    console.log("Mode set to Play/Stop (2)");
+                                                }
                                             }
                                         }
                                     }
@@ -2407,35 +2239,12 @@ Rectangle {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
+                                                modeSelectorRow.selectedMode = 3;
                                                 clipEditorTab.reproductionMode = 3;
-                                            }
-                                        }
-                                    }
-
-                                    // Loop Mode
-                                    Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
-                                        color: parent.selectedMode === 4 ? "#00D9FF" : (loopModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 4 ? "#00D9FF" : "#3A3A3A"
-                                        border.width: parent.selectedMode === 4 ? 2 : 1
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "⟳"
-                                            color: parent.parent.selectedMode === 4 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 20
-                                            font.weight: Font.Bold
-                                        }
-
-                                        MouseArea {
-                                            id: loopModeArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                clipEditorTab.reproductionMode = 4;
+                                                if (root.selectedClipId !== -1) {
+                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 3);
+                                                    console.log("Mode set to Loop (3)");
+                                                }
                                             }
                                         }
                                     }
@@ -3174,6 +2983,51 @@ Rectangle {
                     }
                 }
             }
+        }
+    }
+
+    // Helper for tab buttons
+    component TabButton: Rectangle {
+        property int index: 0
+        property string iconSource: ""
+        property string emoji: ""
+        property bool isActive: rightSidebar.currentTabIndex === index
+
+        width: 32
+        height: 32
+        radius: 8
+        color: isActive ? Qt.rgba(0.23, 0.51, 0.96, 0.2) : (mouse.containsMouse ? "#2D2D2D" : "transparent")
+        border.color: isActive ? "#3B82F6" : "transparent"
+        border.width: 1
+
+        Image {
+            anchors.centerIn: parent
+            source: iconSource
+            width: 16
+            height: 16
+            fillMode: Image.PreserveAspectFit
+            visible: iconSource !== ""
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                colorization: 1.0
+                colorizationColor: isActive ? "#3B82F6" : "#A0A0A0"
+            }
+        }
+
+        Text {
+            anchors.centerIn: parent
+            text: emoji
+            visible: emoji !== ""
+            font.pixelSize: 16
+            opacity: isActive ? 1.0 : 0.7
+        }
+
+        MouseArea {
+            id: mouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: rightSidebar.currentTabIndex = index
         }
     }
 }
