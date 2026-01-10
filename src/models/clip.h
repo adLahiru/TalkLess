@@ -36,4 +36,5 @@ struct Clip
     bool muteMicDuringPlayback = false; // Mute mic while this clip is playing
 
     double durationSec = 0.0;           // Duration in seconds (or -1.0 if unknown)
+    double lastPlayedPosMs = 0.0;       // Saved playback position for resuming
 };

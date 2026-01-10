@@ -1273,8 +1273,16 @@ void SoundboardService::playClip(int clipId)
 
     // Per-clip behavior (when user taps the same clip again)
     if (mode == 1 && isCurrentlyPlaying) {
-        if (isPaused) m_audioEngine->resumeClip(slotId);
-        else          m_audioEngine->pauseClip(slotId);
+        if (isPaused) {
+             m_audioEngine->resumeClip(slotId);
+        } else {
+             // Saving playback position before pausing
+             double pos = m_audioEngine->getClipPlaybackPositionMs(slotId);
+             clip->lastPlayedPosMs = pos;
+             saveActive();
+             
+             m_audioEngine->pauseClip(slotId);
+        }
 
         emit activeClipsChanged();
         return;
@@ -1378,6 +1386,17 @@ void SoundboardService::playClip(int clipId)
     m_audioEngine->setClipTrim(slotId, clip->trimStartMs, clip->trimEndMs);
 
     // 3) Play Clip_B
+    m_audioEngine->setClipTrim(slotId, clip->trimStartMs, clip->trimEndMs);
+
+    // Resume from saved position if applicable (mainly for Play/Pause mode)
+    if (clip->lastPlayedPosMs > 0.0) {
+        // Mode 1: Play/Pause - resume from last position
+        if (mode == 1) {
+             m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
+        }
+    }
+
+    // 3) Play Clip_B
     m_audioEngine->playClip(slotId);
 
     clip->isPlaying = true;
@@ -1419,7 +1438,9 @@ void SoundboardService::finalizeClipPlayback(int clipId)
     Clip* clip = findActiveClipById(clipId);
     if (clip) {
         clip->isPlaying = false;
+        clip->lastPlayedPosMs = 0.0; // Reset position
         emit activeClipsChanged();
+        saveActive();
     }
 
     // Restore mic if this clip had muted it and no other mic-muting clips are playing
@@ -1997,3 +2018,4 @@ void SoundboardService::resetSettings()
     m_repo.saveIndex(m_state);
     emit settingsChanged();
 }
+
