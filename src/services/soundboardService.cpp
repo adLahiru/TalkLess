@@ -441,6 +441,25 @@ bool SoundboardService::addClipWithTitle(int boardId, const QString& filePath, c
     return addClipToBoard(boardId, draft);
 }
 
+bool SoundboardService::addClipWithSettings(int boardId, const QString& filePath, const QString& title, double trimStartMs, double trimEndMs)
+{
+    if (filePath.isEmpty())
+        return false;
+
+    QString localPath = filePath;
+    if (localPath.startsWith("file:")) {
+        localPath = QUrl(localPath).toLocalFile();
+    }
+
+    Clip draft;
+    draft.filePath = localPath;
+    draft.title = title.trimmed().isEmpty() ? QFileInfo(draft.filePath).baseName() : title.trimmed();
+    draft.trimStartMs = trimStartMs;
+    draft.trimEndMs = trimEndMs;
+
+    return addClipToBoard(boardId, draft);
+}
+
 bool SoundboardService::deleteClip(int boardId, int clipId)
 {
     // if deleting from active board (in memory)
@@ -997,6 +1016,17 @@ void SoundboardService::setClipTrim(int boardId, int clipId, double startMs, dou
     }
 }
 
+void SoundboardService::seekClip(int boardId, int clipId, double positionMs)
+{
+    // Active board update
+    if (m_active && m_active->id == boardId) {
+        // Update engine if this clip is in a slot
+        if (m_clipIdToSlot.contains(clipId)) {
+            m_audioEngine->seekClip(m_clipIdToSlot[clipId], positionMs);
+        }
+    }
+}
+
 bool SoundboardService::moveClip(int boardId, int fromIndex, int toIndex)
 {
     // Validate indices
@@ -1457,6 +1487,18 @@ double SoundboardService::getClipPlaybackPositionMs(int clipId) const
     if (!m_clipIdToSlot.contains(clipId)) return 0.0;
     
     return m_audioEngine->getClipPlaybackPositionMs(m_clipIdToSlot[clipId]);
+}
+
+double SoundboardService::getFileDuration(const QString& filePath) const
+{
+    if (!m_audioEngine) return 0.0;
+    
+    QString path = filePath;
+    if (path.startsWith("file:")) {
+        path = QUrl(filePath).toLocalFile();
+    }
+    
+    return m_audioEngine->getFileDuration(path.toStdString());
 }
 
 QVariantList SoundboardService::playingClipIDs() const

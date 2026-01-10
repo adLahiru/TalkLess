@@ -344,6 +344,26 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 
         if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping) break;
 
+        // Check for seek request
+        double seekReq = slot->seekPosMs.exchange(-1.0, std::memory_order_relaxed);
+        if (seekReq >= 0.0) {
+            ma_uint64 targetFrame = static_cast<ma_uint64>((seekReq / 1000.0) * decoder.outputSampleRate);
+            ma_decoder_seek_to_pcm_frame(&decoder, targetFrame);
+            
+            // Should we update playbackFrameCount?
+            // If we don't, the UI slider might jump weirdly or drift.
+            // But playbackFrameCount is updated by the consumer (processAudio).
+            // A reset here might race. However, we are the producer.
+            // If we seek, the ringbuffer content prior to this becomes old.
+            // Ideally we should flush ringbuffers. 
+            // But flushing ringbuffers (reading everything) is hard from here.
+            // A simple seek might result in a small delay until old audio plays out.
+            // For a soundboard, latency is key, but seeking is usually done while paused or editing.
+            
+            // If we are actively playing, we might hear the old audio for a split second.
+            continue;
+        }
+
         ma_uint64 framesRead = 0;
         ma_result readResult = ma_decoder_read_pcm_frames(&decoder, decodeBuffer, kDecodeFrames, &framesRead);
 
@@ -583,6 +603,7 @@ void AudioEngine::playClip(int slotId)
 
     slot.queuedMainFrames.store(0, std::memory_order_relaxed);
     slot.playbackFrameCount.store(0, std::memory_order_relaxed);
+    slot.seekPosMs.store(-1.0, std::memory_order_relaxed);
 
     slot.state.store(ClipState::Playing, std::memory_order_release);
     slot.decoderThread = std::thread(decoderThreadFunc, this, &slot, slotId);
@@ -597,23 +618,49 @@ double AudioEngine::getClipPlaybackPositionMs(int slotId) const
 
     double frames = static_cast<double>(slot.playbackFrameCount.load(std::memory_order_relaxed));
     double startMs = slot.trimStartMs.load(std::memory_order_relaxed);
-    double endMs   = slot.trimEndMs.load(std::memory_order_relaxed);
-    double totalMs = slot.totalDurationMs.load(std::memory_order_relaxed);
-
-    if (endMs <= 0 || endMs > totalMs) endMs = totalMs;
     
-    double durationMs = endMs - startMs;
-    if (durationMs <= 0) durationMs = 1.0; // avoid div by zero
-
-    double elapsedMs = (frames * 1000.0 / sr);
+    // Calculate ms from frames
+    double currentMs = (frames / static_cast<double>(sr)) * 1000.0;
     
-    if (slot.loop.load(std::memory_order_relaxed)) {
-        elapsedMs = fmod(elapsedMs, durationMs);
-    } else {
-        if (elapsedMs > durationMs) elapsedMs = durationMs;
-    }
+    // Add trimStart offset because playbackFrameCount counts from 0 (start of PLAYBACK),
+    // but the decoder started at trimStart.
+    // Wait, playbackFrameCount is incremented by how many frames were consumed from RingBuffer.
+    // The decoder initially seeks to trimStart.
+    // So if I played 1 second, current position in FILE is trimStart + 1s.
+    
+    return startMs + currentMs;
+}
 
-    return startMs + elapsedMs;
+void AudioEngine::seekClip(int slotId, double positionMs)
+{
+    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    
+    // Clamp to duration if possible? Safe enough without.
+    clips[slotId].seekPosMs.store(positionMs, std::memory_order_relaxed);
+    
+    // If paused, we probably want to update playbackFrameCount immediately so UI updates?
+    // But playbackFrameCount tracks *consumed* frames.
+    // If we just seek, we haven't consumed those frames yet.
+    // This is tricky. simpler to just let it play or handle in UI.
+    
+    // Actually, we must reset playbackFrameCount logic if we seek?
+    // If we seek to 10s, and trimStart is 5s, we are effectively jumping to 10s absolute file time.
+    // playbackFrameCount = (10s - 5s) converted to frames?
+    
+    // Let's adjust playbackFrameCount so getClipPlaybackPositionMs returns the seeked time.
+    // positionMs = startMs + currentMs
+    // currentMs = positionMs - startMs
+    // frames = currentMs * sr / 1000
+    
+    double startMs = clips[slotId].trimStartMs.load(std::memory_order_relaxed);
+    double diffMs = positionMs - startMs;
+    if (diffMs < 0) diffMs = 0; // Seeking before start?
+    
+    int sr = clips[slotId].sampleRate.load(std::memory_order_relaxed);
+    if (sr <= 0) sr = 48000;
+    
+    long long newFrames = static_cast<long long>(diffMs * sr / 1000.0);
+    clips[slotId].playbackFrameCount.store(newFrames, std::memory_order_relaxed);
 }
 
 double AudioEngine::getFileDuration(const std::string& filepath)

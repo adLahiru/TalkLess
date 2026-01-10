@@ -2152,7 +2152,7 @@ Rectangle {
                                 TrimWaveform {
                                     id: waveform
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: 50
+                                    Layout.preferredHeight: 60
                                     currentTime: 0
                                     totalDuration: clipEditorTab.durationSec
                                     trimStart: clipEditorTab.durationSec > 0 ? (clipEditorTab.trimStartMs / 1000.0) / clipEditorTab.durationSec : 0.0
@@ -2160,14 +2160,29 @@ Rectangle {
 
                                     onTrimStartMoved: function (pos) {
                                         if (root.selectedClipId !== -1 && clipEditorTab.durationSec > 0) {
-                                            clipEditorTab.trimStartMs = pos * clipEditorTab.durationSec * 1000.0;
-                                            soundboardService.setClipTrim(clipsModel.boardId, root.selectedClipId, clipEditorTab.trimStartMs, clipEditorTab.trimEndMs);
+                                            var newStartMs = pos * clipEditorTab.durationSec * 1000.0;
+                                            clipEditorTab.trimStartMs = newStartMs;
+                                            soundboardService.setClipTrim(clipsModel.boardId, root.selectedClipId, newStartMs, clipEditorTab.trimEndMs);
                                         }
                                     }
                                     onTrimEndMoved: function (pos) {
                                         if (root.selectedClipId !== -1 && clipEditorTab.durationSec > 0) {
-                                            clipEditorTab.trimEndMs = pos * clipEditorTab.durationSec * 1000.0;
-                                            soundboardService.setClipTrim(clipsModel.boardId, root.selectedClipId, clipEditorTab.trimStartMs, clipEditorTab.trimEndMs);
+                                            var newEndMs = pos * clipEditorTab.durationSec * 1000.0;
+                                            clipEditorTab.trimEndMs = newEndMs;
+                                            soundboardService.setClipTrim(clipsModel.boardId, root.selectedClipId, clipEditorTab.trimStartMs, newEndMs);
+                                        }
+                                    }
+                                    onSeekRequested: function (pos) {
+                                        if (root.selectedClipId !== -1 && clipEditorTab.durationSec > 0) {
+                                            var seekMs = pos * clipEditorTab.durationSec * 1000.0;
+
+                                            // If playing, seek audio
+                                            if (soundboardService.isClipPlaying(root.selectedClipId)) {
+                                                soundboardService.seekClip(clipsModel.boardId, root.selectedClipId, seekMs);
+                                            } else {
+                                                // If not playing, just update visual cursor
+                                                waveform.currentTime = seekMs / 1000.0;
+                                            }
                                         }
                                     }
 
@@ -2905,11 +2920,18 @@ Rectangle {
                                 var nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
                                 uploadAudioNameInput.text = nameWithoutExt;
                             }
+
+                            // Get duration for trim preview
+                            fileDuration = soundboardService.getFileDuration(filePath);
+                            console.log("File duration detected:", fileDuration);
                         }
 
                         onFileCleared: {
                             console.log("File cleared");
+                            fileDuration = 0;
                         }
+
+                        property real fileDuration: 0
                     }
 
                     // Spacer
@@ -2934,10 +2956,23 @@ Rectangle {
 
                         // Waveform Display (without playback controls)
                         TrimWaveform {
+                            id: uploadWaveform
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 50
-                            currentTime: 90
-                            totalDuration: 210
+                            Layout.preferredHeight: 60
+                            currentTime: 0
+                            totalDuration: fileDropArea.fileDuration
+                            trimStart: 0.0
+                            trimEnd: 1.0
+
+                            property real trimStartMs: 0
+                            property real trimEndMs: fileDropArea.fileDuration * 1000.0
+
+                            onTrimStartMoved: function (pos) {
+                                trimStartMs = pos * totalDuration * 1000.0;
+                            }
+                            onTrimEndMoved: function (pos) {
+                                trimEndMs = pos * totalDuration * 1000.0;
+                            }
                         }
                     }
 
@@ -3035,10 +3070,10 @@ Rectangle {
                                     const filePath = "file:///" + fileDropArea.droppedFilePath;
                                     const title = uploadAudioNameInput.text;
 
-                                    const success = soundboardService.addClipWithTitle(boardId, filePath, title);
+                                    const success = soundboardService.addClipWithSettings(boardId, filePath, title, uploadWaveform.trimStartMs, uploadWaveform.trimEndMs);
 
                                     if (success) {
-                                        console.log("Clip saved successfully");
+                                        console.log("Clip saved successfully with trim:", uploadWaveform.trimStartMs, uploadWaveform.trimEndMs);
                                         // Reload the clips model
                                         clipsModel.reload();
 

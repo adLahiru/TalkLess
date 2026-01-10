@@ -49,6 +49,7 @@ struct ClipSlot
     std::atomic<double> trimStartMs{0.0};
     std::atomic<double> trimEndMs{0.0};
     std::atomic<double> totalDurationMs{0.0};
+    std::atomic<double> seekPosMs{-1.0};  // If >= 0, decoder starts here
 
     std::atomic<long long> playbackFrameCount{0};
     std::atomic<long long> queuedMainFrames{0};
@@ -86,6 +87,7 @@ public:
     void setClipLoop(int slotId, bool loop);
     void setClipGain(int slotId, float gainDB);
     void setClipTrim(int slotId, double startMs, double endMs);
+    void seekClip(int slotId, double positionMs);
     float getClipGain(int slotId) const;
     bool isClipPlaying(int slotId) const;
     bool isClipPaused(int slotId) const;

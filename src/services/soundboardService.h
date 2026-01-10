@@ -94,6 +94,7 @@ public:
     Q_INVOKABLE bool addClip(int boardId, const QString& filePath);
     Q_INVOKABLE bool addClips(int boardId, const QStringList& filePaths);
     Q_INVOKABLE bool addClipWithTitle(int boardId, const QString& filePath, const QString& title);
+    Q_INVOKABLE bool addClipWithSettings(int boardId, const QString& filePath, const QString& title, double trimStartMs, double trimEndMs);
     Q_INVOKABLE bool deleteClip(int boardId, int clipId);
     bool addClipToBoard(int boardId, const Clip& draft);
     bool updateClipInBoard(int boardId, int clipId, const Clip& updatedClip);
@@ -108,6 +109,7 @@ public:
     Q_INVOKABLE void setClipMuteOtherSounds(int boardId, int clipId, bool mute);
     Q_INVOKABLE void setClipMuteMicDuringPlayback(int boardId, int clipId, bool mute);
     Q_INVOKABLE void setClipTrim(int boardId, int clipId, double startMs, double endMs);
+    Q_INVOKABLE void seekClip(int boardId, int clipId, double positionMs);
     Q_INVOKABLE bool moveClip(int boardId, int fromIndex, int toIndex); // Reorder clips with drag-drop
     Q_INVOKABLE void copyClip(int clipId);                              // Copy clip to internal clipboard
     Q_INVOKABLE bool pasteClip(int boardId);                             // Paste clip from clipboard to target board
@@ -146,6 +148,7 @@ public:
     Q_INVOKABLE bool isMicPassthroughEnabled() const;
     Q_INVOKABLE void setMicEnabled(bool enabled); // Enable/disable capture
     Q_INVOKABLE bool isMicEnabled() const;
+    Q_INVOKABLE double getFileDuration(const QString& filePath) const;
 
     // ---- Hotkey (active only) ----
     int findActiveClipIdByHotkey(const QString& hotkey) const;
