@@ -1,3 +1,5 @@
+// audioEngine.cpp  (UPDATED: fixes short-clips cutting off at the end by adding a Draining phase)
+
 #define MINIAUDIO_IMPLEMENTATION
 #include "audioEngine.h"
 
@@ -80,19 +82,19 @@ void AudioEngine::processAudio(void* output,
 
     const float currentMicGain = micGain.load(std::memory_order_relaxed);
     const float currentBalance = micBalance.load(std::memory_order_relaxed);
-    
-    // Calculate factors: 0.0 = full mic, 1.0 = full soundboard. 0.5 = full both.
-    const float micFactor = std::min(1.0f, (1.0f - currentBalance) * 2.0f);
+
+           // Calculate factors: 0.0 = full mic, 1.0 = full soundboard. 0.5 = full both.
+    const float micFactor  = std::min(1.0f, (1.0f - currentBalance) * 2.0f);
     const float clipFactor = std::min(1.0f, currentBalance * 2.0f);
 
     const ma_uint32 totalOutputSamples = frameCount * playbackChannels;
     for (ma_uint32 i = 0; i < totalOutputSamples; ++i) out[i] = 0.0f;
 
-    // Mic processing: peak monitoring, recording, and passthrough to output
+           // Mic processing: peak monitoring, recording, and passthrough to output
     float micPeak = 0.0f;
     const bool passthroughEnabled = micPassthroughEnabled.load(std::memory_order_relaxed);
-    const bool enabled = micEnabled.load(std::memory_order_relaxed);
-    
+    const bool enabled            = micEnabled.load(std::memory_order_relaxed);
+
     if (mic && captureChannels > 0 && enabled) {
         for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
             // Calculate mono sample from all capture channels
@@ -102,11 +104,11 @@ void AudioEngine::processAudio(void* output,
             }
             monoSample = (monoSample / static_cast<float>(captureChannels)) * currentMicGain;
 
-            // Peak level tracking
+                   // Peak level tracking
             float absSample = std::abs(monoSample);
             if (absSample > micPeak) micPeak = absSample;
-            
-            // Route mic to output if passthrough is enabled
+
+                   // Route mic to output if passthrough is enabled
             if (passthroughEnabled) {
                 ma_uint32 outIdx = frame * playbackChannels;
                 for (ma_uint32 ch = 0; ch < playbackChannels && (outIdx + ch) < totalOutputSamples; ++ch) {
@@ -115,11 +117,11 @@ void AudioEngine::processAudio(void* output,
             }
         }
 
-        // Update peak level
+               // Update peak level
         float currentPeak = micPeakLevel.load(std::memory_order_relaxed);
         if (micPeak > currentPeak) micPeakLevel.store(micPeak, std::memory_order_relaxed);
 
-        // Recording capture
+               // Recording capture
         if (recording.load(std::memory_order_relaxed)) {
             std::lock_guard<std::mutex> lock(recordingMutex);
             for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
@@ -129,6 +131,7 @@ void AudioEngine::processAudio(void* output,
                 }
                 monoSample = (monoSample / static_cast<float>(captureChannels)) * currentMicGain;
 
+                       // Write dual-mono into buffer (L=R)
                 recordingBuffer.push_back(monoSample);
                 recordingBuffer.push_back(monoSample);
             }
@@ -136,12 +139,15 @@ void AudioEngine::processAudio(void* output,
         }
     }
 
-    // Mix clips from MAIN ring buffers
+           // Mix clips from MAIN ring buffers
     for (int slotId = 0; slotId < MAX_CLIPS; ++slotId) {
         ClipSlot& slot = clips[slotId];
-        if (slot.state.load(std::memory_order_relaxed) != ClipState::Playing) continue;
 
-        const float clipGain = slot.gain.load(std::memory_order_relaxed);
+               // UPDATED: allow Draining so the tail in ring buffer plays out fully
+        auto st = slot.state.load(std::memory_order_relaxed);
+        if (st != ClipState::Playing && st != ClipState::Draining) continue;
+
+        const float clipGain      = slot.gain.load(std::memory_order_relaxed);
         const float finalClipGain = clipGain * clipFactor;
 
         void* pReadBuffer = nullptr;
@@ -151,7 +157,7 @@ void AudioEngine::processAudio(void* output,
         if (result == MA_SUCCESS && availableFrames > 0 && pReadBuffer) {
             auto* clipSamples = static_cast<float*>(pReadBuffer);
 
-            // ring buffer stereo (2ch)
+                   // ring buffer stereo (2ch)
             if (playbackChannels == 2) {
                 for (ma_uint32 frame = 0; frame < availableFrames; ++frame) {
                     const ma_uint32 outIdx = frame * 2;
@@ -174,6 +180,9 @@ void AudioEngine::processAudio(void* output,
             }
 
             ma_pcm_rb_commit_read(&slot.ringBufferMain, availableFrames);
+
+                   // UPDATED: track queued frames so decoder thread can wait for drain
+            slot.queuedMainFrames.fetch_sub((long long)availableFrames, std::memory_order_relaxed);
         }
     }
 
@@ -224,7 +233,10 @@ void AudioEngine::processMonitorAudio(void* output, ma_uint32 frameCount, ma_uin
 
     for (int slotId = 0; slotId < MAX_CLIPS; ++slotId) {
         ClipSlot& slot = clips[slotId];
-        if (slot.state.load(std::memory_order_relaxed) != ClipState::Playing) continue;
+
+               // UPDATED: allow Draining so monitor also hears the tail
+        auto st = slot.state.load(std::memory_order_relaxed);
+        if (st != ClipState::Playing && st != ClipState::Draining) continue;
 
         const float clipGain = slot.gain.load(std::memory_order_relaxed);
 
@@ -265,11 +277,11 @@ void AudioEngine::processMonitorAudio(void* output, ma_uint32 frameCount, ma_uin
 
     for (ma_uint32 i = 0; i < totalOutputSamples; ++i) {
         out[i] *= g;
-        
+
         float absSample = std::abs(out[i]);
         if (absSample > outputPeak) outputPeak = absSample;
 
-        // Simple limiter
+               // Simple limiter
         if (out[i] > 1.0f) out[i] = 1.0f;
         if (out[i] < -1.0f) out[i] = -1.0f;
     }
@@ -294,12 +306,6 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
     ma_decoder decoder;
 
     if (ma_decoder_init_file(filepath.c_str(), &config, &decoder) != MA_SUCCESS) {
-        // error callback
-        ClipErrorCallback cb;
-        {
-          // We cannot access AudioEngine instance here directly from slot.
-          // Keep errors visible via stderr at minimum.
-        }
         std::cerr << "Decoder init failed for slot " << slotId << "\n";
         slot->state.store(ClipState::Stopped, std::memory_order_release);
         return;
@@ -345,6 +351,9 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
                 std::memcpy(wMain, pReadCursor, toWriteMain * 2 * sizeof(float));
                 ma_pcm_rb_commit_write(&slot->ringBufferMain, toWriteMain);
 
+                       // UPDATED: track queued frames for drain detection
+                slot->queuedMainFrames.fetch_add((long long)toWriteMain, std::memory_order_relaxed);
+
                        // MONITOR: best-effort, do not block
                 void* wMon = nullptr;
                 ma_uint32 toWriteMon = toWriteMain;
@@ -361,21 +370,52 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
+
+            // If paused, wait here so we don't consume/fill while paused
+            while (slot->state.load(std::memory_order_acquire) == ClipState::Paused) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
         }
     }
 
     ma_decoder_uninit(&decoder);
 
-    slot->state.store(ClipState::Stopped, std::memory_order_release);
-
+           // UPDATED: if natural end, don't stop immediately—drain ring buffer first.
     if (naturalEnd) {
-        std::cout << "Clip finished slot " << slotId << "\n";
-        
-        std::lock_guard<std::mutex> lock(engine->callbackMutex);
-        if (engine->clipFinishedCallback) {
-            engine->clipFinishedCallback(slotId);
+        slot->state.store(ClipState::Draining, std::memory_order_release);
+
+               // Wait until the already-buffered audio is fully played out,
+               // or someone stops the clip, or all outputs stop (avoid hang).
+        while (true) {
+            auto st = slot->state.load(std::memory_order_acquire);
+            if (st == ClipState::Stopping) break;
+
+                   // If nothing is running anymore, don't wait forever.
+            const bool anyOutputRunning =
+                engine->deviceRunning.load(std::memory_order_acquire) ||
+                engine->monitorRunning.load(std::memory_order_acquire);
+            if (!anyOutputRunning) break;
+
+            if (slot->queuedMainFrames.load(std::memory_order_relaxed) <= 0) break;
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
+
+               // If not manually stopped, finalize and fire callback
+        if (slot->state.load(std::memory_order_acquire) != ClipState::Stopping) {
+            slot->state.store(ClipState::Stopped, std::memory_order_release);
+
+            std::lock_guard<std::mutex> lock(engine->callbackMutex);
+            if (engine->clipFinishedCallback) {
+                engine->clipFinishedCallback(slotId);
+            }
+        }
+
+        return;
     }
+
+           // Not a natural end (stop/error): stop immediately
+    slot->state.store(ClipState::Stopped, std::memory_order_release);
 }
 
 // ============================================================================
@@ -416,6 +456,9 @@ bool AudioEngine::loadClip(int slotId, const std::string& filepath)
     slot.gain.store(1.0f, std::memory_order_relaxed);
     slot.loop.store(false, std::memory_order_relaxed);
 
+           // UPDATED
+    slot.queuedMainFrames.store(0, std::memory_order_relaxed);
+
     return true;
 }
 
@@ -425,6 +468,12 @@ void AudioEngine::playClip(int slotId)
 
     ClipSlot& slot = clips[slotId];
     if (slot.filePath.empty()) return;
+
+    // Handle resumption from paused state
+    if (slot.state.load(std::memory_order_acquire) == ClipState::Paused) {
+        slot.state.store(ClipState::Playing, std::memory_order_release);
+        return;
+    }
 
            // Ensure at least one output is running, otherwise decoder will eventually block
     if (!isDeviceRunning() && !isMonitorRunning()) {
@@ -441,8 +490,29 @@ void AudioEngine::playClip(int slotId)
     ma_pcm_rb_reset(&slot.ringBufferMain);
     ma_pcm_rb_reset(&slot.ringBufferMon);
 
+           // UPDATED
+    slot.queuedMainFrames.store(0, std::memory_order_relaxed);
+
     slot.state.store(ClipState::Playing, std::memory_order_release);
     slot.decoderThread = std::thread(decoderThreadFunc, this, &slot, slotId);
+}
+
+void AudioEngine::pauseClip(int slotId)
+{
+    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    auto state = clips[slotId].state.load(std::memory_order_acquire);
+    if (state == ClipState::Playing) {
+        clips[slotId].state.store(ClipState::Paused, std::memory_order_release);
+    }
+}
+
+void AudioEngine::resumeClip(int slotId)
+{
+    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    auto state = clips[slotId].state.load(std::memory_order_acquire);
+    if (state == ClipState::Paused) {
+        clips[slotId].state.store(ClipState::Playing, std::memory_order_release);
+    }
 }
 
 void AudioEngine::stopClip(int slotId)
@@ -450,6 +520,9 @@ void AudioEngine::stopClip(int slotId)
     if (slotId < 0 || slotId >= MAX_CLIPS) return;
 
     ClipSlot& slot = clips[slotId];
+    
+    // If paused, we need to resume briefly so it can see the Stopping transition
+    // or just store Stopping and the decoder thread (which is waiting) will see it.
     slot.state.store(ClipState::Stopping, std::memory_order_release);
 
     if (slot.decoderThread.joinable()) {
@@ -481,7 +554,16 @@ float AudioEngine::getClipGain(int slotId) const
 bool AudioEngine::isClipPlaying(int slotId) const
 {
     if (slotId < 0 || slotId >= MAX_CLIPS) return false;
-    return clips[slotId].state.load(std::memory_order_relaxed) == ClipState::Playing;
+
+           // UPDATED: consider draining as still "playing"
+    auto st = clips[slotId].state.load(std::memory_order_relaxed);
+    return (st == ClipState::Playing || st == ClipState::Draining || st == ClipState::Paused);
+}
+
+bool AudioEngine::isClipPaused(int slotId) const
+{
+    if (slotId < 0 || slotId >= MAX_CLIPS) return false;
+    return clips[slotId].state.load(std::memory_order_relaxed) == ClipState::Paused;
 }
 
 void AudioEngine::unloadClip(int slotId)
@@ -502,6 +584,9 @@ void AudioEngine::unloadClip(int slotId)
         std::free(clips[slotId].ringBufferMonData);
         clips[slotId].ringBufferMonData = nullptr;
     }
+
+           // UPDATED
+    clips[slotId].queuedMainFrames.store(0, std::memory_order_relaxed);
 }
 
 // ============================================================================
@@ -653,7 +738,7 @@ bool AudioEngine::initContext()
 bool AudioEngine::initDevice()
 {
     qDebug() << "AudioEngine::initDevice called";
-    
+
     if (device) {
         qDebug() << "Device already exists, reusing";
         return true;
@@ -665,15 +750,15 @@ bool AudioEngine::initDevice()
 
     device = new ma_device();
 
-    // Try multiple configurations in order of preference
+           // Try multiple configurations in order of preference
     struct DeviceConfig {
         ma_format captureFormat;
         ma_uint32 captureChannels;
         ma_uint32 sampleRate;
         const char* description;
     };
-    
-    // Configuration attempts - from most specific to most flexible
+
+           // Configuration attempts - from most specific to most flexible
     DeviceConfig configs[] = {
         { ma_format_f32, 2, 48000, "48kHz stereo f32" },
         { ma_format_f32, 1, 48000, "48kHz mono f32" },
@@ -685,21 +770,21 @@ bool AudioEngine::initDevice()
         { ma_format_s16, 1, 44100, "44.1kHz mono s16" },
         { ma_format_unknown, 0, 0, "auto-detect all" },  // Let miniaudio pick everything
     };
-    
+
     ma_result result = MA_ERROR;
-    
+
     for (const auto& cfg : configs) {
         ma_device_config config = ma_device_config_init(ma_device_type_duplex);
-        config.playback.format = ma_format_f32;
+        config.playback.format   = ma_format_f32;
         config.playback.channels = 2;
-        config.capture.format = cfg.captureFormat;
-        config.capture.channels = cfg.captureChannels;
-        config.sampleRate = cfg.sampleRate;
-        config.dataCallback = AudioEngine::audioCallback;
-        config.pUserData = this;
+        config.capture.format    = cfg.captureFormat;
+        config.capture.channels  = cfg.captureChannels;
+        config.sampleRate        = cfg.sampleRate;
+        config.dataCallback      = AudioEngine::audioCallback;
+        config.pUserData         = this;
 
         applyDeviceSelection(config);
-        
+
         qDebug() << "Trying device config:" << cfg.description;
 
         result = ma_device_init(context, &config, device);
@@ -712,11 +797,11 @@ bool AudioEngine::initDevice()
             qDebug() << "  Capture format:" << device->capture.format;
             return true;
         }
-        
+
         qDebug() << "  Failed with result:" << result;
     }
-    
-    // All configurations failed
+
+           // All configurations failed
     qWarning() << "All device configurations failed! Last error:" << result;
     delete device;
     device = nullptr;
@@ -758,7 +843,7 @@ bool AudioEngine::applyDeviceSelection(ma_device_config& config)
 bool AudioEngine::reinitializeDevice(bool restart)
 {
     qDebug() << "AudioEngine::reinitializeDevice called, restart:" << restart;
-    
+
     static std::mutex reinitMutex;
     std::lock_guard<std::mutex> lock(reinitMutex);
 
@@ -780,12 +865,12 @@ bool AudioEngine::reinitializeDevice(bool restart)
 
     qDebug() << "Initializing new device with capture device set:" << selectedCaptureSet
              << "playback device set:" << selectedPlaybackSet;
-    
+
     if (!initDevice()) {
         qWarning() << "Failed to initialize device!";
         return false;
     }
-    
+
     qDebug() << "Device initialized successfully";
 
     if (restart || wasRunning) {
@@ -808,11 +893,11 @@ bool AudioEngine::initMonitorDevice()
     monitorDevice = new ma_device();
 
     ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
-    cfg.playback.format = ma_format_f32;
+    cfg.playback.format   = ma_format_f32;
     cfg.playback.channels = 2;
-    cfg.sampleRate = 48000;
-    cfg.dataCallback = AudioEngine::monitorCallback;
-    cfg.pUserData = this;
+    cfg.sampleRate        = 48000;
+    cfg.dataCallback      = AudioEngine::monitorCallback;
+    cfg.pUserData         = this;
 
     if (selectedMonitorPlaybackSet) {
         cfg.playback.pDeviceID = &selectedMonitorPlaybackDeviceIdStruct;
@@ -880,9 +965,9 @@ bool AudioEngine::setMonitorPlaybackDevice(const std::string& deviceId)
     auto devices = enumeratePlaybackDevices();
     for (const auto& dev : devices) {
         if (dev.id == deviceId || dev.name == deviceId) {
-            selectedMonitorPlaybackDeviceId = dev.id;
+            selectedMonitorPlaybackDeviceId       = dev.id;
             selectedMonitorPlaybackDeviceIdStruct = dev.deviceId;
-            selectedMonitorPlaybackSet = true;
+            selectedMonitorPlaybackSet            = true;
             return reinitializeMonitorDevice(true);
         }
     }
@@ -955,9 +1040,9 @@ bool AudioEngine::setPlaybackDevice(const std::string& deviceId)
     auto devices = enumeratePlaybackDevices();
     for (const auto& dev : devices) {
         if (dev.id == deviceId || dev.name == deviceId) {
-            selectedPlaybackDeviceId = dev.id;
+            selectedPlaybackDeviceId       = dev.id;
             selectedPlaybackDeviceIdStruct = dev.deviceId;
-            selectedPlaybackSet = true;
+            selectedPlaybackSet            = true;
             return reinitializeDevice(true);
         }
     }
@@ -967,21 +1052,21 @@ bool AudioEngine::setPlaybackDevice(const std::string& deviceId)
 bool AudioEngine::setCaptureDevice(const std::string& deviceId)
 {
     qDebug() << "AudioEngine::setCaptureDevice called with deviceId:" << QString::fromStdString(deviceId);
-    
+
     auto devices = enumerateCaptureDevices();
     qDebug() << "Found" << devices.size() << "capture devices:";
     for (const auto& dev : devices) {
         qDebug() << "  Device id:" << QString::fromStdString(dev.id)
-                 << "name:" << QString::fromStdString(dev.name)
-                 << "isDefault:" << dev.isDefault;
+        << "name:" << QString::fromStdString(dev.name)
+        << "isDefault:" << dev.isDefault;
     }
-    
+
     for (const auto& dev : devices) {
         if (dev.id == deviceId || dev.name == deviceId) {
             qDebug() << "Found matching device:" << QString::fromStdString(dev.name);
-            selectedCaptureDeviceId = dev.id;
+            selectedCaptureDeviceId       = dev.id;
             selectedCaptureDeviceIdStruct = dev.deviceId;
-            selectedCaptureSet = true;
+            selectedCaptureSet            = true;
             bool result = reinitializeDevice(true);
             qDebug() << "reinitializeDevice result:" << result;
             return result;

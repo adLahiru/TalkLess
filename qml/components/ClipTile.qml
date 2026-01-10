@@ -296,7 +296,7 @@ Item {
             }
         }
 
-        // Whole card click (for selecting/opening) - BELOW the buttons in z-order
+        // Whole card click (for selecting/opening/playing) - BELOW the buttons in z-order
         MouseArea {
             anchors.fill: parent
             z: -1  // Lower z so buttons get clicks first
@@ -305,7 +305,11 @@ Item {
                 if (mouse.button === Qt.RightButton) {
                     clipContextMenu.popup();
                 } else {
+                    // Left click: select AND play the clip
                     root.clicked();
+                    if (!root.isPlaying) {
+                        root.playClicked();
+                    }
                 }
             }
             cursorShape: Qt.PointingHandCursor

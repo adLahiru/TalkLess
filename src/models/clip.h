@@ -26,4 +26,7 @@ struct Clip
     bool isPlaying = false;   // UI state
     bool isRepeat  = false;   // loop flag
     bool locked    = false;   // read-only while playing
+    
+    // Reproduction mode (0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop)
+    int reproductionMode = 0;  // Defaults to Overlay mode
 };

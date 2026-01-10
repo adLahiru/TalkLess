@@ -18,9 +18,11 @@ using ClipErrorCallback = std::function<void(int slotId, const std::string& erro
 #define RING_BUFFER_SIZE_IN_FRAMES (48000 * 2)
 
 enum class ClipState {
-    Stopped = 0,
-    Playing = 1,
-    Stopping = 2
+    Stopped,
+    Playing,
+    Paused,
+    Draining,
+    Stopping
 };
 
 // Two ring buffers are required because reads consume data.
@@ -41,9 +43,10 @@ struct ClipSlot
     std::atomic<float> gain{1.0f};
 
     std::string filePath;
-
     std::atomic<int> sampleRate{0};
     std::atomic<int> channels{0};
+
+    std::atomic<long long> queuedMainFrames{0};
 };
 
 class AudioEngine
@@ -70,11 +73,14 @@ public:
            // Clip control
     bool loadClip(int slotId, const std::string& filepath);
     void playClip(int slotId);
+    void pauseClip(int slotId);
+    void resumeClip(int slotId);
     void stopClip(int slotId);
     void setClipLoop(int slotId, bool loop);
     void setClipGain(int slotId, float gainDB);
     float getClipGain(int slotId) const;
     bool isClipPlaying(int slotId) const;
+    bool isClipPaused(int slotId) const;
     void unloadClip(int slotId);
 
            // Microphone gain

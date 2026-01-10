@@ -1,4 +1,5 @@
 #include "hotkeyManager.h"
+#include "hotkeyvalidator.h"
 #include "services/soundboardService.h"
 #include <QHotkey>
 #include <QDebug>
@@ -150,6 +151,16 @@ QString HotkeyManager::toNative(const QString& text) {
 }
 
 bool HotkeyManager::isValidHotkey(const QString& text) const {
+    auto validationInfo = HotkeyValidator::validate(text);
+    
+    // If not valid, show detailed error message
+    if (!validationInfo.isValid()) {
+        // Note: We can't emit signals from const method, 
+        // so the caller should handle showing the message
+        qDebug() << "Hotkey validation failed:" << validationInfo.message;
+        return false;
+    }
+    
     return !toPortable(text).isEmpty();
 }
 
@@ -393,8 +404,10 @@ int HotkeyManager::addPreferenceHotkey(const QString& title, const QString& acti
 void HotkeyManager::applyCapturedHotkey(const QString& hotkeyText) {
     if (m_target == CaptureTarget::None || m_targetId < 0) return;
 
-    if (!isValidHotkey(hotkeyText)) {
-        emit showMessage("Invalid hotkey.");
+    // Validate the hotkey with detailed feedback
+    auto validationInfo = HotkeyValidator::validate(hotkeyText);
+    if (!validationInfo.isValid()) {
+        emit showMessage(validationInfo.message);
         return;
     }
 

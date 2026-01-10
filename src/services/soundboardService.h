@@ -101,6 +101,7 @@ public:
     Q_INVOKABLE bool updateClipAudioSettings(int boardId, int clipId, int volume, double speed);
     Q_INVOKABLE void setClipVolume(int boardId, int clipId, int volume);  // Real-time volume (no save)
     Q_INVOKABLE void setClipRepeat(int boardId, int clipId, bool repeat); // Toggle repeat mode
+    Q_INVOKABLE void setClipReproductionMode(int boardId, int clipId, int mode); // Set reproduction mode (0-4)
     Q_INVOKABLE bool moveClip(int boardId, int fromIndex, int toIndex); // Reorder clips with drag-drop
     Q_INVOKABLE void copyClip(int clipId);                              // Copy clip to internal clipboard
     Q_INVOKABLE bool pasteClip(int boardId);                             // Paste clip from clipboard to target board
@@ -108,10 +109,11 @@ public:
     QVector<Clip> getClipsForBoard(int boardId) const;                  // Get all clips for a board
     QVector<Clip> getActiveClips() const;                               // Get clips from active board
 
-    // ---- Audio Playback ----
-    Q_INVOKABLE void playClip(int clipId);
-    Q_INVOKABLE void stopClip(int clipId);
-    Q_INVOKABLE void stopAllClips();
+    // ---- Playback controls ----
+    Q_INVOKABLE void clipClicked(int clipId);   // Handle clip tile click: select + play with mode logic
+    Q_INVOKABLE void playClip(int clipId);      // Start playback of the given clip
+    Q_INVOKABLE void stopClip(int clipId);      // Stop playback of the given clip
+    Q_INVOKABLE void stopAllClips();            // Stop all currently playing clips
     Q_INVOKABLE bool isClipPlaying(int clipId) const;
 
     // ---- Audio Device Selection ----
@@ -155,6 +157,7 @@ signals:
 
     // Emitted when play-selected hotkey is pressed - QML handles this since it knows selected clip
     void playSelectedRequested();
+    void clipSelectionRequested(int clipId); // Emitted when a clip should be selected in UI
     void clipboardChanged();
 
 private:

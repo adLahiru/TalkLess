@@ -49,6 +49,8 @@ Rectangle {
                     clipVolume: clipsModel.data(index, 264) // VolumeRole
                     ,
                     clipSpeed: clipsModel.data(index, 265)  // SpeedRole
+                    ,
+                    reproductionMode: clipsModel.data(index, 270) // ReproductionModeRole
                 };
             }
         }
@@ -109,6 +111,14 @@ Rectangle {
         }
         onRejected: {
             root.clipToEditImageId = -1;
+        }
+    }
+
+    // Listen for clip selection requests from backend
+    Connections {
+        target: soundboardService
+        function onClipSelectionRequested(clipId) {
+            root.selectedClipId = clipId;
         }
     }
 
@@ -718,16 +728,8 @@ Rectangle {
                                     opacity: dragHandler.active ? 0.7 : 1.0
 
                                     onClicked: {
-                                        console.log("Clip clicked:", clipWrapper.clipId, clipWrapper.clipTitle);
-                                        if (root.selectedClipId === clipWrapper.clipId) {
-                                            root.selectedClipId = -1;
-                                        } else {
-                                            root.selectedClipId = clipWrapper.clipId;
-                                        }
-                                    }
-                                    onPlayClicked: {
-                                        console.log("Play clicked:", clipWrapper.clipId, clipWrapper.clipTitle);
-                                        soundboardService.playClip(clipWrapper.clipId);
+                                        // Use unified backend method that handles selection + playback
+                                        soundboardService.clipClicked(clipWrapper.clipId);
                                     }
                                     onStopClicked: {
                                         console.log("Stop clicked:", clipWrapper.clipId, clipWrapper.clipTitle);
@@ -926,31 +928,63 @@ Rectangle {
             }
         }
 
-        // RIGHT COLUMN: Sidebar (gray placeholder)
+        // RIGHT COLUMN: Modern Sidebar with Premium Styling
         Rectangle {
             id: rightSidebar
-            Layout.preferredWidth: 250
+            Layout.preferredWidth: 260
             Layout.preferredHeight: 600
             Layout.alignment: Qt.AlignTop
             Layout.topMargin: 20
             Layout.rightMargin: 10
-            color: "#2A2A2A"
-            radius: 10
+
+            // Modern gradient background
+            gradient: Gradient {
+                GradientStop {
+                    position: 0.0
+                    color: "#1F1F1F"
+                }
+                GradientStop {
+                    position: 1.0
+                    color: "#151515"
+                }
+            }
+            radius: 16
+            border.color: "#3A3A3A"
+            border.width: 1
+
+            // Subtle shadow effect with layered rectangles
+            layer.enabled: true
+            layer.effect: ShaderEffect {
+                fragmentShader: ""
+            }
 
             // Tab state: 0=Settings, 1=Plus, 2=Record, 3=Teleprompter, 4=Speaker
             property int currentTabIndex: 2  // Default to Record tab
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 5
-                spacing: 8
+                anchors.margins: 12
+                spacing: 12
 
-                // Top section with F1 label and icons
+                // Top section with modern header
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 50
-                    color: "#2A2A2A"
-                    radius: 8
+                    Layout.preferredHeight: 56
+
+                    // Subtle gradient for header
+                    gradient: Gradient {
+                        GradientStop {
+                            position: 0.0
+                            color: Qt.rgba(0.2, 0.2, 0.25, 0.3)
+                        }
+                        GradientStop {
+                            position: 1.0
+                            color: Qt.rgba(0.15, 0.15, 0.2, 0.2)
+                        }
+                    }
+                    radius: 12
+                    border.color: Qt.rgba(1, 1, 1, 0.05)
+                    border.width: 1
 
                     RowLayout {
                         anchors.fill: parent
@@ -1663,6 +1697,7 @@ Rectangle {
                         property bool muteMicDuringPlayback: true
                         property bool persistentSettings: true
                         property bool clipIsRepeat: false
+                        property int reproductionMode: 0  // 0=Overlay(default), 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop
 
                         // Update when selected clip changes
                         Connections {
@@ -1678,6 +1713,13 @@ Rectangle {
                                         clipEditorTab.clipVolume = data.clipVolume !== undefined ? data.clipVolume : 100;
                                         clipEditorTab.clipSpeed = data.clipSpeed !== undefined ? data.clipSpeed : 1.0;
                                         clipEditorTab.clipIsRepeat = data.isRepeat || false;
+
+                                        // Set flag to prevent saving during load
+                                        if (typeof modeSelectorRow !== 'undefined') {
+                                            modeSelectorRow.ignoreNextChange = true;
+                                        }
+                                        clipEditorTab.reproductionMode = data.reproductionMode !== undefined ? data.reproductionMode : 0;
+
                                         clipTitleInput.text = clipEditorTab.editingClipName;
                                         addTagInput.text = "";
                                         clipEditorTab.hasUnsavedChanges = false;
@@ -1690,6 +1732,7 @@ Rectangle {
                                     clipEditorTab.clipVolume = 100;
                                     clipEditorTab.clipSpeed = 1.0;
                                     clipEditorTab.clipIsRepeat = false;
+                                    clipEditorTab.reproductionMode = 0;
                                     clipTitleInput.text = "";
                                     addTagInput.text = "";
                                     clipEditorTab.hasUnsavedChanges = false;
@@ -1862,6 +1905,25 @@ Rectangle {
                                     onTextChanged: {
                                         if (text !== clipEditorTab.editingClipName) {
                                             clipEditorTab.hasUnsavedChanges = true;
+                                        }
+                                    }
+
+                                    // Auto-save on Enter key
+                                    Keys.onReturnPressed: {
+                                        if (root.selectedClipId !== -1 && text.length > 0) {
+                                            clipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                            clipEditor.editingClipName = text;
+                                            clipsModel.reload();
+                                        }
+                                        focus = false; // Remove focus after saving
+                                    }
+
+                                    // Auto-save on focus loss
+                                    onActiveFocusChanged: {
+                                        if (!activeFocus && root.selectedClipId !== -1 && text.length > 0 && text !== clipEditorTab.editingClipName) {
+                                            clipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                            clipEditorTab.editingClipName = text;
+                                            clipsModel.reload();
                                         }
                                     }
 
@@ -2238,7 +2300,10 @@ Rectangle {
 
                                     onValueChanged: {
                                         clipEditorTab.clipSpeed = value;
-                                        clipEditorTab.hasUnsavedChanges = true;
+                                        // Auto-save speed changes
+                                        if (root.selectedClipId !== -1) {
+                                            clipsModel.updateClipAudioSettings(root.selectedClipId, Math.round(clipEditorTab.clipVolume), value);
+                                        }
                                     }
 
                                     background: Rectangle {
@@ -2309,6 +2374,221 @@ Rectangle {
                                 }
                             }
 
+                            // ===== REPRODUCTION MODES SECTION =====
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Layout.leftMargin: 20
+                                Layout.rightMargin: 20
+                                Layout.topMargin: 8
+                                spacing: 12
+
+                                // Section header
+                                RowLayout {
+                                    spacing: 8
+
+                                    Text {
+                                        text: "🔁"
+                                        font.pixelSize: 14
+                                    }
+
+                                    Text {
+                                        text: "Reproduction Mode"
+                                        color: "#FFFFFF"
+                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                        font.pixelSize: 13
+                                        font.weight: Font.DemiBold
+                                    }
+                                }
+
+                                // Mode icons row
+                                RowLayout {
+                                    id: modeSelectorRow
+                                    Layout.fillWidth: true
+                                    spacing: 10
+
+                                    property int selectedMode: clipEditorTab.reproductionMode  // Bind to clip's mode
+                                    property bool ignoreNextChange: false  // Flag to prevent saving during load
+
+                                    // Update backend ONLY when user clicks, not during load
+                                    onSelectedModeChanged: {
+                                        if (ignoreNextChange) {
+                                            ignoreNextChange = false;  // Reset flag
+                                            return;  // Don't save during load
+                                        }
+                                        if (root.selectedClipId !== -1) {
+                                            soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, selectedMode);
+                                            console.log("Reproduction mode changed to:", selectedMode, "- SAVED!");
+                                        }
+                                    }
+
+                                    // Overlay Mode
+                                    Rectangle {
+                                        width: 44
+                                        height: 44
+                                        radius: 10
+                                        color: parent.selectedMode === 0 ? "#00D9FF" : (overlayModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                        border.color: parent.selectedMode === 0 ? "#00D9FF" : "#3A3A3A"
+                                        border.width: parent.selectedMode === 0 ? 2 : 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "▶"
+                                            color: parent.parent.selectedMode === 0 ? "#000000" : "#FFFFFF"
+                                            font.pixelSize: 18
+                                            font.weight: Font.Bold
+                                        }
+
+                                        MouseArea {
+                                            id: overlayModeArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                clipEditorTab.reproductionMode = 0;
+                                            }
+                                        }
+                                    }
+
+                                    // Play/Pause Mode
+                                    Rectangle {
+                                        width: 44
+                                        height: 44
+                                        radius: 10
+                                        color: parent.selectedMode === 1 ? "#00D9FF" : (playPauseModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                        border.color: parent.selectedMode === 1 ? "#00D9FF" : "#3A3A3A"
+                                        border.width: parent.selectedMode === 1 ? 2 : 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "▶⏸"
+                                            color: parent.parent.selectedMode === 1 ? "#000000" : "#FFFFFF"
+                                            font.pixelSize: 14
+                                            font.weight: Font.Bold
+                                        }
+
+                                        MouseArea {
+                                            id: playPauseModeArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                clipEditorTab.reproductionMode = 1;
+                                            }
+                                        }
+                                    }
+
+                                    // Play/Stop Mode
+                                    Rectangle {
+                                        width: 44
+                                        height: 44
+                                        radius: 10
+                                        color: parent.selectedMode === 2 ? "#00D9FF" : (playStopModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                        border.color: parent.selectedMode === 2 ? "#00D9FF" : "#3A3A3A"
+                                        border.width: parent.selectedMode === 2 ? 2 : 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "▶⏹"
+                                            color: parent.parent.selectedMode === 2 ? "#000000" : "#FFFFFF"
+                                            font.pixelSize: 14
+                                            font.weight: Font.Bold
+                                        }
+
+                                        MouseArea {
+                                            id: playStopModeArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                clipEditorTab.reproductionMode = 2;
+                                            }
+                                        }
+                                    }
+
+                                    // Restart Mode
+                                    Rectangle {
+                                        width: 44
+                                        height: 44
+                                        radius: 10
+                                        color: parent.selectedMode === 3 ? "#00D9FF" : (restartModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                        border.color: parent.selectedMode === 3 ? "#00D9FF" : "#3A3A3A"
+                                        border.width: parent.selectedMode === 3 ? 2 : 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "⟲"
+                                            color: parent.parent.selectedMode === 3 ? "#000000" : "#FFFFFF"
+                                            font.pixelSize: 20
+                                            font.weight: Font.Bold
+                                        }
+
+                                        MouseArea {
+                                            id: restartModeArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                clipEditorTab.reproductionMode = 3;
+                                            }
+                                        }
+                                    }
+
+                                    // Loop Mode
+                                    Rectangle {
+                                        width: 44
+                                        height: 44
+                                        radius: 10
+                                        color: parent.selectedMode === 4 ? "#00D9FF" : (loopModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                        border.color: parent.selectedMode === 4 ? "#00D9FF" : "#3A3A3A"
+                                        border.width: parent.selectedMode === 4 ? 2 : 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "⟳"
+                                            color: parent.parent.selectedMode === 4 ? "#000000" : "#FFFFFF"
+                                            font.pixelSize: 20
+                                            font.weight: Font.Bold
+                                        }
+
+                                        MouseArea {
+                                            id: loopModeArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                clipEditorTab.reproductionMode = 4;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Mode description text
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: {
+                                        const mode = parent.children[1].selectedMode;
+                                        switch (mode) {
+                                        case 0:
+                                            return "Sound plays with other sounds";
+                                        case 1:
+                                            return "First click plays, second pauses";
+                                        case 2:
+                                            return "Second click stops and resets";
+                                        case 3:
+                                            return "Always plays from beginning";
+                                        case 4:
+                                            return "Endless loop until changed";
+                                        default:
+                                            return "";
+                                        }
+                                    }
+                                    color: "#888888"
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 10
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
+
                             // ===== PLAYBACK BEHAVIOR SECTION =====
                             ColumnLayout {
                                 Layout.fillWidth: true
@@ -2352,7 +2632,7 @@ Rectangle {
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
                                                     clipEditorTab.stopOtherSounds = !clipEditorTab.stopOtherSounds;
-                                                    clipEditorTab.hasUnsavedChanges = true;
+                                                    // Auto-save (Note: stopOtherSounds not currently saved to backend)
                                                 }
                                             }
                                         }
@@ -2390,7 +2670,7 @@ Rectangle {
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
                                                     clipEditorTab.muteOtherSounds = !clipEditorTab.muteOtherSounds;
-                                                    clipEditorTab.hasUnsavedChanges = true;
+                                                    // Auto-save (Note: muteOtherSounds not currently saved to backend)
                                                 }
                                             }
                                         }
@@ -2428,7 +2708,7 @@ Rectangle {
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
                                                     clipEditorTab.muteMicDuringPlayback = !clipEditorTab.muteMicDuringPlayback;
-                                                    clipEditorTab.hasUnsavedChanges = true;
+                                                    // Auto-save (Note: muteMicDuringPlayback not currently saved to backend)
                                                 }
                                             }
                                         }
@@ -2466,7 +2746,7 @@ Rectangle {
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
                                                     clipEditorTab.persistentSettings = !clipEditorTab.persistentSettings;
-                                                    clipEditorTab.hasUnsavedChanges = true;
+                                                    // Auto-save (Note: persistentSettings not currently saved to backend)
                                                 }
                                             }
                                         }
@@ -2558,7 +2838,11 @@ Rectangle {
                                         Keys.onReturnPressed: {
                                             if (text.trim().length > 0) {
                                                 clipEditorTab.editingClipTags.push(text.trim());
-                                                clipEditorTab.hasUnsavedChanges = true;
+                                                // Auto-save tags
+                                                if (root.selectedClipId !== -1) {
+                                                    clipsModel.updateClip(root.selectedClipId, clipTitleInput.text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                                    clipsModel.reload();
+                                                }
                                                 text = "";
                                             }
                                         }
@@ -2608,7 +2892,11 @@ Rectangle {
                                                 onClicked: {
                                                     clipEditorTab.editingClipTags.splice(index, 1);
                                                     clipEditorTab.editingClipTagsChanged();
-                                                    clipEditorTab.hasUnsavedChanges = true;
+                                                    // Auto-save tags
+                                                    if (root.selectedClipId !== -1) {
+                                                        clipsModel.updateClip(root.selectedClipId, clipTitleInput.text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                                        clipsModel.reload();
+                                                    }
                                                 }
                                             }
                                         }
@@ -2616,112 +2904,7 @@ Rectangle {
                                 }
                             }
 
-                            // Spacer before buttons
-                            Item {
-                                Layout.preferredHeight: 10
-                            }
-
-                            // ===== CANCEL AND SAVE BUTTONS =====
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 12
-
-                                // Cancel button
-                                Rectangle {
-                                    Layout.preferredWidth: 80
-                                    Layout.preferredHeight: 40
-                                    color: cancelClipArea.containsMouse ? "#444444" : "#333333"
-                                    radius: 8
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "Cancel"
-                                        color: "#FFFFFF"
-                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                        font.pixelSize: 13
-                                        font.weight: Font.Medium
-                                    }
-
-                                    MouseArea {
-                                        id: cancelClipArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            // Reset to original values
-                                            const data = root.getClipDataById(root.selectedClipId);
-                                            if (data) {
-                                                clipTitleInput.text = data.title || "";
-                                                clipEditorTab.editingClipHotkey = data.hotkey || "";
-                                                clipEditorTab.editingClipTags = data.tags || [];
-                                            }
-                                            clipEditorTab.hasUnsavedChanges = false;
-                                        }
-                                    }
-
-                                    Behavior on color {
-                                        ColorAnimation {
-                                            duration: 150
-                                        }
-                                    }
-                                }
-
-                                // Save button (gradient)
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 40
-                                    radius: 8
-
-                                    gradient: Gradient {
-                                        orientation: Gradient.Horizontal
-                                        GradientStop {
-                                            position: 0.0
-                                            color: saveClipArea.containsMouse ? "#4A9AF7" : "#3B82F6"
-                                        }
-                                        GradientStop {
-                                            position: 1.0
-                                            color: saveClipArea.containsMouse ? "#E040FB" : "#D214FD"
-                                        }
-                                    }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "Save"
-                                        color: "#FFFFFF"
-                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                        font.pixelSize: 13
-                                        font.weight: Font.Medium
-                                    }
-
-                                    MouseArea {
-                                        id: saveClipArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            // Save the clip changes
-                                            if (root.selectedClipId !== -1) {
-                                                // Update clip via service with name, hotkey, and tags
-                                                const success = clipsModel.updateClip(root.selectedClipId, clipTitleInput.text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
-
-                                                // Also save volume and speed settings
-                                                const audioSuccess = clipsModel.updateClipAudioSettings(root.selectedClipId, Math.round(clipEditorTab.clipVolume), clipEditorTab.clipSpeed);
-
-                                                if (success || audioSuccess) {
-                                                    console.log("Clip saved successfully");
-                                                    clipEditorTab.editingClipName = clipTitleInput.text;
-                                                    clipEditorTab.hasUnsavedChanges = false;
-                                                    clipsModel.reload();
-                                                } else {
-                                                    console.log("Failed to save clip");
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Bottom padding
+                            // Bottom padding (auto-save enabled - no manual save needed)
                             Item {
                                 Layout.preferredHeight: 10
                             }
@@ -2745,9 +2928,12 @@ Rectangle {
                             }
                             root.hotkeyEditingClipId = -1;
                         } else {
-                            // Standard editor behavior
+                            // Standard editor behavior - AUTO-SAVE hotkey
                             clipEditorTab.editingClipHotkey = hotkeyText;
-                            clipEditorTab.hasUnsavedChanges = true;
+                            if (root.selectedClipId !== -1) {
+                                clipsModel.updateClip(root.selectedClipId, clipTitleInput.text, hotkeyText, clipEditorTab.editingClipTags);
+                                clipsModel.reload();
+                            }
                         }
                     }
 

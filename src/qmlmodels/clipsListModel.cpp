@@ -95,6 +95,8 @@ QVariant ClipsListModel::data(const QModelIndex& index, int role) const
         return c.locked;
     case TagsRole:
         return c.tags;
+    case ReproductionModeRole:
+        return c.reproductionMode;
     default:
         return {};
     }
@@ -115,7 +117,8 @@ QHash<int, QByteArray> ClipsListModel::roleNames() const
         {  IsPlayingRole, "clipIsPlaying"},
         {   IsRepeatRole,      "isRepeat"},
         {     LockedRole,        "locked"},
-        {       TagsRole,          "tags"}
+        {       TagsRole,          "tags"},
+        {ReproductionModeRole, "reproductionMode"}
     };
 }
 

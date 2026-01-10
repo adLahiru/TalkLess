@@ -27,7 +27,8 @@ public:
         IsPlayingRole,
         IsRepeatRole,
         LockedRole,
-        TagsRole
+        TagsRole,
+        ReproductionModeRole
     };
 
     explicit ClipsListModel(QObject* parent = nullptr);

@@ -6,6 +6,7 @@
 #include <QPointer>
 
 #include "qmlmodels/hotkeysModel.h"
+#include "hotkeyvalidator.h"
 
 class QHotkey;
 class SoundboardService;

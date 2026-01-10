@@ -669,6 +669,27 @@ void SoundboardService::setClipRepeat(int boardId, int clipId, bool repeat)
     }
 }
 
+void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mode)
+{
+    // Clamp mode to valid range (0-4)
+    mode = std::max(0, std::min(4, mode));
+
+    // Active board update
+    if (m_active && m_active->id == boardId) {
+        for (auto& c : m_active->clips) {
+            if (c.id != clipId)
+                continue;
+
+            c.reproductionMode = mode;
+
+            emit activeClipsChanged();
+            saveActive();  // Persist the change
+            qDebug() << "Reproduction mode set to" << mode << "for clip" << clipId;
+            return;
+        }
+    }
+}
+
 bool SoundboardService::moveClip(int boardId, int fromIndex, int toIndex)
 {
     // Validate indices
@@ -819,6 +840,22 @@ bool SoundboardService::deleteBoard(int boardId)
 // AUDIO PLAYBACK
 // ============================================================================
 
+void SoundboardService::clipClicked(int clipId)
+{
+    // This method handles a clip tile click:
+    // 1. Emit signal to select the clip (shows in right sidebar)
+    // 2. Play the clip with reproduction mode logic
+
+    qDebug() << "Clip clicked:" << clipId;
+
+    // Emit selection changed signal so UI updates
+    emit clipSelectionRequested(clipId);
+
+    //Now handle playback based on the clip's reproduction mode
+    playClip(clipId);
+}
+
+
 void SoundboardService::playClip(int clipId)
 {
     if (!m_audioEngine) {
@@ -840,6 +877,53 @@ void SoundboardService::playClip(int clipId)
 
     // Get or assign a slot for this clip
     int slotId = getOrAssignSlot(clipId);
+    bool isCurrentlyPlaying = m_audioEngine->isClipPlaying(slotId);
+
+    // Handle reproduction modes
+    int mode = clip->reproductionMode; // 0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop
+
+    switch (mode) {
+        case 1: // Play/Pause mode
+            if (isCurrentlyPlaying) {
+                if (m_audioEngine->isClipPaused(slotId)) {
+                    m_audioEngine->resumeClip(slotId);
+                    qDebug() << "Resumed clip" << clipId;
+                } else {
+                    m_audioEngine->pauseClip(slotId);
+                    qDebug() << "Paused clip" << clipId;
+                }
+                emit activeClipsChanged();
+                return;
+            }
+            break;
+
+        case 2: // Play/Stop mode
+            if (isCurrentlyPlaying) {
+                m_audioEngine->stopClip(slotId);
+                clip->isPlaying = false;
+                emit activeClipsChanged();
+                emit clipPlaybackStopped(clipId);
+                qDebug() << "Stopped clip" << clipId;
+                return;
+            }
+            break;
+
+        case 3: // Restart mode - always stop first then play from beginning
+            if (isCurrentlyPlaying) {
+                m_audioEngine->stopClip(slotId);
+            }
+            break;
+
+        case 4: // Loop mode - enable looping
+            m_audioEngine->setClipLoop(slotId, true);
+            clip->isRepeat = true;
+            break;
+
+        case 0: // Overlay mode (default)
+        default:
+            // Just play alongside other sounds - no special handling
+            break;
+    }
 
     // Load the clip if not already loaded
     std::string filePath = clip->filePath.toStdString();
@@ -851,7 +935,11 @@ void SoundboardService::playClip(int clipId)
     // Apply clip's audio settings
     float gainDb = (clip->volume <= 0) ? -60.0f : 20.0f * std::log10(clip->volume / 100.0f);
     m_audioEngine->setClipGain(slotId, gainDb);
-    m_audioEngine->setClipLoop(slotId, clip->isRepeat);
+    
+    // Apply loop setting (for modes other than Loop, use clip's isRepeat setting)
+    if (mode != 4) {
+        m_audioEngine->setClipLoop(slotId, clip->isRepeat);
+    }
 
     // Play the clip
     m_audioEngine->playClip(slotId);
@@ -861,7 +949,8 @@ void SoundboardService::playClip(int clipId)
     emit activeClipsChanged();
     emit clipPlaybackStarted(clipId);
 
-    qDebug() << "Playing clip" << clipId << "in slot" << slotId << ":" << clip->filePath;
+    const char* modeNames[] = {"Overlay", "Play/Pause", "Play/Stop", "Restart", "Loop"};
+    qDebug() << "Playing clip" << clipId << "in slot" << slotId << "with mode" << modeNames[mode] << ":" << clip->filePath;
 }
 
 void SoundboardService::stopClip(int clipId)
@@ -1225,14 +1314,8 @@ void SoundboardService::handleHotkeyAction(const QString& actionId)
         bool ok;
         int clipId = actionId.mid(5).toInt(&ok);
         if (ok) {
-            // If already playing, stop EXCLUSIVELY this clip (toggle behavior)
-            if (isClipPlaying(clipId)) {
-                stopClip(clipId);
-            } else {
-                // If not playing, stop ALL clips and play this one (exclusive trigger behavior)
-                stopAllClips();
-                playClip(clipId);
-            }
+            // Clip hotkey uses the clip's reproduction mode
+            playClip(clipId);
             qDebug() << "Clip hotkey triggered for clip:" << clipId;
         }
     } else {

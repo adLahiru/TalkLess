@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "" FORCE) 
+set(FFMPEG_ROOT "${CMAKE_SOURCE_DIR}/lib/ffmpeg")
 
 find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg)
 
@@ -40,6 +41,8 @@ qt_add_executable(appTalkLess
     # Controllers
     src/controllers/hotkeyManager.h 
     src/controllers/hotkeyManager.cpp
+    src/controllers/hotkeyvalidator.h
+    src/controllers/hotkeyvalidator.cpp
 
     # QML Models
     src/qmlmodels/soundboardsListModel.h
@@ -177,7 +180,14 @@ qt_add_qml_module(appTalkLess
 target_include_directories(appTalkLess PRIVATE 
                         ${CMAKE_SOURCE_DIR}/src
                         lib
+                        "${FFMPEG_ROOT}/include"
                     )
+
+find_library(FFMPEG_AVFORMAT_LIB   NAMES avformat   libavformat   PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+find_library(FFMPEG_AVCODEC_LIB    NAMES avcodec    libavcodec    PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+find_library(FFMPEG_AVUTIL_LIB     NAMES avutil     libavutil     PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+find_library(FFMPEG_SWRESAMPLE_LIB NAMES swresample libswresample PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
