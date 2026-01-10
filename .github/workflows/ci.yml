@@ -7,7 +7,7 @@ on:
     branches: [main, develop]
 
 env:
-  QT_VERSION: '6.8.0'
+  QT_VERSION: '6.5.3'
   BUILD_TYPE: Release
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
           host: 'mac'
           target: 'desktop'
           arch: 'clang_64'
-          modules: 'qtmultimedia qtquickeffectmaker qtshadertools'
+          modules: 'qtmultimedia qtshadertools'
           cache: true
           set-env: true
 
@@ -88,7 +88,7 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
-          modules: 'qtmultimedia qtquickeffectmaker qtshadertools'
+          modules: 'qtmultimedia qtshadertools'
           cache: true
           set-env: true
 
