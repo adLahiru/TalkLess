@@ -349,6 +349,80 @@ bool SoundboardService::addClip(int boardId, const QString& filePath)
     return addClipToBoard(boardId, draft);
 }
 
+bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
+{
+    if (filePaths.isEmpty())
+        return false;
+
+    // If adding to active board, we can batch and save once
+    if (m_active && m_active->id == boardId) {
+        int maxId = 0;
+        for (const auto& x : m_active->clips)
+            maxId = std::max(maxId, x.id);
+
+        for (const QString& filePath : filePaths) {
+            QString localPath = filePath;
+            if (localPath.startsWith("file:")) {
+                localPath = QUrl(localPath).toLocalFile();
+            }
+            if (localPath.isEmpty()) continue;
+
+            Clip c;
+            c.filePath = localPath;
+            c.title = QFileInfo(localPath).baseName();
+            c.id = ++maxId;
+            c.isPlaying = false;
+            c.locked = false;
+            
+            if (m_audioEngine) {
+                c.durationSec = m_audioEngine->getFileDuration(c.filePath.toStdString());
+            }
+
+            m_active->clips.push_back(c);
+        }
+        rebuildHotkeyIndex();
+        emit activeClipsChanged();
+        return saveActive();
+    }
+
+    // Inactive board: load -> modify -> save
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded) return false;
+
+    Soundboard b = *loaded;
+    int maxId = 0;
+    for (const auto& x : b.clips)
+        maxId = std::max(maxId, x.id);
+
+    for (const QString& filePath : filePaths) {
+        QString localPath = filePath;
+        if (localPath.startsWith("file:")) {
+            localPath = QUrl(localPath).toLocalFile();
+        }
+        if (localPath.isEmpty()) continue;
+
+        Clip c;
+        c.filePath = localPath;
+        c.title = QFileInfo(localPath).baseName();
+        c.id = ++maxId;
+        c.isPlaying = false;
+        c.locked = false;
+
+        if (m_audioEngine) {
+            c.durationSec = m_audioEngine->getFileDuration(c.filePath.toStdString());
+        }
+
+        b.clips.push_back(c);
+    }
+
+    const bool ok = m_repo.saveBoard(b);
+    if (ok) {
+        m_state = m_repo.loadIndex();
+        emit boardsChanged();
+    }
+    return ok;
+}
+
 bool SoundboardService::addClipWithTitle(int boardId, const QString& filePath, const QString& title)
 {
     if (filePath.isEmpty())

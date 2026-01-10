@@ -92,6 +92,7 @@ public:
 
     // ---- Clip operations (board-wise) ----
     Q_INVOKABLE bool addClip(int boardId, const QString& filePath);
+    Q_INVOKABLE bool addClips(int boardId, const QStringList& filePaths);
     Q_INVOKABLE bool addClipWithTitle(int boardId, const QString& filePath, const QString& title);
     Q_INVOKABLE bool deleteClip(int boardId, int clipId);
     bool addClipToBoard(int boardId, const Clip& draft);

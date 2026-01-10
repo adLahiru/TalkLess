@@ -11,7 +11,7 @@ set(CMAKE_AUTORCC ON)
 set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "" FORCE) 
 set(FFMPEG_ROOT "${CMAKE_SOURCE_DIR}/lib/ffmpeg")
 
-find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg QuickEffects)
 
 # Fix for QHotkey's outdated cmake_minimum_required with newer CMake versions
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
@@ -207,6 +207,7 @@ target_link_libraries(appTalkLess
     PRIVATE Qt6::Multimedia
     PRIVATE Qt6::QuickControls2
     PRIVATE Qt6::Svg
+    PRIVATE Qt6::QuickEffects
     PRIVATE QHotkey::QHotkey
 )
 

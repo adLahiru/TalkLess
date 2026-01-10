@@ -544,6 +544,72 @@ Rectangle {
                     clip: true
                     flickableDirection: Flickable.VerticalFlick
 
+                    // DropArea for adding new files via drag and drop
+                    DropArea {
+                        id: gridFileDropArea
+                        anchors.fill: parent
+                        keys: ["text/uri-list"] // Standard for file drops
+
+                        onDropped: function (drop) {
+                            if (drop.hasUrls) {
+                                let urls = [];
+                                for (let i = 0; i < drop.urls.length; i++) {
+                                    urls.push(drop.urls[i].toString());
+                                }
+
+                                const boardId = clipsModel.boardId;
+                                if (boardId !== -1) {
+                                    console.log("Adding clips from drop:", urls);
+                                    const success = soundboardService.addClips(boardId, urls);
+                                    if (success) {
+                                        clipsModel.reload();
+                                    }
+                                }
+                                drop.accept();
+                            }
+                        }
+
+                        // Visual feedback for file dragging
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "#2a00ff00"
+                            visible: parent.containsDrag
+                            border.color: "#00ff00"
+                            border.width: 3
+                            radius: 12
+
+                            ColumnLayout {
+                                anchors.centerIn: parent
+                                spacing: 10
+
+                                // Large plus icon
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: "+"
+                                    color: "#00ff00"
+                                    font.pixelSize: 64
+                                    font.weight: Font.Light
+
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        colorization: 1.0
+                                        colorizationColor: "#00ff00"
+                                        blurEnabled: true
+                                        blur: 0.5
+                                    }
+                                }
+
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: "Drop audio files to add to soundboard"
+                                    color: "#00ff00"
+                                    font.pixelSize: 22
+                                    font.weight: Font.DemiBold
+                                }
+                            }
+                        }
+                    }
+
                     // Background MouseArea for right-click context menu (Paste)
                     MouseArea {
                         anchors.fill: parent
