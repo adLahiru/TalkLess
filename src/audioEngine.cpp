@@ -547,6 +547,8 @@ std::pair<double, double> AudioEngine::loadClip(int slotId, const std::string& f
     slot.gain.store(1.0f, std::memory_order_relaxed);
     slot.loop.store(false, std::memory_order_relaxed);
     slot.queuedMainFrames.store(0, std::memory_order_relaxed);
+    slot.seekPosMs.store(-1.0, std::memory_order_relaxed);
+    slot.playbackFrameCount.store(0, std::memory_order_relaxed);
 
     // ---- NEW: get duration (endSec) using a temporary decoder ----
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, 48000);
@@ -602,8 +604,13 @@ void AudioEngine::playClip(int slotId)
     ma_pcm_rb_reset(&slot.ringBufferMon);
 
     slot.queuedMainFrames.store(0, std::memory_order_relaxed);
-    slot.playbackFrameCount.store(0, std::memory_order_relaxed);
-    slot.seekPosMs.store(-1.0, std::memory_order_relaxed);
+    
+    // Only reset frame count if we are NOT seeking.
+    // (If seeking, seekClip() has already set proper playbackFrameCount)
+    if (slot.seekPosMs.load(std::memory_order_relaxed) < 0.0) {
+        slot.playbackFrameCount.store(0, std::memory_order_relaxed);
+    }
+    // Do NOT reset seekPosMs here, as it might have been set by seekClip() just before playClip()
 
     slot.state.store(ClipState::Playing, std::memory_order_release);
     slot.decoderThread = std::thread(decoderThreadFunc, this, &slot, slotId);

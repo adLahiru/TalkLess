@@ -1220,12 +1220,21 @@ void SoundboardService::reproductionPlayingClip(const QVariantList &playingClipI
             break;
 
         case 1: // Play/Pause -> pause previous clips
+        {
+            double pos = m_audioEngine->getClipPlaybackPositionMs(slotId);
+            qDebug() << "Saving playback position:" << pos;
+            Clip* clip = findActiveClipById(cid);
+            if (!clip) continue;
+            clip->lastPlayedPosMs = pos;
+            saveActive();
             m_audioEngine->pauseClip(slotId);
             // (optional) if you have a signal for pause, emit it here
             break;
+        }
 
         case 2: // Play/Stop -> stop previous clips
         case 3: // Loop -> also stop previous clips
+        {
             m_audioEngine->stopClip(slotId);
 
             // update your UI state if you track it
@@ -1235,6 +1244,7 @@ void SoundboardService::reproductionPlayingClip(const QVariantList &playingClipI
 
             emit clipPlaybackStopped(cid);   // emit clipId (NOT slotId)
             break;
+        }
 
         default:
             break;
@@ -1274,14 +1284,17 @@ void SoundboardService::playClip(int clipId)
     // Per-clip behavior (when user taps the same clip again)
     if (mode == 1 && isCurrentlyPlaying) {
         if (isPaused) {
-             m_audioEngine->resumeClip(slotId);
+            m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
+            m_audioEngine->resumeClip(slotId);
+            clip->isPlaying = true;
         } else {
              // Saving playback position before pausing
-             double pos = m_audioEngine->getClipPlaybackPositionMs(slotId);
-             clip->lastPlayedPosMs = pos;
-             saveActive();
-             
-             m_audioEngine->pauseClip(slotId);
+            double pos = m_audioEngine->getClipPlaybackPositionMs(slotId);
+            qDebug() << "Saving playback position:" << pos;
+            clip->lastPlayedPosMs = pos;
+            saveActive();
+            
+            m_audioEngine->pauseClip(slotId);
         }
 
         emit activeClipsChanged();
@@ -1392,7 +1405,8 @@ void SoundboardService::playClip(int clipId)
     if (clip->lastPlayedPosMs > 0.0) {
         // Mode 1: Play/Pause - resume from last position
         if (mode == 1) {
-             m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
+            m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
+            qDebug() << "Resuming clip" << clipId << "from position" << clip->lastPlayedPosMs;
         }
     }
 
