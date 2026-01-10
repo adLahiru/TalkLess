@@ -103,6 +103,8 @@ QVariant ClipsListModel::data(const QModelIndex& index, int role) const
         return c.muteOtherSounds;
     case MuteMicDuringPlaybackRole:
         return c.muteMicDuringPlayback;
+    case DurationSecRole:
+        return c.durationSec;
     default:
         return {};
     }
@@ -127,7 +129,8 @@ QHash<int, QByteArray> ClipsListModel::roleNames() const
         {ReproductionModeRole, "reproductionMode"},
         {StopOtherSoundsRole, "stopOtherSounds"},
         {MuteOtherSoundsRole, "muteOtherSounds"},
-        {MuteMicDuringPlaybackRole, "muteMicDuringPlayback"}
+        {MuteMicDuringPlaybackRole, "muteMicDuringPlayback"},
+        {      DurationSecRole,      "durationSec"}
     };
 }
 

@@ -14,8 +14,8 @@ struct Clip
     QStringList tags;
 
 
-    qint64 trimStartMs = 0;   // seek start
-    qint64 trimEndMs   = 0;   // stop at end (0 = no end limit)
+    qint64 trimStartMs = 0.0;   // seek start
+    qint64 trimEndMs   = 0.0;   // stop at end (0 = no end limit)
 
     // Per-clip audio settings
     int volume = 100;         // 0-100 percentage
@@ -34,4 +34,6 @@ struct Clip
     bool stopOtherSounds = false;       // Stop other clips when this plays
     bool muteOtherSounds = false;       // Mute (pause) other clips when this plays
     bool muteMicDuringPlayback = false; // Mute mic while this clip is playing
+
+    double durationSec = 0.0;           // Duration in seconds (or -1.0 if unknown)
 };

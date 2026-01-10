@@ -46,6 +46,11 @@ struct ClipSlot
     std::atomic<int> sampleRate{0};
     std::atomic<int> channels{0};
 
+    std::atomic<double> trimStartMs{0.0};
+    std::atomic<double> trimEndMs{0.0};
+    std::atomic<double> totalDurationMs{0.0};
+
+    std::atomic<long long> playbackFrameCount{0};
     std::atomic<long long> queuedMainFrames{0};
 };
 
@@ -70,18 +75,22 @@ public:
     void setMonitorGainDB(float gainDB);
     float getMonitorGainDB() const;
 
+#include <utility>
+
            // Clip control
-    bool loadClip(int slotId, const std::string& filepath);
+    std::pair<double, double> loadClip(int slotId, const std::string& filepath);
     void playClip(int slotId);
     void pauseClip(int slotId);
     void resumeClip(int slotId);
     void stopClip(int slotId);
     void setClipLoop(int slotId, bool loop);
     void setClipGain(int slotId, float gainDB);
+    void setClipTrim(int slotId, double startMs, double endMs);
     float getClipGain(int slotId) const;
     bool isClipPlaying(int slotId) const;
     bool isClipPaused(int slotId) const;
     void unloadClip(int slotId);
+    double getClipPlaybackPositionMs(int slotId) const;
 
            // Microphone gain
     void setMicGainDB(float gainDB);

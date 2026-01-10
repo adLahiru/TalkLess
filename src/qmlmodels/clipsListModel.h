@@ -31,7 +31,8 @@ public:
         ReproductionModeRole,
         StopOtherSoundsRole,
         MuteOtherSoundsRole,
-        MuteMicDuringPlaybackRole
+        MuteMicDuringPlaybackRole,
+        DurationSecRole
     };
 
     explicit ClipsListModel(QObject* parent = nullptr);

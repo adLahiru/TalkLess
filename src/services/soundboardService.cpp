@@ -798,6 +798,40 @@ void SoundboardService::setClipMuteMicDuringPlayback(int boardId, int clipId, bo
     }
 }
 
+void SoundboardService::setClipTrim(int boardId, int clipId, double startMs, double endMs)
+{
+    // Active board update
+    if (m_active && m_active->id == boardId) {
+        for (auto& c : m_active->clips) {
+            if (c.id != clipId) continue;
+            if (c.trimStartMs == startMs && c.trimEndMs == endMs) return;
+            c.trimStartMs = startMs;
+            c.trimEndMs = endMs;
+            emit activeClipsChanged();
+            saveActive();
+            
+            // Update engine if this clip is in a slot
+            if (m_clipIdToSlot.contains(clipId)) {
+                m_audioEngine->setClipTrim(m_clipIdToSlot[clipId], startMs, endMs);
+            }
+            return;
+        }
+    }
+
+    // Inactive board update
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded) return;
+    Soundboard b = *loaded;
+    for (auto& c : b.clips) {
+        if (c.id == clipId) {
+            c.trimStartMs = startMs;
+            c.trimEndMs = endMs;
+            m_repo.saveBoard(b);
+            return;
+        }
+    }
+}
+
 bool SoundboardService::moveClip(int boardId, int fromIndex, int toIndex)
 {
     // Validate indices
@@ -1122,7 +1156,8 @@ void SoundboardService::playClip(int clipId)
     m_audioEngine->stopClip(slotId);
 
     const std::string filePath = clip->filePath.toStdString();
-    if (!m_audioEngine->loadClip(slotId, filePath)) {
+    auto [startSec, endSec] = m_audioEngine->loadClip(slotId, filePath);
+    if (startSec == endSec) {
         qWarning() << "Failed to load clip:" << clip->filePath;
         // Restore mic if we muted it
         if (clip->muteMicDuringPlayback && wasMicEnabled) {
@@ -1132,6 +1167,7 @@ void SoundboardService::playClip(int clipId)
         }
         return;
     }
+    clip->durationSec = endSec;
 
     // Apply gain
     const float gainDb = (clip->volume <= 0)
@@ -1144,6 +1180,7 @@ void SoundboardService::playClip(int clipId)
     if (mode == 3) clip->isRepeat = true;
 
     m_audioEngine->setClipLoop(slotId, loop);
+    m_audioEngine->setClipTrim(slotId, clip->trimStartMs, clip->trimEndMs);
 
     // 3) Play Clip_B
     m_audioEngine->playClip(slotId);
@@ -1247,6 +1284,14 @@ bool SoundboardService::isClipPlaying(int clipId) const
 
     int slotId = m_clipIdToSlot[clipId];
     return m_audioEngine->isClipPlaying(slotId);
+}
+
+double SoundboardService::getClipPlaybackPositionMs(int clipId) const
+{
+    if (!m_audioEngine) return 0.0;
+    if (!m_clipIdToSlot.contains(clipId)) return 0.0;
+    
+    return m_audioEngine->getClipPlaybackPositionMs(m_clipIdToSlot[clipId]);
 }
 
 QVariantList SoundboardService::playingClipIDs() const

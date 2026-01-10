@@ -57,6 +57,12 @@ Rectangle {
                     muteOtherSounds: clipsModel.data(index, 272) // MuteOtherSoundsRole
                     ,
                     muteMicDuringPlayback: clipsModel.data(index, 273) // MuteMicDuringPlaybackRole
+                    ,
+                    durationSec: clipsModel.data(index, 274)         // DurationSecRole
+                    ,
+                    trimStartMs: clipsModel.data(index, 262)         // TrimStartMsRole
+                    ,
+                    trimEndMs: clipsModel.data(index, 263)           // TrimEndMsRole
                 };
             }
         }
@@ -106,6 +112,10 @@ Rectangle {
         clipEditorTab.stopOtherSounds = data.stopOtherSounds || false;
         clipEditorTab.muteOtherSounds = data.muteOtherSounds || false;
         clipEditorTab.muteMicDuringPlayback = data.muteMicDuringPlayback || false;
+
+        clipEditorTab.durationSec = data.durationSec || 0.0;
+        clipEditorTab.trimStartMs = data.trimStartMs || 0.0;
+        clipEditorTab.trimEndMs = data.trimEndMs || 0.0;
 
         clipTitleInput.text = data.title || "";
     }
@@ -1421,6 +1431,9 @@ Rectangle {
                         property bool persistentSettings: true
                         property bool clipIsRepeat: false
                         property int reproductionMode: 0  // 0=Overlay(default), 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop
+                        property real durationSec: 0.0
+                        property real trimStartMs: 0.0
+                        property real trimEndMs: 0.0
 
                         // Update when selected clip changes
                         Connections {
@@ -1440,6 +1453,9 @@ Rectangle {
                                     clipEditorTab.clipSpeed = 1.0;
                                     clipEditorTab.clipIsRepeat = false;
                                     clipEditorTab.reproductionMode = 0;
+                                    clipEditorTab.durationSec = 0.0;
+                                    clipEditorTab.trimStartMs = 0.0;
+                                    clipEditorTab.trimEndMs = 0.0;
                                     clipTitleInput.text = "";
                                     addTagInput.text = "";
                                     clipEditorTab.hasUnsavedChanges = false;
@@ -2074,10 +2090,36 @@ Rectangle {
 
                                 // Waveform display
                                 TrimWaveform {
+                                    id: waveform
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 50
-                                    currentTime: 90
-                                    totalDuration: 210
+                                    currentTime: 0
+                                    totalDuration: clipEditorTab.durationSec
+                                    trimStart: clipEditorTab.durationSec > 0 ? (clipEditorTab.trimStartMs / 1000.0) / clipEditorTab.durationSec : 0.0
+                                    trimEnd: (clipEditorTab.durationSec > 0 && clipEditorTab.trimEndMs > 0) ? (clipEditorTab.trimEndMs / 1000.0) / clipEditorTab.durationSec : 1.0
+
+                                    onTrimStartMoved: function (pos) {
+                                        if (root.selectedClipId !== -1 && clipEditorTab.durationSec > 0) {
+                                            clipEditorTab.trimStartMs = pos * clipEditorTab.durationSec * 1000.0;
+                                            soundboardService.setClipTrim(clipsModel.boardId, root.selectedClipId, clipEditorTab.trimStartMs, clipEditorTab.trimEndMs);
+                                        }
+                                    }
+                                    onTrimEndMoved: function (pos) {
+                                        if (root.selectedClipId !== -1 && clipEditorTab.durationSec > 0) {
+                                            clipEditorTab.trimEndMs = pos * clipEditorTab.durationSec * 1000.0;
+                                            soundboardService.setClipTrim(clipsModel.boardId, root.selectedClipId, clipEditorTab.trimStartMs, clipEditorTab.trimEndMs);
+                                        }
+                                    }
+
+                                    Timer {
+                                        id: playbackTimer
+                                        interval: 50
+                                        running: root.selectedClipId !== -1 && soundboardService.isClipPlaying(root.selectedClipId)
+                                        repeat: true
+                                        onTriggered: {
+                                            waveform.currentTime = soundboardService.getClipPlaybackPositionMs(root.selectedClipId) / 1000.0;
+                                        }
+                                    }
                                 }
                             }
 

@@ -1,13 +1,3 @@
-// audioEngine.cpp  (UPDATED)
-// ✅ Pause/Resume now continues from the paused position (does NOT restart from 0.00)
-// Key changes:
-//  - Decoder thread will NOT read/advance the decoder while Paused
-//  - Decoder thread will NOT switch to Draining while Paused (pause-near-end bug)
-//  - pauseClip can pause Playing or Draining
-//
-// NOTE: For resume to work, your UI/service must NOT call loadClip() again when resuming.
-//       It must call resumeClip(slotId) on the same slot.
-
 #define MINIAUDIO_IMPLEMENTATION
 #include "audioEngine.h"
 
@@ -18,7 +8,8 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
-#include <thread>   // IMPORTANT for std::this_thread::sleep_for
+#include <thread> 
+#include <utility>  
 
 AudioEngine::AudioEngine() = default;
 
@@ -191,7 +182,9 @@ void AudioEngine::processAudio(void* output,
 
             ma_pcm_rb_commit_read(&slot.ringBufferMain, availableFrames);
 
-            // Track queued frames so decoder thread can wait for drain
+            // Track progress
+            slot.playbackFrameCount.fetch_add((long long)availableFrames, std::memory_order_relaxed);
+            // Track queued frames for drain detection
             slot.queuedMainFrames.fetch_sub((long long)availableFrames, std::memory_order_relaxed);
         }
     }
@@ -325,6 +318,13 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
     slot->sampleRate.store((int)decoder.outputSampleRate, std::memory_order_relaxed);
     slot->channels.store((int)decoder.outputChannels, std::memory_order_relaxed);
 
+    // Initial seek to trim start
+    double initialStartMs = slot->trimStartMs.load(std::memory_order_relaxed);
+    if (initialStartMs > 0) {
+        ma_uint64 startFrame = static_cast<ma_uint64>((initialStartMs / 1000.0) * decoder.outputSampleRate);
+        ma_decoder_seek_to_pcm_frame(&decoder, startFrame);
+    }
+
     constexpr ma_uint32 kDecodeFrames = 1024;
     float decodeBuffer[kDecodeFrames * 2];
 
@@ -351,11 +351,34 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 
         if (framesRead == 0) {
             if (slot->loop.load(std::memory_order_relaxed)) {
-                ma_decoder_seek_to_pcm_frame(&decoder, 0);
+                double sMs = slot->trimStartMs.load(std::memory_order_relaxed);
+                ma_uint64 sFrame = static_cast<ma_uint64>((sMs / 1000.0) * decoder.outputSampleRate);
+                ma_decoder_seek_to_pcm_frame(&decoder, sFrame);
                 continue;
             }
             naturalEnd = true;
             break;
+        }
+
+        // Check if we hit trim end
+        double endMs = slot->trimEndMs.load(std::memory_order_relaxed);
+        if (endMs > 0) {
+            ma_uint64 currentFrame = 0;
+            ma_decoder_get_cursor_in_pcm_frames(&decoder, &currentFrame);
+            ma_uint64 endFrame = static_cast<ma_uint64>((endMs / 1000.0) * decoder.outputSampleRate);
+            
+            if (currentFrame >= endFrame) {
+                // We might have read a bit past endFrame, but for simplicity we stop here
+                if (slot->loop.load(std::memory_order_relaxed)) {
+                    double sMs = slot->trimStartMs.load(std::memory_order_relaxed);
+                    ma_uint64 sFrame = static_cast<ma_uint64>((sMs / 1000.0) * decoder.outputSampleRate);
+                    ma_decoder_seek_to_pcm_frame(&decoder, sFrame);
+                    // We can still process this last chunk if we want, or just loop now
+                } else {
+                    naturalEnd = true;
+                    break;
+                }
+            }
         }
 
         ma_uint32 framesRemaining = static_cast<ma_uint32>(framesRead);
@@ -466,20 +489,24 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 // CLIPS API
 // ============================================================================
 
-bool AudioEngine::loadClip(int slotId, const std::string& filepath)
+std::pair<double, double> AudioEngine::loadClip(int slotId, const std::string& filepath)
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return false;
-    if (filepath.empty()) return false;
+    double startSec = 0.0;
+    double endSec   = 0.0;  // duration in seconds (or -1.0 if unknown)
+
+    // Fail -> return same values (0.0, 0.0)
+    if (slotId < 0 || slotId >= MAX_CLIPS) return {0.0, 0.0};
+    if (filepath.empty()) return {0.0, 0.0};
 
     ClipSlot& slot = clips[slotId];
 
-    if (slot.state.load(std::memory_order_relaxed) != ClipState::Stopped) return false;
+    if (slot.state.load(std::memory_order_relaxed) != ClipState::Stopped) return {0.0, 0.0};
 
     const size_t bufferSizeInBytes = RING_BUFFER_SIZE_IN_FRAMES * 2 * sizeof(float);
 
     if (slot.ringBufferMainData == nullptr) {
         slot.ringBufferMainData = std::malloc(bufferSizeInBytes);
-        if (!slot.ringBufferMainData) return false;
+        if (!slot.ringBufferMainData) return {0.0, 0.0};
 
         ma_pcm_rb_init(ma_format_f32, 2, RING_BUFFER_SIZE_IN_FRAMES,
                        slot.ringBufferMainData, nullptr, &slot.ringBufferMain);
@@ -487,7 +514,7 @@ bool AudioEngine::loadClip(int slotId, const std::string& filepath)
 
     if (slot.ringBufferMonData == nullptr) {
         slot.ringBufferMonData = std::malloc(bufferSizeInBytes);
-        if (!slot.ringBufferMonData) return false;
+        if (!slot.ringBufferMonData) return {0.0, 0.0};
 
         ma_pcm_rb_init(ma_format_f32, 2, RING_BUFFER_SIZE_IN_FRAMES,
                        slot.ringBufferMonData, nullptr, &slot.ringBufferMon);
@@ -499,10 +526,31 @@ bool AudioEngine::loadClip(int slotId, const std::string& filepath)
     slot.filePath = filepath;
     slot.gain.store(1.0f, std::memory_order_relaxed);
     slot.loop.store(false, std::memory_order_relaxed);
-
     slot.queuedMainFrames.store(0, std::memory_order_relaxed);
 
-    return true;
+    // ---- NEW: get duration (endSec) using a temporary decoder ----
+    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, 48000);
+    ma_decoder dec;
+
+    if (ma_decoder_init_file(filepath.c_str(), &cfg, &dec) == MA_SUCCESS) {
+        ma_uint64 totalFrames = 0;
+        if (ma_decoder_get_length_in_pcm_frames(&dec, &totalFrames) == MA_SUCCESS &&
+            dec.outputSampleRate > 0 && totalFrames > 0) {
+            endSec = static_cast<double>(totalFrames) / static_cast<double>(dec.outputSampleRate);
+            slot.totalDurationMs.store(endSec * 1000.0, std::memory_order_relaxed);
+        } else {
+            // Loaded, but duration unknown (stream / some formats)
+            endSec = -1.0;
+        }
+        ma_decoder_uninit(&dec);
+    } else {
+        // Still consider load OK? Usually decoder init fail means file is bad.
+        // If you want loadClip to fail when file can't be decoded, return {0,0}:
+        return {0.0, 0.0};
+    }
+
+    // Success -> return different times
+    return {startSec, endSec};
 }
 
 void AudioEngine::playClip(int slotId)
@@ -534,9 +582,38 @@ void AudioEngine::playClip(int slotId)
     ma_pcm_rb_reset(&slot.ringBufferMon);
 
     slot.queuedMainFrames.store(0, std::memory_order_relaxed);
+    slot.playbackFrameCount.store(0, std::memory_order_relaxed);
 
     slot.state.store(ClipState::Playing, std::memory_order_release);
     slot.decoderThread = std::thread(decoderThreadFunc, this, &slot, slotId);
+}
+
+double AudioEngine::getClipPlaybackPositionMs(int slotId) const
+{
+    if (slotId < 0 || slotId >= MAX_CLIPS) return 0.0;
+    const ClipSlot& slot = clips[slotId];
+    int sr = slot.sampleRate.load(std::memory_order_relaxed);
+    if (sr <= 0) sr = 48000;
+
+    double frames = static_cast<double>(slot.playbackFrameCount.load(std::memory_order_relaxed));
+    double startMs = slot.trimStartMs.load(std::memory_order_relaxed);
+    double endMs   = slot.trimEndMs.load(std::memory_order_relaxed);
+    double totalMs = slot.totalDurationMs.load(std::memory_order_relaxed);
+
+    if (endMs <= 0 || endMs > totalMs) endMs = totalMs;
+    
+    double durationMs = endMs - startMs;
+    if (durationMs <= 0) durationMs = 1.0; // avoid div by zero
+
+    double elapsedMs = (frames * 1000.0 / sr);
+    
+    if (slot.loop.load(std::memory_order_relaxed)) {
+        elapsedMs = fmod(elapsedMs, durationMs);
+    } else {
+        if (elapsedMs > durationMs) elapsedMs = durationMs;
+    }
+
+    return startMs + elapsedMs;
 }
 
 void AudioEngine::pauseClip(int slotId)
@@ -593,6 +670,13 @@ float AudioEngine::getClipGain(int slotId) const
     if (slotId < 0 || slotId >= MAX_CLIPS) return 0.0f;
     float linear = clips[slotId].gain.load(std::memory_order_relaxed);
     return 20.0f * log10(std::max(linear, 0.000001f));
+}
+
+void AudioEngine::setClipTrim(int slotId, double startMs, double endMs)
+{
+    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    clips[slotId].trimStartMs.store(startMs, std::memory_order_relaxed);
+    clips[slotId].trimEndMs.store(endMs, std::memory_order_relaxed);
 }
 
 bool AudioEngine::isClipPlaying(int slotId) const
