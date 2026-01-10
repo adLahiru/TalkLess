@@ -15,15 +15,20 @@ Item {
     property url imageSource: "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
     property string hotkeyText: "Alt+F2+Shift"
     property bool selected: false
+    property bool showActions: false
     property bool isPlaying: false  // Track playback state
 
     // actions
     signal playClicked
     signal stopClicked
     signal copyClicked
+    signal pasteClicked
     signal clicked
     signal editBackgroundClicked
     signal hotkeyClicked
+    signal deleteClicked
+    signal editClicked
+    signal webClicked
 
     Rectangle {
         id: card
@@ -122,66 +127,6 @@ Item {
             }
         }
 
-        // Edit background button - top right corner (white circular button)
-        Rectangle {
-            id: editBackgroundButton
-            anchors.top: parent.top
-            anchors.right: parent.right
-            anchors.topMargin: 8
-            anchors.rightMargin: 8
-            width: 24
-            height: 24
-            radius: 12  // Circular button
-            color: editBgMouseArea.containsMouse ? "#FFFFFF" : "#E0E0E0"
-            z: 10  // Above other elements
-
-            // Drop shadow effect for visibility on any background
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: -1
-                radius: parent.radius + 1
-                color: "#40000000"
-                z: -1
-            }
-
-            Image {
-                id: editIcon
-                anchors.centerIn: parent
-                source: "qrc:/qt/qml/TalkLess/resources/icons/uil_edit.svg"
-                width: 14
-                height: 14
-                fillMode: Image.PreserveAspectFit
-                visible: false  // Hidden, used as source for MultiEffect
-            }
-
-            // Color the icon dark for visibility on white button
-            MultiEffect {
-                source: editIcon
-                anchors.centerIn: parent
-                width: editIcon.width
-                height: editIcon.height
-                colorization: 1.0
-                colorizationColor: "#333333"
-            }
-
-            MouseArea {
-                id: editBgMouseArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: function (mouse) {
-                    root.editBackgroundClicked();
-                    mouse.accepted = true;
-                }
-            }
-
-            Behavior on color {
-                ColorAnimation {
-                    duration: 150
-                }
-            }
-        }
-
         // Bottom hotkey bar - thin translucent black bar at bottom only
         Rectangle {
             id: hotkeyBar
@@ -213,32 +158,6 @@ Item {
                 anchors.rightMargin: 8
                 spacing: 6
 
-                // Play/Stop button - toggles based on playing state
-                Item {
-                    Layout.preferredWidth: 20
-                    Layout.preferredHeight: 20
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: root.isPlaying ? "■" : "▶"  // Stop or Play icon
-                        color: root.isPlaying ? "#FF6B6B" : "#FFFFFF"  // Red when playing
-                        font.pixelSize: 14
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: function (mouse) {
-                            if (root.isPlaying) {
-                                root.stopClicked();
-                            } else {
-                                root.playClicked();
-                            }
-                            mouse.accepted = true;
-                        }
-                    }
-                }
-
                 // Hotkey container
                 Rectangle {
                     Layout.fillWidth: true
@@ -269,27 +188,211 @@ Item {
                         }
                     }
                 }
+            }
+        }
 
-                // Copy/Menu button
+        // Action Bar - toggled by right click
+        Rectangle {
+            id: actionPopupBar
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.topMargin: 8
+            width: 240 // Widened for Copy and Paste buttons
+            height: 40
+            radius: 20
+            color: "#E61A1A1A" // More solid than hover version
+            border.color: "#3B82F6" // Blue border when open
+            border.width: 1
+            opacity: root.showActions ? 1.0 : 0.0
+            visible: opacity > 0
+            z: 20 // Above everything
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 150
+                }
+            }
+
+            RowLayout {
+                anchors.centerIn: parent
+                spacing: 2
+
+                // Play/Stop Button
                 Rectangle {
-                    Layout.preferredWidth: 24
-                    Layout.preferredHeight: 24
-                    radius: 4
-                    color: "transparent"
+                    width: 30
+                    height: 30
+                    radius: 15
+                    color: playActionMouseArea.containsMouse ? "#444444" : "transparent"
 
                     Text {
                         anchors.centerIn: parent
-                        text: "☰"
-                        color: "#FFFFFF"
+                        text: root.isPlaying ? "⏹️" : "▶️"
                         font.pixelSize: 14
                     }
 
                     MouseArea {
+                        id: playActionMouseArea
                         anchors.fill: parent
+                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: function (mouse) {
+                        onClicked: {
+                            if (root.isPlaying)
+                                root.stopClicked();
+                            else
+                                root.playClicked();
+                            root.showActions = false;
+                        }
+                    }
+                }
+
+                // Copy Button (Clipboard)
+                Rectangle {
+                    width: 30
+                    height: 30
+                    radius: 15
+                    color: copyActionMouseArea.containsMouse ? "#444444" : "transparent"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "📋"
+                        font.pixelSize: 14
+                    }
+
+                    MouseArea {
+                        id: copyActionMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
                             root.copyClicked();
-                            mouse.accepted = true;
+                            root.showActions = false;
+                        }
+                    }
+                }
+
+                // Paste Button (Clipboard Paste)
+                Rectangle {
+                    width: 30
+                    height: 30
+                    radius: 15
+                    color: pasteActionMouseArea.containsMouse ? "#444444" : "transparent"
+                    opacity: soundboardService.canPaste() ? 1.0 : 0.4
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "📥"
+                        font.pixelSize: 14
+                    }
+
+                    MouseArea {
+                        id: pasteActionMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        enabled: soundboardService.canPaste()
+                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: {
+                            root.pasteClicked();
+                            root.showActions = false;
+                        }
+                    }
+                }
+
+                // Edit Background Button
+                Rectangle {
+                    width: 30
+                    height: 30
+                    radius: 15
+                    color: editBgActionMouseArea.containsMouse ? "#444444" : "transparent"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "🖼️"
+                        font.pixelSize: 14
+                    }
+
+                    MouseArea {
+                        id: editBgActionMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.editBackgroundClicked();
+                            root.showActions = false;
+                        }
+                    }
+                }
+
+                // Web/Globe Button
+                Rectangle {
+                    width: 30
+                    height: 30
+                    radius: 15
+                    color: webActionMouseArea.containsMouse ? "#444444" : "transparent"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "🌐"
+                        font.pixelSize: 14
+                    }
+
+                    MouseArea {
+                        id: webActionMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.webClicked();
+                            root.showActions = false;
+                        }
+                    }
+                }
+
+                // Edit Settings Button
+                Rectangle {
+                    width: 30
+                    height: 30
+                    radius: 15
+                    color: editActionMouseArea.containsMouse ? "#444444" : "transparent"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "✏️"
+                        font.pixelSize: 14
+                    }
+
+                    MouseArea {
+                        id: editActionMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.editClicked();
+                            root.showActions = false;
+                        }
+                    }
+                }
+
+                // Delete Button
+                Rectangle {
+                    width: 30
+                    height: 30
+                    radius: 15
+                    color: deleteActionMouseArea.containsMouse ? "#444444" : "transparent"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "🗑️"
+                        font.pixelSize: 14
+                    }
+
+                    MouseArea {
+                        id: deleteActionMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.deleteClicked();
+                            root.showActions = false;
                         }
                     }
                 }
@@ -298,18 +401,23 @@ Item {
 
         // Whole card click (for selecting/opening/playing) - BELOW the buttons in z-order
         MouseArea {
+            id: cardMouseArea
             anchors.fill: parent
+            hoverEnabled: true
             z: -1  // Lower z so buttons get clicks first
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             onClicked: function (mouse) {
                 if (mouse.button === Qt.RightButton) {
-                    clipContextMenu.popup();
+                    root.showActions = !root.showActions;
                 } else {
-                    // Left click: select AND play the clip
-                    root.clicked();
+                    // Left click: Play the clip and select it
+                    root.clicked(); // Updates selection sidebar
                     if (!root.isPlaying) {
                         root.playClicked();
+                    } else {
+                        root.stopClicked();
                     }
+                    root.showActions = false; // Hide bar on play
                 }
             }
             cursorShape: Qt.PointingHandCursor

@@ -111,6 +111,7 @@ public:
 
     // ---- Playback controls ----
     Q_INVOKABLE void clipClicked(int clipId);   // Handle clip tile click: select + play with mode logic
+    Q_INVOKABLE void setCurrentlySelectedClip(int clipId); // Just select the clip (for UI)
     Q_INVOKABLE void playClip(int clipId);      // Start playback of the given clip
     Q_INVOKABLE void stopClip(int clipId);      // Stop playback of the given clip
     Q_INVOKABLE void stopAllClips();            // Stop all currently playing clips

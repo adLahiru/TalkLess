@@ -65,6 +65,30 @@ Rectangle {
             data = getClipDataById(selectedClipId);
         }
         displayedClipData = data;
+
+        // If displayed data is the selected clip, push to editor properties
+        if (data && data.clipId === selectedClipId) {
+            pushToEditor(data);
+        }
+    }
+
+    function pushToEditor(data) {
+        if (!data)
+            return;
+        clipEditorTab.editingClipName = data.title || "";
+        clipEditorTab.editingClipHotkey = data.hotkey || "";
+        clipEditorTab.editingClipTags = data.tags || [];
+        clipEditorTab.editingClipImgPath = data.imgPath || "";
+        clipEditorTab.clipVolume = data.clipVolume !== undefined ? data.clipVolume : 100;
+        clipEditorTab.clipSpeed = data.clipSpeed !== undefined ? data.clipSpeed : 1.0;
+        clipEditorTab.clipIsRepeat = data.isRepeat || false;
+
+        if (typeof modeSelectorRow !== 'undefined') {
+            modeSelectorRow.ignoreNextChange = true;
+        }
+        clipEditorTab.reproductionMode = data.reproductionMode !== undefined ? data.reproductionMode : 0;
+
+        clipTitleInput.text = data.title || "";
     }
 
     // Refresh when core IDs change
@@ -452,160 +476,10 @@ Rectangle {
                 }
             }
 
-            // Action Buttons Bar - centered below banner
+            // Spacer between banner and content
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 36
-                Layout.topMargin: -10
-
-                Rectangle {
-                    id: actionButtonsBar
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    width: 160
-                    height: 36
-                    radius: 8
-                    color: "#1A1A1A"
-                    border.color: "#2A2A2A"
-                    border.width: 0
-
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 4
-
-                        // Play Button
-                        Rectangle {
-                            width: 32
-                            height: 32
-                            radius: 6
-                            color: playMouseArea.containsMouse ? "#333333" : "transparent"
-                            opacity: root.selectedClipId !== -1 ? 1.0 : 0.4
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "▶️"
-                                font.pixelSize: 16
-                            }
-
-                            MouseArea {
-                                id: playMouseArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                enabled: root.selectedClipId !== -1
-                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                onClicked: {
-                                    console.log("Play clip clicked:", root.selectedClipId);
-                                    if (root.selectedClipId !== -1) {
-                                        soundboardService.playClip(root.selectedClipId);
-                                    }
-                                }
-                            }
-
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
-                        }
-
-                        // Globe/Web Button
-                        Rectangle {
-                            width: 32
-                            height: 32
-                            radius: 6
-                            color: globeMouseArea.containsMouse ? "#333333" : "transparent"
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "🌐"
-                                font.pixelSize: 16
-                            }
-
-                            MouseArea {
-                                id: globeMouseArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Web/Share clicked")
-                            }
-
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
-                        }
-
-                        // Edit/Pencil Button
-                        Rectangle {
-                            width: 32
-                            height: 32
-                            radius: 6
-                            color: editMouseArea.containsMouse ? "#333333" : "transparent"
-                            opacity: root.selectedClipId !== -1 ? 1.0 : 0.4
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "✏️"
-                                font.pixelSize: 16
-                            }
-
-                            MouseArea {
-                                id: editMouseArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                enabled: root.selectedClipId !== -1
-                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                onClicked: console.log("Edit clip clicked:", root.selectedClipId)
-                            }
-
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
-                        }
-
-                        // Delete/Trash Button
-                        Rectangle {
-                            width: 32
-                            height: 32
-                            radius: 6
-                            color: deleteMouseArea.containsMouse ? "#333333" : "transparent"
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "🗑️"
-                                font.pixelSize: 16
-                            }
-
-                            MouseArea {
-                                id: deleteMouseArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                enabled: root.selectedClipId !== -1
-                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                onClicked: {
-                                    console.log("Delete clip clicked:", root.selectedClipId);
-                                    if (root.selectedClipId !== -1) {
-                                        const success = soundboardService.deleteClip(clipsModel.boardId, root.selectedClipId);
-                                        if (success) {
-                                            root.selectedClipId = -1;
-                                            clipsModel.reload();
-                                        }
-                                    }
-                                }
-                            }
-
-                            opacity: root.selectedClipId !== -1 ? 1.0 : 0.4
-
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
-                        }
-                    }
-                }
+                Layout.preferredHeight: 10
             }
 
             // Soundboard content area
@@ -719,7 +593,7 @@ Rectangle {
                                         } else if (clipWrapper.imgPath.startsWith("qrc:") || clipWrapper.imgPath.startsWith("file:") || clipWrapper.imgPath.startsWith("http")) {
                                             return clipWrapper.imgPath;
                                         } else {
-                                            return "file://" + clipWrapper.imgPath;
+                                            return "file:///" + clipWrapper.imgPath; // Use 3 slashes for Windows local paths
                                         }
                                     }
                                     isPlaying: clipWrapper.clipIsPlaying
@@ -728,16 +602,37 @@ Rectangle {
                                     opacity: dragHandler.active ? 0.7 : 1.0
 
                                     onClicked: {
-                                        // Use unified backend method that handles selection + playback
-                                        soundboardService.clipClicked(clipWrapper.clipId);
+                                        // Selecting the clip updates the sidebar
+                                        soundboardService.setCurrentlySelectedClip(clipWrapper.clipId);
+                                    }
+                                    onPlayClicked: {
+                                        soundboardService.playClip(clipWrapper.clipId);
                                     }
                                     onStopClicked: {
-                                        console.log("Stop clicked:", clipWrapper.clipId, clipWrapper.clipTitle);
                                         soundboardService.stopClip(clipWrapper.clipId);
                                     }
+                                    onDeleteClicked: {
+                                        if (soundboardService.deleteClip(clipsModel.boardId, clipWrapper.clipId)) {
+                                            if (root.selectedClipId === clipWrapper.clipId)
+                                                root.selectedClipId = -1;
+                                            clipsModel.reload();
+                                        }
+                                    }
+                                    onEditClicked: {
+                                        soundboardService.setCurrentlySelectedClip(clipWrapper.clipId);
+                                        rightSidebar.currentTabIndex = 0; // Focus the editor tab
+                                    }
+                                    onWebClicked: {
+                                        console.log("Web clicked for clip:", clipWrapper.clipId);
+                                        // Open sharing URL?
+                                    }
                                     onCopyClicked: {
-                                        console.log("Copy clicked:", clipWrapper.clipId, clipWrapper.clipTitle);
                                         soundboardService.copyClip(clipWrapper.clipId);
+                                    }
+                                    onPasteClicked: {
+                                        if (soundboardService.pasteClip(clipsModel.boardId)) {
+                                            clipsModel.reload();
+                                        }
                                     }
                                     onEditBackgroundClicked: {
                                         console.log("Edit background clicked:", clipWrapper.clipId, clipWrapper.clipTitle);
@@ -850,7 +745,7 @@ Rectangle {
                         return imgPath;
                     } else {
                         // Local path - convert to file:// URL
-                        return "file://" + imgPath;
+                        return "file:///" + imgPath;
                     }
                 }
 
@@ -1706,23 +1601,7 @@ Rectangle {
                                 if (root.selectedClipId !== -1) {
                                     const data = root.getClipDataById(root.selectedClipId);
                                     if (data) {
-                                        clipEditorTab.editingClipName = data.title || "";
-                                        clipEditorTab.editingClipHotkey = data.hotkey || "";
-                                        clipEditorTab.editingClipTags = data.tags || [];
-                                        clipEditorTab.editingClipImgPath = data.imgPath || "";
-                                        clipEditorTab.clipVolume = data.clipVolume !== undefined ? data.clipVolume : 100;
-                                        clipEditorTab.clipSpeed = data.clipSpeed !== undefined ? data.clipSpeed : 1.0;
-                                        clipEditorTab.clipIsRepeat = data.isRepeat || false;
-
-                                        // Set flag to prevent saving during load
-                                        if (typeof modeSelectorRow !== 'undefined') {
-                                            modeSelectorRow.ignoreNextChange = true;
-                                        }
-                                        clipEditorTab.reproductionMode = data.reproductionMode !== undefined ? data.reproductionMode : 0;
-
-                                        clipTitleInput.text = clipEditorTab.editingClipName;
-                                        addTagInput.text = "";
-                                        clipEditorTab.hasUnsavedChanges = false;
+                                        root.pushToEditor(data);
                                     }
                                 } else {
                                     clipEditorTab.editingClipName = "";
@@ -1806,7 +1685,7 @@ Rectangle {
                                             } else if (imgPath.startsWith("qrc:") || imgPath.startsWith("file:") || imgPath.startsWith("http")) {
                                                 return imgPath;
                                             } else {
-                                                return "file://" + imgPath;
+                                                return "file:///" + imgPath; // Use 3 slashes for Windows local paths
                                             }
                                         }
                                     }
@@ -1912,7 +1791,7 @@ Rectangle {
                                     Keys.onReturnPressed: {
                                         if (root.selectedClipId !== -1 && text.length > 0) {
                                             clipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
-                                            clipEditor.editingClipName = text;
+                                            clipEditorTab.editingClipName = text;
                                             clipsModel.reload();
                                         }
                                         focus = false; // Remove focus after saving
@@ -3210,7 +3089,7 @@ Rectangle {
                                     }
 
                                     // Save the clip with the user-entered title (or auto-generated one)
-                                    const filePath = "file://" + fileDropArea.droppedFilePath;
+                                    const filePath = "file:///" + fileDropArea.droppedFilePath;
                                     const title = uploadAudioNameInput.text;
 
                                     const success = soundboardService.addClipWithTitle(boardId, filePath, title);

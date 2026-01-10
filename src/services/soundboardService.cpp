@@ -849,10 +849,15 @@ void SoundboardService::clipClicked(int clipId)
     qDebug() << "Clip clicked:" << clipId;
 
     // Emit selection changed signal so UI updates
-    emit clipSelectionRequested(clipId);
+    setCurrentlySelectedClip(clipId);
 
     //Now handle playback based on the clip's reproduction mode
     playClip(clipId);
+}
+
+void SoundboardService::setCurrentlySelectedClip(int clipId)
+{
+    emit clipSelectionRequested(clipId);
 }
 
 
