@@ -7,6 +7,7 @@
 
 #include <QHash>
 #include <QObject>
+#include <QSet>
 
 #include <memory>
 #include <optional>
@@ -101,7 +102,10 @@ public:
     Q_INVOKABLE bool updateClipAudioSettings(int boardId, int clipId, int volume, double speed);
     Q_INVOKABLE void setClipVolume(int boardId, int clipId, int volume);  // Real-time volume (no save)
     Q_INVOKABLE void setClipRepeat(int boardId, int clipId, bool repeat); // Toggle repeat mode
-    Q_INVOKABLE void setClipReproductionMode(int boardId, int clipId, int mode); // Set reproduction mode (0-4)
+    Q_INVOKABLE void setClipReproductionMode(int boardId, int clipId, int mode); // Set reproduction mode (0-3)
+    Q_INVOKABLE void setClipStopOtherSounds(int boardId, int clipId, bool stop);
+    Q_INVOKABLE void setClipMuteOtherSounds(int boardId, int clipId, bool mute);
+    Q_INVOKABLE void setClipMuteMicDuringPlayback(int boardId, int clipId, bool mute);
     Q_INVOKABLE bool moveClip(int boardId, int fromIndex, int toIndex); // Reorder clips with drag-drop
     Q_INVOKABLE void copyClip(int clipId);                              // Copy clip to internal clipboard
     Q_INVOKABLE bool pasteClip(int boardId);                             // Paste clip from clipboard to target board
@@ -168,6 +172,7 @@ private:
     int getOrAssignSlot(int clipId); // Get audio engine slot for clip
     void reproductionPlayingClip(const QVariantList &playingClipIds, int mode);
     static QString normalizeHotkey(const QString& hotkey);
+    void finalizeClipPlayback(int clipId); // Shared cleanup for manual stop and natural end
 
 private:
     StorageRepository m_repo;
@@ -180,6 +185,7 @@ private:
     std::unique_ptr<AudioEngine> m_audioEngine;
     QHash<int, int> m_clipIdToSlot; // clipId -> audio engine slot
     int m_nextSlot = 0;             // next available slot
+    QSet<int> m_clipsThatMutedMic;  // Track clips that muted the mic (to restore on stop)
 
     std::optional<Clip> m_clipboardClip; // Internal clipboard for copy/paste
 };

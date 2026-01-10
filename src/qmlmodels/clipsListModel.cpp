@@ -97,6 +97,12 @@ QVariant ClipsListModel::data(const QModelIndex& index, int role) const
         return c.tags;
     case ReproductionModeRole:
         return c.reproductionMode;
+    case StopOtherSoundsRole:
+        return c.stopOtherSounds;
+    case MuteOtherSoundsRole:
+        return c.muteOtherSounds;
+    case MuteMicDuringPlaybackRole:
+        return c.muteMicDuringPlayback;
     default:
         return {};
     }
@@ -118,7 +124,10 @@ QHash<int, QByteArray> ClipsListModel::roleNames() const
         {   IsRepeatRole,      "isRepeat"},
         {     LockedRole,        "locked"},
         {       TagsRole,          "tags"},
-        {ReproductionModeRole, "reproductionMode"}
+        {ReproductionModeRole, "reproductionMode"},
+        {StopOtherSoundsRole, "stopOtherSounds"},
+        {MuteOtherSoundsRole, "muteOtherSounds"},
+        {MuteMicDuringPlaybackRole, "muteMicDuringPlayback"}
     };
 }
 

@@ -29,4 +29,9 @@ struct Clip
     
     // Reproduction mode (0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Loop/Repeat)
     int reproductionMode = 1;  // Defaults to Play/Pause mode
+    
+    // Playback behavior options
+    bool stopOtherSounds = false;       // Stop other clips when this plays
+    bool muteOtherSounds = false;       // Mute (pause) other clips when this plays
+    bool muteMicDuringPlayback = false; // Mute mic while this clip is playing
 };

@@ -28,7 +28,10 @@ public:
         IsRepeatRole,
         LockedRole,
         TagsRole,
-        ReproductionModeRole
+        ReproductionModeRole,
+        StopOtherSoundsRole,
+        MuteOtherSoundsRole,
+        MuteMicDuringPlaybackRole
     };
 
     explicit ClipsListModel(QObject* parent = nullptr);

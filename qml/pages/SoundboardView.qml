@@ -51,6 +51,12 @@ Rectangle {
                     clipSpeed: clipsModel.data(index, 265)  // SpeedRole
                     ,
                     reproductionMode: clipsModel.data(index, 270) // ReproductionModeRole
+                    ,
+                    stopOtherSounds: clipsModel.data(index, 271) // StopOtherSoundsRole
+                    ,
+                    muteOtherSounds: clipsModel.data(index, 272) // MuteOtherSoundsRole
+                    ,
+                    muteMicDuringPlayback: clipsModel.data(index, 273) // MuteMicDuringPlaybackRole
                 };
             }
         }
@@ -95,6 +101,11 @@ Rectangle {
             modeSelectorRow.ignoreNextChange = true;
             modeSelectorRow.selectedMode = newMode;
         }
+
+        // Playback behavior options
+        clipEditorTab.stopOtherSounds = data.stopOtherSounds || false;
+        clipEditorTab.muteOtherSounds = data.muteOtherSounds || false;
+        clipEditorTab.muteMicDuringPlayback = data.muteMicDuringPlayback || false;
 
         clipTitleInput.text = data.title || "";
     }
@@ -2298,18 +2309,23 @@ Rectangle {
                                     // Stop other sounds on play
                                     RowLayout {
                                         spacing: 8
+                                        // Disabled when mode is Play/Stop (mode 2) or Play/Pause (mode 1)
+                                        property bool isReadOnly: clipEditorTab.reproductionMode === 1 || clipEditorTab.reproductionMode === 2
+                                        opacity: isReadOnly ? 0.5 : 1.0
 
                                         Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            color: clipEditorTab.stopOtherSounds ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: clipEditorTab.stopOtherSounds ? "#8B5CF6" : "#4A4A4A"
+                                            // Force checked when mode is Play/Stop (mode 2), force unchecked when Play/Pause (mode 1)
+                                            property bool effectiveValue: clipEditorTab.reproductionMode === 2 ? true : (clipEditorTab.reproductionMode === 1 ? false : clipEditorTab.stopOtherSounds)
+                                            color: effectiveValue ? "#8B5CF6" : "#3A3A3A"
+                                            border.color: effectiveValue ? "#8B5CF6" : "#4A4A4A"
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: clipEditorTab.stopOtherSounds ? "✓" : ""
+                                                text: parent.effectiveValue ? "✓" : ""
                                                 color: "#FFFFFF"
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
@@ -2317,17 +2333,20 @@ Rectangle {
 
                                             MouseArea {
                                                 anchors.fill: parent
-                                                cursorShape: Qt.PointingHandCursor
+                                                cursorShape: parent.parent.isReadOnly ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+                                                enabled: !parent.parent.isReadOnly
                                                 onClicked: {
-                                                    clipEditorTab.stopOtherSounds = !clipEditorTab.stopOtherSounds;
-                                                    // Auto-save (Note: stopOtherSounds not currently saved to backend)
+                                                    if (root.selectedClipId !== -1) {
+                                                        clipEditorTab.stopOtherSounds = !clipEditorTab.stopOtherSounds;
+                                                        soundboardService.setClipStopOtherSounds(clipsModel.boardId, root.selectedClipId, clipEditorTab.stopOtherSounds);
+                                                    }
                                                 }
                                             }
                                         }
 
                                         Text {
-                                            text: "Stop other sounds on play"
-                                            color: "#CCCCCC"
+                                            text: clipEditorTab.reproductionMode === 2 ? "Stop other sounds on play (auto)" : clipEditorTab.reproductionMode === 1 ? "Stop other sounds on play (disabled)" : "Stop other sounds on play"
+                                            color: parent.isReadOnly ? "#888888" : "#CCCCCC"
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2357,8 +2376,14 @@ Rectangle {
                                                 anchors.fill: parent
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
-                                                    clipEditorTab.muteOtherSounds = !clipEditorTab.muteOtherSounds;
-                                                    // Auto-save (Note: muteOtherSounds not currently saved to backend)
+                                                    if (root.selectedClipId !== -1) {
+                                                        clipEditorTab.muteOtherSounds = !clipEditorTab.muteOtherSounds;
+                                                        soundboardService.setClipMuteOtherSounds(clipsModel.boardId, root.selectedClipId, clipEditorTab.muteOtherSounds);
+                                                        // If muteOtherSounds is enabled, also enable muteMicDuringPlayback
+                                                        if (clipEditorTab.muteOtherSounds) {
+                                                            clipEditorTab.muteMicDuringPlayback = true;
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -2374,18 +2399,22 @@ Rectangle {
                                     // Mute mic during playback
                                     RowLayout {
                                         spacing: 8
+                                        // Disabled when muteOtherSounds is enabled - it's automatically on
+                                        opacity: clipEditorTab.muteOtherSounds ? 0.5 : 1.0
 
                                         Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            color: clipEditorTab.muteMicDuringPlayback ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: clipEditorTab.muteMicDuringPlayback ? "#8B5CF6" : "#4A4A4A"
+                                            // Force checked when muteOtherSounds is enabled
+                                            property bool effectiveValue: clipEditorTab.muteOtherSounds || clipEditorTab.muteMicDuringPlayback
+                                            color: effectiveValue ? "#8B5CF6" : "#3A3A3A"
+                                            border.color: effectiveValue ? "#8B5CF6" : "#4A4A4A"
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: clipEditorTab.muteMicDuringPlayback ? "✓" : ""
+                                                text: parent.effectiveValue ? "✓" : ""
                                                 color: "#FFFFFF"
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
@@ -2393,17 +2422,20 @@ Rectangle {
 
                                             MouseArea {
                                                 anchors.fill: parent
-                                                cursorShape: Qt.PointingHandCursor
+                                                cursorShape: clipEditorTab.muteOtherSounds ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+                                                enabled: !clipEditorTab.muteOtherSounds
                                                 onClicked: {
-                                                    clipEditorTab.muteMicDuringPlayback = !clipEditorTab.muteMicDuringPlayback;
-                                                    // Auto-save (Note: muteMicDuringPlayback not currently saved to backend)
+                                                    if (root.selectedClipId !== -1) {
+                                                        clipEditorTab.muteMicDuringPlayback = !clipEditorTab.muteMicDuringPlayback;
+                                                        soundboardService.setClipMuteMicDuringPlayback(clipsModel.boardId, root.selectedClipId, clipEditorTab.muteMicDuringPlayback);
+                                                    }
                                                 }
                                             }
                                         }
 
                                         Text {
-                                            text: "Mute mic during playback"
-                                            color: "#CCCCCC"
+                                            text: clipEditorTab.muteOtherSounds ? "Mute mic during playback (auto)" : "Mute mic during playback"
+                                            color: clipEditorTab.muteOtherSounds ? "#888888" : "#CCCCCC"
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }

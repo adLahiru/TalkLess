@@ -75,12 +75,7 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
             if (finishedClipId != -1) {
                 // Update state on the main thread
                 QMetaObject::invokeMethod(this, [this, finishedClipId]() {
-                    Clip* clip = findActiveClipById(finishedClipId);
-                    if (clip) {
-                        clip->isPlaying = false;
-                        emit activeClipsChanged();
-                    }
-                    emit clipPlaybackStopped(finishedClipId);
+                    finalizeClipPlayback(finishedClipId);
                 }, Qt::QueuedConnection);
             }
         });
@@ -720,6 +715,89 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
     }
 }
 
+void SoundboardService::setClipStopOtherSounds(int boardId, int clipId, bool stop)
+{
+    // Active board update
+    if (m_active && m_active->id == boardId) {
+        for (auto& c : m_active->clips) {
+            if (c.id != clipId) continue;
+            c.stopOtherSounds = stop;
+            emit activeClipsChanged();
+            saveActive();
+            return;
+        }
+    }
+
+    // Inactive board update
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded) return;
+    Soundboard b = *loaded;
+    for (auto& c : b.clips) {
+        if (c.id == clipId) {
+            c.stopOtherSounds = stop;
+            m_repo.saveBoard(b);
+            return;
+        }
+    }
+}
+
+void SoundboardService::setClipMuteOtherSounds(int boardId, int clipId, bool mute)
+{
+    // Active board update
+    if (m_active && m_active->id == boardId) {
+        for (auto& c : m_active->clips) {
+            if (c.id != clipId) continue;
+            c.muteOtherSounds = mute;
+            // If muteOtherSounds is enabled, also enable muteMicDuringPlayback
+            if (mute) {
+                c.muteMicDuringPlayback = true;
+            }
+            emit activeClipsChanged();
+            saveActive();
+            return;
+        }
+    }
+
+    // Inactive board update
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded) return;
+    Soundboard b = *loaded;
+    for (auto& c : b.clips) {
+        if (c.id == clipId) {
+            c.muteOtherSounds = mute;
+            if (mute) c.muteMicDuringPlayback = true;
+            m_repo.saveBoard(b);
+            return;
+        }
+    }
+}
+
+void SoundboardService::setClipMuteMicDuringPlayback(int boardId, int clipId, bool mute)
+{
+    // Active board update
+    if (m_active && m_active->id == boardId) {
+        for (auto& c : m_active->clips) {
+            if (c.id != clipId) continue;
+            c.muteMicDuringPlayback = mute;
+            emit activeClipsChanged();
+            saveActive();
+            return;
+        }
+    }
+
+    // Inactive board update
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded) return;
+    Soundboard b = *loaded;
+    for (auto& c : b.clips) {
+        if (c.id == clipId) {
+            c.muteMicDuringPlayback = mute;
+            m_repo.saveBoard(b);
+            return;
+        }
+    }
+}
+
 bool SoundboardService::moveClip(int boardId, int fromIndex, int toIndex)
 {
     // Validate indices
@@ -1006,6 +1084,38 @@ void SoundboardService::playClip(int clipId)
         reproductionPlayingClip(others, 3);
     }
     // mode == 0 overlay -> do nothing to others
+    
+    // Per-clip behavior options (independent of reproduction mode)
+    if (clip->stopOtherSounds && !others.isEmpty()) {
+        // Stop all other playing clips
+        for (const QVariant& v : others) {
+            bool ok = false;
+            int otherId = v.toInt(&ok);
+            if (ok) {
+                stopClip(otherId);
+            }
+        }
+    } else if (clip->muteOtherSounds && !others.isEmpty()) {
+        // Pause (mute) all other playing clips
+        for (const QVariant& v : others) {
+            bool ok = false;
+            int otherId = v.toInt(&ok);
+            if (ok && m_clipIdToSlot.contains(otherId)) {
+                m_audioEngine->pauseClip(m_clipIdToSlot[otherId]);
+            }
+        }
+    }
+    
+    // Mute mic if muteMicDuringPlayback is enabled for this clip
+    bool wasMicEnabled = isMicEnabled();
+    if (clip->muteMicDuringPlayback && wasMicEnabled) {
+        if (m_audioEngine) {
+            m_audioEngine->setMicEnabled(false);
+            m_clipsThatMutedMic.insert(clipId);  // Track this clip muted the mic
+            emit settingsChanged();
+            qDebug() << "Mic muted during playback of clip" << clipId;
+        }
+    }
 
     // 2) Prepare Clip_B to start from beginning
     // Ensure it's stopped so loadClip() can succeed reliably
@@ -1014,6 +1124,12 @@ void SoundboardService::playClip(int clipId)
     const std::string filePath = clip->filePath.toStdString();
     if (!m_audioEngine->loadClip(slotId, filePath)) {
         qWarning() << "Failed to load clip:" << clip->filePath;
+        // Restore mic if we muted it
+        if (clip->muteMicDuringPlayback && wasMicEnabled) {
+            m_audioEngine->setMicEnabled(true);
+            m_clipsThatMutedMic.remove(clipId);
+            emit settingsChanged();
+        }
         return;
     }
 
@@ -1061,6 +1177,12 @@ void SoundboardService::stopClip(int clipId)
     int slotId = m_clipIdToSlot[clipId];
     m_audioEngine->stopClip(slotId);
 
+    finalizeClipPlayback(clipId);
+    qDebug() << "Stopped clip" << clipId << "in slot" << slotId;
+}
+
+void SoundboardService::finalizeClipPlayback(int clipId)
+{
     // Update state
     Clip* clip = findActiveClipById(clipId);
     if (clip) {
@@ -1068,8 +1190,20 @@ void SoundboardService::stopClip(int clipId)
         emit activeClipsChanged();
     }
 
+    // Restore mic if this clip had muted it and no other mic-muting clips are playing
+    if (m_clipsThatMutedMic.contains(clipId)) {
+        m_clipsThatMutedMic.remove(clipId);
+        // Only restore mic if no other clips that muted the mic are still playing
+        if (m_clipsThatMutedMic.isEmpty()) {
+            if (m_audioEngine) {
+                m_audioEngine->setMicEnabled(true);
+                emit settingsChanged();
+                qDebug() << "Mic restored after clip" << clipId << "playback finalized";
+            }
+        }
+    }
+
     emit clipPlaybackStopped(clipId);
-    qDebug() << "Stopped clip" << clipId << "in slot" << slotId;
 }
 
 void SoundboardService::stopAllClips()
@@ -1084,6 +1218,16 @@ void SoundboardService::stopAllClips()
         Clip* clip = findActiveClipById(it.key());
         if (clip) {
             clip->isPlaying = false;
+        }
+    }
+
+    // Restore mic if any clips had muted it
+    if (!m_clipsThatMutedMic.isEmpty()) {
+        m_clipsThatMutedMic.clear();
+        if (m_audioEngine) {
+            m_audioEngine->setMicEnabled(true);
+            emit settingsChanged();
+            qDebug() << "Mic restored after stopping all clips";
         }
     }
 
