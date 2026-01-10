@@ -1334,7 +1334,7 @@ Rectangle {
                 }
             }
 
-            // Tab 5: Preferences
+            // Tab 5: System
             Flickable {
                 contentWidth: width
                 contentHeight: preferencesContent.implicitHeight + 40

@@ -1,10 +1,10 @@
-// SideBar.qml
 pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
+import "../styles"
 
 Rectangle {
     id: root
@@ -29,11 +29,31 @@ Rectangle {
 
     ListModel {
         id: menuModel
-        ListElement { title: "Soundboard";            route: "soundboard"; iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_soundboard.svg" }
-        ListElement { title: "Audio Playback Engine"; route: "engine";     iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_play.svg"  }
-        ListElement { title: "Macros & Automation";   route: "macros";     iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_macros.svg" }
-        ListElement { title: "Application Settings";  route: "settings";   iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_settings.svg"  }
-        ListElement { title: "Statistics & Reporting";route: "stats";      iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_stats.svg" }
+        ListElement {
+            title: "Soundboard"
+            route: "soundboard"
+            iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_soundboard.svg"
+        }
+        ListElement {
+            title: "Audio Playback Engine"
+            route: "engine"
+            iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_play.svg"
+        }
+        ListElement {
+            title: "Macros & Automation"
+            route: "macros"
+            iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_macros.svg"
+        }
+        ListElement {
+            title: "Application Settings"
+            route: "settings"
+            iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_settings.svg"
+        }
+        ListElement {
+            title: "Statistics & Reporting"
+            route: "stats"
+            iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_stats.svg"
+        }
     }
 
     ColumnLayout {
@@ -55,7 +75,9 @@ Rectangle {
                 Layout.alignment: Qt.AlignLeft
             }
 
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+            }
         }
 
         // Divider
@@ -94,8 +116,14 @@ Rectangle {
                     visible: rowItem.isSelected
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "#3B82F6" }
-                        GradientStop { position: 1.0; color: "#D214FD" }
+                        GradientStop {
+                            position: 0.0
+                            color: Colors.gradientPrimaryStart
+                        }
+                        GradientStop {
+                            position: 1.0
+                            color: Colors.gradientPrimaryEnd
+                        }
                     }
                 }
 
@@ -113,7 +141,8 @@ Rectangle {
                     spacing: 12
 
                     Rectangle {
-                        width: 34; height: 34
+                        width: 34
+                        height: 34
                         radius: 12
                         color: rowItem.isSelected ? "#FFFFFF" : "#4F3B82F6"
                         border.width: 1
@@ -123,7 +152,8 @@ Rectangle {
                             id: iconImage
                             anchors.centerIn: parent
                             source: rowItem.iconSource
-                            width: 18; height: 18
+                            width: 18
+                            height: 18
                             fillMode: Image.PreserveAspectFit
                             visible: false
                         }
@@ -152,9 +182,9 @@ Rectangle {
                     id: mouse
                     anchors.fill: parent
                     hoverEnabled: true
-                    onClicked: {
-                        root.currentIndex = rowItem.index
-                        root.selected(rowItem.route)
+                    onClicked: () => {
+                        root.currentIndex = rowItem.index;
+                        root.selected(rowItem.route);
                     }
                 }
             }
@@ -202,7 +232,7 @@ Rectangle {
                         required property string hotkey
                         required property string imagePath
                         required property bool isActive
-                        
+
                         // Aliases for convenience
                         readonly property int boardId: id
                         readonly property string boardName: name
@@ -216,17 +246,17 @@ Rectangle {
                             anchors.fill: parent
                             hoverEnabled: true
                             acceptedButtons: Qt.LeftButton
-                            
-                            onClicked: {
+
+                            onClicked: () => {
                                 if (root.editingBoardId === -1) {
                                     // Select this soundboard (for viewing)
-                                    root.selectedBoardId = boardRow.boardId
-                                    root.soundboardSelected(boardRow.boardId)
+                                    root.selectedBoardId = boardRow.boardId;
+                                    root.soundboardSelected(boardRow.boardId);
                                 }
                             }
 
-                            onDoubleClicked: {
-                                root.editingBoardId = boardRow.boardId
+                            onDoubleClicked: () => {
+                                root.editingBoardId = boardRow.boardId;
                             }
                         }
 
@@ -236,11 +266,11 @@ Rectangle {
                             // Show selection highlight (blue border) or active state (filled) or hover
                             color: {
                                 if (root.selectedBoardId === boardRow.boardId) {
-                                    return "#1A3B82F6"  // Light blue for selected
+                                    return "#1A3B82F6";  // Light blue for selected
                                 } else if (mouse2.containsMouse) {
-                                    return "#232323"
+                                    return "#232323";
                                 } else {
-                                    return "transparent"
+                                    return "transparent";
                                 }
                             }
                             border.width: root.selectedBoardId === boardRow.boardId ? 1 : 0
@@ -257,7 +287,8 @@ Rectangle {
                             // radio indicator - clicking this activates the soundboard
                             Rectangle {
                                 id: radioIndicator
-                                width: 22; height: 22
+                                width: 22
+                                height: 22
                                 radius: 11
                                 border.width: 2
                                 border.color: boardRow.active ? "#D214FD" : "#5AFFFFFF"
@@ -265,7 +296,8 @@ Rectangle {
 
                                 Rectangle {
                                     anchors.centerIn: parent
-                                    width: 12; height: 12
+                                    width: 12
+                                    height: 12
                                     radius: 6
                                     visible: boardRow.active
                                     color: "#D214FD"
@@ -277,17 +309,18 @@ Rectangle {
                                     anchors.margins: -4  // Make clickable area slightly larger
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    
-                                    onClicked: {
-                                        console.log("Radio clicked - activating board:", boardRow.boardId)
-                                        soundboardsModel.activateById(boardRow.boardId)
+
+                                    onClicked: () => {
+                                        console.log("Radio clicked - activating board:", boardRow.boardId);
+                                        soundboardsModel.activateById(boardRow.boardId);
                                     }
                                 }
                             }
 
                             // Soundboard image - rounded corners with layer mask
                             Item {
-                                width: 44; height: 44
+                                width: 44
+                                height: 44
 
                                 Rectangle {
                                     id: imageMask
@@ -300,9 +333,7 @@ Rectangle {
                                     id: soundboardImg
                                     anchors.fill: parent
                                     fillMode: Image.PreserveAspectCrop
-                                    source: (boardRow.boardImage && boardRow.boardImage.length > 0)
-                                            ? boardRow.boardImage
-                                            : "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
+                                    source: (boardRow.boardImage && boardRow.boardImage.length > 0) ? boardRow.boardImage : "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
                                     visible: false
                                 }
 
@@ -311,13 +342,11 @@ Rectangle {
                                     anchors.fill: parent
                                     radius: 12
                                     color: "#141414"
-                                    
+
                                     Image {
                                         anchors.fill: parent
                                         fillMode: Image.PreserveAspectCrop
-                                        source: (boardRow.boardImage && boardRow.boardImage.length > 0)
-                                                ? boardRow.boardImage
-                                                : "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
+                                        source: boardRow.boardImage || "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
                                         layer.enabled: true
                                         layer.effect: MultiEffect {
                                             maskEnabled: true
@@ -360,50 +389,52 @@ Rectangle {
                                     selectByMouse: true
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 28
-                                    
+
                                     background: Rectangle {
                                         color: "#1A1A1A"
                                         radius: 6
                                         border.color: "#D214FD"
                                         border.width: 1
                                     }
-                                    
+
                                     color: "#FFFFFF"
                                     font.pixelSize: 14
                                     font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
-                                    
+
                                     // Prevent clicks from propagating
                                     MouseArea {
                                         anchors.fill: parent
                                         propagateComposedEvents: false
-                                        onPressed: (mouse) => { mouse.accepted = false }
+                                        onPressed: mouse => {
+                                            mouse.accepted = false;
+                                        }
                                     }
 
                                     // When this row becomes editable, focus + select all
                                     onVisibleChanged: {
                                         if (visible) {
-                                            text = boardRow.boardName
-                                            forceActiveFocus()
-                                            selectAll()
+                                            text = boardRow.boardName;
+                                            forceActiveFocus();
+                                            selectAll();
                                         }
                                     }
 
                                     // Commit rename when user finishes
                                     onEditingFinished: {
-                                        const newName = text.trim()
+                                        const newName = text.trim();
                                         if (newName.length > 0 && newName !== boardRow.boardName) {
-                                            soundboardService.renameBoard(boardRow.boardId, newName)
-                                            soundboardsModel.reload()
+                                            soundboardService.renameBoard(boardRow.boardId, newName);
+                                            soundboardsModel.reload();
                                         }
-                                        root.editingBoardId = -1
+                                        root.editingBoardId = -1;
                                     }
 
                                     Keys.onReturnPressed: {
-                                        focus = false
+                                        focus = false;
                                     }
                                     Keys.onEscapePressed: {
-                                        text = boardRow.boardName
-                                        root.editingBoardId = -1
+                                        text = boardRow.boardName;
+                                        root.editingBoardId = -1;
                                     }
                                 }
                             }
@@ -416,10 +447,16 @@ Rectangle {
                                 radius: 8
                                 visible: mouse2.containsMouse && root.editingBoardId !== boardRow.boardId
                                 z: 10  // Ensure it's on top
-                                
+
                                 gradient: Gradient {
-                                    GradientStop { position: 0.0; color: deleteBtnMouse.containsMouse ? "#FF3B30" : "#3A3A3A" }
-                                    GradientStop { position: 1.0; color: deleteBtnMouse.containsMouse ? "#FF6B60" : "#2A2A2A" }
+                                    GradientStop {
+                                        position: 0.0
+                                        color: deleteBtnMouse.containsMouse ? "#FF3B30" : "#3A3A3A"
+                                    }
+                                    GradientStop {
+                                        position: 1.0
+                                        color: deleteBtnMouse.containsMouse ? "#FF6B60" : "#2A2A2A"
+                                    }
                                 }
 
                                 Text {
@@ -434,31 +471,32 @@ Rectangle {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     propagateComposedEvents: false
-                                    
-                                    onClicked: (mouse) => {
-                                        mouse.accepted = true
-                                        console.log("Delete clicked for board:", boardRow.boardId, boardRow.boardName)
-                                        deleteConfirmDialog.boardIdToDelete = boardRow.boardId
-                                        deleteConfirmDialog.boardNameToDelete = boardRow.boardName
-                                        deleteConfirmDialog.open()
+
+                                    onClicked: mouse => {
+                                        mouse.accepted = true;
+                                        console.log("Delete clicked for board:", boardRow.boardId, boardRow.boardName);
+                                        deleteConfirmDialog.boardIdToDelete = boardRow.boardId;
+                                        deleteConfirmDialog.boardNameToDelete = boardRow.boardName;
+                                        deleteConfirmDialog.open();
                                     }
                                 }
 
                                 Behavior on opacity {
-                                    NumberAnimation { duration: 150 }
+                                    NumberAnimation {
+                                        duration: 150
+                                    }
                                 }
                             }
                         }
-
                     }
                 }
             }
 
-            // Add audio button - matches design
+            // Add Soundboard button - matches design
             Button {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 48
-                text: "Add audio"
+                text: "Add Soundboard"
 
                 background: Rectangle {
                     radius: 12
@@ -473,7 +511,8 @@ Rectangle {
 
                     // Plus icon in rounded square
                     Rectangle {
-                        width: 52; height: 36
+                        width: 52
+                        height: 36
                         radius: 8
                         color: "#4F3B3B"
 
@@ -487,7 +526,7 @@ Rectangle {
                     }
 
                     Text {
-                        text: "Add audio"
+                        text: "Add Soundboard"
                         color: "#FFFFFF"
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
                         font.pixelSize: 14
@@ -498,21 +537,20 @@ Rectangle {
 
                 onClicked: {
                     // Create immediately with a placeholder name
-                    const newId = soundboardService.createBoard("New Soundboard")
-                    root.editingBoardId = newId
+                    const newId = soundboardService.createBoard("New Soundboard");
+                    root.editingBoardId = newId;
 
                     // Refresh model (usually boardsChanged triggers reload automatically,
                     // but calling reload makes it immediate)
-                    soundboardsModel.reload()
+                    soundboardsModel.reload();
 
                     // Scroll to the new one and start editing
-                    const row = soundboardsModel.rowForId(newId)
+                    const row = soundboardsModel.rowForId(newId);
                     if (row >= 0) {
-                        boardsList.positionViewAtIndex(row, ListView.End)
+                        boardsList.positionViewAtIndex(row, ListView.End);
                         // Focus happens automatically when the TextField becomes visible
                     }
                 }
-
             }
         }
     }
@@ -526,12 +564,12 @@ Rectangle {
         anchors.centerIn: parent
         width: 300
         padding: 20
-        
+
         property int boardIdToDelete: -1
         property string boardNameToDelete: ""
-        
-        onOpened: {
-            console.log("Dialog opened for deleting board:", boardIdToDelete, boardNameToDelete)
+
+        onOpened: () => {
+            console.log("Dialog opened for deleting board:", boardIdToDelete, boardNameToDelete);
         }
 
         background: Rectangle {
@@ -560,7 +598,7 @@ Rectangle {
                 Button {
                     text: "Cancel"
                     onClicked: deleteConfirmDialog.close()
-                    
+
                     background: Rectangle {
                         color: parent.hovered ? "#444444" : "#333333"
                         radius: 8
@@ -577,14 +615,14 @@ Rectangle {
 
                 Button {
                     text: "Delete"
-                    onClicked: {
-                        console.log("Deleting board:", deleteConfirmDialog.boardIdToDelete)
-                        const result = soundboardService.deleteBoard(deleteConfirmDialog.boardIdToDelete)
-                        console.log("Delete result:", result)
-                        soundboardsModel.reload()
-                        deleteConfirmDialog.close()
+                    onClicked: () => {
+                        console.log("Deleting board:", deleteConfirmDialog.boardIdToDelete);
+                        const result = soundboardService.deleteBoard(deleteConfirmDialog.boardIdToDelete);
+                        console.log("Delete result:", result);
+                        soundboardsModel.reload();
+                        deleteConfirmDialog.close();
                     }
-                    
+
                     background: Rectangle {
                         color: parent.hovered ? "#FF3333" : "#FF4444"
                         radius: 8

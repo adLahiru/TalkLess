@@ -83,6 +83,10 @@ QVariant ClipsListModel::data(const QModelIndex& index, int role) const
         return c.trimStartMs;
     case TrimEndMsRole:
         return c.trimEndMs;
+    case VolumeRole:
+        return c.volume;
+    case SpeedRole:
+        return c.speed;
     case IsPlayingRole:
         return c.isPlaying;
     case IsRepeatRole:
@@ -106,6 +110,8 @@ QHash<int, QByteArray> ClipsListModel::roleNames() const
         {      TitleRole,     "clipTitle"},
         {TrimStartMsRole,   "trimStartMs"},
         {  TrimEndMsRole,     "trimEndMs"},
+        {     VolumeRole,   "clipVolume"},
+        {      SpeedRole,    "clipSpeed"},
         {  IsPlayingRole, "clipIsPlaying"},
         {   IsRepeatRole,      "isRepeat"},
         {     LockedRole,        "locked"},
@@ -200,4 +206,63 @@ bool ClipsListModel::updateClipImage(int clipId, const QString& imagePath)
         emit clipsChanged();
     }
     return success;
+}
+
+bool ClipsListModel::updateClipAudioSettings(int clipId, int volume, double speed)
+{
+    if (!m_service || m_boardId < 0)
+        return false;
+
+    bool success = m_service->updateClipAudioSettings(m_boardId, clipId, volume, speed);
+    if (success) {
+        // Update cache and emit dataChanged for the specific row
+        for (int i = 0; i < m_cache.size(); ++i) {
+            if (m_cache[i].id == clipId) {
+                m_cache[i].volume = volume;
+                m_cache[i].speed = speed;
+
+                // Emit dataChanged for the specific row and roles
+                QModelIndex idx = index(i, 0);
+                emit dataChanged(idx, idx, {VolumeRole, SpeedRole});
+                break;
+            }
+        }
+    }
+    return success;
+}
+
+void ClipsListModel::setClipVolume(int clipId, int volume)
+{
+    if (!m_service || m_boardId < 0)
+        return;
+
+    m_service->setClipVolume(m_boardId, clipId, volume);
+
+    // Update cache
+    for (int i = 0; i < m_cache.size(); ++i) {
+        if (m_cache[i].id == clipId) {
+            m_cache[i].volume = volume;
+            QModelIndex idx = index(i, 0);
+            emit dataChanged(idx, idx, {VolumeRole});
+            break;
+        }
+    }
+}
+
+void ClipsListModel::setClipRepeat(int clipId, bool repeat)
+{
+    if (!m_service || m_boardId < 0)
+        return;
+
+    m_service->setClipRepeat(m_boardId, clipId, repeat);
+
+    // Update cache
+    for (int i = 0; i < m_cache.size(); ++i) {
+        if (m_cache[i].id == clipId) {
+            m_cache[i].isRepeat = repeat;
+            QModelIndex idx = index(i, 0);
+            emit dataChanged(idx, idx, {IsRepeatRole});
+            break;
+        }
+    }
 }

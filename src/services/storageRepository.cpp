@@ -85,6 +85,10 @@ static QJsonObject clipToJson(const Clip& c)
     o["trimStartMs"] = static_cast<qint64>(c.trimStartMs);
     o["trimEndMs"] = static_cast<qint64>(c.trimEndMs);
 
+    // Per-clip audio settings
+    o["volume"] = c.volume;
+    o["speed"] = c.speed;
+
     o["title"] = c.title;
     o["isRepeat"] = c.isRepeat;
 
@@ -105,6 +109,10 @@ static Clip clipFromJson(const QJsonObject& o)
 
     c.trimStartMs = o.value("trimStartMs").toVariant().toLongLong();
     c.trimEndMs = o.value("trimEndMs").toVariant().toLongLong();
+
+    // Per-clip audio settings (with defaults)
+    c.volume = o.value("volume").toInt(100);
+    c.speed = o.value("speed").toDouble(1.0);
 
     c.title = o.value("title").toString();
     c.isRepeat = o.value("isRepeat").toBool(false);

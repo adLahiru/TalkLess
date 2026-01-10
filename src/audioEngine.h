@@ -146,7 +146,7 @@ private:
     void processMonitorAudio(void* output, ma_uint32 frameCount, ma_uint32 playbackChannels);
 
            // Decoder thread
-    static void decoderThreadFunc(ClipSlot* slot, int slotId);
+    static void decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slotId);
 
            // Helpers
     bool initContext();

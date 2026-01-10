@@ -9,6 +9,8 @@
 #include <QJsonValue>
 #include <QUrl>
 
+#include <cmath>
+
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
     // Initialize audio engine
@@ -58,7 +60,33 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
                  << "dB, Mic:" << m_state.settings.micGainDb << "dB";
     }
 
-    // 5) Notify UI
+    // 5) Setup AudioEngine callbacks
+    if (m_audioEngine) {
+        m_audioEngine->setClipFinishedCallback([this](int slotId) {
+            // Find which clipId was in this slot
+            int finishedClipId = -1;
+            for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it) {
+                if (it.value() == slotId) {
+                    finishedClipId = it.key();
+                    break;
+                }
+            }
+
+            if (finishedClipId != -1) {
+                // Update state on the main thread
+                QMetaObject::invokeMethod(this, [this, finishedClipId]() {
+                    Clip* clip = findActiveClipById(finishedClipId);
+                    if (clip) {
+                        clip->isPlaying = false;
+                        emit activeClipsChanged();
+                    }
+                    emit clipPlaybackStopped(finishedClipId);
+                }, Qt::QueuedConnection);
+            }
+        });
+    }
+
+    // 6) Notify UI
     emit boardsChanged();
     emit activeBoardChanged();
     emit activeClipsChanged();
@@ -532,6 +560,115 @@ bool SoundboardService::updateClipImage(int boardId, int clipId, const QString& 
     return false;
 }
 
+bool SoundboardService::updateClipAudioSettings(int boardId, int clipId, int volume, double speed)
+{
+    // Clamp values to valid ranges
+    volume = std::max(0, std::min(100, volume));
+    speed = std::max(0.5, std::min(2.0, speed));
+
+    // Active board update
+    if (m_active && m_active->id == boardId) {
+        for (auto& c : m_active->clips) {
+            if (c.id != clipId)
+                continue;
+            if (c.locked)
+                return false;
+
+            // Update volume and speed
+            c.volume = volume;
+            c.speed = speed;
+
+            // Apply to audio engine if clip is loaded
+            if (m_clipIdToSlot.contains(clipId) && m_audioEngine) {
+                int slotId = m_clipIdToSlot[clipId];
+                // Convert volume (0-100) to dB gain (-60 to 0)
+                float gainDb = (volume <= 0) ? -60.0f : 20.0f * std::log10(volume / 100.0f);
+                m_audioEngine->setClipGain(slotId, gainDb);
+                // Note: Speed changes would require reloading the clip with pitch shift
+                // This is a placeholder for future implementation
+            }
+
+            emit activeClipsChanged();
+            return saveActive();
+        }
+        return false;
+    }
+
+    // Inactive board update
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded)
+        return false;
+
+    Soundboard b = *loaded;
+    for (auto& c : b.clips) {
+        if (c.id != clipId)
+            continue;
+
+        // Update volume and speed
+        c.volume = volume;
+        c.speed = speed;
+
+        const bool ok = m_repo.saveBoard(b);
+        if (ok) {
+            m_state = m_repo.loadIndex();
+            emit boardsChanged();
+        }
+        return ok;
+    }
+    return false;
+}
+
+void SoundboardService::setClipVolume(int boardId, int clipId, int volume)
+{
+    // Clamp volume to valid range
+    volume = std::max(0, std::min(100, volume));
+
+    // Only apply to active board (real-time, no save)
+    if (!m_active || m_active->id != boardId)
+        return;
+
+    for (auto& c : m_active->clips) {
+        if (c.id != clipId)
+            continue;
+
+        // Update in-memory volume
+        c.volume = volume;
+
+        // Apply to audio engine if clip is loaded
+        if (m_clipIdToSlot.contains(clipId) && m_audioEngine) {
+            int slotId = m_clipIdToSlot[clipId];
+            // Convert volume (0-100) to dB gain (-60 to 0)
+            float gainDb = (volume <= 0) ? -60.0f : 20.0f * std::log10(volume / 100.0f);
+            m_audioEngine->setClipGain(slotId, gainDb);
+        }
+
+        emit activeClipsChanged();
+        return;
+    }
+}
+
+void SoundboardService::setClipRepeat(int boardId, int clipId, bool repeat)
+{
+    // Active board update
+    if (m_active && m_active->id == boardId) {
+        for (auto& c : m_active->clips) {
+            if (c.id != clipId)
+                continue;
+
+            c.isRepeat = repeat;
+
+            // Apply to audio engine if clip is loaded
+            if (m_clipIdToSlot.contains(clipId) && m_audioEngine) {
+                m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], repeat);
+            }
+
+            emit activeClipsChanged();
+            saveActive();  // Persist the change
+            return;
+        }
+    }
+}
+
 bool SoundboardService::moveClip(int boardId, int fromIndex, int toIndex)
 {
     // Validate indices
@@ -570,6 +707,35 @@ bool SoundboardService::moveClip(int boardId, int fromIndex, int toIndex)
         emit boardsChanged();
     }
     return ok;
+}
+
+void SoundboardService::copyClip(int clipId)
+{
+    Clip* clip = findActiveClipById(clipId);
+    if (clip) {
+        m_clipboardClip = *clip;
+        qDebug() << "Copied clip:" << clip->title;
+        emit clipboardChanged();
+    }
+}
+
+bool SoundboardService::pasteClip(int boardId)
+{
+    if (!m_clipboardClip)
+        return false;
+
+    Clip draft = *m_clipboardClip;
+    // Clear hotkey and ID for the new copy
+    draft.hotkey = "";
+    draft.id = -1;
+
+    qDebug() << "Pasting clip:" << draft.title << "to board:" << boardId;
+    return addClipToBoard(boardId, draft);
+}
+
+bool SoundboardService::canPaste() const
+{
+    return m_clipboardClip.has_value();
 }
 
 int SoundboardService::createBoard(const QString& name)
@@ -681,6 +847,11 @@ void SoundboardService::playClip(int clipId)
         qWarning() << "Failed to load clip:" << clip->filePath;
         return;
     }
+
+    // Apply clip's audio settings
+    float gainDb = (clip->volume <= 0) ? -60.0f : 20.0f * std::log10(clip->volume / 100.0f);
+    m_audioEngine->setClipGain(slotId, gainDb);
+    m_audioEngine->setClipLoop(slotId, clip->isRepeat);
 
     // Play the clip
     m_audioEngine->playClip(slotId);

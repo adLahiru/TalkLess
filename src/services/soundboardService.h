@@ -40,6 +40,7 @@ public:
         bool micPassthroughEnabled READ isMicPassthroughEnabled WRITE setMicPassthroughEnabled NOTIFY settingsChanged)
     Q_PROPERTY(
         float micSoundboardBalance READ getMicSoundboardBalance WRITE setMicSoundboardBalance NOTIFY settingsChanged)
+    Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
 
     // ---- Index / Settings ----
     double masterGainDb() const { return m_state.settings.masterGainDb; }
@@ -96,7 +97,13 @@ public:
     Q_INVOKABLE bool updateClipInBoard(int boardId, int clipId, const QString& title, const QString& hotkey,
                                        const QStringList& tags);
     Q_INVOKABLE bool updateClipImage(int boardId, int clipId, const QString& imagePath);
+    Q_INVOKABLE bool updateClipAudioSettings(int boardId, int clipId, int volume, double speed);
+    Q_INVOKABLE void setClipVolume(int boardId, int clipId, int volume);  // Real-time volume (no save)
+    Q_INVOKABLE void setClipRepeat(int boardId, int clipId, bool repeat); // Toggle repeat mode
     Q_INVOKABLE bool moveClip(int boardId, int fromIndex, int toIndex); // Reorder clips with drag-drop
+    Q_INVOKABLE void copyClip(int clipId);                              // Copy clip to internal clipboard
+    Q_INVOKABLE bool pasteClip(int boardId);                             // Paste clip from clipboard to target board
+    Q_INVOKABLE bool canPaste() const;                                  // Check if clipboard has a clip
     QVector<Clip> getClipsForBoard(int boardId) const;                  // Get all clips for a board
     QVector<Clip> getActiveClips() const;                               // Get clips from active board
 
@@ -147,6 +154,7 @@ signals:
 
     // Emitted when play-selected hotkey is pressed - QML handles this since it knows selected clip
     void playSelectedRequested();
+    void clipboardChanged();
 
 private:
     void rebuildHotkeyIndex();
@@ -166,4 +174,6 @@ private:
     std::unique_ptr<AudioEngine> m_audioEngine;
     QHash<int, int> m_clipIdToSlot; // clipId -> audio engine slot
     int m_nextSlot = 0;             // next available slot
+
+    std::optional<Clip> m_clipboardClip; // Internal clipboard for copy/paste
 };

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import QtQuick.Controls
 import QtQuick.Layouts
 import "qml/components"
@@ -6,7 +7,7 @@ import "qml/pages"
 
 ApplicationWindow {
     id: mainWindow
-    
+
     width: 1280
     height: 800
     minimumWidth: 800
@@ -17,44 +18,46 @@ ApplicationWindow {
     title: qsTr("TalkLess")
     color: '#000000'
 
+    property bool isSoundboardDetached: false
+
     // ---- Hotkey Capture Popup ----
     HotkeyCapturePopup {
         id: hotkeyCapturePopup
-        
-        onHotkeyConfirmed: function(hotkeyText) {
-            hotkeyManager.applyCapturedHotkey(hotkeyText)
+
+        onHotkeyConfirmed: function (hotkeyText) {
+            hotkeyManager.applyCapturedHotkey(hotkeyText);
         }
-        
+
         onCancelled: {
-            hotkeyManager.cancelCapture()
+            hotkeyManager.cancelCapture();
         }
     }
-    
+
     // Connect to hotkeyManager signals
     Connections {
         target: hotkeyManager
-        
+
         function onRequestCapture(title) {
-            hotkeyCapturePopup.title = title
-            hotkeyCapturePopup.open()
+            hotkeyCapturePopup.title = title;
+            hotkeyCapturePopup.open();
         }
-        
+
         function onShowMessageSignal(text) {
-            toastMessage.text = text
-            toastMessage.show()
+            toastMessage.text = text;
+            toastMessage.show();
         }
     }
-    
+
     // ---- Toast Notification ----
     Rectangle {
         id: toastMessage
         property string text: ""
-        
+
         function show() {
-            opacity = 1.0
-            toastTimer.restart()
+            opacity = 1.0;
+            toastTimer.restart();
         }
-        
+
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 60
@@ -66,11 +69,14 @@ ApplicationWindow {
         border.color: "#333333"
         opacity: 0
         z: 999
-        
+
         Behavior on opacity {
-            NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
+            NumberAnimation {
+                duration: 200
+                easing.type: Easing.OutQuad
+            }
         }
-        
+
         Text {
             id: toastText
             anchors.centerIn: parent
@@ -79,7 +85,7 @@ ApplicationWindow {
             font.pixelSize: 14
             font.weight: Font.Medium
         }
-        
+
         Timer {
             id: toastTimer
             interval: 3000
@@ -90,8 +96,6 @@ ApplicationWindow {
     ColumnLayout {
         anchors.fill: parent
         spacing: 10
-
-       
 
         // Main content row (sidebar + pages)
         RowLayout {
@@ -104,32 +108,32 @@ ApplicationWindow {
                 Layout.preferredWidth: 280
                 Layout.fillHeight: true
 
-                onSelected: (route) => {
-                    console.log("Selected route:", route)
-                    switch(route) {
-                        case "soundboard":
-                            contentStack.currentIndex = 0
-                            break
-                        case "engine":
-                            contentStack.currentIndex = 1
-                            break
-                        case "macros":
-                            contentStack.currentIndex = 2
-                            break
-                        case "settings":
-                            contentStack.currentIndex = 3
-                            break
-                        case "stats":
-                            contentStack.currentIndex = 4
-                            break
+                onSelected: route => {
+                    console.log("Selected route:", route);
+                    switch (route) {
+                    case "soundboard":
+                        contentStack.currentIndex = 0;
+                        break;
+                    case "engine":
+                        contentStack.currentIndex = 1;
+                        break;
+                    case "macros":
+                        contentStack.currentIndex = 2;
+                        break;
+                    case "settings":
+                        contentStack.currentIndex = 3;
+                        break;
+                    case "stats":
+                        contentStack.currentIndex = 4;
+                        break;
                     }
                 }
 
                 // When a soundboard is selected, load its clips
-                onSoundboardSelected: (boardId) => {
-                    console.log("Soundboard selected:", boardId)
-                    clipsModel.boardId = boardId
-                    clipsModel.reload()
+                onSoundboardSelected: boardId => {
+                    console.log("Soundboard selected:", boardId);
+                    clipsModel.boardId = boardId;
+                    clipsModel.reload();
                 }
             }
 
@@ -153,7 +157,65 @@ ApplicationWindow {
                     currentIndex: 0
 
                     // Soundboard Page
-                    SoundboardView {
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+
+                        SoundboardView {
+                            id: internalSoundboardView
+                            anchors.fill: parent
+                            isDetached: mainWindow.isSoundboardDetached
+                            visible: !mainWindow.isSoundboardDetached
+
+                            onRequestDetach: {
+                                mainWindow.isSoundboardDetached = true;
+                            }
+                            onRequestDock: {
+                                mainWindow.isSoundboardDetached = false;
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            visible: mainWindow.isSoundboardDetached
+                            color: "#0d0d0d"
+                            radius: 10
+
+                            ColumnLayout {
+                                anchors.centerIn: parent
+                                spacing: 20
+
+                                Text {
+                                    text: "Soundboard Detached"
+                                    color: "#666666"
+                                    font.pixelSize: 24
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                Rectangle {
+                                    width: 180
+                                    height: 44
+                                    radius: 10
+                                    color: "#1F1F1F"
+                                    border.color: "#333333"
+                                    Layout.alignment: Qt.AlignHCenter
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "Re-dock Soundboard"
+                                        color: "#FFFFFF"
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            mainWindow.isSoundboardDetached = false;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Audio Playback Engine (placeholder)
@@ -181,8 +243,7 @@ ApplicationWindow {
                     }
 
                     // Application Settings
-                    ApplicationSettingsView {
-                    }
+                    ApplicationSettingsView {}
 
                     // Statistics & Reporting (placeholder)
                     Rectangle {
@@ -220,7 +281,7 @@ ApplicationWindow {
             interval: 250  // Show splash for 2.5 seconds
             running: true
             onTriggered: {
-                splashFadeOut.start()
+                splashFadeOut.start();
             }
         }
 
@@ -232,6 +293,29 @@ ApplicationWindow {
             to: 0.0
             duration: 500  // 0.5 second fade out
             easing.type: Easing.OutQuad
+        }
+    }
+
+    // ---- Detached Soundboard Window ----
+    Window {
+        id: detachedSoundboardWindow
+        title: "Soundboard - Detached"
+        width: 1000
+        height: 700
+        visible: mainWindow.isSoundboardDetached
+        color: "#000000"
+
+        onClosing: {
+            mainWindow.isSoundboardDetached = false;
+        }
+
+        SoundboardView {
+            anchors.fill: parent
+            isDetached: true
+
+            onRequestDock: {
+                mainWindow.isSoundboardDetached = false;
+            }
         }
     }
 }

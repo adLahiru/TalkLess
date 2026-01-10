@@ -17,6 +17,10 @@ struct Clip
     qint64 trimStartMs = 0;   // seek start
     qint64 trimEndMs   = 0;   // stop at end (0 = no end limit)
 
+    // Per-clip audio settings
+    int volume = 100;         // 0-100 percentage
+    double speed = 1.0;       // 0.5 - 2.0 playback speed
+
     QString title;
 
     bool isPlaying = false;   // UI state

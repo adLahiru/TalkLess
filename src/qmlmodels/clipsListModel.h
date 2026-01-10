@@ -22,6 +22,8 @@ public:
         TitleRole,
         TrimStartMsRole,
         TrimEndMsRole,
+        VolumeRole,
+        SpeedRole,
         IsPlayingRole,
         IsRepeatRole,
         LockedRole,
@@ -50,6 +52,9 @@ public:
     Q_INVOKABLE void loadActiveBoard(); // Load clips from the currently active board
     Q_INVOKABLE bool updateClip(int clipId, const QString& title, const QString& hotkey, const QStringList& tags);
     Q_INVOKABLE bool updateClipImage(int clipId, const QString& imagePath);
+    Q_INVOKABLE bool updateClipAudioSettings(int clipId, int volume, double speed);
+    Q_INVOKABLE void setClipVolume(int clipId, int volume);  // Real-time volume update
+    Q_INVOKABLE void setClipRepeat(int clipId, bool repeat); // Toggle repeat mode
 
 signals:
     void boardIdChanged();

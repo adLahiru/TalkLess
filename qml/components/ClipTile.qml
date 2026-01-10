@@ -18,11 +18,12 @@ Item {
     property bool isPlaying: false  // Track playback state
 
     // actions
-    signal playClicked()
-    signal stopClicked()
-    signal copyClicked()
-    signal clicked()
-    signal editBackgroundClicked()
+    signal playClicked
+    signal stopClicked
+    signal copyClicked
+    signal clicked
+    signal editBackgroundClicked
+    signal hotkeyClicked
 
     Rectangle {
         id: card
@@ -168,14 +169,16 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: function(mouse) {
-                    root.editBackgroundClicked()
-                    mouse.accepted = true
+                onClicked: function (mouse) {
+                    root.editBackgroundClicked();
+                    mouse.accepted = true;
                 }
             }
 
             Behavior on color {
-                ColorAnimation { duration: 150 }
+                ColorAnimation {
+                    duration: 150
+                }
             }
         }
 
@@ -225,27 +228,46 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: function(mouse) {
+                        onClicked: function (mouse) {
                             if (root.isPlaying) {
-                                root.stopClicked()
+                                root.stopClicked();
                             } else {
-                                root.playClicked()
+                                root.playClicked();
                             }
-                            mouse.accepted = true
+                            mouse.accepted = true;
                         }
                     }
                 }
 
-                // Hotkey text - centered
-                Text {
+                // Hotkey container
+                Rectangle {
                     Layout.fillWidth: true
-                    text: root.hotkeyText
-                    color: "#FFFFFF"
-                    font.pixelSize: 13
-                    font.weight: Font.Medium
-                    elide: Text.ElideRight
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
+                    Layout.preferredHeight: 20
+                    color: root.hotkeyText !== "" ? "rgba(0, 0, 0, 0.4)" : "rgba(60, 123, 255, 0.15)"
+                    radius: 4
+                    border.color: root.hotkeyText !== "" ? "transparent" : "rgba(60, 123, 255, 0.3)"
+                    border.width: root.hotkeyText !== "" ? 0 : 1
+
+                    Text {
+                        id: hotkeyDisplayText
+                        anchors.fill: parent
+                        text: root.hotkeyText !== "" ? root.hotkeyText : "Assign"
+                        color: root.hotkeyText !== "" ? "#FFFFFF" : "#3C7BFF"
+                        font.pixelSize: 12
+                        font.weight: root.hotkeyText !== "" ? Font.Medium : Font.DemiBold
+                        elide: Text.ElideRight
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: function (mouse) {
+                                root.hotkeyClicked();
+                                mouse.accepted = true;
+                            }
+                        }
+                    }
                 }
 
                 // Copy/Menu button
@@ -265,9 +287,9 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: function(mouse) {
-                            root.copyClicked()
-                            mouse.accepted = true
+                        onClicked: function (mouse) {
+                            root.copyClicked();
+                            mouse.accepted = true;
                         }
                     }
                 }
@@ -278,8 +300,33 @@ Item {
         MouseArea {
             anchors.fill: parent
             z: -1  // Lower z so buttons get clicks first
-            onClicked: root.clicked()
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onClicked: function (mouse) {
+                if (mouse.button === Qt.RightButton) {
+                    clipContextMenu.popup();
+                } else {
+                    root.clicked();
+                }
+            }
             cursorShape: Qt.PointingHandCursor
+        }
+
+        Menu {
+            id: clipContextMenu
+            MenuItem {
+                text: "Copy Clip"
+                onTriggered: root.copyClicked()
+            }
+            MenuItem {
+                text: "Paste Clip"
+                enabled: soundboardService.canPaste
+                onTriggered: {
+                    const bId = clipsModel.boardId;
+                    if (bId !== -1 && soundboardService.pasteClip(bId)) {
+                        clipsModel.reload();
+                    }
+                }
+            }
         }
     }
 }

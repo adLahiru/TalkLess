@@ -282,7 +282,7 @@ void AudioEngine::processMonitorAudio(void* output, ma_uint32 frameCount, ma_uin
 // DECODER THREAD (fills ringBufferMain always, ringBufferMon best-effort)
 // ============================================================================
 
-void AudioEngine::decoderThreadFunc(ClipSlot* slot, int slotId)
+void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slotId)
 {
     const std::string filepath = slot->filePath;
     if (filepath.empty()) {
@@ -370,6 +370,11 @@ void AudioEngine::decoderThreadFunc(ClipSlot* slot, int slotId)
 
     if (naturalEnd) {
         std::cout << "Clip finished slot " << slotId << "\n";
+        
+        std::lock_guard<std::mutex> lock(engine->callbackMutex);
+        if (engine->clipFinishedCallback) {
+            engine->clipFinishedCallback(slotId);
+        }
     }
 }
 
@@ -437,7 +442,7 @@ void AudioEngine::playClip(int slotId)
     ma_pcm_rb_reset(&slot.ringBufferMon);
 
     slot.state.store(ClipState::Playing, std::memory_order_release);
-    slot.decoderThread = std::thread(decoderThreadFunc, &slot, slotId);
+    slot.decoderThread = std::thread(decoderThreadFunc, this, &slot, slotId);
 }
 
 void AudioEngine::stopClip(int slotId)
