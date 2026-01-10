@@ -14,8 +14,8 @@ struct Clip
     QStringList tags;
 
 
-    qint64 trimStartMs = 0.0;   // seek start
-    qint64 trimEndMs   = 0.0;   // stop at end (0 = no end limit)
+    double trimStartMs = 0.0;   // seek start
+    double trimEndMs   = 0.0;   // stop at end (0 = no end limit)
 
     // Per-clip audio settings
     int volume = 100;         // 0-100 percentage

@@ -616,6 +616,24 @@ double AudioEngine::getClipPlaybackPositionMs(int slotId) const
     return startMs + elapsedMs;
 }
 
+double AudioEngine::getFileDuration(const std::string& filepath)
+{
+    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, 48000);
+    ma_decoder dec;
+    double duration = -1.0;
+
+    if (ma_decoder_init_file(filepath.c_str(), &cfg, &dec) == MA_SUCCESS) {
+        ma_uint64 totalFrames = 0;
+        if (ma_decoder_get_length_in_pcm_frames(&dec, &totalFrames) == MA_SUCCESS &&
+            dec.outputSampleRate > 0) {
+            duration = static_cast<double>(totalFrames) / static_cast<double>(dec.outputSampleRate);
+        }
+        ma_decoder_uninit(&dec);
+    }
+
+    return duration;
+}
+
 void AudioEngine::pauseClip(int slotId)
 {
     if (slotId < 0 || slotId >= MAX_CLIPS) return;

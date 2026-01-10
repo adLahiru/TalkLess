@@ -91,6 +91,7 @@ public:
     bool isClipPaused(int slotId) const;
     void unloadClip(int slotId);
     double getClipPlaybackPositionMs(int slotId) const;
+    double getFileDuration(const std::string& filepath);
 
            // Microphone gain
     void setMicGainDB(float gainDB);

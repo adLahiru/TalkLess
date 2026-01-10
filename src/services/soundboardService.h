@@ -113,6 +113,7 @@ public:
     Q_INVOKABLE bool canPaste() const;                                  // Check if clipboard has a clip
     QVector<Clip> getClipsForBoard(int boardId) const;                  // Get all clips for a board
     QVector<Clip> getActiveClips() const;                               // Get clips from active board
+    Q_INVOKABLE QVariantMap getClipData(int boardId, int clipId) const;  // Get full clip data as map
 
     // ---- Playback controls ----
     Q_INVOKABLE void clipClicked(int clipId);   // Handle clip tile click: select + play with mode logic
@@ -162,6 +163,7 @@ signals:
     void settingsChanged();
     void clipPlaybackStarted(int clipId);
     void clipPlaybackStopped(int clipId);
+    void clipUpdated(int boardId, int clipId);
 
     // Emitted when play-selected hotkey is pressed - QML handles this since it knows selected clip
     void playSelectedRequested();

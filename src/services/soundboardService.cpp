@@ -247,6 +247,78 @@ QVector<Clip> SoundboardService::getClipsForBoard(int boardId) const
     return loaded->clips;
 }
 
+QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
+{
+    const Clip* clip = nullptr;
+    if (m_active && m_active->id == boardId) {
+        for (const auto& c : m_active->clips) {
+            if (c.id == clipId) {
+                clip = &c;
+                break;
+            }
+        }
+    } else {
+        auto loaded = m_repo.loadBoard(boardId);
+        if (loaded) {
+            for (const auto& c : loaded->clips) {
+                if (c.id == clipId) {
+                    QVariantMap map;
+                    map["id"] = c.id;
+                    map["title"] = c.title;
+                    map["filePath"] = c.filePath;
+                    map["imgPath"] = c.imgPath;
+                    map["hotkey"] = c.hotkey;
+                    map["volume"] = c.volume;
+                    map["speed"] = c.speed;
+                    map["isPlaying"] = isClipPlaying(c.id);
+                    map["isRepeat"] = c.isRepeat;
+                    map["tags"] = c.tags;
+                    map["reproductionMode"] = c.reproductionMode;
+                    map["stopOtherSounds"] = c.stopOtherSounds;
+                    map["muteOtherSounds"] = c.muteOtherSounds;
+                    map["muteMicDuringPlayback"] = c.muteMicDuringPlayback;
+                    double duration = c.durationSec;
+                    if (duration <= 0.0 && m_audioEngine) {
+                        duration = m_audioEngine->getFileDuration(c.filePath.toStdString());
+                    }
+                    map["durationSec"] = duration;
+                    map["trimStartMs"] = c.trimStartMs;
+                    map["trimEndMs"] = c.trimEndMs;
+                    return map;
+                }
+            }
+        }
+    }
+
+    if (clip) {
+        QVariantMap map;
+        map["id"] = clip->id;
+        map["title"] = clip->title;
+        map["filePath"] = clip->filePath;
+        map["imgPath"] = clip->imgPath;
+        map["hotkey"] = clip->hotkey;
+        map["volume"] = clip->volume;
+        map["speed"] = clip->speed;
+        map["isPlaying"] = isClipPlaying(clip->id);
+        map["isRepeat"] = clip->isRepeat;
+        map["tags"] = clip->tags;
+        map["reproductionMode"] = clip->reproductionMode;
+        map["stopOtherSounds"] = clip->stopOtherSounds;
+        map["muteOtherSounds"] = clip->muteOtherSounds;
+        map["muteMicDuringPlayback"] = clip->muteMicDuringPlayback;
+        double duration = clip->durationSec;
+        if (duration <= 0.0 && m_audioEngine) {
+            duration = m_audioEngine->getFileDuration(clip->filePath.toStdString());
+        }
+        map["durationSec"] = duration;
+        map["trimStartMs"] = clip->trimStartMs;
+        map["trimEndMs"] = clip->trimEndMs;
+        return map;
+    }
+
+    return {};
+}
+
 bool SoundboardService::setClipPlaying(int clipId, bool playing)
 {
     Clip* c = findActiveClipById(clipId);
@@ -368,6 +440,11 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
             maxId = std::max(maxId, x.id);
         c.id = maxId + 1;
 
+        // Get duration
+        if (m_audioEngine) {
+            c.durationSec = m_audioEngine->getFileDuration(c.filePath.toStdString());
+        }
+
         m_active->clips.push_back(c);
         rebuildHotkeyIndex();
 
@@ -392,6 +469,11 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
     for (const auto& x : b.clips)
         maxId = std::max(maxId, x.id);
     c.id = maxId + 1;
+
+    // Get duration
+    if (m_audioEngine) {
+        c.durationSec = m_audioEngine->getFileDuration(c.filePath.toStdString());
+    }
 
     b.clips.push_back(c);
 
@@ -479,6 +561,7 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const QString
 
             rebuildHotkeyIndex();
             emit activeClipsChanged();
+            emit clipUpdated(boardId, clipId);
             return saveActive();
         }
         return false;
@@ -529,6 +612,7 @@ bool SoundboardService::updateClipImage(int boardId, int clipId, const QString& 
             c.imgPath = localPath;
 
             emit activeClipsChanged();
+            emit clipUpdated(boardId, clipId);
             return saveActive();
         }
         return false;
@@ -640,6 +724,7 @@ void SoundboardService::setClipVolume(int boardId, int clipId, int volume)
         }
 
         emit activeClipsChanged();
+        emit clipUpdated(boardId, clipId);
         return;
     }
 }
@@ -660,6 +745,7 @@ void SoundboardService::setClipRepeat(int boardId, int clipId, bool repeat)
             }
 
             emit activeClipsChanged();
+            emit clipUpdated(boardId, clipId);
             saveActive();  // Persist the change
             return;
         }
@@ -693,6 +779,7 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
             }
 
             emit activeClipsChanged();
+            emit clipUpdated(boardId, clipId);
             saveActive();  // Persist the change
             qDebug() << "Reproduction mode set to" << mode << "for clip" << clipId;
             return;
@@ -723,6 +810,7 @@ void SoundboardService::setClipStopOtherSounds(int boardId, int clipId, bool sto
             if (c.id != clipId) continue;
             c.stopOtherSounds = stop;
             emit activeClipsChanged();
+            emit clipUpdated(boardId, clipId);
             saveActive();
             return;
         }
@@ -753,6 +841,7 @@ void SoundboardService::setClipMuteOtherSounds(int boardId, int clipId, bool mut
                 c.muteMicDuringPlayback = true;
             }
             emit activeClipsChanged();
+            emit clipUpdated(boardId, clipId);
             saveActive();
             return;
         }
@@ -780,6 +869,7 @@ void SoundboardService::setClipMuteMicDuringPlayback(int boardId, int clipId, bo
             if (c.id != clipId) continue;
             c.muteMicDuringPlayback = mute;
             emit activeClipsChanged();
+            emit clipUpdated(boardId, clipId);
             saveActive();
             return;
         }
@@ -808,6 +898,7 @@ void SoundboardService::setClipTrim(int boardId, int clipId, double startMs, dou
             c.trimStartMs = startMs;
             c.trimEndMs = endMs;
             emit activeClipsChanged();
+            emit clipUpdated(boardId, clipId);
             saveActive();
             
             // Update engine if this clip is in a slot
@@ -1307,6 +1398,7 @@ QVariantList SoundboardService::playingClipIDs() const
     }
     return playingIds;
 }
+
 
 int SoundboardService::getOrAssignSlot(int clipId)
 {

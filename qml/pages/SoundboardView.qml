@@ -28,59 +28,47 @@ Rectangle {
     function getClipDataById(clipId) {
         if (clipId === -1)
             return null;
-        for (let i = 0; i < clipsModel.count; i++) {
-            const index = clipsModel.index(i, 0);
-            const id = clipsModel.data(index, 257);  // IdRole = 257
-            if (id === clipId) {
-                return {
-                    clipId: id,
-                    title: clipsModel.data(index, 261)     // TitleRole
-                    ,
-                    hotkey: clipsModel.data(index, 260)    // HotkeyRole
-                    ,
-                    imgPath: clipsModel.data(index, 259)   // ImgPathRole
-                    ,
-                    isPlaying: clipsModel.data(index, 266) // IsPlayingRole
-                    ,
-                    isRepeat: clipsModel.data(index, 267)  // IsRepeatRole
-                    ,
-                    tags: clipsModel.data(index, 269) || [] // TagsRole
-                    ,
-                    clipVolume: clipsModel.data(index, 264) // VolumeRole
-                    ,
-                    clipSpeed: clipsModel.data(index, 265)  // SpeedRole
-                    ,
-                    reproductionMode: clipsModel.data(index, 270) // ReproductionModeRole
-                    ,
-                    stopOtherSounds: clipsModel.data(index, 271) // StopOtherSoundsRole
-                    ,
-                    muteOtherSounds: clipsModel.data(index, 272) // MuteOtherSoundsRole
-                    ,
-                    muteMicDuringPlayback: clipsModel.data(index, 273) // MuteMicDuringPlaybackRole
-                    ,
-                    durationSec: clipsModel.data(index, 274)         // DurationSecRole
-                    ,
-                    trimStartMs: clipsModel.data(index, 262)         // TrimStartMsRole
-                    ,
-                    trimEndMs: clipsModel.data(index, 263)           // TrimEndMsRole
-                };
-            }
-        }
-        return null;
+
+        // Use the new backend function for more reliable and efficient data retrieval
+        const data = soundboardService.getClipData(clipsModel.boardId, clipId);
+        if (!data || Object.keys(data).length === 0)
+            return null;
+
+        return {
+            clipId: data.id,
+            title: data.title,
+            hotkey: data.hotkey,
+            imgPath: data.imgPath,
+            isPlaying: data.isPlaying,
+            isRepeat: data.isRepeat,
+            tags: data.tags || [],
+            clipVolume: data.volume,
+            clipSpeed: data.speed,
+            reproductionMode: data.reproductionMode,
+            stopOtherSounds: data.stopOtherSounds,
+            muteOtherSounds: data.muteOtherSounds,
+            muteMicDuringPlayback: data.muteMicDuringPlayback,
+            durationSec: data.durationSec,
+            trimStartMs: data.trimStartMs,
+            trimEndMs: data.trimEndMs
+        };
     }
 
-    // Update what's shown in the player card
+    // Update what's shown in the player card and editor
     function updateDisplayedClipData() {
-        // Priority: Playing Clip > Selected Clip
-        let data = getClipDataById(playingClipId);
-        if (!data) {
-            data = getClipDataById(selectedClipId);
+        // 1. Player Card Logic (Priority: Playing Clip > Selected Clip)
+        let playerCardData = getClipDataById(playingClipId);
+        if (!playerCardData) {
+            playerCardData = getClipDataById(selectedClipId);
         }
-        displayedClipData = data;
+        displayedClipData = playerCardData;
 
-        // If displayed data is the selected clip, push to editor properties
-        if (data && data.clipId === selectedClipId) {
-            pushToEditor(data);
+        // 2. Editor Sidebar Logic (Always Selected Clip)
+        if (selectedClipId !== -1) {
+            const editorData = getClipDataById(selectedClipId);
+            if (editorData) {
+                pushToEditor(editorData);
+            }
         }
     }
 
@@ -183,6 +171,12 @@ Rectangle {
         target: soundboardService
         function onClipSelectionRequested(clipId) {
             root.selectedClipId = clipId;
+            root.updateDisplayedClipData();
+        }
+        function onClipUpdated(boardId, clipId) {
+            if (clipId === root.selectedClipId) {
+                root.updateDisplayedClipData();
+            }
         }
     }
 
