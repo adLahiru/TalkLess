@@ -70,6 +70,7 @@ public:
     Q_INVOKABLE bool exportSettings(const QString& filePath);
     Q_INVOKABLE bool importSettings(const QString& filePath);
     Q_INVOKABLE void triggerSettingsChanged() { emit settingsChanged(); }
+    Q_INVOKABLE void resetSettings();
 
     Q_INVOKABLE int createBoard(const QString& name);
     Q_INVOKABLE bool renameBoard(int boardId, const QString& newName);

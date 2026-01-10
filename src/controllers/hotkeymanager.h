@@ -41,6 +41,7 @@ public:
 
     Q_INVOKABLE void undoHotkeyChanges();
     Q_INVOKABLE void saveHotkeys();
+    Q_INVOKABLE void resetAllHotkeys();
 
     // --- Add preference hotkey for a soundboard (you can call this from UI) ---
     Q_INVOKABLE int addPreferenceHotkey(const QString& title, const QString& actionId);

@@ -19,12 +19,24 @@ Rectangle {
     // Tab model - just titles
     ListModel {
         id: tabModel
-        ListElement { title: "Microphone Controller" }
-        ListElement { title: "Language & Theme" }
-        ListElement { title: "Audio & Devices" }
-        ListElement { title: "Hotkeys" }
-        ListElement { title: "AI & Productivity Tools" }
-        ListElement { title: "Preferences" }
+        ListElement {
+            title: "Microphone Controller"
+        }
+        ListElement {
+            title: "Language & Theme"
+        }
+        ListElement {
+            title: "Audio & Devices"
+        }
+        ListElement {
+            title: "Hotkeys"
+        }
+        ListElement {
+            title: "AI & Productivity Tools"
+        }
+        ListElement {
+            title: "System"
+        }
     }
 
     // Load Inter font for tab text
@@ -59,10 +71,10 @@ Rectangle {
                 Layout.preferredHeight: 40
                 Layout.preferredWidth: tabText.implicitWidth + 32
                 radius: 20
-                
+
                 required property int index
                 required property string title
-                
+
                 readonly property bool isSelected: tabItem.index === root.currentIndex
 
                 // Gradient background for selected tab
@@ -72,8 +84,14 @@ Rectangle {
                 Gradient {
                     id: selectedGradient
                     orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: "#3B82F6" }
-                    GradientStop { position: 1.0; color: "#D214FD" }
+                    GradientStop {
+                        position: 0.0
+                        color: "#3B82F6"
+                    }
+                    GradientStop {
+                        position: 1.0
+                        color: "#D214FD"
+                    }
                 }
 
                 Text {
@@ -93,25 +111,27 @@ Rectangle {
                     hoverEnabled: true
 
                     onClicked: {
-                        root.currentIndex = tabItem.index
-                        root.tabSelected(tabItem.index)
+                        root.currentIndex = tabItem.index;
+                        root.tabSelected(tabItem.index);
                     }
 
                     onEntered: {
                         if (!tabItem.isSelected) {
-                            tabText.opacity = 0.9
+                            tabText.opacity = 0.9;
                         }
                     }
 
                     onExited: {
                         if (!tabItem.isSelected) {
-                            tabText.opacity = 0.7
+                            tabText.opacity = 0.7;
                         }
                     }
                 }
 
                 Behavior on opacity {
-                    NumberAnimation { duration: 150 }
+                    NumberAnimation {
+                        duration: 150
+                    }
                 }
             }
         }

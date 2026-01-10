@@ -1385,3 +1385,26 @@ bool SoundboardService::importSettings(const QString& filePath)
 
     return false;
 }
+void SoundboardService::resetSettings()
+{
+    m_state.settings = AppSettings();
+    
+    // Apply audio settings to engine
+    if (m_audioEngine) {
+        m_audioEngine->setMasterGainDB(static_cast<float>(m_state.settings.masterGainDb));
+        m_audioEngine->setMicGainDB(static_cast<float>(m_state.settings.micGainDb));
+        
+        // Note: Devices might need more complex handling if we want to reset to "System Default"
+        // For now, setting them to empty so the engine uses defaults
+        m_audioEngine->setPlaybackDevice("");
+        m_audioEngine->setCaptureDevice("");
+        m_audioEngine->setMonitorPlaybackDevice("");
+
+        m_audioEngine->setMicEnabled(m_state.settings.micEnabled);
+        m_audioEngine->setMicPassthroughEnabled(m_state.settings.micPassthroughEnabled);
+        m_audioEngine->setMicSoundboardBalance(m_state.settings.micSoundboardBalance);
+    }
+    
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}

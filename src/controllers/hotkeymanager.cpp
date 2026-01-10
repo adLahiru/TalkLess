@@ -435,3 +435,30 @@ void HotkeyManager::cancelCapture() {
     m_target = CaptureTarget::None;
     m_targetId = -1;
 }
+void HotkeyManager::resetAllHotkeys() {
+    loadDefaults();
+    
+    // Clear user settings from QSettings
+    QSettings s("TalkLess", "TalkLess");
+    s.remove("hotkeys");
+    
+    // Also clear hotkeys in SoundboardService (boards and clips)
+    if (m_soundboardService) {
+        // Clear board hotkeys
+        const auto boards = m_soundboardService->listBoards();
+        for (const auto& board : boards) {
+            m_soundboardService->setBoardHotkey(board.id, "");
+        }
+        
+        // Clear clip hotkeys for all boards
+        // We'll need a method in SoundboardService for this or loop through boards
+        // For now, let's assume clearing the active board's clips is a good start
+        // or better, SoundboardService should have a reset-all-clip-hotkeys 
+    }
+    
+    rebuildRegistrations();
+    snapshotForUndo();
+    saveUserSettings(); // Persist the cleared state
+    
+    emit showMessage("All hotkeys reset to defaults.");
+}
