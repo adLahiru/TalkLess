@@ -87,7 +87,7 @@ Rectangle {
 
         Text {
             text: root.selectedValue.length > 0 ? root.selectedValue : root.placeholder
-            color: root.selectedValue.length > 0 ? "#FFFFFF" : "#AAAAAA"
+            color: root.selectedValue.length > 0 ? Colors.textPrimary : Colors.textSecondary
             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
             font.pixelSize: 15
             Layout.fillWidth: true
@@ -97,7 +97,7 @@ Rectangle {
         // Dropdown arrow
         Text {
             text: dropdownPopup.visible ? "▲" : "▼"
-            color: "#888888"
+            color: Colors.textSecondary
             font.pixelSize: 10
         }
     }
@@ -170,7 +170,7 @@ Rectangle {
                         width: itemColumn.width
                         height: 42
                         radius: 8
-                        color: itemMouseArea.containsMouse ? "#2D2D2D" : (root.selectedId === modelData.id ? "#252525" : "transparent")
+                        color: itemMouseArea.containsMouse ? Colors.surfaceLight : (root.selectedId === modelData.id ? Colors.surfaceDark : "transparent")
 
                         RowLayout {
                             anchors.fill: parent
@@ -180,7 +180,7 @@ Rectangle {
 
                             Text {
                                 text: itemDelegate.modelData.name
-                                color: root.selectedId === itemDelegate.modelData.id ? "#FFFFFF" : "#CCCCCC"
+                                color: root.selectedId === itemDelegate.modelData.id ? Colors.textPrimary : Colors.textSecondary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 14
                                 font.weight: root.selectedId === itemDelegate.modelData.id ? Font.Medium : Font.Normal
@@ -194,13 +194,13 @@ Rectangle {
                                 width: defaultLabel.width + 10
                                 height: 18
                                 radius: 4
-                                color: "#1E3A2F"
+                                color: Qt.lighter(Colors.success, 1.8) // Very light green background
 
                                 Text {
                                     id: defaultLabel
                                     anchors.centerIn: parent
                                     text: "Default"
-                                    color: "#22C55E"
+                                    color: Colors.success
                                     font.pixelSize: 10
                                     font.weight: Font.Medium
                                 }
@@ -210,7 +210,7 @@ Rectangle {
                             Text {
                                 visible: root.selectedId === itemDelegate.modelData.id
                                 text: "✓"
-                                color: "#22C55E"
+                                color: Colors.success
                                 font.pixelSize: 14
                                 font.weight: Font.Bold
                             }
@@ -247,7 +247,7 @@ Rectangle {
                     Text {
                         anchors.centerIn: parent
                         text: "No devices found"
-                        color: "#666666"
+                        color: Colors.textSecondary
                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                         font.pixelSize: 14
                     }

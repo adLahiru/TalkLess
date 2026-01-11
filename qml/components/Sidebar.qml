@@ -390,9 +390,9 @@ Rectangle {
                                     anchors.right: parent.right
                                     anchors.topMargin: 3
                                     anchors.rightMargin: 3
-                                    color: boardRow.active ? "#D214FD" : "#80000000"
+                                    color: boardRow.active ? Colors.accent : "#80000000"
                                     border.width: 1.5
-                                    border.color: boardRow.active ? "#D214FD" : "#FFFFFF"
+                                    border.color: boardRow.active ? Colors.accent : "#FFFFFF"
 
                                     // Checkmark when active
                                     Text {
@@ -430,10 +430,10 @@ Rectangle {
                                 width: 22
                                 height: 22
                                 radius: 4  // Square with rounded corners for checkbox
-                                border.width: 2
-                                border.color: boardRow.active ? Colors.accent : Qt.alpha(Colors.white, 0.35)
+                                border.width: boardRow.active ? 0 : 2
+                                border.color: boardRow.active ? "transparent" : (checkboxMouse.containsMouse ? Colors.accent : Qt.alpha(Colors.white, 0.35))
 
-                                color: checkboxMouse.containsMouse ? Colors.surfaceLight : "transparent"
+                                color: boardRow.active ? Colors.accent : (checkboxMouse.containsMouse ? Colors.surfaceLight : "transparent")
 
                                 // Checkmark icon when active
                                 Text {
@@ -441,8 +441,7 @@ Rectangle {
                                     text: "✓"
                                     font.pixelSize: 14
                                     font.bold: true
-                                    color: Colors.borderLight
-                                    opacity: root.enabled ? 1.0 : 0.6
+                                    color: Colors.white
                                     visible: boardRow.active
                                 }
 

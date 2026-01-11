@@ -31,16 +31,12 @@ Item {
     signal primaryClicked(string id)
     signal secondaryClicked(string id)
 
-    implicitHeight: titleLabel.implicitHeight
-                    + (showHeader ? (headerRect.height + 14) : 0)
-                    + list.contentHeight
-                    + (showWarning ? (warningRow.implicitHeight + 14) : 0)
-                    + 10
+    implicitHeight: titleLabel.implicitHeight + (showHeader ? (headerRect.height + 14) : 0) + list.contentHeight + (showWarning ? (warningRow.implicitHeight + 14) : 0) + 10
 
     Label {
         id: titleLabel
         text: root.title
-        color: "#EDEDED"
+        color: Colors.textPrimary
         font.pixelSize: 20
         font.weight: Font.DemiBold
         anchors.left: parent.left
@@ -56,7 +52,7 @@ Item {
         anchors.topMargin: 16
         height: 46
         radius: 12
-        color: "#131313"
+        color: Colors.surface
 
         Row {
             anchors.fill: parent
@@ -67,7 +63,7 @@ Item {
             Text {
                 width: root.col1Width
                 text: root.headerCol1
-                color: "#BDBDBD"
+                color: Colors.textSecondary
                 font.pixelSize: 13
                 verticalAlignment: Text.AlignVCenter
                 anchors.verticalCenter: parent.verticalCenter
@@ -76,17 +72,21 @@ Item {
             Text {
                 width: root.col2Width
                 text: root.headerCol2
-                color: "#BDBDBD"
+                color: Colors.textSecondary
                 font.pixelSize: 13
                 verticalAlignment: Text.AlignVCenter
                 anchors.verticalCenter: parent.verticalCenter
             }
 
-            Item { width: 1; height: 1; anchors.verticalCenter: parent.verticalCenter }
+            Item {
+                width: 1
+                height: 1
+                anchors.verticalCenter: parent.verticalCenter
+            }
 
             Text {
                 text: root.headerCol3
-                color: "#BDBDBD"
+                color: Colors.textSecondary
                 font.pixelSize: 13
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -108,14 +108,14 @@ Item {
             id: delegateRoot
             required property int index
             required property var model
-            
+
             width: ListView.view.width
             height: 62
             radius: 12
-            color: "#101010"
+            color: Colors.surfaceLight
 
             // subtle inner shadow feel
-            border.color: "#0A0A0A"
+            border.color: Colors.border
             border.width: 1
 
             Row {
@@ -127,7 +127,7 @@ Item {
                 Text {
                     width: root.col1Width
                     text: delegateRoot.model[root.nameRole]
-                    color: "#EDEDED"
+                    color: Colors.textPrimary
                     font.pixelSize: 14
                     elide: Text.ElideRight
                     anchors.verticalCenter: parent.verticalCenter
@@ -136,13 +136,16 @@ Item {
                 Text {
                     width: root.col2Width
                     text: delegateRoot.model[root.hotkeyRole]
-                    color: "#EDEDED"
+                    color: Colors.textSecondary
                     font.pixelSize: 14
                     elide: Text.ElideRight
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
-                Item { width: 1; height: 1 } // spacer
+                Item {
+                    width: 1
+                    height: 1
+                } // spacer
 
                 Row {
                     spacing: 12
@@ -166,8 +169,14 @@ Item {
                         background: Rectangle {
                             radius: 10
                             gradient: Gradient {
-                                GradientStop { position: 0.0; color: "#2F7BFF" }
-                                GradientStop { position: 1.0; color: "#C800FF" }
+                                GradientStop {
+                                    position: 0.0
+                                    color: Colors.gradientPrimaryStart
+                                }
+                                GradientStop {
+                                    position: 1.0
+                                    color: Colors.gradientPrimaryEnd
+                                }
                             }
                         }
                     }
@@ -180,7 +189,7 @@ Item {
 
                         contentItem: Text {
                             text: secondaryButton.text
-                            color: "#EDEDED"
+                            color: Colors.textPrimary
                             font.pixelSize: 13
                             font.weight: Font.Medium
                             horizontalAlignment: Text.AlignHCenter
@@ -189,8 +198,8 @@ Item {
 
                         background: Rectangle {
                             radius: 10
-                            color: "#1A1A1A"
-                            border.color: "#3A3A3A"
+                            color: secondaryButton.down ? Colors.surfaceDark : Colors.surface
+                            border.color: Colors.border
                             border.width: 1
                         }
                     }
@@ -207,7 +216,15 @@ Item {
         anchors.top: list.bottom
         anchors.topMargin: 16
 
-        Text { text: "⚠"; color: "#F6D14A"; font.pixelSize: 16 }
-        Text { text: "Warning if assigned elsewhere"; color: "#CFCFCF"; font.pixelSize: 14 }
+        Text {
+            text: "⚠"
+            color: "#F6D14A"
+            font.pixelSize: 16
+        }
+        Text {
+            text: "Warning if assigned elsewhere"
+            color: "#CFCFCF"
+            font.pixelSize: 14
+        }
     }
 }

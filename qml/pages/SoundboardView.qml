@@ -402,7 +402,7 @@ Rectangle {
                         // Main text
                         Text {
                             text: clipsModel.boardName || "Soundboard"
-                            color: Colors.white
+                            color: Colors.textPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 28
                             font.weight: Font.DemiBold
@@ -411,7 +411,7 @@ Rectangle {
                         // Secondary text
                         Text {
                             text: "Manage and trigger your audio clips"
-                            color: Colors.white
+                            color: Colors.textPrimary
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 15
                             font.weight: Font.Normal
@@ -448,7 +448,7 @@ Rectangle {
                         Text {
                             anchors.centerIn: parent
                             text: "Add Soundboard"
-                            color: Colors.textPrimary
+                            color: Colors.textOnPrimary
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 13
                             font.weight: Font.Medium
@@ -1632,7 +1632,7 @@ Rectangle {
                                 // Background with clip image or default
                                 Rectangle {
                                     anchors.fill: parent
-                                    color: "#1A1A1A"
+                                    color: Colors.surfaceDark // was #1A1A1A
                                     radius: 12
 
                                     // Clip preview image
@@ -1705,7 +1705,7 @@ Rectangle {
                                         width: 24
                                         height: 24
                                         radius: 4
-                                        color: editImageArea.containsMouse ? "#444444" : "#333333"
+                                        color: editImageArea.containsMouse ? Colors.surfaceLight : Colors.surface // was #444444/#333333
 
                                         Text {
                                             anchors.centerIn: parent
@@ -1738,7 +1738,7 @@ Rectangle {
                                     Layout.preferredWidth: implicitWidth + 20
                                     Layout.maximumWidth: 180
                                     horizontalAlignment: Text.AlignHCenter
-                                    color: "#FFFFFF"
+                                    color: Colors.textPrimary // was #FFFFFF
                                     font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                     font.pixelSize: 16
                                     font.weight: Font.DemiBold
@@ -1773,7 +1773,7 @@ Rectangle {
                                     Text {
                                         anchors.centerIn: parent
                                         text: "Enter title..."
-                                        color: "#666666"
+                                        color: Colors.textSecondary // was #666666
                                         font: parent.font
                                         visible: !parent.text && !parent.activeFocus
                                     }
@@ -1790,6 +1790,7 @@ Rectangle {
                                         anchors.centerIn: parent
                                         text: "✏️"
                                         font.pixelSize: 12
+                                        color: Colors.textPrimary
                                         opacity: 0.7
                                     }
 
@@ -1810,7 +1811,7 @@ Rectangle {
 
                                 Text {
                                     text: "Hotkey"
-                                    color: "#AAAAAA"
+                                    color: Colors.textSecondary // was #AAAAAA
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 12
                                     font.weight: Font.Medium
@@ -1819,15 +1820,15 @@ Rectangle {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 36
-                                    color: "#1A1A1A"
+                                    color: Colors.surfaceDark // was #1A1A1A
                                     radius: 8
-                                    border.color: hotkeyArea.containsMouse ? "#8B5CF6" : "#3A3A3A"
+                                    border.color: hotkeyArea.containsMouse ? Colors.accent : Colors.border // was #8B5CF6 / #3A3A3A
                                     border.width: 1
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: clipEditorTab.editingClipHotkey !== "" ? clipEditorTab.editingClipHotkey : "Not Set"
-                                        color: clipEditorTab.editingClipHotkey !== "" ? "#FFFFFF" : "#666666"
+                                        color: clipEditorTab.editingClipHotkey !== "" ? Colors.textPrimary : Colors.textSecondary // was #FFFFFF / #666666
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 12
                                         font.weight: clipEditorTab.editingClipHotkey !== "" ? Font.DemiBold : Font.Normal
@@ -1850,8 +1851,8 @@ Rectangle {
                                     width: 36
                                     height: 36
                                     radius: 8
-                                    color: clearHotkeyArea.containsMouse ? "#3A3A3A" : "transparent"
-                                    border.color: clearHotkeyArea.containsMouse ? "#FF4D4D" : "transparent"
+                                    color: clearHotkeyArea.containsMouse ? Colors.surfaceLight : "transparent"
+                                    border.color: clearHotkeyArea.containsMouse ? Colors.error : "transparent"
                                     border.width: 1
                                     visible: clipEditorTab.editingClipHotkey !== ""
 
@@ -1885,12 +1886,12 @@ Rectangle {
                                     width: 28
                                     height: 28
                                     radius: 6
-                                    color: prevBtnArea.containsMouse ? "#3A3A3A" : "transparent"
+                                    color: prevBtnArea.containsMouse ? Colors.surfaceLight : "transparent" // was #3A3A3A
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: "◀"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary // was #FFFFFF
                                         font.pixelSize: 10
                                     }
 
@@ -1908,12 +1909,12 @@ Rectangle {
                                     width: 28
                                     height: 28
                                     radius: 6
-                                    color: skipBackArea.containsMouse ? "#3A3A3A" : "transparent"
+                                    color: skipBackArea.containsMouse ? Colors.surfaceLight : "transparent"
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: "⏮"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary
                                         font.pixelSize: 12
                                     }
 
@@ -1969,12 +1970,12 @@ Rectangle {
                                     width: 28
                                     height: 28
                                     radius: 6
-                                    color: skipFwdArea.containsMouse ? "#3A3A3A" : "transparent"
+                                    color: skipFwdArea.containsMouse ? Colors.surfaceLight : "transparent"
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: "⏭"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary
                                         font.pixelSize: 12
                                     }
 
@@ -1995,15 +1996,15 @@ Rectangle {
                                     color: {
                                         // Active when repeat is on
                                         if (clipEditorTab.clipIsRepeat) {
-                                            return loopBtnArea.containsMouse ? "#7C3AED" : "#8B5CF6";
+                                            return loopBtnArea.containsMouse ? Colors.accent : Colors.accentLight; // was #7C3AED / #8B5CF6
                                         }
-                                        return loopBtnArea.containsMouse ? "#3A3A3A" : "transparent";
+                                        return loopBtnArea.containsMouse ? Colors.surfaceLight : "transparent"; // was #3A3A3A
                                     }
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: "🔁"
-                                        color: clipEditorTab.clipIsRepeat ? "#FFFFFF" : "#888888"
+                                        color: clipEditorTab.clipIsRepeat ? Colors.textOnPrimary : Colors.textPrimary // was #FFFFFF / #888888
                                         font.pixelSize: 12
                                     }
 
@@ -2033,7 +2034,7 @@ Rectangle {
 
                                     Text {
                                         text: "Voice Volume"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary // was #FFFFFF
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 12
                                     }
@@ -2044,7 +2045,7 @@ Rectangle {
 
                                     Text {
                                         text: Math.round(clipEditorTab.clipVolume)
-                                        color: "#AAAAAA"
+                                        color: Colors.textSecondary // was #AAAAAA
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 11
                                     }
@@ -2072,7 +2073,7 @@ Rectangle {
                                         width: volumeSlider.availableWidth
                                         height: 4
                                         radius: 2
-                                        color: "#3A3A3A"
+                                        color: Colors.surfaceLight // was #3A3A3A
 
                                         Rectangle {
                                             width: volumeSlider.visualPosition * parent.width
@@ -2113,7 +2114,7 @@ Rectangle {
 
                                     Text {
                                         text: "Speed"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary // was #FFFFFF
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 12
                                     }
@@ -2124,7 +2125,7 @@ Rectangle {
 
                                     Text {
                                         text: clipEditorTab.clipSpeed.toFixed(1) + "x"
-                                        color: "#AAAAAA"
+                                        color: Colors.textSecondary // was #AAAAAA
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 11
                                     }
@@ -2153,7 +2154,7 @@ Rectangle {
                                         width: speedSlider.availableWidth
                                         height: 4
                                         radius: 2
-                                        color: "#3A3A3A"
+                                        color: Colors.surfaceLight // was #3A3A3A
 
                                         Rectangle {
                                             width: speedSlider.visualPosition * parent.width
@@ -2199,7 +2200,7 @@ Rectangle {
 
                                     Text {
                                         text: "Trim Audio"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary // was #FFFFFF
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 12
                                         font.weight: Font.DemiBold
@@ -2275,7 +2276,7 @@ Rectangle {
 
                                     Text {
                                         text: "Reproduction Mode"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary // was #FFFFFF
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 13
                                         font.weight: Font.DemiBold
@@ -2308,14 +2309,14 @@ Rectangle {
                                         width: 44
                                         height: 44
                                         radius: 10
-                                        color: parent.selectedMode === 0 ? "#00D9FF" : (overlayModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 0 ? "#00D9FF" : "#3A3A3A"
+                                        color: parent.selectedMode === 0 ? Colors.accent : (overlayModeArea.containsMouse ? Colors.surfaceLight : Colors.surface)
+                                        border.color: parent.selectedMode === 0 ? Colors.accent : Colors.border
                                         border.width: parent.selectedMode === 0 ? 2 : 1
 
                                         Text {
                                             anchors.centerIn: parent
                                             text: "▶"
-                                            color: parent.parent.selectedMode === 0 ? "#000000" : "#FFFFFF"
+                                            color: parent.parent.selectedMode === 0 ? Colors.textOnPrimary : Colors.textPrimary
                                             font.pixelSize: 18
                                             font.weight: Font.Bold
                                         }
@@ -2341,14 +2342,14 @@ Rectangle {
                                         width: 44
                                         height: 44
                                         radius: 10
-                                        color: parent.selectedMode === 1 ? "#00D9FF" : (playPauseModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 1 ? "#00D9FF" : "#3A3A3A"
+                                        color: parent.selectedMode === 1 ? Colors.accent : (playPauseModeArea.containsMouse ? Colors.surfaceLight : Colors.surface)
+                                        border.color: parent.selectedMode === 1 ? Colors.accent : Colors.border
                                         border.width: parent.selectedMode === 1 ? 2 : 1
 
                                         Text {
                                             anchors.centerIn: parent
                                             text: "▶⏸"
-                                            color: parent.parent.selectedMode === 1 ? "#000000" : "#FFFFFF"
+                                            color: parent.parent.selectedMode === 1 ? Colors.textOnPrimary : Colors.textPrimary
                                             font.pixelSize: 14
                                             font.weight: Font.Bold
                                         }
@@ -2374,14 +2375,14 @@ Rectangle {
                                         width: 44
                                         height: 44
                                         radius: 10
-                                        color: parent.selectedMode === 2 ? "#00D9FF" : (playStopModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 2 ? "#00D9FF" : "#3A3A3A"
+                                        color: parent.selectedMode === 2 ? Colors.accent : (playStopModeArea.containsMouse ? Colors.surfaceLight : Colors.surface)
+                                        border.color: parent.selectedMode === 2 ? Colors.accent : Colors.border
                                         border.width: parent.selectedMode === 2 ? 2 : 1
 
                                         Text {
                                             anchors.centerIn: parent
                                             text: "▶⏹"
-                                            color: parent.parent.selectedMode === 2 ? "#000000" : "#FFFFFF"
+                                            color: parent.parent.selectedMode === 2 ? Colors.textOnPrimary : Colors.textPrimary
                                             font.pixelSize: 14
                                             font.weight: Font.Bold
                                         }

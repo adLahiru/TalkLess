@@ -99,7 +99,7 @@ Rectangle {
                     id: tabText
                     anchors.centerIn: parent
                     text: tabItem.title
-                    color: Colors.textPrimary
+                    color: tabItem.isSelected ? Colors.textOnPrimary : Colors.textPrimary
                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                     font.pixelSize: Typography.fontSizeMedium
                     font.weight: tabItem.isSelected ? Font.Medium : Font.Normal

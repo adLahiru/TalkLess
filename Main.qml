@@ -276,7 +276,7 @@ ApplicationWindow {
         id: splashScreen
         anchors.fill: parent
         z: 1000  // Always on top
-        color: Colors.black
+        color: Colors.background
         visible: opacity > 0
 
         Image {

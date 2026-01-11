@@ -20,7 +20,7 @@ Rectangle {
     implicitHeight: 200
     radius: 16
     clip: true
-    color: "transparent"
+    color: backgroundImage.status === Image.Error ? "red" : (backgroundImage.status === Image.Loading ? "blue" : "transparent")
 
     // Load Poppins font (SemiBold 600)
     FontLoader {
@@ -39,7 +39,15 @@ Rectangle {
         id: backgroundImage
         anchors.fill: parent
         source: Colors.bannerImage
-        fillMode: Image.PreserveAspectCrop
+        fillMode: Image.Stretch
+
+        onStatusChanged: {
+            if (status === Image.Error) {
+                console.log("BackgroundBanner Image Error loading: " + source);
+            } else if (status === Image.Ready) {
+                console.log("BackgroundBanner Image Loaded: " + source);
+            }
+        }
     }
 
     // Dark overlay for better text readability (only when text is shown)
@@ -75,7 +83,7 @@ Rectangle {
         // Line 1 - Main text (Poppins SemiBold 27.51px)
         Text {
             text: root.line1
-            color: "#FFFFFF"
+            color: Colors.textPrimary
             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
             font.pixelSize: 28
             font.weight: Font.DemiBold

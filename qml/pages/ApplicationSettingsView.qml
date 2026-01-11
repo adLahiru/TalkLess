@@ -288,7 +288,7 @@ Rectangle {
                                     text: "Mixer Controls"
                                     color: Colors.textPrimary
                                     font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                                    font.pixelSize:Typography.fontSizeLarge
+                                    font.pixelSize: Typography.fontSizeLarge
                                     font.weight: Font.DemiBold
                                 }
 
@@ -816,7 +816,7 @@ Rectangle {
                                         RowLayout {
                                             spacing: 12
                                             Repeater {
-                                                model: ["#EF4444", "#D946EF", "#22C55E", "#EAB308", "#06B6D4", "#F97316"]
+                                                model: ["#3B82F6", "#EF4444", "#D946EF", "#22C55E", "#EAB308", "#06B6D4", "#F97316"]
                                                 delegate: Rectangle {
                                                     id: colorDelegate
                                                     required property var modelData
@@ -895,6 +895,7 @@ Rectangle {
                                                     color: Colors.textPrimary
                                                     font.pixelSize: 13
                                                     text: soundboardService.accentColor
+                                                    onEditingFinished: soundboardService.setAccentColor(text)
                                                 }
                                             }
 
@@ -1285,6 +1286,13 @@ Rectangle {
                                     text: "Refresh Devices"
                                     onClicked: console.log("Refresh Devices clicked")
 
+                                    background: Rectangle {
+                                        color: parent.hovered ? Colors.surfaceLight : Colors.surface
+                                        radius: 8
+                                        border.color: Colors.border
+                                        border.width: 1
+                                    }
+
                                     contentItem: Text {
                                         text: refreshButton.text
                                         color: Colors.textPrimary
@@ -1351,13 +1359,14 @@ Rectangle {
                                             text: "System Hotkeys"
                                             width: 200
                                             height: parent.height
-                                            checkable: true
-                                            checked: hotkeysContent.tabIndex === 0
+                                            // Manual active state management to avoid binding loops
+                                            property bool isActive: hotkeysContent.tabIndex === 0
+
                                             onClicked: hotkeysContent.tabIndex = 0
 
                                             contentItem: Text {
                                                 text: systemHotkeysButton.text
-                                                color: systemHotkeysButton.checked ? Colors.textOnPrimary : Colors.textSecondary
+                                                color: systemHotkeysButton.isActive ? Colors.textOnPrimary : Colors.textSecondary
                                                 font.pixelSize: 15
                                                 font.weight: Font.Medium
                                                 horizontalAlignment: Text.AlignHCenter
@@ -1369,6 +1378,7 @@ Rectangle {
                                                 color: "transparent"
 
                                                 gradient: Gradient {
+                                                    orientation: Gradient.Horizontal
                                                     GradientStop {
                                                         position: 0.0
                                                         color: Colors.gradientPrimaryStart
@@ -1380,7 +1390,13 @@ Rectangle {
                                                 }
 
                                                 // turn gradient on/off
-                                                opacity: systemHotkeysButton.checked ? 1.0 : 0.0
+                                                opacity: systemHotkeysButton.isActive ? 1.0 : 0.0
+
+                                                Behavior on opacity {
+                                                    NumberAnimation {
+                                                        duration: 150
+                                                    }
+                                                }
                                             }
                                         }
 
@@ -1389,13 +1405,14 @@ Rectangle {
                                             text: "My Preference"
                                             width: 200
                                             height: parent.height
-                                            checkable: true
-                                            checked: hotkeysContent.tabIndex === 1
+                                            // Manual active state management
+                                            property bool isActive: hotkeysContent.tabIndex === 1
+
                                             onClicked: hotkeysContent.tabIndex = 1
 
                                             contentItem: Text {
                                                 text: myPreferenceButton.text
-                                                color: myPreferenceButton.checked ? Colors.textOnPrimary : Colors.textSecondary
+                                                color: myPreferenceButton.isActive ? Colors.textOnPrimary : Colors.textSecondary
                                                 font.pixelSize: 15
                                                 font.weight: Font.Medium
                                                 horizontalAlignment: Text.AlignHCenter
@@ -1407,6 +1424,7 @@ Rectangle {
                                                 color: "transparent"
 
                                                 gradient: Gradient {
+                                                    orientation: Gradient.Horizontal
                                                     GradientStop {
                                                         position: 0.0
                                                         color: Colors.gradientPrimaryStart
@@ -1418,7 +1436,13 @@ Rectangle {
                                                 }
 
                                                 // turn gradient on/off
-                                                opacity: myPreferenceButton.checked ? 1.0 : 0.0
+                                                opacity: myPreferenceButton.isActive ? 1.0 : 0.0
+
+                                                Behavior on opacity {
+                                                    NumberAnimation {
+                                                        duration: 150
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -1625,7 +1649,7 @@ Rectangle {
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: "📤 Export"
-                                                color: Colors.textOnPrimary
+                                                color: Colors.textPrimary
                                             }
                                             MouseArea {
                                                 anchors.fill: parent
@@ -1641,7 +1665,7 @@ Rectangle {
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: "📥 Import"
-                                                color: Colors.textOnPrimary
+                                                color: Colors.textPrimary
                                             }
                                             MouseArea {
                                                 anchors.fill: parent
@@ -1678,7 +1702,7 @@ Rectangle {
                                         Layout.fillWidth: true
                                         Text {
                                             text: "Reset All Settings & Hotkeys"
-                                            color: Colors.textOnPrimary
+                                            color: Colors.textPrimary
                                             font.pixelSize: 16
                                             font.weight: Font.Medium
                                         }

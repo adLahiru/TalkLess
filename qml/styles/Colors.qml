@@ -6,7 +6,8 @@ QtObject {
     property string currentTheme: "dark"
 
     // Primary Colors (Driven by Accent)
-    property color accent: "#7C3AED" // Default purple
+    // Primary Colors (Driven by Accent)
+    property color accent: "#3B82F6" // Default Blue (requested start of gradient)
     property color primary: accent
     property color primaryDark: Qt.darker(accent, 1.3)
     property color primaryLight: Qt.lighter(accent, 1.3)
@@ -55,7 +56,7 @@ QtObject {
 
     // Gradients - Premium Look
     property color gradientPrimaryStart: accent
-    property color gradientPrimaryEnd: Qt.lighter(accent, 1.5)
+    property color gradientPrimaryEnd: (accent == "#3B82F6" || accent == "#3b82f6") ? "#D214FD" : Qt.lighter(accent, 1.5)
     property color gradientBgStart: currentTheme === "light" ? "#F8FAFC" : "#0C0C0E"
     property color gradientBgEnd: currentTheme === "light" ? "#F1F5F9" : "#141416"
 
