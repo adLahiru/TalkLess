@@ -678,6 +678,7 @@ Rectangle {
                             onClicked: {
                                 console.log("Add Audio clicked - opening add audio panel");
                                 rightSidebar.currentTabIndex = 1;
+                                audioFileDialog.open()
                             }
                         }
 
@@ -732,7 +733,9 @@ Rectangle {
                                         // Selecting the clip updates the sidebar
                                         console.log("ClipTile clicked - index:", clipWrapper.index, "clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle);
                                         soundboardService.setCurrentlySelectedClip(clipWrapper.clipId);
+                                        soundboardService.playClip(clipWrapper.clipId);
                                     }
+
                                     onPlayClicked: {
                                         console.log("ClipTile playClicked - clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle, "filePath:", clipWrapper.filePath);
                                         soundboardService.playClip(clipWrapper.clipId);
