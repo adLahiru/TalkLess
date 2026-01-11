@@ -2477,7 +2477,7 @@ Rectangle {
                                         case 2:
                                             return "Second click stops and resets";
                                         case 3:
-                                            return "Stops all other sounds (exclusive)";
+                                            return "Plays from start, pauses others";
                                         case 4:
                                             return "Loops from beginning, stops others";
                                         default:
