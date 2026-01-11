@@ -44,6 +44,12 @@ public:
     Q_PROPERTY(
         float micSoundboardBalance READ getMicSoundboardBalance WRITE setMicSoundboardBalance NOTIFY settingsChanged)
     Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
+    Q_PROPERTY(bool isRecording READ isRecording NOTIFY recordingStateChanged)
+    Q_PROPERTY(QString lastRecordingPath READ lastRecordingPath NOTIFY recordingStateChanged)
+    Q_PROPERTY(float recordingDuration READ recordingDuration NOTIFY recordingStateChanged)
+
+
+
 
     // ---- Index / Settings ----
     double masterGainDb() const { return m_state.settings.masterGainDb; }
@@ -157,6 +163,17 @@ public:
     Q_INVOKABLE bool isMicEnabled() const;
     Q_INVOKABLE double getFileDuration(const QString& filePath) const;
 
+    // ---- Recording ----
+    Q_INVOKABLE bool startRecording();
+    Q_INVOKABLE bool stopRecording();
+    bool isRecording() const;
+    QString lastRecordingPath() const { return m_lastRecordingPath; }
+    float recordingDuration() const;
+    Q_INVOKABLE QString getRecordingOutputPath() const;
+
+
+
+
     // ---- Hotkey (active only) ----
     int findActiveClipIdByHotkey(const QString& hotkey) const;
 
@@ -181,6 +198,8 @@ signals:
     void playSelectedRequested();
     void clipSelectionRequested(int clipId); // Emitted when a clip should be selected in UI
     void clipboardChanged();
+    void recordingStateChanged();
+
 
 private:
     void rebuildHotkeyIndex();
@@ -204,4 +223,6 @@ private:
     QSet<int> m_clipsThatMutedMic;  // Track clips that muted the mic (to restore on stop)
 
     std::optional<Clip> m_clipboardClip; // Internal clipboard for copy/paste
+    QString m_lastRecordingPath;
 };
+

@@ -529,7 +529,7 @@ Rectangle {
                 readonly property real tilePadding: 20
                 readonly property real minTileWidth: 120  // Minimum tile width
                 readonly property real maxTileWidth: 180  // Maximum tile width (smaller than original)
-                
+
                 // Calculate number of columns based on available width
                 // Default to 5 columns for normal displays, but adjust based on space
                 readonly property int columnsCount: {
@@ -544,7 +544,7 @@ Rectangle {
                     // Fallback: calculate based on minimum width
                     return Math.max(3, Math.floor((availableWidth + tileSpacing) / (minTileWidth + tileSpacing)));
                 }
-                
+
                 // Width calculation based on column count
                 readonly property real tileWidth: (width - tilePadding * 2 - tileSpacing * (columnsCount - 1)) / columnsCount
                 readonly property real tileHeight: tileWidth * 79 / 111  // 111:79 aspect ratio
@@ -1203,7 +1203,7 @@ Rectangle {
                         spacing: 8
 
                         // Recording state
-                        property bool isRecording: false
+                        readonly property bool isRecording: soundboardService.isRecording
 
                         // Microphone button with gray background
                         Rectangle {
@@ -1239,8 +1239,11 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    parent.parent.isRecording = !parent.parent.isRecording;
-                                    console.log("Recording:", parent.parent.isRecording);
+                                    if (soundboardService.isRecording) {
+                                        soundboardService.stopRecording();
+                                    } else {
+                                        soundboardService.startRecording();
+                                    }
                                 }
                             }
 
@@ -1316,8 +1319,8 @@ Rectangle {
                         WaveformDisplay {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 90
-                            currentTime: 90
-                            totalDuration: 210
+                            currentTime: soundboardService.recordingDuration
+                            totalDuration: Math.max(soundboardService.recordingDuration, 10)
                         }
                     }
 
@@ -1423,7 +1426,11 @@ Rectangle {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Cancel clicked")
+                                onClicked: {
+                                    saveNameInput.text = "";
+                                    audioNameInput.text = "";
+                                    rightSidebar.currentTabIndex = 0;
+                                }
                             }
 
                             Behavior on color {
@@ -1464,7 +1471,24 @@ Rectangle {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Save clicked")
+                                onClicked: {
+                                    console.log("Save clicked");
+                                    const boardId = clipsModel.boardId;
+                                    if (boardId >= 0 && soundboardService.lastRecordingPath !== "") {
+                                        const title = saveNameInput.text.trim() || audioNameInput.text.trim() || "New Recording";
+                                        const success = soundboardService.addClipWithTitle(boardId, "file:///" + soundboardService.lastRecordingPath, title);
+                                        if (success) {
+                                            clipsModel.reload();
+                                            // Clear inputs
+                                            saveNameInput.text = "";
+                                            audioNameInput.text = "";
+                                            // Switch back to editor tab
+                                            rightSidebar.currentTabIndex = 0;
+                                        }
+                                    } else {
+                                        console.log("Cannot save: Board ID", boardId, "Recording Path", soundboardService.lastRecordingPath);
+                                    }
+                                }
                             }
                         }
                     }
