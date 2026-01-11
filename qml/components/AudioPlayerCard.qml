@@ -105,11 +105,11 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
+                    // Don't toggle isPlaying locally - let the backend update the state
+                    // and propagate it back through the binding
                     if (root.isPlaying) {
-                        root.isPlaying = false
                         root.pauseClicked()
                     } else {
-                        root.isPlaying = true
                         root.playClicked()
                     }
                 }

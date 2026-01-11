@@ -248,10 +248,8 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            if (root.isPlaying)
-                                root.stopClicked();
-                            else
-                                root.playClicked();
+                            // Always call playClicked - backend handles pause/resume based on mode
+                            root.playClicked();
                             root.showActions = false;
                         }
                     }
@@ -422,13 +420,10 @@ Item {
                 if (mouse.button === Qt.RightButton) {
                     root.showActions = !root.showActions;
                 } else {
-                    // Left click: Play the clip and select it
+                    // Left click: Select and toggle play/pause
                     root.clicked(); // Updates selection sidebar
-                    if (!root.isPlaying) {
-                        root.playClicked();
-                    } else {
-                        root.stopClicked();
-                    }
+                    // Always call playClicked - backend handles pause/resume based on reproduction mode
+                    root.playClicked();
                     root.showActions = false; // Hide bar on play
                 }
             }

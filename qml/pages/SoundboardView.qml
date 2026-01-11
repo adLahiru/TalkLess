@@ -207,6 +207,12 @@ Rectangle {
 
         function onClipPlaybackStarted(clipId) {
             root.playingClipId = clipId;
+            root.updateDisplayedClipData();
+        }
+
+        function onClipPlaybackPaused(clipId) {
+            // Update the UI when a clip is paused (but keep it as the displayed clip)
+            root.updateDisplayedClipData();
         }
 
         function onClipPlaybackStopped(clipId) {
@@ -725,9 +731,11 @@ Rectangle {
 
                                     onClicked: {
                                         // Selecting the clip updates the sidebar
+                                        console.log("ClipTile clicked - index:", clipWrapper.index, "clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle);
                                         soundboardService.setCurrentlySelectedClip(clipWrapper.clipId);
                                     }
                                     onPlayClicked: {
+                                        console.log("ClipTile playClicked - clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle, "filePath:", clipWrapper.filePath);
                                         soundboardService.playClip(clipWrapper.clipId);
                                     }
                                     onStopClicked: {

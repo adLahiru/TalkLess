@@ -338,7 +338,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
                     map["hotkey"] = c.hotkey;
                     map["volume"] = c.volume;
                     map["speed"] = c.speed;
-                    map["isPlaying"] = isClipPlaying(c.id);
+                    map["isPlaying"] = c.isPlaying;  // Use stored state, not audio engine state
                     map["isRepeat"] = c.isRepeat;
                     map["tags"] = c.tags;
                     map["reproductionMode"] = c.reproductionMode;
@@ -352,6 +352,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
                     map["durationSec"] = duration;
                     map["trimStartMs"] = c.trimStartMs;
                     map["trimEndMs"] = c.trimEndMs;
+                    map["lastPlayedPosMs"] = c.lastPlayedPosMs;  // For resuming playback
                     return map;
                 }
             }
@@ -367,7 +368,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
         map["hotkey"] = clip->hotkey;
         map["volume"] = clip->volume;
         map["speed"] = clip->speed;
-        map["isPlaying"] = isClipPlaying(clip->id);
+        map["isPlaying"] = clip->isPlaying;  // Use stored state, not audio engine state
         map["isRepeat"] = clip->isRepeat;
         map["tags"] = clip->tags;
         map["reproductionMode"] = clip->reproductionMode;
@@ -381,6 +382,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
         map["durationSec"] = duration;
         map["trimStartMs"] = clip->trimStartMs;
         map["trimEndMs"] = clip->trimEndMs;
+        map["lastPlayedPosMs"] = clip->lastPlayedPosMs;  // For resuming playback
         return map;
     }
 
