@@ -18,6 +18,8 @@ class AudioEngine;
 class SoundboardService : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QVariantList activeBoardIds READ activeBoardIdsList NOTIFY activeBoardChanged)
+    // Legacy single-board support (returns first active or -1)
     Q_PROPERTY(int activeBoardId READ activeBoardId NOTIFY activeBoardChanged)
     Q_PROPERTY(QString activeBoardName READ activeBoardName NOTIFY activeBoardChanged)
 
@@ -83,12 +85,16 @@ public:
     Q_INVOKABLE bool setBoardHotkey(int boardId, const QString& hotkey);
     Q_INVOKABLE void reloadIndex(); // re-read index.json
 
-    // ---- Active board ----
-    int activeBoardId() const;
-    QString activeBoardName() const;
+    // ---- Active boards (multiple can be active) ----
+    int activeBoardId() const;                        // Returns first active board ID or -1
+    QString activeBoardName() const;                  // Returns first active board name
+    QVariantList activeBoardIdsList() const;          // Returns all active board IDs
+    Q_INVOKABLE bool isBoardActive(int boardId) const; // Check if a specific board is active
+    Q_INVOKABLE bool toggleBoardActive(int boardId);  // Toggle active state of a board
 
-    bool activate(int boardId);
-    bool saveActive();
+    bool activate(int boardId);                       // Activate a board (adds to active set)
+    bool deactivate(int boardId);                     // Deactivate a board (removes from active set)
+    bool saveActive();                                // Save all active boards
 
     // ---- Clip operations (board-wise) ----
     Q_INVOKABLE bool addClip(int boardId, const QString& filePath);
@@ -187,9 +193,9 @@ private:
 private:
     StorageRepository m_repo;
 
-    AppState m_state;                     // index.json data in memory
-    std::optional<Soundboard> m_active;   // active board in memory
-    QHash<QString, int> m_hotkeyToClipId; // hotkey -> clipId (active only)
+    AppState m_state;                             // index.json data in memory
+    QHash<int, Soundboard> m_activeBoards;        // Multiple active boards in memory (boardId -> Soundboard)
+    QHash<QString, int> m_hotkeyToClipId;         // hotkey -> clipId (from all active boards)
 
     // Audio playback
     std::unique_ptr<AudioEngine> m_audioEngine;

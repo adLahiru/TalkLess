@@ -2,6 +2,7 @@
 #include "AppSettings.h"
 #include "soundboardInfo.h"
 
+#include <QSet>
 #include <QVector>
 
 struct AppState
@@ -9,5 +10,5 @@ struct AppState
     int version = 1;
     AppSettings settings;
     QVector<SoundboardInfo> soundboards;
-    int activeBoardId = -1;
+    QSet<int> activeBoardIds;  // Multiple boards can be active simultaneously
 };

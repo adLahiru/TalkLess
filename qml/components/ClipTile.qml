@@ -7,8 +7,8 @@ import QtQuick.Effects
 
 Item {
     id: root
-    width: 222  // 111:79 aspect ratio (landscape)
-    height: 158
+    width: 180  // 111:79 aspect ratio (landscape) - reduced from 222
+    height: 128  // Calculated: 180 * 79 / 111 ≈ 128
 
     // data
     property string title: ""  // Optional - only shows if not empty (e.g., "Morning")
