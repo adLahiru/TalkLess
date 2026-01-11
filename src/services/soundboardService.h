@@ -94,7 +94,8 @@ public:
     Q_INVOKABLE bool addClip(int boardId, const QString& filePath);
     Q_INVOKABLE bool addClips(int boardId, const QStringList& filePaths);
     Q_INVOKABLE bool addClipWithTitle(int boardId, const QString& filePath, const QString& title);
-    Q_INVOKABLE bool addClipWithSettings(int boardId, const QString& filePath, const QString& title, double trimStartMs, double trimEndMs);
+    Q_INVOKABLE bool addClipWithSettings(int boardId, const QString& filePath, const QString& title, double trimStartMs,
+                                         double trimEndMs);
     Q_INVOKABLE bool deleteClip(int boardId, int clipId);
     bool addClipToBoard(int boardId, const Clip& draft);
     bool updateClipInBoard(int boardId, int clipId, const Clip& updatedClip);
@@ -102,8 +103,8 @@ public:
                                        const QStringList& tags);
     Q_INVOKABLE bool updateClipImage(int boardId, int clipId, const QString& imagePath);
     Q_INVOKABLE bool updateClipAudioSettings(int boardId, int clipId, int volume, double speed);
-    Q_INVOKABLE void setClipVolume(int boardId, int clipId, int volume);  // Real-time volume (no save)
-    Q_INVOKABLE void setClipRepeat(int boardId, int clipId, bool repeat); // Toggle repeat mode
+    Q_INVOKABLE void setClipVolume(int boardId, int clipId, int volume);         // Real-time volume (no save)
+    Q_INVOKABLE void setClipRepeat(int boardId, int clipId, bool repeat);        // Toggle repeat mode
     Q_INVOKABLE void setClipReproductionMode(int boardId, int clipId, int mode); // Set reproduction mode (0-3)
     Q_INVOKABLE void setClipStopOtherSounds(int boardId, int clipId, bool stop);
     Q_INVOKABLE void setClipMuteOtherSounds(int boardId, int clipId, bool mute);
@@ -112,18 +113,18 @@ public:
     Q_INVOKABLE void seekClip(int boardId, int clipId, double positionMs);
     Q_INVOKABLE bool moveClip(int boardId, int fromIndex, int toIndex); // Reorder clips with drag-drop
     Q_INVOKABLE void copyClip(int clipId);                              // Copy clip to internal clipboard
-    Q_INVOKABLE bool pasteClip(int boardId);                             // Paste clip from clipboard to target board
+    Q_INVOKABLE bool pasteClip(int boardId);                            // Paste clip from clipboard to target board
     Q_INVOKABLE bool canPaste() const;                                  // Check if clipboard has a clip
     QVector<Clip> getClipsForBoard(int boardId) const;                  // Get all clips for a board
     QVector<Clip> getActiveClips() const;                               // Get clips from active board
-    Q_INVOKABLE QVariantMap getClipData(int boardId, int clipId) const;  // Get full clip data as map
+    Q_INVOKABLE QVariantMap getClipData(int boardId, int clipId) const; // Get full clip data as map
 
     // ---- Playback controls ----
-    Q_INVOKABLE void clipClicked(int clipId);   // Handle clip tile click: select + play with mode logic
+    Q_INVOKABLE void clipClicked(int clipId);              // Handle clip tile click: select + play with mode logic
     Q_INVOKABLE void setCurrentlySelectedClip(int clipId); // Just select the clip (for UI)
-    Q_INVOKABLE void playClip(int clipId);      // Start playback of the given clip
-    Q_INVOKABLE void stopClip(int clipId);      // Stop playback of the given clip
-    Q_INVOKABLE void stopAllClips();            // Stop all currently playing clips
+    Q_INVOKABLE void playClip(int clipId);                 // Start playback of the given clip
+    Q_INVOKABLE void stopClip(int clipId);                 // Stop playback of the given clip
+    Q_INVOKABLE void stopAllClips();                       // Stop all currently playing clips
     Q_INVOKABLE bool isClipPlaying(int clipId) const;
     Q_INVOKABLE double getClipPlaybackPositionMs(int clipId) const;
     Q_INVOKABLE QVariantList playingClipIDs() const;
@@ -167,6 +168,7 @@ signals:
     void settingsChanged();
     void clipPlaybackStarted(int clipId);
     void clipPlaybackStopped(int clipId);
+    void clipPlaybackPaused(int clipId); // Notify UI when clip is paused by another clip
     void clipUpdated(int boardId, int clipId);
 
     // Emitted when play-selected hotkey is pressed - QML handles this since it knows selected clip
@@ -178,7 +180,7 @@ private:
     void rebuildHotkeyIndex();
     Clip* findActiveClipById(int clipId);
     int getOrAssignSlot(int clipId); // Get audio engine slot for clip
-    void reproductionPlayingClip(const QVariantList &playingClipIds, int mode);
+    void reproductionPlayingClip(const QVariantList& playingClipIds, int mode);
     static QString normalizeHotkey(const QString& hotkey);
     void finalizeClipPlayback(int clipId); // Shared cleanup for manual stop and natural end
 
