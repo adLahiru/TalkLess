@@ -2,16 +2,15 @@
 
 #include "audioEngine.h"
 
+#include <QDateTime>
 #include <QDebug>
+#include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
-#include <QUrl>
-#include <QDateTime>
 #include <QStandardPaths>
-#include <QDir>
-
+#include <QUrl>
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
@@ -241,7 +240,7 @@ bool SoundboardService::saveActive()
             allOk = false;
         }
     }
-    
+
     if (allOk) {
         // reload index because clipCount/name might update
         m_state = m_repo.loadIndex();
@@ -258,7 +257,7 @@ QString SoundboardService::normalizeHotkey(const QString& hotkey)
 void SoundboardService::rebuildHotkeyIndex()
 {
     m_hotkeyToClipId.clear();
-    
+
     // Build hotkey index from all active boards
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& c : it.value().clips) {
@@ -1380,31 +1379,55 @@ void SoundboardService::playClip(int clipId)
     const bool isPaused = m_audioEngine->isClipPaused(slotId);
 
     // Per-clip behavior (when user taps the same clip again)
+    // Mode 0 (Overlay): Stop the clip when clicked again
+    if (mode == 0 && isCurrentlyPlaying && !isPaused) {
+        m_audioEngine->stopClip(slotId);
+        clip->isPlaying = false;
+        emit activeClipsChanged();
+        emit clipPlaybackStopped(clipId);
+        qDebug() << "Stopped overlay clip" << clipId;
+        return;
+    }
+
+    // Mode 1 (Play/Pause): Pause when playing, resume when paused
     if (mode == 1 && isCurrentlyPlaying) {
         if (isPaused) {
             // Resume from saved position
             m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
             m_audioEngine->resumeClip(slotId);
             clip->isPlaying = true;
+            emit activeClipsChanged();
+            emit clipPlaybackStarted(clipId);
             qDebug() << "Resuming clip" << clipId << "from position" << clip->lastPlayedPosMs;
         } else {
-            // User clicked a playing clip - STOP it (not pause) per user request
-            m_audioEngine->stopClip(slotId);
+            // Pause the clip (save position for later resume)
+            clip->lastPlayedPosMs = m_audioEngine->getClipPlaybackPositionMs(slotId);
+            m_audioEngine->pauseClip(slotId);
             clip->isPlaying = false;
-            clip->lastPlayedPosMs = 0.0; // Reset position since we're stopping
-            emit clipPlaybackStopped(clipId);
-            qDebug() << "Stopped clip" << clipId << "(user clicked playing tile)";
+            emit activeClipsChanged();
+            emit clipPlaybackPaused(clipId);
+            qDebug() << "Paused clip" << clipId << "at position" << clip->lastPlayedPosMs;
         }
-
-        emit activeClipsChanged();
         return;
     }
 
+    // Mode 2 (Play/Stop): Stop when playing
     if (mode == 2 && isCurrentlyPlaying && !isPaused) {
         m_audioEngine->stopClip(slotId);
         clip->isPlaying = false;
         emit activeClipsChanged();
         emit clipPlaybackStopped(clipId);
+        return;
+    }
+
+    // Mode 3 (Loop): Stop when playing
+    if (mode == 3 && isCurrentlyPlaying && !isPaused) {
+        m_audioEngine->stopClip(slotId);
+        clip->isPlaying = false;
+        clip->isRepeat = false; // Turn off loop when stopped
+        emit activeClipsChanged();
+        emit clipPlaybackStopped(clipId);
+        qDebug() << "Stopped loop clip" << clipId;
         return;
     }
 
@@ -1582,7 +1605,6 @@ float SoundboardService::recordingDuration() const
     return m_audioEngine->getRecordingDuration();
 }
 
-
 QString SoundboardService::getRecordingOutputPath() const
 {
     // Recordings folder in AppData
@@ -1696,7 +1718,7 @@ double SoundboardService::getFileDuration(const QString& filePath) const
 QVariantList SoundboardService::playingClipIDs() const
 {
     QVariantList playingIds;
-    
+
     // Check all active boards for playing clips
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& clip : it.value().clips) {

@@ -873,15 +873,16 @@ Rectangle {
                 // Bind isPlaying state
                 isPlaying: root.displayedClipData ? root.displayedClipData.isPlaying : false
 
-                // Play/Pause the displayed clip
+                // Toggle playback - backend handles reproduction mode behavior
                 onPlayClicked: {
                     if (root.displayedClipData) {
                         soundboardService.playClip(root.displayedClipData.clipId);
                     }
                 }
                 onPauseClicked: {
+                    // Also call playClip - backend toggles based on reproduction mode
                     if (root.displayedClipData) {
-                        soundboardService.stopClip(root.displayedClipData.clipId);
+                        soundboardService.playClip(root.displayedClipData.clipId);
                     }
                 }
 
@@ -1940,12 +1941,10 @@ Rectangle {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
+                                            // Let the backend handle reproduction mode behavior
+                                            // (playClip toggles based on clip's reproductionMode)
                                             if (root.selectedClipId !== -1) {
-                                                if (soundboardService.isClipPlaying(root.selectedClipId)) {
-                                                    soundboardService.stopClip(root.selectedClipId);
-                                                } else {
-                                                    soundboardService.playClip(root.selectedClipId);
-                                                }
+                                                soundboardService.playClip(root.selectedClipId);
                                             }
                                         }
                                     }
