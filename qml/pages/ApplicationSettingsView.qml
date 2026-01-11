@@ -168,8 +168,15 @@ Rectangle {
                                     Layout.fillWidth: true
                                     icon: "🎤"
                                     placeholder: "Select Input Device"
-                                    model: soundboardService.getInputDevices()
+
                                     selectedId: soundboardService.selectedCaptureDeviceId
+
+                                    // initial can be empty; we’ll fill on open
+                                    model: []
+
+                                    onAboutToOpen: {
+                                        model = soundboardService.getInputDevices()
+                                    }
 
                                     onItemSelected: function (id, name) {
                                         console.log("Input device selected:", name, "(id:", id, ")");
@@ -1024,7 +1031,7 @@ Rectangle {
                                 anchors.fill: parent
                                 anchors.margins: 22
                                 spacing: 22
-
+    
                                 // // ---- Row 1: Mic Input ----
                                 // RowLayout {
                                 //     spacing: 18
@@ -1067,7 +1074,7 @@ Rectangle {
 
                                 //     Item { Layout.fillWidth: true } // pushes items left
                                 // }
-
+                            
                                 // ---- Row 2: Speaker Output ----
                                 RowLayout {
                                     spacing: 18
@@ -1084,14 +1091,21 @@ Rectangle {
                                         id: speakerOutputDropdown
                                         Layout.preferredWidth: 280
                                         placeholder: "Select Output Device"
-                                        model: soundboardService.getOutputDevices()
                                         selectedId: soundboardService.selectedPlaybackDeviceId
 
+                                        // initial can be empty; we’ll fill on open
+                                        model: []
+
+                                        onAboutToOpen: {
+                                            model = soundboardService.getOutputDevices()
+                                        }
+
                                         onItemSelected: function (id, name) {
-                                            console.log("Speaker output selected:", name);
-                                            soundboardService.setOutputDevice(id);
+                                            console.log("Speaker output selected:", name)
+                                            soundboardService.setOutputDevice(id)
                                         }
                                     }
+
 
                                     DotMeter {
                                         Layout.leftMargin: 10
@@ -1119,8 +1133,14 @@ Rectangle {
                                         id: secondOutputDropdown
                                         Layout.preferredWidth: 280
                                         placeholder: "Select Monitor Device"
-                                        model: soundboardService.getOutputDevices()
+
                                         selectedId: soundboardService.selectedMonitorDeviceId
+
+                                        model: []
+
+                                        onAboutToOpen: {
+                                            model = soundboardService.getOutputDevices()
+                                        }
 
                                         onItemSelected: function (id, name) {
                                             console.log("Monitor output selected:", name);

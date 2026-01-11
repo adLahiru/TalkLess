@@ -15,7 +15,7 @@ Rectangle {
     property var model: []  // Array of objects with {id, name, isDefault}
     
     signal itemSelected(string id, string name)
-    
+    signal aboutToOpen()
     // Internal list model to properly manage items
     property var internalModel: []
     
@@ -108,9 +108,11 @@ Rectangle {
             if (dropdownPopup.visible) {
                 dropdownPopup.close()
             } else {
+                root.aboutToOpen()
                 dropdownPopup.open()
             }
         }
+
     }
 
     // Dropdown popup menu

@@ -1821,6 +1821,7 @@ QVariantList SoundboardService::getOutputDevices() const
         return result;
     }
 
+    
     auto devices = m_audioEngine->enumeratePlaybackDevices();
     for (const auto& device : devices) {
         QVariantMap deviceMap;
