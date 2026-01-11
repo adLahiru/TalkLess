@@ -3,8 +3,8 @@ import QtQuick.Controls 2.15
 
 Item {
     id: root
-    width: 222  // 111:79 aspect ratio (landscape)
-    height: 158
+    width: 180  // Match ClipTile size - reduced from 222
+    height: 128  // Match ClipTile size - reduced from 158
 
     property bool enabled: true
     property string text: enabled ? "Add Audio" : "Limit Reached"
