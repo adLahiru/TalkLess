@@ -1635,8 +1635,8 @@ Rectangle {
                                     Image {
                                         id: clipPreviewImage
                                         anchors.centerIn: parent
-                                        width: 80
-                                        height: 80
+                                        width: 100
+                                        height: 100
                                         fillMode: Image.PreserveAspectFit
                                         source: {
                                             const imgPath = clipEditorTab.editingClipImgPath;
@@ -1871,155 +1871,155 @@ Rectangle {
                                 }
                             }
 
-                            // ===== PLAYBACK CONTROLS =====
-                            RowLayout {
-                                Layout.alignment: Qt.AlignHCenter
-                                spacing: 6
+        //                     // ===== PLAYBACK CONTROLS =====
+        //                     RowLayout {
+        //                         Layout.alignment: Qt.AlignHCenter
+        //                         spacing: 6
 
-                                // Previous button
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: prevBtnArea.containsMouse ? "#3A3A3A" : "transparent"
+        //                         // Previous button
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: prevBtnArea.containsMouse ? "#3A3A3A" : "transparent"
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "◀"
-                                        color: "#FFFFFF"
-                                        font.pixelSize: 10
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "◀"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 10
+        //                             }
 
-                                    MouseArea {
-                                        id: prevBtnArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Previous clicked")
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 id: prevBtnArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: console.log("Previous clicked")
+        //                             }
+        //                         }
 
-                                // Skip backward button
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: skipBackArea.containsMouse ? "#3A3A3A" : "transparent"
+        //                         // Skip backward button
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: skipBackArea.containsMouse ? "#3A3A3A" : "transparent"
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "⏮"
-                                        color: "#FFFFFF"
-                                        font.pixelSize: 12
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "⏮"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 12
+        //                             }
 
-                                    MouseArea {
-                                        id: skipBackArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Skip backward clicked")
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 id: skipBackArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: console.log("Skip backward clicked")
+        //                             }
+        //                         }
 
-                                // Main Play Button (larger, gradient)
-                                Rectangle {
-                                    width: 36
-                                    height: 36
-                                    radius: 18
+        //                         // Main Play Button (larger, gradient)
+        //                         Rectangle {
+        //                             width: 36
+        //                             height: 36
+        //                             radius: 18
 
-                                    gradient: Gradient {
-                                        orientation: Gradient.Horizontal
-                                        GradientStop {
-                                            position: 0.0
-                                            color: "#3B82F6"
-                                        }
-                                        GradientStop {
-                                            position: 1.0
-                                            color: "#8B5CF6"
-                                        }
-                                    }
+        //                             gradient: Gradient {
+        //                                 orientation: Gradient.Horizontal
+        //                                 GradientStop {
+        //                                     position: 0.0
+        //                                     color: "#3B82F6"
+        //                                 }
+        //                                 GradientStop {
+        //                                     position: 1.0
+        //                                     color: "#8B5CF6"
+        //                                 }
+        //                             }
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: root.displayedClipData && root.displayedClipData.isPlaying ? "⏸" : "▶"
-                                        color: "#FFFFFF"
-                                        font.pixelSize: 14
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: root.displayedClipData && root.displayedClipData.isPlaying ? "⏸" : "▶"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 14
+        //                             }
 
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            if (root.selectedClipId !== -1) {
-                                                if (soundboardService.isClipPlaying(root.selectedClipId)) {
-                                                    soundboardService.stopClip(root.selectedClipId);
-                                                } else {
-                                                    soundboardService.playClip(root.selectedClipId);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 anchors.fill: parent
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: {
+        //                                     if (root.selectedClipId !== -1) {
+        //                                         if (soundboardService.isClipPlaying(root.selectedClipId)) {
+        //                                             soundboardService.stopClip(root.selectedClipId);
+        //                                         } else {
+        //                                             soundboardService.playClip(root.selectedClipId);
+        //                                         }
+        //                                     }
+        //                                 }
+        //                             }
+        //                         }
 
-                                // Skip forward button
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: skipFwdArea.containsMouse ? "#3A3A3A" : "transparent"
+        //                         // Skip forward button
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: skipFwdArea.containsMouse ? "#3A3A3A" : "transparent"
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "⏭"
-                                        color: "#FFFFFF"
-                                        font.pixelSize: 12
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "⏭"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 12
+        //                             }
 
-                                    MouseArea {
-                                        id: skipFwdArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Skip forward clicked")
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 id: skipFwdArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: console.log("Skip forward clicked")
+        //                             }
+        //                         }
 
-                                // Loop button - toggles repeat for selected clip
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: {
-                                        // Active when repeat is on
-                                        if (clipEditorTab.clipIsRepeat) {
-                                            return loopBtnArea.containsMouse ? "#7C3AED" : "#8B5CF6";
-                                        }
-                                        return loopBtnArea.containsMouse ? "#3A3A3A" : "transparent";
-                                    }
+        //                         // Loop button - toggles repeat for selected clip
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: {
+        //                                 // Active when repeat is on
+        //                                 if (clipEditorTab.clipIsRepeat) {
+        //                                     return loopBtnArea.containsMouse ? "#7C3AED" : "#8B5CF6";
+        //                                 }
+        //                                 return loopBtnArea.containsMouse ? "#3A3A3A" : "transparent";
+        //                             }
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "🔁"
-                                        color: clipEditorTab.clipIsRepeat ? "#FFFFFF" : "#888888"
-                                        font.pixelSize: 12
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "🔁"
+        //                                 color: clipEditorTab.clipIsRepeat ? "#FFFFFF" : "#888888"
+        //                                 font.pixelSize: 12
+        //                             }
 
-                                    MouseArea {
-                                        id: loopBtnArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            // Toggle repeat for selected clip
-                                            if (root.selectedClipId !== -1) {
-                                                clipEditorTab.clipIsRepeat = !clipEditorTab.clipIsRepeat;
-                                                clipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+        //                             MouseArea {
+        //                                 id: loopBtnArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: {
+        //                                     // Toggle repeat for selected clip
+        //                                     if (root.selectedClipId !== -1) {
+        //                                         clipEditorTab.clipIsRepeat = !clipEditorTab.clipIsRepeat;
+        //                                         clipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
+        //                                     }
+        //                                 }
+        //                             }
+        //                         }
+        //                     }
 
                             // ===== VOICE VOLUME SLIDER =====
                             ColumnLayout {
@@ -2279,193 +2279,295 @@ Rectangle {
                                         font.weight: Font.DemiBold
                                     }
                                 }
-
-                                // Mode icons row
+                                // Mode icons row (SVG + blue circle when selected)
                                 RowLayout {
                                     id: modeSelectorRow
                                     Layout.alignment: Qt.AlignHCenter
                                     spacing: 8
 
-                                    property int selectedMode: clipEditorTab.reproductionMode  // Bind to clip's mode
-                                    property bool ignoreNextChange: false  // Flag to prevent saving during load
+                                    property int selectedMode: clipEditorTab.reproductionMode
+                                    property bool ignoreNextChange: false
 
-                                    // Update backend ONLY when user clicks, not during load
+                                    // change this to your real theme flag
+                                    property bool isLightTheme: false
+
+                                    // Update backend ONLY once (here), not inside each button
                                     onSelectedModeChanged: {
                                         if (ignoreNextChange) {
-                                            ignoreNextChange = false;  // Reset flag
-                                            return;  // Don't save during load
+                                            ignoreNextChange = false
+                                            return
                                         }
+                                        clipEditorTab.reproductionMode = selectedMode
                                         if (root.selectedClipId !== -1) {
-                                            soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, selectedMode);
-                                            console.log("Reproduction mode changed to:", selectedMode, "- SAVED!");
+                                            soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, selectedMode)
+                                            console.log("Reproduction mode changed to:", selectedMode, "- SAVED!")
                                         }
                                     }
 
-                                    // Overlay Mode
-                                    Rectangle {
+                                    // helper: pick correct svg for mode + theme
+                                    function modeIconSource(mode) {
+                                        const base = "qrc:/qt/qml/TalkLess/resources/icons/reproduction/"
+                                        const suffix = isLightTheme ? "_light.svg" : "_dark.svg"
+                                        switch (mode) {
+                                        case 0: return base + "overlay" + suffix
+                                        case 1: return base + "play-pause" + suffix
+                                        case 2: return base + "play-stop" + suffix
+                                        case 3: return base + "restart" + suffix
+                                        case 4: return base + "loop" + suffix
+                                        default: return ""
+                                        }
+                                    }
+
+                                    // reusable button
+                                    component ModeButton: Rectangle {
+                                        required property int mode
+                                        property bool selected: modeSelectorRow.selectedMode === mode
+
                                         width: 36
                                         height: 36
                                         radius: 8
-                                        color: parent.selectedMode === 0 ? "#00D9FF" : (overlayModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 0 ? "#00D9FF" : "#3A3A3A"
-                                        border.width: parent.selectedMode === 0 ? 2 : 1
+                                        color: ma.containsMouse ? "#2A2A2A" : "#1A1A1A"
+                                        // border.color: transientParent
+                                        border.width: 1
 
-                                        Text {
+                                        // Blue circle background when selected
+                                        Rectangle {
                                             anchors.centerIn: parent
-                                            text: "▶"
-                                            color: parent.parent.selectedMode === 0 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 14
-                                            font.weight: Font.Bold
+                                            width: 28
+                                            height: 28
+                                            radius: 14
+                                            visible: parent.selected
+                                            color: "#00D9FF"
+                                        }
+
+                                        Image {
+                                            anchors.centerIn: parent
+                                            source: modeSelectorRow.modeIconSource(parent.mode)
+
+                                            // icon size inside 36x36 (tweak if needed)
+                                            width: 18
+                                            height: 18
+                                            sourceSize.width: width
+                                            sourceSize.height: height
+
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            mipmap: true
                                         }
 
                                         MouseArea {
-                                            id: overlayModeArea
+                                            id: ma
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                modeSelectorRow.selectedMode = 0;
-                                                clipEditorTab.reproductionMode = 0;
-                                                if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 0);
-                                                    console.log("Mode set to Overlay (0)");
-                                                }
+                                                modeSelectorRow.selectedMode = parent.mode
                                             }
                                         }
                                     }
 
-                                    // Play/Pause Mode
-                                    Rectangle {
-                                        width: 36
-                                        height: 36
-                                        radius: 8
-                                        color: parent.selectedMode === 1 ? "#00D9FF" : (playPauseModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 1 ? "#00D9FF" : "#3A3A3A"
-                                        border.width: parent.selectedMode === 1 ? 2 : 1
+                                    // 0 Overlay
+                                    ModeButton { mode: 0 }
 
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "▶⏸"
-                                            color: parent.parent.selectedMode === 1 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 14
-                                            font.weight: Font.Bold
-                                        }
+                                    // 1 Play/Pause
+                                    ModeButton { mode: 1 }
 
-                                        MouseArea {
-                                            id: playPauseModeArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                modeSelectorRow.selectedMode = 1;
-                                                clipEditorTab.reproductionMode = 1;
-                                                if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 1);
-                                                    console.log("Mode set to Play/Pause (1)");
-                                                }
-                                            }
-                                        }
-                                    }
+                                    // 2 Play/Stop
+                                    ModeButton { mode: 2 }
 
-                                    // Play/Stop Mode
-                                    Rectangle {
-                                        width: 36
-                                        height: 36
-                                        radius: 8
-                                        color: parent.selectedMode === 2 ? "#00D9FF" : (playStopModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 2 ? "#00D9FF" : "#3A3A3A"
-                                        border.width: parent.selectedMode === 2 ? 2 : 1
+                                    // 3 Exclusive (mapped to restart icons you provided)
+                                    ModeButton { mode: 3 }
 
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "▶⏹"
-                                            color: parent.parent.selectedMode === 2 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 14
-                                            font.weight: Font.Bold
-                                        }
-
-                                        MouseArea {
-                                            id: playStopModeArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                modeSelectorRow.selectedMode = 2;
-                                                clipEditorTab.reproductionMode = 2;
-                                                if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 2);
-                                                    console.log("Mode set to Play/Stop (2)");
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Exclusive Playback Mode (NEW - mode 3)
-                                    Rectangle {
-                                        width: 36
-                                        height: 36
-                                        radius: 8
-                                        color: parent.selectedMode === 3 ? "#00D9FF" : (exclusiveModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 3 ? "#00D9FF" : "#3A3A3A"
-                                        border.width: parent.selectedMode === 3 ? 2 : 1
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "🔒"
-                                            color: parent.parent.selectedMode === 3 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 14
-                                            font.weight: Font.Bold
-                                        }
-
-                                        MouseArea {
-                                            id: exclusiveModeArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                modeSelectorRow.selectedMode = 3;
-                                                clipEditorTab.reproductionMode = 3;
-                                                if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 3);
-                                                    console.log("Mode set to Exclusive Playback (3)");
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Loop Mode (was Restart, now mode 4)
-                                    Rectangle {
-                                        width: 36
-                                        height: 36
-                                        radius: 8
-                                        color: parent.selectedMode === 4 ? "#00D9FF" : (loopModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 4 ? "#00D9FF" : "#3A3A3A"
-                                        border.width: parent.selectedMode === 4 ? 2 : 1
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "⟲"
-                                            color: parent.parent.selectedMode === 4 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 16
-                                            font.weight: Font.Bold
-                                        }
-
-                                        MouseArea {
-                                            id: loopModeArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                modeSelectorRow.selectedMode = 4;
-                                                clipEditorTab.reproductionMode = 4;
-                                                if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 4);
-                                                    console.log("Mode set to Loop (4)");
-                                                }
-                                            }
-                                        }
-                                    }
+                                    // 4 Loop
+                                    ModeButton { mode: 4 }
                                 }
+
+                                // // Mode icons row
+                                // RowLayout {
+                                //     id: modeSelectorRow
+                                //     Layout.alignment: Qt.AlignHCenter
+                                //     spacing: 8
+
+                                //     property int selectedMode: clipEditorTab.reproductionMode  // Bind to clip's mode
+                                //     property bool ignoreNextChange: false  // Flag to prevent saving during load
+
+                                //     // Update backend ONLY when user clicks, not during load
+                                //     onSelectedModeChanged: {
+                                //         if (ignoreNextChange) {
+                                //             ignoreNextChange = false;  // Reset flag
+                                //             return;  // Don't save during load
+                                //         }
+                                //         if (root.selectedClipId !== -1) {
+                                //             soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, selectedMode);
+                                //             console.log("Reproduction mode changed to:", selectedMode, "- SAVED!");
+                                //         }
+                                //     }
+
+                                //     // Overlay Mode
+                                //     Rectangle {
+                                //         width: 36
+                                //         height: 36
+                                //         radius: 8
+                                //         color: parent.selectedMode === 0 ? "#00D9FF" : (overlayModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                //         border.color: parent.selectedMode === 0 ? "#00D9FF" : "#3A3A3A"
+                                //         border.width: parent.selectedMode === 0 ? 2 : 1
+
+                                //         Text {
+                                //             anchors.centerIn: parent
+                                //             text: "▶"
+                                //             color: parent.parent.selectedMode === 0 ? "#000000" : "#FFFFFF"
+                                //             font.pixelSize: 14
+                                //             font.weight: Font.Bold
+                                //         }
+
+                                //         MouseArea {
+                                //             id: overlayModeArea
+                                //             anchors.fill: parent
+                                //             hoverEnabled: true
+                                //             cursorShape: Qt.PointingHandCursor
+                                //             onClicked: {
+                                //                 modeSelectorRow.selectedMode = 0;
+                                //                 clipEditorTab.reproductionMode = 0;
+                                //                 if (root.selectedClipId !== -1) {
+                                //                     soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 0);
+                                //                     console.log("Mode set to Overlay (0)");
+                                //                 }
+                                //             }
+                                //         }
+                                //     }
+
+                                //     // Play/Pause Mode
+                                //     Rectangle {
+                                //         width: 36
+                                //         height: 36
+                                //         radius: 8
+                                //         color: parent.selectedMode === 1 ? "#00D9FF" : (playPauseModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                //         border.color: parent.selectedMode === 1 ? "#00D9FF" : "#3A3A3A"
+                                //         border.width: parent.selectedMode === 1 ? 2 : 1
+
+                                //         Text {
+                                //             anchors.centerIn: parent
+                                //             text: "▶⏸"
+                                //             color: parent.parent.selectedMode === 1 ? "#000000" : "#FFFFFF"
+                                //             font.pixelSize: 14
+                                //             font.weight: Font.Bold
+                                //         }
+
+                                //         MouseArea {
+                                //             id: playPauseModeArea
+                                //             anchors.fill: parent
+                                //             hoverEnabled: true
+                                //             cursorShape: Qt.PointingHandCursor
+                                //             onClicked: {
+                                //                 modeSelectorRow.selectedMode = 1;
+                                //                 clipEditorTab.reproductionMode = 1;
+                                //                 if (root.selectedClipId !== -1) {
+                                //                     soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 1);
+                                //                     console.log("Mode set to Play/Pause (1)");
+                                //                 }
+                                //             }
+                                //         }
+                                //     }
+
+                                //     // Play/Stop Mode
+                                //     Rectangle {
+                                //         width: 36
+                                //         height: 36
+                                //         radius: 8
+                                //         color: parent.selectedMode === 2 ? "#00D9FF" : (playStopModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                //         border.color: parent.selectedMode === 2 ? "#00D9FF" : "#3A3A3A"
+                                //         border.width: parent.selectedMode === 2 ? 2 : 1
+
+                                //         Text {
+                                //             anchors.centerIn: parent
+                                //             text: "▶⏹"
+                                //             color: parent.parent.selectedMode === 2 ? "#000000" : "#FFFFFF"
+                                //             font.pixelSize: 14
+                                //             font.weight: Font.Bold
+                                //         }
+
+                                //         MouseArea {
+                                //             id: playStopModeArea
+                                //             anchors.fill: parent
+                                //             hoverEnabled: true
+                                //             cursorShape: Qt.PointingHandCursor
+                                //             onClicked: {
+                                //                 modeSelectorRow.selectedMode = 2;
+                                //                 clipEditorTab.reproductionMode = 2;
+                                //                 if (root.selectedClipId !== -1) {
+                                //                     soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 2);
+                                //                     console.log("Mode set to Play/Stop (2)");
+                                //                 }
+                                //             }
+                                //         }
+                                //     }
+
+                                //     // Exclusive Playback Mode (NEW - mode 3)
+                                //     Rectangle {
+                                //         width: 36
+                                //         height: 36
+                                //         radius: 8
+                                //         color: parent.selectedMode === 3 ? "#00D9FF" : (exclusiveModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                //         border.color: parent.selectedMode === 3 ? "#00D9FF" : "#3A3A3A"
+                                //         border.width: parent.selectedMode === 3 ? 2 : 1
+
+                                //         Text {
+                                //             anchors.centerIn: parent
+                                //             text: "🔒"
+                                //             color: parent.parent.selectedMode === 3 ? "#000000" : "#FFFFFF"
+                                //             font.pixelSize: 14
+                                //             font.weight: Font.Bold
+                                //         }
+
+                                //         MouseArea {
+                                //             id: exclusiveModeArea
+                                //             anchors.fill: parent
+                                //             hoverEnabled: true
+                                //             cursorShape: Qt.PointingHandCursor
+                                //             onClicked: {
+                                //                 modeSelectorRow.selectedMode = 3;
+                                //                 clipEditorTab.reproductionMode = 3;
+                                //                 if (root.selectedClipId !== -1) {
+                                //                     soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 3);
+                                //                     console.log("Mode set to Exclusive Playback (3)");
+                                //                 }
+                                //             }
+                                //         }
+                                //     }
+
+                                //     // Loop Mode (was Restart, now mode 4)
+                                //     Rectangle {
+                                //         width: 36
+                                //         height: 36
+                                //         radius: 8
+                                //         color: parent.selectedMode === 4 ? "#00D9FF" : (loopModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                //         border.color: parent.selectedMode === 4 ? "#00D9FF" : "#3A3A3A"
+                                //         border.width: parent.selectedMode === 4 ? 2 : 1
+
+                                //         Text {
+                                //             anchors.centerIn: parent
+                                //             text: "⟲"
+                                //             color: parent.parent.selectedMode === 4 ? "#000000" : "#FFFFFF"
+                                //             font.pixelSize: 16
+                                //             font.weight: Font.Bold
+                                //         }
+
+                                //         MouseArea {
+                                //             id: loopModeArea
+                                //             anchors.fill: parent
+                                //             hoverEnabled: true
+                                //             cursorShape: Qt.PointingHandCursor
+                                //             onClicked: {
+                                //                 modeSelectorRow.selectedMode = 4;
+                                //                 clipEditorTab.reproductionMode = 4;
+                                //                 if (root.selectedClipId !== -1) {
+                                //                     soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 4);
+                                //                     console.log("Mode set to Loop (4)");
+                                //                 }
+                                //             }
+                                //         }
+                                //     }
+                                // }
 
                                 // Mode description text
                                 Text {

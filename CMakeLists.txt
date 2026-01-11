@@ -105,11 +105,7 @@ qt_add_qml_module(appTalkLess
         qml/styles/Typography.qml
         qml/styles/Theme.qml
         qml/utils/Functions.qml
-    SOURCES
-        # src/view/soundboardview.h
-        # src/view/soundboardview.cpp
-        # src/view/audioplayerview.h
-        # src/view/audioplayerview.cpp
+
     RESOURCES
         # Sidebar navigation icons
         resources/icons/sidebar/ic_logo.png
@@ -140,6 +136,17 @@ qt_add_qml_module(appTalkLess
         resources/images/addAudioBackground.png
         resources/images/sondboard.jpg
         resources/images/Subtract.svg
+        # Reproduction Icons
+        resources/icons/reproduction/loop_dark.svg
+        resources/icons/reproduction/loop_light.svg
+        resources/icons/reproduction/overlay_dark.svg
+        resources/icons/reproduction/overlay_light.svg
+        resources/icons/reproduction/play-pause_dark.svg
+        resources/icons/reproduction/play-pause_light.svg
+        resources/icons/reproduction/restart_dark.svg
+        resources/icons/reproduction/restart_light.svg
+        resources/icons/reproduction/play-stop_dark.svg
+        resources/icons/reproduction/play-stop_light.svg
 )
 
 # Add include directories for QML type registration
