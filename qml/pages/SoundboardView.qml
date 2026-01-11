@@ -524,30 +524,33 @@ Rectangle {
                 color: "#0d0d0d"
                 radius: 12
 
-                // Tile sizing properties - responsive layout
+                // Tile sizing properties - responsive layout with scale factor
                 readonly property real tileSpacing: 15
                 readonly property real tilePadding: 20
-                readonly property real minTileWidth: 120  // Minimum tile width
-                readonly property real maxTileWidth: 180  // Maximum tile width (smaller than original)
+                // Base size range, scaled by slotSizeScale (0.5 to 1.5)
+                readonly property real baseMinTileWidth: 120
+                readonly property real baseMaxTileWidth: 180
+                readonly property real minTileWidth: baseMinTileWidth * soundboardService.slotSizeScale
+                readonly property real maxTileWidth: baseMaxTileWidth * soundboardService.slotSizeScale
 
                 // Calculate number of columns based on available width
                 // Default to 5 columns for normal displays, but adjust based on space
                 readonly property int columnsCount: {
                     const availableWidth = width - tilePadding * 2;
                     // Try different column counts and find the best fit
-                    for (let cols = 6; cols >= 3; cols--) {
+                    for (let cols = 8; cols >= 2; cols--) {
                         const calculatedWidth = (availableWidth - tileSpacing * (cols - 1)) / cols;
                         if (calculatedWidth >= minTileWidth && calculatedWidth <= maxTileWidth) {
                             return cols;
                         }
                     }
                     // Fallback: calculate based on minimum width
-                    return Math.max(3, Math.floor((availableWidth + tileSpacing) / (minTileWidth + tileSpacing)));
+                    return Math.max(2, Math.floor((availableWidth + tileSpacing) / (minTileWidth + tileSpacing)));
                 }
 
-                // Width calculation based on column count
+                // Width calculation based on column count - proportionally scaled
                 readonly property real tileWidth: (width - tilePadding * 2 - tileSpacing * (columnsCount - 1)) / columnsCount
-                readonly property real tileHeight: tileWidth * 79 / 111  // 111:79 aspect ratio
+                readonly property real tileHeight: tileWidth * 79 / 111  // 111:79 aspect ratio maintained
 
                 // Dummy clips data - REMOVED, now using real clipsModel
                 // The clipsModel is exposed from C++ and updated when a soundboard is selected

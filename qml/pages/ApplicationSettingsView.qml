@@ -895,18 +895,14 @@ Rectangle {
                                                 font.pixelSize: 12
                                             }
                                             Slider {
+                                                id: slotSizeSlider
                                                 Layout.fillWidth: true
-                                                from: 0
-                                                to: 2
-                                                stepSize: 1
-                                                value: soundboardService.slotSize === "Compact" ? 0 : (soundboardService.slotSize === "Comfortable" ? 2 : 1)
+                                                from: 0.5
+                                                to: 1.5
+                                                stepSize: 0  // Continuous slider
+                                                value: soundboardService.slotSizeScale
                                                 onMoved: {
-                                                    if (value === 0)
-                                                        soundboardService.setSlotSize("Compact");
-                                                    else if (value === 1)
-                                                        soundboardService.setSlotSize("Standard");
-                                                    else
-                                                        soundboardService.setSlotSize("Comfortable");
+                                                    soundboardService.setSlotSizeScale(value);
                                                 }
                                             }
                                             Text {
@@ -926,8 +922,13 @@ Rectangle {
                                             font.weight: Font.Medium
                                         }
                                         Repeater {
-                                            model: ["Compact", "Standard", "Comfortable"]
+                                            model: [
+                                                { name: "Compact", scale: 0.7 },
+                                                { name: "Standard", scale: 1.0 },
+                                                { name: "Comfortable", scale: 1.3 }
+                                            ]
                                             delegate: RowLayout {
+                                                required property var modelData
                                                 spacing: 10
                                                 Rectangle {
                                                     width: 16
@@ -942,17 +943,17 @@ Rectangle {
                                                         height: 8
                                                         radius: 4
                                                         color: "#3B82F6"
-                                                        visible: soundboardService.slotSize === modelData
+                                                        visible: Math.abs(soundboardService.slotSizeScale - modelData.scale) < 0.1
                                                     }
                                                 }
                                                 Text {
-                                                    text: modelData
+                                                    text: modelData.name
                                                     color: "#FFFFFF"
                                                     font.pixelSize: 14
                                                 }
                                                 MouseArea {
                                                     anchors.fill: parent
-                                                    onClicked: soundboardService.setSlotSize(modelData)
+                                                    onClicked: soundboardService.setSlotSizeScale(modelData.scale)
                                                 }
                                             }
                                         }
@@ -966,50 +967,19 @@ Rectangle {
                                             font.pixelSize: 12
                                         }
 
-                                        // Mockup Clip Card
-                                        Rectangle {
-                                            Layout.preferredWidth: 200
-                                            Layout.preferredHeight: soundboardService.slotSize === "Compact" ? 120 : (soundboardService.slotSize === "Comfortable" ? 180 : 150)
-                                            color: "#2A2A2A"
-                                            radius: 12
-                                            clip: true
-
-                                            Rectangle {
-                                                anchors.fill: parent
-                                                color: soundboardService.accentColor
-                                                opacity: 0.1
-                                            }
-
-                                            ColumnLayout {
-                                                anchors.centerIn: parent
-                                                spacing: 8
-                                                Rectangle {
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                    width: 40
-                                                    height: 40
-                                                    radius: 20
-                                                    color: soundboardService.accentColor
-                                                    Text {
-                                                        anchors.centerIn: parent
-                                                        text: "▶"
-                                                        color: "#FFFFFF"
-                                                        font.pixelSize: 16
-                                                    }
-                                                }
-                                                Text {
-                                                    text: "Morning"
-                                                    color: "#FFFFFF"
-                                                    font.pixelSize: 14
-                                                    font.weight: Font.Bold
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                }
-                                                Text {
-                                                    text: "Alt+F2+Shift"
-                                                    color: "#888888"
-                                                    font.pixelSize: 12
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                }
-                                            }
+                                        // Use actual ClipTile component for accurate preview
+                                        // Size matches SoundboardView: baseWidth=180, aspect ratio 111:79
+                                        ClipTile {
+                                            id: previewTile
+                                            readonly property real previewBaseWidth: 180
+                                            readonly property real previewAspectRatio: 79 / 111
+                                            Layout.preferredWidth: previewBaseWidth * soundboardService.slotSizeScale
+                                            Layout.preferredHeight: previewBaseWidth * previewAspectRatio * soundboardService.slotSizeScale
+                                            title: "Morning"
+                                            hotkeyText: "Alt+Shift+M"
+                                            selected: false
+                                            showActions: false
+                                            isPlaying: false
                                         }
                                     }
                                 }

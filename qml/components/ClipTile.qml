@@ -7,8 +7,16 @@ import QtQuick.Effects
 
 Item {
     id: root
-    width: 180  // 111:79 aspect ratio (landscape) - reduced from 222
-    height: 128  // Calculated: 180 * 79 / 111 ≈ 128
+    // Base dimensions matching SoundboardView calculation
+    readonly property real baseWidth: 180
+    readonly property real baseHeight: baseWidth * 79 / 111  // 111:79 aspect ratio = ~128.1
+    
+    // Scale factor for proportional sizing - based on actual width vs base width
+    readonly property real scaleFactor: width / baseWidth
+    
+    // Default size (can be overridden by parent)
+    width: baseWidth
+    height: baseHeight
 
     // data
     property string title: ""  // Optional - only shows if not empty (e.g., "Morning")
@@ -33,9 +41,9 @@ Item {
     Rectangle {
         id: card
         anchors.fill: parent
-        radius: 16
+        radius: 16 * root.scaleFactor
         color: "#101010"
-        border.width: 2
+        border.width: Math.max(1, 2 * root.scaleFactor)
         border.color: "#EDEDED"
         clip: true
 
@@ -43,7 +51,7 @@ Item {
         Item {
             id: imageContainer
             anchors.fill: parent
-            anchors.margins: 2  // Account for border
+            anchors.margins: 2 * root.scaleFactor  // Account for border
 
             // The actual image (hidden, used as source for masking)
             Image {
@@ -59,7 +67,7 @@ Item {
             Rectangle {
                 id: imageMask
                 anchors.fill: parent
-                radius: 14  // Slightly less than card radius to account for border
+                radius: 14 * root.scaleFactor  // Slightly less than card radius to account for border
                 visible: false
             }
 
@@ -86,8 +94,8 @@ Item {
 
             Rectangle {
                 anchors.fill: parent
-                anchors.rightMargin: -16  // Extend right to hide right-side corners
-                radius: 16  // Match card radius
+                anchors.rightMargin: -16 * root.scaleFactor  // Extend right to hide right-side corners
+                radius: 16 * root.scaleFactor  // Match card radius
                 color: "#D9D9D938"  // Yellowish/golden color
                 opacity: 0.2  // Transparent so background shows through
             }
@@ -98,29 +106,29 @@ Item {
             id: tagPill
             anchors.left: parent.left
             anchors.top: parent.top
-            anchors.topMargin: 10
-            height: 28
+            anchors.topMargin: 10 * root.scaleFactor
+            height: 28 * root.scaleFactor
             // Width is content-based but limited to 60% of tile width
-            width: Math.min(tagText.implicitWidth + 20, parent.width * 0.6)
+            width: Math.min(tagText.implicitWidth + 20 * root.scaleFactor, parent.width * 0.6)
             visible: root.title !== ""
             clip: true
 
             // Background with right-side rounded corners only
             Rectangle {
                 anchors.fill: parent
-                anchors.leftMargin: -16  // Extend left to hide left corners
-                radius: 14
+                anchors.leftMargin: -16 * root.scaleFactor  // Extend left to hide left corners
+                radius: 14 * root.scaleFactor
                 color: "#3B82F6"
             }
 
             Text {
                 id: tagText
                 anchors.centerIn: parent
-                anchors.horizontalCenterOffset: 4  // Slight offset for padding
-                width: parent.width - 16  // Leave padding on both sides
+                anchors.horizontalCenterOffset: 4 * root.scaleFactor  // Slight offset for padding
+                width: parent.width - 16 * root.scaleFactor  // Leave padding on both sides
                 text: root.title
                 color: "#FFFFFF"
-                font.pixelSize: 14
+                font.pixelSize: Math.max(10, 14 * root.scaleFactor)
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight  // Truncate with ellipsis if text is too long
                 horizontalAlignment: Text.AlignHCenter
@@ -133,11 +141,11 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 8
-            anchors.rightMargin: 8
-            anchors.bottomMargin: 6
-            height: 28
-            radius: 10
+            anchors.leftMargin: 8 * root.scaleFactor
+            anchors.rightMargin: 8 * root.scaleFactor
+            anchors.bottomMargin: 6 * root.scaleFactor
+            height: 28 * root.scaleFactor
+            radius: 10 * root.scaleFactor
             color: "#000000"
             opacity: 0.7
         }
@@ -147,23 +155,23 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 8
-            anchors.rightMargin: 8
-            anchors.bottomMargin: 6
-            height: 28
+            anchors.leftMargin: 8 * root.scaleFactor
+            anchors.rightMargin: 8 * root.scaleFactor
+            anchors.bottomMargin: 6 * root.scaleFactor
+            height: 28 * root.scaleFactor
 
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 8
-                anchors.rightMargin: 8
-                spacing: 6
+                anchors.leftMargin: 8 * root.scaleFactor
+                anchors.rightMargin: 8 * root.scaleFactor
+                spacing: 6 * root.scaleFactor
 
                 // Hotkey container
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 20
+                    Layout.preferredHeight: 20 * root.scaleFactor
                     color: root.hotkeyText !== "" ? "rgba(0, 0, 0, 0.4)" : "rgba(60, 123, 255, 0.15)"
-                    radius: 4
+                    radius: 4 * root.scaleFactor
                     border.color: root.hotkeyText !== "" ? "transparent" : "rgba(60, 123, 255, 0.3)"
                     border.width: root.hotkeyText !== "" ? 0 : 1
 
@@ -172,7 +180,7 @@ Item {
                         anchors.fill: parent
                         text: root.hotkeyText !== "" ? root.hotkeyText : "Assign"
                         color: root.hotkeyText !== "" ? "#FFFFFF" : "#3C7BFF"
-                        font.pixelSize: 12
+                        font.pixelSize: Math.max(8, 12 * root.scaleFactor)
                         font.weight: root.hotkeyText !== "" ? Font.Medium : Font.DemiBold
                         elide: Text.ElideRight
                         horizontalAlignment: Text.AlignHCenter
@@ -196,10 +204,10 @@ Item {
             id: actionPopupBar
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.topMargin: 8
-            width: 240 // Widened for Copy and Paste buttons
-            height: 40
-            radius: 20
+            anchors.topMargin: 8 * root.scaleFactor
+            width: Math.min(240 * root.scaleFactor, parent.width - 16 * root.scaleFactor) // Widened for Copy and Paste buttons
+            height: 40 * root.scaleFactor
+            radius: 20 * root.scaleFactor
             color: "#E61A1A1A" // More solid than hover version
             border.color: "#3B82F6" // Blue border when open
             border.width: 1
@@ -215,19 +223,19 @@ Item {
 
             RowLayout {
                 anchors.centerIn: parent
-                spacing: 2
+                spacing: 2 * root.scaleFactor
 
                 // Play/Stop Button
                 Rectangle {
-                    width: 30
-                    height: 30
-                    radius: 15
+                    width: 30 * root.scaleFactor
+                    height: 30 * root.scaleFactor
+                    radius: 15 * root.scaleFactor
                     color: playActionMouseArea.containsMouse ? "#444444" : "transparent"
 
                     Text {
                         anchors.centerIn: parent
                         text: root.isPlaying ? "⏹️" : "▶️"
-                        font.pixelSize: 14
+                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
                     }
 
                     MouseArea {
@@ -247,15 +255,15 @@ Item {
 
                 // Copy Button (Clipboard)
                 Rectangle {
-                    width: 30
-                    height: 30
-                    radius: 15
+                    width: 30 * root.scaleFactor
+                    height: 30 * root.scaleFactor
+                    radius: 15 * root.scaleFactor
                     color: copyActionMouseArea.containsMouse ? "#444444" : "transparent"
 
                     Text {
                         anchors.centerIn: parent
                         text: "📋"
-                        font.pixelSize: 14
+                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
                     }
 
                     MouseArea {
@@ -272,23 +280,23 @@ Item {
 
                 // Paste Button (Clipboard Paste)
                 Rectangle {
-                    width: 30
-                    height: 30
-                    radius: 15
+                    width: 30 * root.scaleFactor
+                    height: 30 * root.scaleFactor
+                    radius: 15 * root.scaleFactor
                     color: pasteActionMouseArea.containsMouse ? "#444444" : "transparent"
-                    opacity: soundboardService.canPaste() ? 1.0 : 0.4
+                    opacity: soundboardService.canPaste ? 1.0 : 0.4
 
                     Text {
                         anchors.centerIn: parent
                         text: "📥"
-                        font.pixelSize: 14
+                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
                     }
 
                     MouseArea {
                         id: pasteActionMouseArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        enabled: soundboardService.canPaste()
+                        enabled: soundboardService.canPaste
                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                         onClicked: {
                             root.pasteClicked();
@@ -299,15 +307,15 @@ Item {
 
                 // Edit Background Button
                 Rectangle {
-                    width: 30
-                    height: 30
-                    radius: 15
+                    width: 30 * root.scaleFactor
+                    height: 30 * root.scaleFactor
+                    radius: 15 * root.scaleFactor
                     color: editBgActionMouseArea.containsMouse ? "#444444" : "transparent"
 
                     Text {
                         anchors.centerIn: parent
                         text: "🖼️"
-                        font.pixelSize: 14
+                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
                     }
 
                     MouseArea {
@@ -324,15 +332,15 @@ Item {
 
                 // Web/Globe Button
                 Rectangle {
-                    width: 30
-                    height: 30
-                    radius: 15
+                    width: 30 * root.scaleFactor
+                    height: 30 * root.scaleFactor
+                    radius: 15 * root.scaleFactor
                     color: webActionMouseArea.containsMouse ? "#444444" : "transparent"
 
                     Text {
                         anchors.centerIn: parent
                         text: "🌐"
-                        font.pixelSize: 14
+                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
                     }
 
                     MouseArea {
@@ -349,15 +357,15 @@ Item {
 
                 // Edit Settings Button
                 Rectangle {
-                    width: 30
-                    height: 30
-                    radius: 15
+                    width: 30 * root.scaleFactor
+                    height: 30 * root.scaleFactor
+                    radius: 15 * root.scaleFactor
                     color: editActionMouseArea.containsMouse ? "#444444" : "transparent"
 
                     Text {
                         anchors.centerIn: parent
                         text: "✏️"
-                        font.pixelSize: 14
+                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
                     }
 
                     MouseArea {
@@ -374,15 +382,15 @@ Item {
 
                 // Delete Button
                 Rectangle {
-                    width: 30
-                    height: 30
-                    radius: 15
+                    width: 30 * root.scaleFactor
+                    height: 30 * root.scaleFactor
+                    radius: 15 * root.scaleFactor
                     color: deleteActionMouseArea.containsMouse ? "#444444" : "transparent"
 
                     Text {
                         anchors.centerIn: parent
                         text: "🗑️"
-                        font.pixelSize: 14
+                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
                     }
 
                     MouseArea {

@@ -2047,6 +2047,17 @@ void SoundboardService::setSlotSize(const QString& size)
     emit settingsChanged();
 }
 
+void SoundboardService::setSlotSizeScale(double scale)
+{
+    // Clamp scale to valid range
+    scale = qBound(0.5, scale, 1.5);
+    if (qFuzzyCompare(m_state.settings.slotSizeScale, scale))
+        return;
+    m_state.settings.slotSizeScale = scale;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
 void SoundboardService::setLanguage(const QString& lang)
 {
     if (m_state.settings.language == lang)

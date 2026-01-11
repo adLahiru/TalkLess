@@ -103,7 +103,7 @@ ApplicationWindow {
             Layout.fillHeight: true
             spacing: 10
 
-            SideBar {
+            Sidebar {
                 id: sidebar
                 Layout.preferredWidth: isCollapsed ? 80 : 280
                 Layout.fillHeight: true

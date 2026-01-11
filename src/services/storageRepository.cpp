@@ -23,6 +23,7 @@ static QJsonObject settingsToJson(const AppSettings& s)
     o["theme"] = s.theme;
     o["accentColor"] = s.accentColor;
     o["slotSize"] = s.slotSize;
+    o["slotSizeScale"] = s.slotSizeScale;
     o["language"] = s.language;
     o["hotkeyMode"] = s.hotkeyMode;
     o["micEnabled"] = s.micEnabled;
@@ -42,6 +43,7 @@ static AppSettings settingsFromJson(const QJsonObject& o)
     s.theme = o.value("theme").toString("Dark");
     s.accentColor = o.value("accentColor").toString("#3B82F6");
     s.slotSize = o.value("slotSize").toString("Standard");
+    s.slotSizeScale = o.value("slotSizeScale").toDouble(1.0);
     s.language = o.value("language").toString("English");
     s.hotkeyMode = o.value("hotkeyMode").toString("ActiveBoardOnly");
     s.micEnabled = o.value("micEnabled").toBool(true);

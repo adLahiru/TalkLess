@@ -72,7 +72,7 @@ qt_add_qml_module(appTalkLess
     QML_FILES
         Main.qml
         # Components
-        qml/components/SideBar.qml
+        qml/components/Sidebar.qml
         qml/components/HeaderBar.qml
         qml/components/BackgroundBanner.qml
         qml/components/SettingsTabSelector.qml
@@ -99,45 +99,11 @@ qt_add_qml_module(appTalkLess
         qml/components/FileDropArea.qml
         qml/components/TrimWaveform.qml
         qml/components/AudioPlayerCard.qml
-        # qml/components/SoundboardListItem.qml
-        # qml/components/HeaderBar.qml
-        # qml/components/SettingsTabBar.qml
-        # qml/components/SettingsHeader.qml
-        # qml/components/ToggleSwitch.qml
-        # qml/components/DropdownSelect.qml
-        # qml/components/ActionButton.qml
-        # qml/components/HotkeyItem.qml
-        # qml/components/FeatureToggleItem.qml
-        # qml/components/AudioCard.qml
-        # qml/components/AddAudioCard.qml
-        # qml/components/AudioTag.qml
-        # qml/components/WaveformDisplay.qml
-        # qml/components/SettingsImportExport.qml
-        # qml/components/AudioPlayer.qml
-        # qml/components/VolumeMeter.qml
-        # qml/components/AudioDetailsPanel.qml
-        # qml/components/AddAudioPanel.qml
-        # qml/components/MetersPanel.qml
-        # qml/components/TeleprompterPanel.qml
-        # qml/components/AudioPanelTabs.qml
-        # qml/components/AddAudioContent.qml
-        # qml/components/RecordAudioContent.qml
-        # Pages
         qml/pages/ApplicationSettingsView.qml
         qml/pages/SoundboardView.qml
-        # qml/pages/AudioDevicesTab.qml
-        # qml/pages/HotkeysTab.qml
-        # qml/pages/FeaturesTab.qml
-        # qml/pages/UIDisplayTab.qml
-        # qml/pages/UpdatesTab.qml
-        # qml/pages/SoundboardPage.qml
-        # qml/pages/VolumeMixerPage.qml
-        # qml/pages/SettingsManagementPage.qml
-        # Styles (singletons)
         qml/styles/Colors.qml
         qml/styles/Typography.qml
         qml/styles/Theme.qml
-        # Utils (singleton)
         qml/utils/Functions.qml
     SOURCES
         # src/view/soundboardview.h

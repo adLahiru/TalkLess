@@ -33,6 +33,7 @@ public:
     Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY settingsChanged)
     Q_PROPERTY(QString accentColor READ accentColor WRITE setAccentColor NOTIFY settingsChanged)
     Q_PROPERTY(QString slotSize READ slotSize WRITE setSlotSize NOTIFY settingsChanged)
+    Q_PROPERTY(double slotSizeScale READ slotSizeScale WRITE setSlotSizeScale NOTIFY settingsChanged)
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY settingsChanged)
     Q_PROPERTY(QString hotkeyMode READ hotkeyMode WRITE setHotkeyMode NOTIFY settingsChanged)
     Q_PROPERTY(QString selectedCaptureDeviceId READ selectedCaptureDeviceId NOTIFY settingsChanged)
@@ -69,6 +70,9 @@ public:
 
     QString slotSize() const { return m_state.settings.slotSize; }
     Q_INVOKABLE void setSlotSize(const QString& size);
+
+    double slotSizeScale() const { return m_state.settings.slotSizeScale; }
+    Q_INVOKABLE void setSlotSizeScale(double scale);
 
     QString language() const { return m_state.settings.language; }
     Q_INVOKABLE void setLanguage(const QString& lang);

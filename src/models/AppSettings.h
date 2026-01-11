@@ -12,7 +12,8 @@ struct AppSettings
 
     QString theme = "Dark"; // "Dark" or "Light"
     QString accentColor = "#3B82F6"; // Default blue
-    QString slotSize = "Standard"; // "Compact", "Standard", "Comfortable"
+    QString slotSize = "Standard"; // "Compact", "Standard", "Comfortable" (legacy)
+    double slotSizeScale = 1.0; // Continuous scale factor: 0.5 (small) to 1.5 (large)
     QString language = "English";
     QString hotkeyMode = "ActiveBoardOnly";
 
