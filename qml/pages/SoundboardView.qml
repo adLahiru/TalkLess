@@ -269,7 +269,7 @@ Rectangle {
                 Image {
                     id: backgroundImage
                     anchors.fill: parent
-                    source: "qrc:/qt/qml/TalkLess/resources/images/background.png"
+                    source: Colors.bannerImage
                     fillMode: Image.PreserveAspectCrop
                 }
 

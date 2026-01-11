@@ -165,7 +165,7 @@ Rectangle {
                                     color: Colors.textPrimary
                                     font.family: Typography.fontFamily
                                     font.pixelSize: Typography.fontSizeLarge
-                                    font.weight: Typography.fontWeightBold
+                                    font.weight: Font.DemiBold
                                 }
 
                                 // Select Input Dropdown - using DropdownSelector
@@ -206,7 +206,7 @@ Rectangle {
                                             width: 22
                                             height: 22
                                             radius: 11
-                                            color: "#FFFFFF"
+                                            color: Colors.textPrimary
                                             x: alwaysOnToggle.isOn ? parent.width - width - 3 : 3
                                             anchors.verticalCenter: parent.verticalCenter
 
@@ -255,9 +255,9 @@ Rectangle {
 
                                         Text {
                                             text: "Test Mic"
-                                            color: "#FFFFFF"
+                                            color: Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                            font.pixelSize: 15
+                                            font.pixelSize: Typography.fontSizeMedium
                                             font.weight: Font.Medium
                                         }
                                     }
@@ -275,8 +275,8 @@ Rectangle {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 380
-                            color: "#1A1A1A"
-                            radius: 16
+                            color: Colors.surface
+                            radius: Theme.radiusLarge
 
                             ColumnLayout {
                                 anchors.fill: parent
@@ -286,9 +286,9 @@ Rectangle {
                                 // Title
                                 Text {
                                     text: "Mixer Controls"
-                                    color: "#FFFFFF"
+                                    color: Colors.textPrimary
                                     font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                                    font.pixelSize: 20
+                                    font.pixelSize:Typography.fontSizeLarge
                                     font.weight: Font.DemiBold
                                 }
 
@@ -304,9 +304,9 @@ Rectangle {
                                         // Label aligned with slider bar
                                         Text {
                                             text: "Mic Level:"
-                                            color: "#FFFFFF"
+                                            color: Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                            font.pixelSize: 14
+                                            font.pixelSize: Typography.fontSizeMedium
                                             Layout.alignment: Qt.AlignVCenter
                                         }
 
@@ -327,8 +327,8 @@ Rectangle {
 
                                     Text {
                                         text: "Adjust how loud your mic is in the output mix"
-                                        color: "#666666"
-                                        font.pixelSize: 12
+                                        color: Colors.textSecondary
+                                        font.pixelSize: Typography.fontSizeSmall
                                     }
                                 }
 
@@ -349,9 +349,9 @@ Rectangle {
                                         // Label aligned with squares
                                         Text {
                                             text: "Mic Level Meter:"
-                                            color: "#FFFFFF"
+                                            color: Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                            font.pixelSize: 14
+                                            font.pixelSize: Typography.fontSizeMedium
                                             Layout.alignment: Qt.AlignVCenter
                                         }
 
@@ -380,12 +380,12 @@ Rectangle {
                                                         color: {
                                                             if (index < parent.parent.parent.parent.activeSquares) {
                                                                 if (index >= 10)
-                                                                    return "#EF4444";  // Red for clipping
+                                                                    return Colors.error;  // Red for clipping
                                                                 if (index >= 8)
-                                                                    return "#F59E0B";   // Orange/yellow for high
-                                                                return "#22C55E";  // Green for normal
+                                                                    return Colors.warning;   // Orange/yellow for high
+                                                                return Colors.success;  // Green for normal
                                                             }
-                                                            return "#3A3A3A";  // Dark gray for inactive
+                                                            return Colors.border;  // Dark gray for inactive
                                                         }
 
                                                         required property int index
@@ -407,15 +407,15 @@ Rectangle {
                                                 Text {
                                                     anchors.left: parent.left
                                                     text: "Low"
-                                                    color: "#666666"
-                                                    font.pixelSize: 11
+                                                    color: Colors.textSecondary
+                                                    font.pixelSize: Typography.fontSizeSmall
                                                 }
 
                                                 Text {
                                                     anchors.right: parent.right
                                                     text: "High"
-                                                    color: "#666666"
-                                                    font.pixelSize: 11
+                                                    color: Colors.textSecondary
+                                                    font.pixelSize: Typography.fontSizeSmall
                                                 }
                                             }
                                         }
@@ -423,8 +423,8 @@ Rectangle {
 
                                     Text {
                                         text: "Shows real-time microphone input level"
-                                        color: "#666666"
-                                        font.pixelSize: 12
+                                        color: Colors.textSecondary
+                                        font.pixelSize: Typography.fontSizeSmall
                                     }
                                 }
 
@@ -435,9 +435,9 @@ Rectangle {
 
                                     Text {
                                         text: "Output Mic + Soundboard:"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                        font.pixelSize: 14
+                                        font.pixelSize: Typography.fontSizeMedium
                                     }
 
                                     // Toggle button - green when on, white/gray when off
@@ -446,7 +446,7 @@ Rectangle {
                                         width: 52
                                         height: 28
                                         radius: 14
-                                        color: outputToggle.isOn ? "#22C55E" : "#FFFFFF"
+                                        color: outputToggle.isOn ? Colors.success : Colors.border
 
                                         property bool isOn: soundboardService.micPassthroughEnabled
                                         onIsOnChanged: {
@@ -458,7 +458,7 @@ Rectangle {
                                             width: 22
                                             height: 22
                                             radius: 11
-                                            color: outputToggle.isOn ? "#FFFFFF" : "#666666"
+                                            color: outputToggle.isOn ? Colors.textPrimary : Colors.border
                                             x: outputToggle.isOn ? parent.width - width - 3 : 3
                                             anchors.verticalCenter: parent.verticalCenter
 
@@ -478,8 +478,8 @@ Rectangle {
 
                                     Text {
                                         text: "ON/OFF"
-                                        color: "#666666"
-                                        font.pixelSize: 12
+                                        color: Colors.textSecondary
+                                        font.pixelSize: Typography.fontSizeSmall
                                     }
 
                                     Item {
@@ -489,8 +489,8 @@ Rectangle {
 
                                 Text {
                                     text: "Send mixed mic + soundboard audio to output device"
-                                    color: "#666666"
-                                    font.pixelSize: 12
+                                    color: Colors.textSecondary
+                                    font.pixelSize: Typography.fontSizeSmall
                                 }
 
                                 // Mic ↔ Soundboard Balance - using BalanceSlider component
@@ -500,9 +500,9 @@ Rectangle {
 
                                     Text {
                                         text: "Mic ↔ Soundboard Balance"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                        font.pixelSize: 14
+                                        font.pixelSize: Typography.fontSizeMedium
                                     }
 
                                     BalanceSlider {
@@ -515,8 +515,8 @@ Rectangle {
 
                                     Text {
                                         text: "Adjust how much mic vs. audio plays in the mix"
-                                        color: "#666666"
-                                        font.pixelSize: 12
+                                        color: Colors.textSecondary
+                                        font.pixelSize: Typography.fontSizeSmall
                                     }
                                 }
                             }
@@ -534,9 +534,9 @@ Rectangle {
                         // Title
                         Text {
                             text: "Advanced Audio Settings"
-                            color: "#FFFFFF"
+                            color: Colors.textPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                            font.pixelSize: 20
+                            font.pixelSize: Typography.fontSizeLarge
                             font.weight: Font.DemiBold
                         }
 
@@ -1557,8 +1557,8 @@ Rectangle {
                         Text {
                             anchors.centerIn: parent
                             text: "AI & Productivity Tools"
-                            color: "#FFFFFF"
-                            font.pixelSize: 24
+                            color: Colors.textPrimary
+                            font.pixelSize: Typography.fontSizeLarge
                             font.weight: Font.Medium
                         }
                     }

@@ -17,7 +17,7 @@ Item {
         id: outerFrame
         anchors.fill: parent
         radius: 16
-        color: "#D5D0CD"
+        color: Colors.border
         opacity: root.enabled ? 1.0 : 0.6
 
         // Inner card with background image
@@ -42,7 +42,7 @@ Item {
             Rectangle {
                 anchors.fill: parent
                 radius: 12
-                color: "#000000"
+                color: Colors.surface
                 opacity: 0.55
             }
 
@@ -53,7 +53,7 @@ Item {
 
                 Text {
                     text: "+"
-                    color: "#FFFFFF"
+                    color: Colors.textPrimary
                     font.pixelSize: 48
                     font.weight: Font.Normal
                     horizontalAlignment: Text.AlignHCenter
@@ -62,8 +62,8 @@ Item {
 
                 Text {
                     text: root.text
-                    color: "#FFFFFF"
-                    font.pixelSize: 14
+                    color: Colors.textPrimary
+                    font.pixelSize: Typography.fontSizeMedium
                     font.weight: Font.DemiBold
                     horizontalAlignment: Text.AlignHCenter
                     anchors.horizontalCenter: parent.horizontalCenter
