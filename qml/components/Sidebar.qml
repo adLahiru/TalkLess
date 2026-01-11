@@ -11,6 +11,17 @@ Rectangle {
     color: "#1F1F1F"
     radius: 10
 
+    // Collapsible state
+    property bool isCollapsed: false
+    
+    // Animated width based on collapsed state
+    Behavior on Layout.preferredWidth {
+        NumberAnimation {
+            duration: 250
+            easing.type: Easing.InOutQuad
+        }
+    }
+
     FontLoader {
         id: outfitFont
         source: "https://fonts.gstatic.com/s/outfit/v11/QGYyz_MVcBeNP4NjuGObqx1XmO1I4TC1C4G-EiAou6Y.ttf"
@@ -73,10 +84,38 @@ Rectangle {
                 Layout.preferredHeight: 40
                 Layout.preferredWidth: 120
                 Layout.alignment: Qt.AlignLeft
+                visible: !root.isCollapsed
             }
 
             Item {
                 Layout.fillWidth: true
+            }
+
+            // Toggle button
+            Rectangle {
+                width: 36
+                height: 36
+                radius: 8
+                color: toggleMouse.containsMouse ? "#2A2A2A" : "transparent"
+                Layout.alignment: Qt.AlignRight
+
+                Text {
+                    anchors.centerIn: parent
+                    text: root.isCollapsed ? "☰" : "‹"
+                    color: "#FFFFFF"
+                    font.pixelSize: 20
+                    font.weight: Font.Medium
+                }
+
+                MouseArea {
+                    id: toggleMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root.isCollapsed = !root.isCollapsed
+                    }
+                }
             }
         }
 
@@ -101,7 +140,7 @@ Rectangle {
             delegate: Item {
                 id: rowItem
                 width: menuList.width
-                height: 54
+                height: root.isCollapsed ? 48 : 54
 
                 required property int index
                 required property string title
@@ -110,35 +149,56 @@ Rectangle {
 
                 readonly property bool isSelected: (rowItem.index === root.currentIndex)
 
+                // Selected background for collapsed state - gradient
                 Rectangle {
                     anchors.fill: parent
-                    radius: 16
-                    visible: rowItem.isSelected
+                    radius: 12
+                    visible: rowItem.isSelected && root.isCollapsed
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
                         GradientStop {
                             position: 0.0
-                            color: Colors.gradientPrimaryStart
+                            color: "#3B82F6"
                         }
                         GradientStop {
                             position: 1.0
-                            color: Colors.gradientPrimaryEnd
+                            color: "#D214FD"
                         }
                     }
                 }
 
+                // Selected background for expanded state - gradient
                 Rectangle {
                     anchors.fill: parent
                     radius: 16
+                    visible: rowItem.isSelected && !root.isCollapsed
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop {
+                            position: 0.0
+                            color: "#3B82F6"
+                        }
+                        GradientStop {
+                            position: 1.0
+                            color: "#D214FD"
+                        }
+                    }
+                }
+
+                // Hover background
+                Rectangle {
+                    anchors.fill: parent
+                    radius: root.isCollapsed ? 12 : 16
                     visible: !rowItem.isSelected && mouse.containsMouse
                     color: "#1B1D24"
                 }
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
-                    spacing: 12
+                    anchors.leftMargin: root.isCollapsed ? 0 : 12
+                    anchors.rightMargin: root.isCollapsed ? 0 : 12
+                    spacing: root.isCollapsed ? 0 : 12
+                    layoutDirection: root.isCollapsed ? Qt.LeftToRight : Qt.LeftToRight
 
                     Rectangle {
                         width: 34
@@ -147,6 +207,7 @@ Rectangle {
                         color: rowItem.isSelected ? "#FFFFFF" : "#4F3B82F6"
                         border.width: 1
                         border.color: rowItem.isSelected ? "#FFFFFF" : "#4F3B82F6"
+                        Layout.alignment: root.isCollapsed ? Qt.AlignHCenter : Qt.AlignVCenter
 
                         Image {
                             id: iconImage
@@ -175,6 +236,7 @@ Rectangle {
                         font.pixelSize: 15
                         font.weight: Font.Medium
                         verticalAlignment: Text.AlignVCenter
+                        visible: !root.isCollapsed
                     }
                 }
 
@@ -206,6 +268,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: 8
             spacing: 8
+            visible: !root.isCollapsed
 
             // Soundboards list
             Item {

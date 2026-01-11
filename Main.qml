@@ -105,7 +105,7 @@ ApplicationWindow {
 
             SideBar {
                 id: sidebar
-                Layout.preferredWidth: 280
+                Layout.preferredWidth: isCollapsed ? 80 : 280
                 Layout.fillHeight: true
 
                 onSelected: route => {
