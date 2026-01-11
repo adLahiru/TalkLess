@@ -8,12 +8,12 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import QtQuick.Dialogs
 import "../components"
-import TalkLess
+import "../styles"
 
 Rectangle {
     id: root
-    color: Colors.background
-    radius: Theme.radiusLarge
+    color: "#0d0d0d"
+    radius: 10
 
     property int selectedClipId: -1  // Keep track of which clip is selected
     property int playingClipId: -1   // Last started clip that is still playing
@@ -276,9 +276,8 @@ Rectangle {
                 // Dark overlay for text readability
                 Rectangle {
                     anchors.fill: parent
-                    radius: 16
-                    color: Colors.backgroundDark
-                    opacity: root.enabled ? 1.0 : 0.6
+                    color: "#000000"
+                    opacity: 0.3
                 }
 
                 // Three dots menu button - top right corner
@@ -291,7 +290,7 @@ Rectangle {
                     width: 28
                     height: 28
                     radius: 6
-                    color: moreMouseArea.containsMouse || moreOptionsMenu.visible ? Qt.alpha(Colors.white, 0.2) : Qt.alpha(Colors.white, 0.15)
+                    color: moreMouseArea.containsMouse || moreOptionsMenu.visible ? "#33FFFFFF" : "#22FFFFFF"
 
                     // Three vertical dots
                     Column {
@@ -304,7 +303,7 @@ Rectangle {
                                 width: 3
                                 height: 3
                                 radius: 1.5
-                                color: Colors.white
+                                color: "#FFFFFF"
                             }
                         }
                     }
@@ -334,9 +333,9 @@ Rectangle {
                         padding: 8
 
                         background: Rectangle {
-                            color: Colors.surfaceDark
+                            color: "#1F1F1F"
                             radius: 8
-                            border.color: Colors.border
+                            border.color: "#333333"
                             border.width: 1
                         }
 
@@ -351,7 +350,7 @@ Rectangle {
                                     width: 144
                                     height: 36
                                     radius: 6
-                                    color: menuItemMouse.containsMouse ? Colors.surfaceLight : "transparent"
+                                    color: menuItemMouse.containsMouse ? "#333333" : "transparent"
 
                                     required property string modelData
 
@@ -360,7 +359,7 @@ Rectangle {
                                         anchors.leftMargin: 12
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: menuItem.modelData
-                                        color: menuItem.modelData === "Delete" ? Colors.error : Colors.textPrimary
+                                        color: menuItem.modelData === "Delete" ? "#FF6B6B" : "#FFFFFF"
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 14
                                         font.weight: Font.Normal
@@ -402,7 +401,7 @@ Rectangle {
                         // Main text
                         Text {
                             text: clipsModel.boardName || "Soundboard"
-                            color: Colors.white
+                            color: "#FFFFFF"
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 28
                             font.weight: Font.DemiBold
@@ -411,7 +410,7 @@ Rectangle {
                         // Secondary text
                         Text {
                             text: "Manage and trigger your audio clips"
-                            color: Colors.white
+                            color: "#FFFFFF"
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 15
                             font.weight: Font.Normal
@@ -441,7 +440,7 @@ Rectangle {
                             }
                             GradientStop {
                                 position: 1.0
-                                color: addMouseArea.containsMouse ? Colors.primaryLight : Colors.accent
+                                color: addMouseArea.containsMouse ? Colors.secondary : "#D214FD"
                             }
                         }
 
@@ -528,8 +527,8 @@ Rectangle {
                 id: contentArea
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: Colors.surfaceDark
-                radius: Theme.radiusLarge
+                color: "#0d0d0d"
+                radius: 12
 
                 // Tile sizing properties - responsive layout with scale factor
                 readonly property real tileSpacing: 15
@@ -815,7 +814,7 @@ Rectangle {
                                             // If dropped on a valid position, reorder
                                             if (dropIndex >= 0 && dropIndex !== clipWrapper.index) {
                                                 console.log("Moving clip from", clipWrapper.index, "to", dropIndex);
-                                                soundboardService.moveClip(clipsModel.boardId, clipWrapper.index, dropIndex);
+                                                soundboardService.moveClip(soundboardService.activeBoardId, clipWrapper.index, dropIndex);
                                                 clipsModel.reload();
                                             }
                                         }
@@ -963,8 +962,8 @@ Rectangle {
             Layout.rightMargin: 0
 
             // Glassmorphism effect
-            color: Colors.panelBg
-            border.color: Colors.border
+            color: "#161618"
+            border.color: "#2D2D30"
             border.width: 1
 
             // Rounded only on left side if desired, but let's keep it simple and clean
@@ -990,7 +989,7 @@ Rectangle {
                         anchors.bottom: parent.bottom
                         width: parent.width
                         height: 1
-                        color: Colors.border
+                        color: "#2D2D30"
                     }
 
                     RowLayout {
@@ -1065,8 +1064,7 @@ Rectangle {
 
                             Text {
                                 text: "Name Audio File"
-                                color: Colors.textPrimary
-
+                                color: "#FFFFFF"
                                 font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                 font.pixelSize: 14
                                 font.weight: Font.DemiBold
@@ -1096,7 +1094,7 @@ Rectangle {
                                     source: clipboardIcon
                                     anchors.fill: clipboardIcon
                                     colorization: 1.0
-                                    colorizationColor: Colors.textPrimary
+                                    colorizationColor: "#FFFFFF"
                                 }
 
                                 MouseArea {
@@ -1243,7 +1241,7 @@ Rectangle {
                                 source: micIcon
                                 anchors.fill: micIcon
                                 colorization: 1.0
-                                colorizationColor: parent.parent.isRecording ? Colors.accent : Colors.textPrimary
+                                colorizationColor: parent.parent.isRecording ? "#3B82F6" : "#FFFFFF"
                             }
 
                             MouseArea {
@@ -1270,7 +1268,7 @@ Rectangle {
                         // Start Recording text
                         Text {
                             text: parent.isRecording ? "Stop Recording" : "Start Recording"
-                            color: Colors.textSecondary // Changed for light mode visibility
+                            color: "#888888"
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 9
                             font.weight: Font.Normal
@@ -1315,13 +1313,13 @@ Rectangle {
                                     source: scissorsIcon
                                     anchors.fill: scissorsIcon
                                     colorization: 1.0
-                                    colorizationColor: Colors.textPrimary // Changed for light mode visibility
+                                    colorizationColor: "#FFFFFF"
                                 }
                             }
 
                             Text {
                                 text: "Trim Audio"
-                                color: Colors.textPrimary // Changed for light mode visibility
+                                color: "#FFFFFF"
                                 font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
@@ -1351,7 +1349,7 @@ Rectangle {
 
                         Text {
                             text: "Name Audio File"
-                            color: Colors.textPrimary // Changed for light mode visibility
+                            color: "#FFFFFF"
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 11
                             font.weight: Font.DemiBold
@@ -1361,9 +1359,9 @@ Rectangle {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 36
-                            color: Colors.background // Changed for theme
+                            color: "#1A1A1A"
                             radius: 6
-                            border.color: Colors.border // Changed for theme
+                            border.color: "#3A3A3A"
                             border.width: 1
 
                             RowLayout {
@@ -1374,7 +1372,7 @@ Rectangle {
 
                                 Text {
                                     text: "Enter Name Here:"
-                                    color: Colors.textSecondary // Changed for theme
+                                    color: "#808080"
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 11
                                     visible: saveNameInput.text === ""
@@ -1383,7 +1381,7 @@ Rectangle {
                                 TextInput {
                                     id: saveNameInput
                                     Layout.fillWidth: true
-                                    color: Colors.textPrimary // Changed for theme
+                                    color: "#FFFFFF"
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 11
                                     clip: true
@@ -1391,7 +1389,7 @@ Rectangle {
                                     Text {
                                         anchors.fill: parent
                                         text: "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _"
-                                        color: Colors.textSecondary // Changed for theme
+                                        color: "#666666"
                                         font.family: parent.font.family
                                         font.pixelSize: parent.font.pixelSize
                                         visible: !parent.text && !parent.activeFocus
@@ -1422,16 +1420,13 @@ Rectangle {
                         Rectangle {
                             Layout.preferredWidth: 80
                             Layout.preferredHeight: 36
-                            color: cancelBtnArea.containsMouse ? Colors.surfaceLight : Colors.surface
+                            color: cancelBtnArea.containsMouse ? "#4A4A4A" : "#3A3A3A"
                             radius: 8
-                            border.color: Colors.border
-                            border.width: 1
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "Cancel"
-                                color: Colors.textPrimary
-
+                                color: "#FFFFFF"
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
@@ -1465,19 +1460,18 @@ Rectangle {
                                 orientation: Gradient.Horizontal
                                 GradientStop {
                                     position: 0.0
-                                    color: saveBtnArea.containsMouse ? Colors.primaryLight : Colors.primary
+                                    color: saveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6"
                                 }
                                 GradientStop {
                                     position: 1.0
-                                    color: saveBtnArea.containsMouse ? Colors.secondary : Colors.accent
+                                    color: saveBtnArea.containsMouse ? "#E040FB" : "#D214FD"
                                 }
                             }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "Save"
-                                color: Colors.textOnPrimary
-
+                                color: "#FFFFFF"
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
@@ -1935,7 +1929,7 @@ Rectangle {
                                         orientation: Gradient.Horizontal
                                         GradientStop {
                                             position: 0.0
-                                            color: Colors.accent
+                                            color: "#3B82F6"
                                         }
                                         GradientStop {
                                             position: 1.0
@@ -2083,7 +2077,7 @@ Rectangle {
                                                 orientation: Gradient.Horizontal
                                                 GradientStop {
                                                     position: 0.0
-                                                    color: Colors.accent
+                                                    color: "#3B82F6"
                                                 }
                                                 GradientStop {
                                                     position: 1.0
@@ -2164,7 +2158,7 @@ Rectangle {
                                                 orientation: Gradient.Horizontal
                                                 GradientStop {
                                                     position: 0.0
-                                                    color: Colors.accent
+                                                    color: "#3B82F6"
                                                 }
                                                 GradientStop {
                                                     position: 1.0
@@ -2441,7 +2435,7 @@ Rectangle {
                                 Text {
                                     Layout.fillWidth: true
                                     text: {
-                                        const mode = modeSelectorRow.selectedMode; // Use modeSelectorRow directly
+                                        const mode = parent.children[1].selectedMode;
                                         switch (mode) {
                                         case 0:
                                             return "Sound plays with other sounds";
@@ -2777,7 +2771,7 @@ Rectangle {
                                                 id: tagText
                                                 anchors.centerIn: parent
                                                 text: modelData
-                                                color: Colors.textSecondary
+                                                color: "#CCCCCC"
                                                 font.pixelSize: 10
                                             }
 
@@ -3087,11 +3081,11 @@ Rectangle {
                                 orientation: Gradient.Horizontal
                                 GradientStop {
                                     position: 0.0
-                                    color: uploadSaveBtnArea.containsMouse ? Colors.primaryLight : Colors.accent
+                                    color: uploadSaveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6"
                                 }
                                 GradientStop {
                                     position: 1.0
-                                    color: uploadSaveBtnArea.containsMouse ? Colors.primaryLight : Colors.accent
+                                    color: uploadSaveBtnArea.containsMouse ? "#E040FB" : "#D214FD"
                                 }
                             }
 
@@ -3166,7 +3160,7 @@ Rectangle {
 
                     Text {
                         text: "Teleprompter"
-                        color: Colors.textPrimary
+                        color: "#FFFFFF"
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
@@ -3174,7 +3168,7 @@ Rectangle {
 
                     Text {
                         text: "Teleprompter content will appear here"
-                        color: Colors.textSecondary
+                        color: "#666666"
                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                         font.pixelSize: 12
                     }
@@ -3193,7 +3187,7 @@ Rectangle {
 
                     Text {
                         text: "Audio Output"
-                        color: Colors.textPrimary
+                        color: "#FFFFFF"
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
@@ -3201,7 +3195,7 @@ Rectangle {
 
                     Text {
                         text: "Speaker and output settings here"
-                        color: Colors.textSecondary
+                        color: "#666666"
                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                         font.pixelSize: 12
                     }
@@ -3224,8 +3218,8 @@ Rectangle {
         width: 32
         height: 32
         radius: 8
-        color: isActive ? Qt.alpha(Colors.accent, 0.15) : (mouse.containsMouse ? Colors.surfaceLight : "transparent")
-        border.color: isActive ? Colors.accent : "transparent"
+        color: isActive ? Qt.rgba(0.23, 0.51, 0.96, 0.2) : (mouse.containsMouse ? "#2D2D2D" : "transparent")
+        border.color: isActive ? "#3B82F6" : "transparent"
         border.width: 1
 
         Image {
@@ -3238,7 +3232,7 @@ Rectangle {
             layer.enabled: true
             layer.effect: MultiEffect {
                 colorization: 1.0
-                colorizationColor: isActive ? Colors.accent : Colors.textSecondary
+                colorizationColor: isActive ? "#3B82F6" : "#A0A0A0"
             }
         }
 

@@ -4,7 +4,6 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "qml/components"
 import "qml/pages"
-import TalkLess
 
 ApplicationWindow {
     id: mainWindow
@@ -17,7 +16,7 @@ ApplicationWindow {
     // Start in normal windowed mode, not fullscreen
     visibility: Window.Windowed
     title: qsTr("TalkLess")
-    color: Colors.background
+    color: '#000000'
 
     property bool isSoundboardDetached: false
 
@@ -49,13 +48,6 @@ ApplicationWindow {
         }
     }
 
-    // Connections for global state are now handled in the singletons themselves
-
-    Component.onCompleted: {
-        Colors.setTheme(soundboardService.theme.toLowerCase());
-        Colors.setAccentColor(soundboardService.accentColor);
-    }
-
     // ---- Toast Notification ----
     Rectangle {
         id: toastMessage
@@ -72,10 +64,9 @@ ApplicationWindow {
         width: toastText.implicitWidth + 40
         height: 48
         radius: 24
-        color: Colors.cardBg
+        color: "#1A1A1A"
         border.width: 1
-        border.color: Colors.border
-
+        border.color: "#333333"
         opacity: 0
         z: 999
 
@@ -90,8 +81,7 @@ ApplicationWindow {
             id: toastText
             anchors.centerIn: parent
             text: toastMessage.text
-            color: Colors.textPrimary
-
+            color: "#FFFFFF"
             font.pixelSize: 14
             font.weight: Font.Medium
         }
@@ -188,7 +178,7 @@ ApplicationWindow {
                         Rectangle {
                             anchors.fill: parent
                             visible: mainWindow.isSoundboardDetached
-                            color: Colors.background
+                            color: "#0d0d0d"
                             radius: 10
 
                             ColumnLayout {
@@ -197,7 +187,7 @@ ApplicationWindow {
 
                                 Text {
                                     text: "Soundboard Detached"
-                                    color: Colors.textSecondary
+                                    color: "#666666"
                                     font.pixelSize: 24
                                     Layout.alignment: Qt.AlignHCenter
                                 }
@@ -206,14 +196,14 @@ ApplicationWindow {
                                     width: 180
                                     height: 44
                                     radius: 10
-                                    color: Colors.surface
-                                    border.color: Colors.border
+                                    color: "#1F1F1F"
+                                    border.color: "#333333"
                                     Layout.alignment: Qt.AlignHCenter
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: "Re-dock Soundboard"
-                                        color: Colors.textPrimary
+                                        color: "#FFFFFF"
                                     }
 
                                     MouseArea {
@@ -230,24 +220,24 @@ ApplicationWindow {
 
                     // Audio Playback Engine (placeholder)
                     Rectangle {
-                        color: Colors.background
+                        color: "#0d0d0d"
                         radius: 10
                         Text {
                             anchors.centerIn: parent
                             text: "Audio Playback Engine"
-                            color: Colors.textSecondary
+                            color: "#666666"
                             font.pixelSize: 32
                         }
                     }
 
                     // Macros & Automation (placeholder)
                     Rectangle {
-                        color: Colors.background
+                        color: "#0d0d0d"
                         radius: 10
                         Text {
                             anchors.centerIn: parent
                             text: "Macros & Automation"
-                            color: Colors.textSecondary
+                            color: "#666666"
                             font.pixelSize: 32
                         }
                     }
@@ -257,12 +247,12 @@ ApplicationWindow {
 
                     // Statistics & Reporting (placeholder)
                     Rectangle {
-                        color: Colors.background
+                        color: "#0d0d0d"
                         radius: 10
                         Text {
                             anchors.centerIn: parent
                             text: "Statistics & Reporting"
-                            color: Colors.textSecondary
+                            color: "#666666"
                             font.pixelSize: 32
                         }
                     }
@@ -276,12 +266,12 @@ ApplicationWindow {
         id: splashScreen
         anchors.fill: parent
         z: 1000  // Always on top
-        color: Colors.black
+        color: "#000000"
         visible: opacity > 0
 
         Image {
             anchors.fill: parent
-            source: Colors.splashImage
+            source: "qrc:/qt/qml/TalkLess/resources/images/splashScreen.png"
             fillMode: Image.PreserveAspectCrop
         }
 
@@ -313,7 +303,7 @@ ApplicationWindow {
         width: 1000
         height: 700
         visible: mainWindow.isSoundboardDetached
-        color: Colors.background
+        color: "#000000"
 
         onClosing: {
             mainWindow.isSoundboardDetached = false;

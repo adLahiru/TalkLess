@@ -3,25 +3,24 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
-import TalkLess
 import QtQuick.Layouts
 
 Rectangle {
     id: root
-
+    
     property string text: "Button"
     property string icon: ""
-    property color backgroundColor: Colors.surface
-    property color hoverColor: Colors.surfaceLight
-    property color textColor: Colors.textPrimary
-
-    signal clicked
-
+    property color backgroundColor: "#2A2A2A"
+    property color hoverColor: "#3A3A3A"
+    property color textColor: "#FFFFFF"
+    
+    signal clicked()
+    
     height: 50
     color: mouseArea.containsMouse ? root.hoverColor : root.backgroundColor
     radius: 12
     border.width: 1
-    border.color: Colors.border
+    border.color: "#3A3A3A"
 
     FontLoader {
         id: interFont
@@ -56,8 +55,6 @@ Rectangle {
     }
 
     Behavior on color {
-        ColorAnimation {
-            duration: 150
-        }
+        ColorAnimation { duration: 150 }
     }
 }

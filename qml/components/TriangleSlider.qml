@@ -7,22 +7,22 @@ import QtQuick.Layouts
 
 Item {
     id: root
-
+    
     property string label: "Mic Level:"
     property real from: -60
     property real to: 0
     property real value: -16
     property string unit: "dB"
     property string description: ""
-
+    
     // Gradient colors
     property color gradientStart: "#3B82F6"
-    property color gradientEnd: Colors.accent
-
+    property color gradientEnd: "#D214FD"
+    
     signal sliderMoved(real newValue)
-
+    
     implicitHeight: 60  // Compact height for the slider
-
+    
     FontLoader {
         id: interFont
         source: "https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.ttf"
@@ -40,17 +40,11 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             height: 8
             radius: 4
-
+            
             gradient: Gradient {
                 orientation: Gradient.Horizontal
-                GradientStop {
-                    position: 0.0
-                    color: root.gradientStart
-                }
-                GradientStop {
-                    position: 1.0
-                    color: root.gradientEnd
-                }
+                GradientStop { position: 0.0; color: root.gradientStart }
+                GradientStop { position: 1.0; color: root.gradientEnd }
             }
         }
 
@@ -81,25 +75,25 @@ Item {
                 height: 12
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
-
+                
                 onPaint: {
-                    var ctx = getContext("2d");
-                    ctx.reset();
-
-                    var size = 14;  // Equilateral triangle side length
-                    var h = size * Math.sqrt(3) / 2;  // Height of equilateral triangle
-                    var centerX = width / 2;
-
+                    var ctx = getContext("2d")
+                    ctx.reset()
+                    
+                    var size = 14  // Equilateral triangle side length
+                    var h = size * Math.sqrt(3) / 2  // Height of equilateral triangle
+                    var centerX = width / 2
+                    
                     // Draw equilateral triangle pointing down
-                    ctx.beginPath();
-                    ctx.moveTo(centerX - size / 2, 0);  // Top left
-                    ctx.lineTo(centerX + size / 2, 0);  // Top right
-                    ctx.lineTo(centerX, h);           // Bottom center (tip)
-                    ctx.closePath();
-
+                    ctx.beginPath()
+                    ctx.moveTo(centerX - size/2, 0)  // Top left
+                    ctx.lineTo(centerX + size/2, 0)  // Top right
+                    ctx.lineTo(centerX, h)           // Bottom center (tip)
+                    ctx.closePath()
+                    
                     // Fill with white
-                    ctx.fillStyle = "#FFFFFF";
-                    ctx.fill();
+                    ctx.fillStyle = "#FFFFFF"
+                    ctx.fill()
                 }
             }
         }
@@ -107,17 +101,16 @@ Item {
         // Invisible slider for interaction
         MouseArea {
             anchors.fill: parent
-
-            onPressed: mouse => updateValue(mouse.x)
-            onPositionChanged: mouse => {
-                if (pressed)
-                    updateValue(mouse.x);
+            
+            onPressed: (mouse) => updateValue(mouse.x)
+            onPositionChanged: (mouse) => {
+                if (pressed) updateValue(mouse.x)
             }
-
+            
             function updateValue(mouseX) {
-                var ratio = Math.max(0, Math.min(1, mouseX / width));
-                root.value = root.from + ratio * (root.to - root.from);
-                root.sliderMoved(root.value);
+                var ratio = Math.max(0, Math.min(1, mouseX / width))
+                root.value = root.from + ratio * (root.to - root.from)
+                root.sliderMoved(root.value)
             }
         }
 

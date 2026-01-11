@@ -8,12 +8,12 @@ import "../styles"
 
 Rectangle {
     id: root
-    color: Colors.backgroundDark
-    radius: Theme.radiusLarge
+    color: "#1F1F1F"
+    radius: 10
 
     // Collapsible state
     property bool isCollapsed: false
-
+    
     // Animated width based on collapsed state
     Behavior on Layout.preferredWidth {
         NumberAnimation {
@@ -96,14 +96,13 @@ Rectangle {
                 width: 36
                 height: 36
                 radius: 8
-                color: toggleMouse.containsMouse ? Colors.surfaceLight : "transparent"
-
+                color: toggleMouse.containsMouse ? "#2A2A2A" : "transparent"
                 Layout.alignment: Qt.AlignRight
 
                 Text {
                     anchors.centerIn: parent
                     text: root.isCollapsed ? "☰" : "‹"
-                    color: Colors.textPrimary
+                    color: "#FFFFFF"
                     font.pixelSize: 20
                     font.weight: Font.Medium
                 }
@@ -114,7 +113,7 @@ Rectangle {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        root.isCollapsed = !root.isCollapsed;
+                        root.isCollapsed = !root.isCollapsed
                     }
                 }
             }
@@ -191,7 +190,7 @@ Rectangle {
                     anchors.fill: parent
                     radius: root.isCollapsed ? 12 : 16
                     visible: !rowItem.isSelected && mouse.containsMouse
-                    color: Colors.surfaceLight
+                    color: "#1B1D24"
                 }
 
                 RowLayout {
@@ -205,10 +204,9 @@ Rectangle {
                         width: 34
                         height: 34
                         radius: 12
-                        color: rowItem.isSelected ? Colors.white : Qt.alpha(Colors.accent, 0.3)
+                        color: rowItem.isSelected ? "#FFFFFF" : "#4F3B82F6"
                         border.width: 1
-                        border.color: rowItem.isSelected ? Colors.white : Qt.alpha(Colors.accent, 0.3)
-
+                        border.color: rowItem.isSelected ? "#FFFFFF" : "#4F3B82F6"
                         Layout.alignment: root.isCollapsed ? Qt.AlignHCenter : Qt.AlignVCenter
 
                         Image {
@@ -225,7 +223,7 @@ Rectangle {
                             anchors.fill: iconImage
                             source: iconImage
                             colorization: 1.0
-                            colorizationColor: rowItem.isSelected ? Colors.accent : Qt.alpha(Colors.white, 0.85)
+                            colorizationColor: rowItem.isSelected ? "#3B82F6" : "#DBFFFFFF"
                         }
                     }
 
@@ -233,7 +231,7 @@ Rectangle {
                         text: rowItem.title
                         Layout.fillWidth: true
                         elide: Text.ElideRight
-                        color: Colors.textPrimary
+                        color: "#FFFFFF"
                         font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
                         font.pixelSize: 15
                         font.weight: Font.Medium
@@ -260,7 +258,7 @@ Rectangle {
             Layout.preferredHeight: 2
             Layout.leftMargin: -18  // Extend to edge
             Layout.rightMargin: -18  // Extend to edge
-            color: Colors.border
+            color: "#2D2D2D"
         }
 
         // ==========================
@@ -331,15 +329,15 @@ Rectangle {
                             // Show selection highlight (blue border) or active state (filled) or hover
                             color: {
                                 if (root.selectedBoardId === boardRow.boardId) {
-                                    return Qt.alpha(Colors.accent, 0.15);  // Light accent for selected
+                                    return "#1A3B82F6";  // Light blue for selected
                                 } else if (mouse2.containsMouse) {
-                                    return Colors.surfaceLight;
+                                    return "#232323";
                                 } else {
                                     return "transparent";
                                 }
                             }
                             border.width: root.selectedBoardId === boardRow.boardId ? 1 : 0
-                            border.color: Colors.accent
+                            border.color: "#3B82F6"
                         }
 
                         RowLayout {
@@ -356,9 +354,8 @@ Rectangle {
                                 height: 22
                                 radius: 4  // Square with rounded corners for checkbox
                                 border.width: 2
-                                border.color: boardRow.active ? Colors.accent : Qt.alpha(Colors.white, 0.35)
-
-                                color: checkboxMouse.containsMouse ? Colors.surfaceLight : "transparent"
+                                border.color: boardRow.active ? "#D214FD" : "#5AFFFFFF"
+                                color: checkboxMouse.containsMouse ? "#333333" : "transparent"
 
                                 // Checkmark icon when active
                                 Text {
@@ -366,8 +363,7 @@ Rectangle {
                                     text: "✓"
                                     font.pixelSize: 14
                                     font.bold: true
-                                    color: Colors.borderLight
-                                    opacity: root.enabled ? 1.0 : 0.6
+                                    color: "#D214FD"
                                     visible: boardRow.active
                                 }
 
@@ -406,13 +402,6 @@ Rectangle {
                                 }
 
                                 // Use ShaderEffectSource and OpacityMask via layer
-                                // Translucent overlay
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: 12
-                                    color: Colors.black
-                                    opacity: Colors.currentTheme === "light" ? 0.2 : 0.55
-                                }
                                 Rectangle {
                                     anchors.fill: parent
                                     radius: 12
@@ -448,7 +437,7 @@ Rectangle {
                                     visible: root.editingBoardId !== boardRow.boardId
                                     text: boardRow.boardName
                                     elide: Text.ElideRight
-                                    color: Colors.textPrimary
+                                    color: "#FFFFFF"
                                     font.pixelSize: 14
                                     font.weight: Font.DemiBold
                                     font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
@@ -466,14 +455,13 @@ Rectangle {
                                     Layout.preferredHeight: 28
 
                                     background: Rectangle {
-                                        color: Colors.backgroundDark
+                                        color: "#1A1A1A"
                                         radius: 6
-                                        border.color: Colors.accent
+                                        border.color: "#D214FD"
                                         border.width: 1
                                     }
 
-                                    color: Colors.textPrimary
-
+                                    color: "#FFFFFF"
                                     font.pixelSize: 14
                                     font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
 
@@ -527,11 +515,11 @@ Rectangle {
                                 gradient: Gradient {
                                     GradientStop {
                                         position: 0.0
-                                        color: deleteBtnMouse.containsMouse ? Colors.error : Colors.surfaceDark
+                                        color: deleteBtnMouse.containsMouse ? "#FF3B30" : "#3A3A3A"
                                     }
                                     GradientStop {
                                         position: 1.0
-                                        color: deleteBtnMouse.containsMouse ? Colors.errorDark : Colors.surface
+                                        color: deleteBtnMouse.containsMouse ? "#FF6B60" : "#2A2A2A"
                                     }
                                 }
 
@@ -576,19 +564,7 @@ Rectangle {
 
                 background: Rectangle {
                     radius: 12
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop {
-                            position: 0.0
-                            color: Colors.surfaceDark
-                        }
-                        GradientStop {
-                            position: 1.0
-                            color: Colors.surface
-                        }
-                    }
-                    border.color: Colors.border
-                    border.width: 1
+                    color: "#3D2F2F"  // Brown/maroon background
                 }
 
                 contentItem: RowLayout {
@@ -599,23 +575,23 @@ Rectangle {
 
                     // Plus icon in rounded square
                     Rectangle {
-                        width: 36
+                        width: 52
                         height: 36
                         radius: 8
-                        color: Colors.accent
+                        color: "#4F3B3B"
 
                         Text {
                             anchors.centerIn: parent
                             text: "+"
-                            color: Colors.textOnPrimary
+                            color: "#FFFFFF"
                             font.pixelSize: 20
-                            font.weight: Font.DemiBold
+                            font.weight: Font.Normal
                         }
                     }
 
                     Text {
                         text: "Add Soundboard"
-                        color: Colors.textPrimary
+                        color: "#FFFFFF"
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
@@ -661,9 +637,9 @@ Rectangle {
         }
 
         background: Rectangle {
-            color: Colors.panelBg
+            color: "#2A2A2A"
             radius: 12
-            border.color: Colors.border
+            border.color: "#3A3A3A"
             border.width: 1
         }
 
@@ -672,7 +648,7 @@ Rectangle {
 
             Text {
                 text: "Are you sure you want to delete \"" + deleteConfirmDialog.boardNameToDelete + "\"?"
-                color: Colors.textPrimary
+                color: "#FFFFFF"
                 font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
                 font.pixelSize: 14
                 wrapMode: Text.WordWrap
@@ -688,13 +664,12 @@ Rectangle {
                     onClicked: deleteConfirmDialog.close()
 
                     background: Rectangle {
-                        color: parent.hovered ? Colors.surfaceLight : Colors.surface
+                        color: parent.hovered ? "#444444" : "#333333"
                         radius: 8
-                        border.color: Colors.border
                     }
                     contentItem: Text {
                         text: parent.text
-                        color: Colors.textPrimary
+                        color: "#FFFFFF"
                         font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
                         font.pixelSize: 13
                         horizontalAlignment: Text.AlignHCenter
@@ -713,12 +688,12 @@ Rectangle {
                     }
 
                     background: Rectangle {
-                        color: parent.hovered ? Colors.errorLight : Colors.error
+                        color: parent.hovered ? "#FF3333" : "#FF4444"
                         radius: 8
                     }
                     contentItem: Text {
                         text: parent.text
-                        color: Colors.textOnPrimary
+                        color: "#FFFFFF"
                         font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
                         font.pixelSize: 13
                         font.weight: Font.Medium

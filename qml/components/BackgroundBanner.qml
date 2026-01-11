@@ -3,12 +3,13 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
+
 Rectangle {
     id: root
-
+    
     // Pass comma-separated text like "Line 1,Line 2" or empty string for no text
     property string displayText: ""
-
+    
     // Computed properties for the two lines
     readonly property var textLines: displayText.length > 0 ? displayText.split(",") : []
     readonly property string line1: textLines.length > 0 ? textLines[0].trim() : ""
@@ -38,7 +39,7 @@ Rectangle {
     Image {
         id: backgroundImage
         anchors.fill: parent
-        source: Colors.bannerImage
+        source: "qrc:/qt/qml/TalkLess/resources/images/background.png"
         fillMode: Image.PreserveAspectCrop
     }
 
@@ -46,14 +47,12 @@ Rectangle {
     Rectangle {
         anchors.fill: parent
         radius: root.radius
-        color: Colors.black
-        opacity: root.hasText ? 0.4 : 0
+        color: "#000000"
+        opacity: root.hasText ? 0.3 : 0
         visible: root.hasText
-
+        
         Behavior on opacity {
-            NumberAnimation {
-                duration: 200
-            }
+            NumberAnimation { duration: 200 }
         }
     }
 
@@ -67,9 +66,7 @@ Rectangle {
         opacity: root.hasText ? 1 : 0
 
         Behavior on opacity {
-            NumberAnimation {
-                duration: 200
-            }
+            NumberAnimation { duration: 200 }
         }
 
         // Line 1 - Main text (Poppins SemiBold 27.51px)

@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import TalkLess
 import QtQuick.Effects
 
 Item {
@@ -11,10 +10,10 @@ Item {
     // Base dimensions matching SoundboardView calculation
     readonly property real baseWidth: 180
     readonly property real baseHeight: baseWidth * 79 / 111  // 111:79 aspect ratio = ~128.1
-
+    
     // Scale factor for proportional sizing - based on actual width vs base width
     readonly property real scaleFactor: width / baseWidth
-
+    
     // Default size (can be overridden by parent)
     width: baseWidth
     height: baseHeight
@@ -43,10 +42,9 @@ Item {
         id: card
         anchors.fill: parent
         radius: 16 * root.scaleFactor
-        color: Colors.cardBg
+        color: "#101010"
         border.width: Math.max(1, 2 * root.scaleFactor)
-        border.color: root.selected ? Colors.accent : Colors.border
-
+        border.color: "#EDEDED"
         clip: true
 
         // Background image with rounded corners
@@ -98,8 +96,8 @@ Item {
                 anchors.fill: parent
                 anchors.rightMargin: -16 * root.scaleFactor  // Extend right to hide right-side corners
                 radius: 16 * root.scaleFactor  // Match card radius
-                color: Qt.alpha(Colors.accent, 0.15)
-                opacity: 0.5
+                color: "#D9D9D938"  // Yellowish/golden color
+                opacity: 0.2  // Transparent so background shows through
             }
         }
 
@@ -120,7 +118,7 @@ Item {
                 anchors.fill: parent
                 anchors.leftMargin: -16 * root.scaleFactor  // Extend left to hide left corners
                 radius: 14 * root.scaleFactor
-                color: Colors.accent
+                color: "#3B82F6"
             }
 
             Text {
@@ -129,7 +127,7 @@ Item {
                 anchors.horizontalCenterOffset: 4 * root.scaleFactor  // Slight offset for padding
                 width: parent.width - 16 * root.scaleFactor  // Leave padding on both sides
                 text: root.title
-                color: Colors.textOnPrimary
+                color: "#FFFFFF"
                 font.pixelSize: Math.max(10, 14 * root.scaleFactor)
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight  // Truncate with ellipsis if text is too long
@@ -148,8 +146,8 @@ Item {
             anchors.bottomMargin: 6 * root.scaleFactor
             height: 28 * root.scaleFactor
             radius: 10 * root.scaleFactor
-            color: Colors.black
-            opacity: 0.5
+            color: "#000000"
+            opacity: 0.7
         }
 
         // Hotkey bar content (on top of the translucent background)
@@ -172,17 +170,16 @@ Item {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 20 * root.scaleFactor
-                    color: root.hotkeyText !== "" ? Qt.alpha(Colors.black, 0.4) : Qt.alpha(Colors.accent, 0.15)
+                    color: root.hotkeyText !== "" ? "rgba(0, 0, 0, 0.4)" : "rgba(60, 123, 255, 0.15)"
                     radius: 4 * root.scaleFactor
-                    border.color: root.hotkeyText !== "" ? "transparent" : Qt.alpha(Colors.accent, 0.3)
+                    border.color: root.hotkeyText !== "" ? "transparent" : "rgba(60, 123, 255, 0.3)"
                     border.width: root.hotkeyText !== "" ? 0 : 1
 
                     Text {
                         id: hotkeyDisplayText
                         anchors.fill: parent
                         text: root.hotkeyText !== "" ? root.hotkeyText : "Assign"
-                        color: root.hotkeyText !== "" ? Colors.white : Colors.accent
-
+                        color: root.hotkeyText !== "" ? "#FFFFFF" : "#3C7BFF"
                         font.pixelSize: Math.max(8, 12 * root.scaleFactor)
                         font.weight: root.hotkeyText !== "" ? Font.Medium : Font.DemiBold
                         elide: Text.ElideRight
@@ -211,9 +208,8 @@ Item {
             width: Math.min(240 * root.scaleFactor, parent.width - 16 * root.scaleFactor) // Widened for Copy and Paste buttons
             height: 40 * root.scaleFactor
             radius: 20 * root.scaleFactor
-            color: Colors.surfaceDark
-            border.color: Colors.accent
-
+            color: "#E61A1A1A" // More solid than hover version
+            border.color: "#3B82F6" // Blue border when open
             border.width: 1
             opacity: root.showActions ? 1.0 : 0.0
             visible: opacity > 0
@@ -234,7 +230,7 @@ Item {
                     width: 30 * root.scaleFactor
                     height: 30 * root.scaleFactor
                     radius: 15 * root.scaleFactor
-                    color: playActionMouseArea.containsMouse ? Colors.surfaceLight : "transparent"
+                    color: playActionMouseArea.containsMouse ? "#444444" : "transparent"
 
                     Text {
                         anchors.centerIn: parent
