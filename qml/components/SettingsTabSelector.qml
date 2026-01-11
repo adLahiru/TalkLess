@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import TalkLess
 import QtQuick.Layouts
 
 Rectangle {
@@ -52,7 +53,7 @@ Rectangle {
         width: tabRow.width + 20
         height: 48
         radius: 24
-        color: "#1F1F1F"
+        color: Colors.surface
     }
 
     // Tab row on top of the gray background
@@ -86,11 +87,11 @@ Rectangle {
                     orientation: Gradient.Horizontal
                     GradientStop {
                         position: 0.0
-                        color: "#3B82F6"
+                        color: Colors.gradientPrimaryStart
                     }
                     GradientStop {
                         position: 1.0
-                        color: "#D214FD"
+                        color: Colors.gradientPrimaryEnd
                     }
                 }
 

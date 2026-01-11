@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../styles"
 
 Rectangle {
     id: root
@@ -38,9 +39,10 @@ Rectangle {
                 Layout.preferredWidth: 320
                 Layout.preferredHeight: 40
                 radius: 20
-                color: "#1F1F1F"
+                color: Colors.surface
+
                 border.width: 1
-                border.color: searchInput.activeFocus ? "#6D39FF" : "#2A2C33"
+                border.color: searchInput.activeFocus ? Colors.accent : Colors.border
 
                 RowLayout {
                     anchors.fill: parent
@@ -53,7 +55,7 @@ Rectangle {
                         Layout.preferredWidth: 20
                         Layout.preferredHeight: 20
                         color: "transparent"
-                        
+
                         Text {
                             anchors.centerIn: parent
                             text: "🔍"
@@ -67,8 +69,9 @@ Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         placeholderText: "Search..."
-                        placeholderTextColor: "#666666"
-                        color: "#FFFFFF"
+                        placeholderTextColor: Colors.textTertiary
+                        color: Colors.textPrimary
+
                         font.pixelSize: 14
                         background: Rectangle {
                             color: "transparent"
@@ -81,7 +84,8 @@ Rectangle {
                         Layout.preferredWidth: 20
                         Layout.preferredHeight: 20
                         radius: 10
-                        color: searchInput.text.length > 0 ? "#333" : "transparent"
+                        color: searchInput.text.length > 0 ? Colors.surfaceDark : "transparent"
+
                         visible: searchInput.text.length > 0
 
                         Text {
@@ -100,7 +104,9 @@ Rectangle {
                 }
 
                 Behavior on border.color {
-                    ColorAnimation { duration: 150 }
+                    ColorAnimation {
+                        duration: 150
+                    }
                 }
             }
 
@@ -110,9 +116,10 @@ Rectangle {
                 Layout.preferredWidth: 40
                 Layout.preferredHeight: 40
                 radius: 10
-                color: profileMouseArea.containsMouse ? "#2A2C33" : "#1F1F1F"
+                color: profileMouseArea.containsMouse ? Colors.surfaceLight : Colors.surface
+
                 border.width: 1
-                border.color: "#2A2C33"
+                border.color: Colors.border
 
                 // Gradient overlay for selected/hover state
                 Rectangle {
@@ -121,8 +128,14 @@ Rectangle {
                     visible: profileMouseArea.containsPress
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "#3E66FF" }
-                        GradientStop { position: 1.0; color: "#B44CFF" }
+                        GradientStop {
+                            position: 0.0
+                            color: Colors.gradientPrimaryStart
+                        }
+                        GradientStop {
+                            position: 1.0
+                            color: Colors.gradientPrimaryEnd
+                        }
                     }
                     opacity: 0.3
                 }
@@ -140,20 +153,23 @@ Rectangle {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        console.log("Profile clicked")
+                        console.log("Profile clicked");
                         // TODO: Open profile menu/dialog
                     }
                 }
 
                 Behavior on color {
-                    ColorAnimation { duration: 150 }
+                    ColorAnimation {
+                        duration: 150
+                    }
                 }
             }
 
             // User Name
             Text {
                 text: "Johnson"
-                color: "#FFFFFF"
+                color: Colors.textPrimary
+
                 font.family: orelegaOneFont.status === FontLoader.Ready ? orelegaOneFont.name : "Arial"
                 font.pixelSize: 18
                 font.weight: Font.Normal

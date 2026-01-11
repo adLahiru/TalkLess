@@ -1,14 +1,17 @@
 import QtQuick
 import QtQuick.Controls
+import TalkLess
 import QtQuick.Layouts
+
 import QtQuick.Effects
 import QtQuick.Dialogs
 import "../components"
+import "../styles"
 
 Rectangle {
     id: root
-    color: "#0d0d0d"
-    radius: 10
+    color: Colors.background
+    radius: Theme.radiusLarge
 
     // Properties for dynamic banner text
     property string bannerMainText: "Microphone Control & Mixer"
@@ -18,6 +21,9 @@ Rectangle {
     property real micPeakLevel: 0.0
     property real masterPeakLevel: 0.0
     property real monitorPeakLevel: 0.0
+    property color backgroundColor: Colors.surface
+    property color hoverColor: Colors.surfaceLight
+    property color textColor: Colors.textPrimary
 
     function restartUI() {
         mainLoader.active = false;
@@ -80,7 +86,7 @@ Rectangle {
 
         ColumnLayout {
             anchors.fill: parent
-            spacing: 20
+            spacing: Theme.spacingLarge
 
             // Background Banner at the top
             BackgroundBanner {
@@ -145,8 +151,8 @@ Rectangle {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 380
-                            color: "#1A1A1A"
-                            radius: 16
+                            color: Colors.surface
+                            radius: Theme.radiusLarge
 
                             ColumnLayout {
                                 anchors.fill: parent
@@ -156,10 +162,10 @@ Rectangle {
                                 // Title
                                 Text {
                                     text: "Input Device & Mic Capture"
-                                    color: "#FFFFFF"
-                                    font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                                    font.pixelSize: 20
-                                    font.weight: Font.DemiBold
+                                    color: Colors.textPrimary
+                                    font.family: Typography.fontFamily
+                                    font.pixelSize: Typography.fontSizeLarge
+                                    font.weight: Typography.fontWeightBold
                                 }
 
                                 // Select Input Dropdown - using DropdownSelector
@@ -188,7 +194,7 @@ Rectangle {
                                         width: 52
                                         height: 28
                                         radius: 14
-                                        color: alwaysOnToggle.isOn ? "#22C55E" : "#3A3A3A"
+                                        color: alwaysOnToggle.isOn ? Colors.success : Colors.border
 
                                         property bool isOn: soundboardService.micEnabled
                                         onIsOnChanged: {
@@ -226,7 +232,7 @@ Rectangle {
 
                                     Text {
                                         text: "Always-On Mic"
-                                        color: "#FFFFFF"
+                                        color: Colors.textSecondary
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 15
                                     }
@@ -236,10 +242,10 @@ Rectangle {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 50
-                                    color: "#2A2A2A"
+                                    color: Colors.surfaceDark
                                     radius: 12
                                     border.width: 1
-                                    border.color: "#3A3A3A"
+                                    border.color: Colors.border
 
                                     RowLayout {
                                         anchors.left: parent.left
@@ -545,7 +551,7 @@ Rectangle {
 
                                 Text {
                                     text: "Sample Rate:"
-                                    color: "#FFFFFF"
+                                    color: Colors.textPrimary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 14
                                 }
@@ -553,7 +559,7 @@ Rectangle {
                                 Rectangle {
                                     width: 200
                                     height: 40
-                                    color: "#2A2A2A"
+                                    color: Colors.backgroundDark
                                     radius: 8
 
                                     RowLayout {
@@ -563,7 +569,7 @@ Rectangle {
 
                                         Text {
                                             text: "48 kHz"
-                                            color: "#AAAAAA"
+                                            color: Colors.textSecondary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 14
                                             Layout.fillWidth: true
@@ -571,7 +577,7 @@ Rectangle {
 
                                         Text {
                                             text: "▼"
-                                            color: "#666666"
+                                            color: Colors.textSecondary
                                             font.pixelSize: 12
                                         }
                                     }
@@ -590,7 +596,7 @@ Rectangle {
 
                                 Text {
                                     text: "Channels:"
-                                    color: "#FFFFFF"
+                                    color: Colors.textPrimary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 14
                                 }
@@ -598,7 +604,7 @@ Rectangle {
                                 Rectangle {
                                     width: 200
                                     height: 40
-                                    color: "#2A2A2A"
+                                    color: Colors.backgroundDark
                                     radius: 8
 
                                     RowLayout {
@@ -608,7 +614,7 @@ Rectangle {
 
                                         Text {
                                             text: "Stereo"
-                                            color: "#AAAAAA"
+                                            color: Colors.textSecondary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 14
                                             Layout.fillWidth: true
@@ -616,7 +622,7 @@ Rectangle {
 
                                         Text {
                                             text: "▼"
-                                            color: "#666666"
+                                            color: Colors.textSecondary
                                             font.pixelSize: 12
                                         }
                                     }
@@ -637,7 +643,7 @@ Rectangle {
 
                             Text {
                                 text: "Driver Mode:"
-                                color: "#FFFFFF"
+                                color: Colors.textPrimary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 14
                             }
@@ -645,7 +651,7 @@ Rectangle {
                             Rectangle {
                                 width: 200
                                 height: 40
-                                color: "#2A2A2A"
+                                color: Colors.backgroundDark
                                 radius: 8
 
                                 RowLayout {
@@ -655,7 +661,7 @@ Rectangle {
 
                                     Text {
                                         text: "WASAPI"
-                                        color: "#AAAAAA"
+                                        color: Colors.textSecondary
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 14
                                         Layout.fillWidth: true
@@ -663,7 +669,7 @@ Rectangle {
 
                                     Text {
                                         text: "▼"
-                                        color: "#666666"
+                                        color: Colors.textSecondary
                                         font.pixelSize: 12
                                     }
                                 }
@@ -701,9 +707,9 @@ Rectangle {
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: leftPaneColumn.implicitHeight + 40
-                                color: "#1A1A1A"
-                                radius: 16
-                                border.color: "#2A2A2A"
+                                color: Colors.surface
+                                radius: Theme.radiusLarge
+                                border.color: Colors.border
 
                                 ColumnLayout {
                                     id: leftPaneColumn
@@ -715,10 +721,11 @@ Rectangle {
                                         spacing: 8
                                         Text {
                                             text: "Language Selection"
-                                            color: "#FFFFFF"
-                                            font.pixelSize: 14
-                                            font.weight: Font.Medium
+                                            color: Colors.textPrimary
+                                            font.pixelSize: Typography.fontSizeNormal
+                                            font.weight: Typography.fontWeightMedium
                                         }
+
                                         DropdownSelector {
                                             id: langDropdown
                                             Layout.fillWidth: true
@@ -742,40 +749,47 @@ Rectangle {
                                         spacing: 12
                                         Text {
                                             text: "Theme Mode"
-                                            color: "#FFFFFF"
-                                            font.pixelSize: 14
-                                            font.weight: Font.Medium
+                                            color: Colors.textPrimary
+                                            font.pixelSize: Typography.fontSizeNormal
+                                            font.weight: Typography.fontWeightMedium
                                         }
+
                                         RowLayout {
                                             spacing: 20
                                             Repeater {
                                                 model: ["Light", "Dark"]
                                                 delegate: RowLayout {
+                                                    id: themeDelegate
+                                                    required property var modelData
+
                                                     spacing: 8
                                                     Rectangle {
                                                         width: 16
                                                         height: 16
                                                         radius: 8
                                                         color: "transparent"
-                                                        border.color: "#FFFFFF"
+                                                        border.color: Colors.border
                                                         border.width: 1
+
                                                         Rectangle {
                                                             anchors.centerIn: parent
                                                             width: 8
                                                             height: 8
                                                             radius: 4
-                                                            color: "#3B82F6"
-                                                            visible: soundboardService.theme === modelData
+                                                            color: Colors.primary
+
+                                                            visible: soundboardService.theme === themeDelegate.modelData
                                                         }
                                                     }
                                                     Text {
-                                                        text: modelData
-                                                        color: "#FFFFFF"
-                                                        font.pixelSize: 14
+                                                        text: themeDelegate.modelData
+                                                        color: Colors.textPrimary
+                                                        font.pixelSize: Typography.fontSizeNormal
                                                     }
+
                                                     MouseArea {
                                                         anchors.fill: parent
-                                                        onClicked: soundboardService.setTheme(modelData)
+                                                        onClicked: soundboardService.setTheme(themeDelegate.modelData)
                                                     }
                                                 }
                                             }
@@ -786,13 +800,15 @@ Rectangle {
                                         spacing: 12
                                         Text {
                                             text: "Base Theme Color"
-                                            color: "#FFFFFF"
+                                            color: Colors.textPrimary
+
                                             font.pixelSize: 14
                                             font.weight: Font.Medium
                                         }
                                         Text {
                                             text: "Choose your primary accent color for buttons, highlights, and icons."
-                                            color: "#888888"
+                                            color: Colors.textSecondary
+
                                             font.pixelSize: 12
                                             Layout.fillWidth: true
                                             wrapMode: Text.WordWrap
@@ -802,16 +818,54 @@ Rectangle {
                                             Repeater {
                                                 model: ["#EF4444", "#D946EF", "#22C55E", "#EAB308", "#06B6D4", "#F97316"]
                                                 delegate: Rectangle {
+                                                    id: colorDelegate
+                                                    required property var modelData
                                                     width: 32
                                                     height: 32
                                                     radius: 16
-                                                    color: modelData
-                                                    border.color: "#FFFFFF"
-                                                    border.width: soundboardService.accentColor === modelData ? 2 : 0
+                                                    color: colorDelegate.modelData
+                                                    border.color: Colors.white
+                                                    border.width: soundboardService.accentColor === colorDelegate.modelData ? 2 : 0
                                                     MouseArea {
                                                         anchors.fill: parent
-                                                        onClicked: soundboardService.setAccentColor(modelData)
+                                                        onClicked: soundboardService.setAccentColor(colorDelegate.modelData)
                                                     }
+                                                }
+                                            }
+                                        }
+
+                                        // Gradient Preview Section
+                                        ColumnLayout {
+                                            spacing: 8
+                                            Layout.topMargin: 8
+                                            Text {
+                                                text: "Primary Gradient Preview"
+                                                color: Colors.textSecondary
+                                                font.pixelSize: 12
+                                                font.weight: Typography.fontWeightMedium
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true
+                                                Layout.preferredHeight: 40
+                                                radius: Theme.radiusMedium
+                                                gradient: Gradient {
+                                                    orientation: Gradient.Horizontal
+                                                    GradientStop {
+                                                        position: 0.0
+                                                        color: Colors.gradientPrimaryStart
+                                                    }
+                                                    GradientStop {
+                                                        position: 1.0
+                                                        color: Colors.gradientPrimaryEnd
+                                                    }
+                                                }
+
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: "Sample Text"
+                                                    color: Colors.textOnPrimary
+                                                    font.pixelSize: 13
+                                                    font.weight: Font.Medium
                                                 }
                                             }
                                         }
@@ -821,7 +875,7 @@ Rectangle {
                                         spacing: 8
                                         Text {
                                             text: "Custom Color Picker"
-                                            color: "#FFFFFF"
+                                            color: Colors.textPrimary
                                             font.pixelSize: 14
                                             font.weight: Font.Medium
                                         }
@@ -830,29 +884,31 @@ Rectangle {
                                             Rectangle {
                                                 Layout.fillWidth: true
                                                 height: 36
-                                                color: "#0D0D0D"
+                                                color: Colors.backgroundDark
                                                 radius: 6
-                                                border.color: "#333333"
+                                                border.color: Colors.border
                                                 TextInput {
                                                     id: customColorInput
                                                     anchors.fill: parent
                                                     anchors.leftMargin: 10
                                                     verticalAlignment: Text.AlignVCenter
-                                                    color: "#FFFFFF"
+                                                    color: Colors.textPrimary
                                                     font.pixelSize: 13
                                                     text: soundboardService.accentColor
                                                 }
                                             }
+
                                             Rectangle {
                                                 width: 60
                                                 height: 36
-                                                color: "#2A2A2A"
+                                                color: Colors.surface
                                                 radius: 6
-                                                border.color: "#3A3A3A"
+                                                border.width: 1
+                                                border.color: Colors.border
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: "Apply"
-                                                    color: "#FFFFFF"
+                                                    color: Colors.textPrimary
                                                     font.pixelSize: 12
                                                 }
                                                 MouseArea {
@@ -869,9 +925,9 @@ Rectangle {
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: rightPaneColumn.implicitHeight + 40
-                                color: "#1A1A1A"
-                                radius: 16
-                                border.color: "#2A2A2A"
+                                color: Colors.surface
+                                radius: Theme.radiusLarge
+                                border.color: Colors.border
 
                                 ColumnLayout {
                                     id: rightPaneColumn
@@ -883,15 +939,16 @@ Rectangle {
                                         spacing: 12
                                         Text {
                                             text: "Slot Size"
-                                            color: "#FFFFFF"
-                                            font.pixelSize: 14
-                                            font.weight: Font.Medium
+                                            color: Colors.textPrimary
+                                            font.pixelSize: Typography.fontSizeNormal
+                                            font.weight: Typography.fontWeightMedium
                                         }
+
                                         RowLayout {
                                             spacing: 12
                                             Text {
                                                 text: "Small"
-                                                color: "#888888"
+                                                color: Colors.textSecondary
                                                 font.pixelSize: 12
                                             }
                                             Slider {
@@ -907,7 +964,7 @@ Rectangle {
                                             }
                                             Text {
                                                 text: "Large"
-                                                color: "#888888"
+                                                color: Colors.textSecondary
                                                 font.pixelSize: 12
                                             }
                                         }
@@ -917,17 +974,27 @@ Rectangle {
                                         spacing: 12
                                         Text {
                                             text: "Slot Size Presets"
-                                            color: "#FFFFFF"
+                                            color: Colors.textPrimary
                                             font.pixelSize: 14
                                             font.weight: Font.Medium
                                         }
                                         Repeater {
                                             model: [
-                                                { name: "Compact", scale: 0.7 },
-                                                { name: "Standard", scale: 1.0 },
-                                                { name: "Comfortable", scale: 1.3 }
+                                                {
+                                                    name: "Compact",
+                                                    scale: 0.7
+                                                },
+                                                {
+                                                    name: "Standard",
+                                                    scale: 1.0
+                                                },
+                                                {
+                                                    name: "Comfortable",
+                                                    scale: 1.3
+                                                }
                                             ]
                                             delegate: RowLayout {
+                                                id: slotDelegate
                                                 required property var modelData
                                                 spacing: 10
                                                 Rectangle {
@@ -935,25 +1002,26 @@ Rectangle {
                                                     height: 16
                                                     radius: 8
                                                     color: "transparent"
-                                                    border.color: "#FFFFFF"
+                                                    border.color: Colors.border
                                                     border.width: 1
                                                     Rectangle {
                                                         anchors.centerIn: parent
                                                         width: 8
                                                         height: 8
                                                         radius: 4
-                                                        color: "#3B82F6"
-                                                        visible: Math.abs(soundboardService.slotSizeScale - modelData.scale) < 0.1
+                                                        color: Colors.primary
+                                                        visible: Math.abs(soundboardService.slotSizeScale - slotDelegate.modelData.scale) < 0.1
                                                     }
                                                 }
                                                 Text {
-                                                    text: modelData.name
-                                                    color: "#FFFFFF"
+                                                    text: slotDelegate.modelData.name
+                                                    color: Colors.textPrimary
                                                     font.pixelSize: 14
                                                 }
+
                                                 MouseArea {
                                                     anchors.fill: parent
-                                                    onClicked: soundboardService.setSlotSizeScale(modelData.scale)
+                                                    onClicked: soundboardService.setSlotSizeScale(slotDelegate.modelData.scale)
                                                 }
                                             }
                                         }
@@ -963,7 +1031,7 @@ Rectangle {
                                         spacing: 12
                                         Text {
                                             text: "Preview"
-                                            color: "#888888"
+                                            color: Colors.textSecondary
                                             font.pixelSize: 12
                                         }
 
@@ -998,12 +1066,13 @@ Rectangle {
                         id: audioContent
                         width: parent.width
                         height: 400
-                        color: "#0d0d0d"
+                        color: Colors.background
                         radius: 12
 
                         Label {
                             text: "Audio & Devices"
-                            color: "#EDEDED"
+                            color: Colors.textPrimary
+
                             font.pixelSize: 20
                             anchors.left: panel.left
                             anchors.leftMargin: 22
@@ -1017,8 +1086,8 @@ Rectangle {
                             height: parent.height * 0.85
                             anchors.centerIn: parent
                             radius: 10
-                            color: "#101010"
-                            border.color: "#1b1b1b"
+                            color: Colors.surface
+                            border.color: Colors.border
 
                             ColumnLayout {
                                 anchors.fill: parent
@@ -1075,7 +1144,7 @@ Rectangle {
 
                                     Label {
                                         text: "Speaker Output:"
-                                        color: "#EDEDED"
+                                        color: Colors.textSecondary
                                         font.pixelSize: 14
                                         Layout.preferredWidth: 110
                                     }
@@ -1110,7 +1179,7 @@ Rectangle {
 
                                     Label {
                                         text: "Monitor Output:"
-                                        color: "#EDEDED"
+                                        color: Colors.textPrimary
                                         font.pixelSize: 14
                                         Layout.preferredWidth: 110
                                     }
@@ -1145,7 +1214,7 @@ Rectangle {
 
                                     Label {
                                         text: "Master Volume:"
-                                        color: "#EDEDED"
+                                        color: Colors.textSecondary
                                         font.pixelSize: 14
                                         Layout.preferredWidth: 110
                                     }
@@ -1158,6 +1227,7 @@ Rectangle {
                                             id: masterVolumeSlider
                                             anchors.fill: parent
                                             from: -60
+
                                             to: 0
                                             stepSize: 1
                                             value: soundboardService.masterGainDb
@@ -1170,8 +1240,8 @@ Rectangle {
                                                 width: 10
                                                 height: 10
                                                 radius: 5
-                                                color: "#EDEDED"
-                                                border.color: "#2A2A2A"
+                                                color: Colors.textPrimary
+                                                border.color: Colors.backgroundDark
                                                 border.width: 1
 
                                                 x: masterVolumeSlider.leftPadding + masterVolumeSlider.visualPosition * (masterVolumeSlider.availableWidth - width)
@@ -1179,14 +1249,14 @@ Rectangle {
 
                                                 Label {
                                                     text: Math.round(masterVolumeSlider.value) + " dB"
-                                                    color: "#EDEDED"
+                                                    color: Colors.textPrimary
                                                     font.pixelSize: 12
                                                     anchors.horizontalCenter: parent.horizontalCenter
                                                     anchors.bottom: parent.top
                                                     anchors.bottomMargin: 6
 
                                                     background: Rectangle {
-                                                        color: "#1F1F1F"
+                                                        color: Colors.backgroundDark
                                                         radius: 4
                                                         opacity: 0.85
                                                     }
@@ -1200,7 +1270,7 @@ Rectangle {
                                                 width: masterVolumeSlider.availableWidth
                                                 height: 3
                                                 radius: 1
-                                                color: "#EDEDED"
+                                                color: Colors.textPrimary
                                                 opacity: 0.9
                                             }
                                         }
@@ -1217,7 +1287,7 @@ Rectangle {
 
                                     contentItem: Text {
                                         text: refreshButton.text
-                                        color: "#EDEDED"
+                                        color: Colors.textPrimary
                                         font.pixelSize: 13
                                         verticalAlignment: Text.AlignVCenter
                                         horizontalAlignment: Text.AlignHCenter
@@ -1245,7 +1315,7 @@ Rectangle {
                         id: hotkeysContent
                         width: parent.width - 20  // Leave room for scrollbar
                         implicitHeight: hotkeysColumn.implicitHeight + 56  // Column height + margins
-                        color: "#0d0d0d"
+                        color: Colors.panelBg
                         radius: 12
 
                         property int tabIndex: 0 // 0 system, 1 preference
@@ -1268,8 +1338,8 @@ Rectangle {
                                 Rectangle {
                                     height: 55
                                     radius: 8
-                                    color: "#0f0f0f"
-                                    border.color: "#4a4a4a"
+                                    color: Colors.panelBg
+                                    border.color: Colors.border
                                     border.width: 1
 
                                     RowLayout {
@@ -1287,7 +1357,7 @@ Rectangle {
 
                                             contentItem: Text {
                                                 text: systemHotkeysButton.text
-                                                color: "#EDEDED"
+                                                color: systemHotkeysButton.checked ? Colors.textOnPrimary : Colors.textSecondary
                                                 font.pixelSize: 15
                                                 font.weight: Font.Medium
                                                 horizontalAlignment: Text.AlignHCenter
@@ -1301,11 +1371,11 @@ Rectangle {
                                                 gradient: Gradient {
                                                     GradientStop {
                                                         position: 0.0
-                                                        color: "#3C7BFF"
+                                                        color: Colors.gradientPrimaryStart
                                                     }
                                                     GradientStop {
                                                         position: 1.0
-                                                        color: "#B400FF"
+                                                        color: Colors.gradientPrimaryEnd
                                                     }
                                                 }
 
@@ -1325,7 +1395,7 @@ Rectangle {
 
                                             contentItem: Text {
                                                 text: myPreferenceButton.text
-                                                color: "#EDEDED"
+                                                color: myPreferenceButton.checked ? Colors.textOnPrimary : Colors.textSecondary
                                                 font.pixelSize: 15
                                                 font.weight: Font.Medium
                                                 horizontalAlignment: Text.AlignHCenter
@@ -1339,11 +1409,11 @@ Rectangle {
                                                 gradient: Gradient {
                                                     GradientStop {
                                                         position: 0.0
-                                                        color: "#3C7BFF"
+                                                        color: Colors.gradientPrimaryStart
                                                     }
                                                     GradientStop {
                                                         position: 1.0
-                                                        color: "#B400FF"
+                                                        color: Colors.gradientPrimaryEnd
                                                     }
                                                 }
 
@@ -1365,20 +1435,30 @@ Rectangle {
                                     height: 30
                                     onClicked: hotkeyManager.undoHotkeyChanges()
 
-                                    contentItem: Image {
-                                        id: resetIcon
-                                        source: "qrc:/qt/qml/TalkLess/resources/icons/actions/ic_refresh.svg"
-                                        anchors.centerIn: parent
-                                        width: 18
-                                        height: 18
-                                        fillMode: Image.PreserveAspectFit
-                                        smooth: true
+                                    contentItem: Item {
+                                        Image {
+                                            id: resetIcon
+                                            source: "qrc:/qt/qml/TalkLess/resources/icons/actions/ic_refresh.svg"
+                                            anchors.centerIn: parent
+                                            width: 18
+                                            height: 18
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            visible: false
+                                        }
+
+                                        MultiEffect {
+                                            anchors.fill: resetIcon
+                                            source: resetIcon
+                                            colorization: 1.0
+                                            colorizationColor: Colors.textPrimary
+                                        }
                                     }
 
                                     background: Rectangle {
                                         radius: 8
-                                        color: "#0f0f0f"
-                                        border.color: "#4a4a4a"
+                                        color: Colors.panelBg
+                                        border.color: Colors.border
                                         border.width: 1
                                     }
                                 }
@@ -1393,7 +1473,7 @@ Rectangle {
 
                                     contentItem: Text {
                                         text: saveButton.text
-                                        color: "#FFFFFF"
+                                        color: Colors.textOnPrimary
                                         font.pixelSize: 14
                                         font.weight: Font.Medium
                                         horizontalAlignment: Text.AlignHCenter
@@ -1401,15 +1481,16 @@ Rectangle {
                                     }
 
                                     background: Rectangle {
+                                        id: saveBtnArea
                                         radius: 10
                                         gradient: Gradient {
                                             GradientStop {
                                                 position: 0.0
-                                                color: "#2F7BFF"
+                                                color: saveBtnArea.containsMouse ? Colors.primaryLight : Colors.primary
                                             }
                                             GradientStop {
                                                 position: 1.0
-                                                color: "#C800FF"
+                                                color: saveBtnArea.containsMouse ? Colors.primary : Colors.primaryDark
                                             }
                                         }
                                     }
@@ -1469,7 +1550,8 @@ Rectangle {
                         id: aiContent
                         width: parent.width
                         height: 200
-                        color: "#1F1F1F"
+                        color: Colors.background
+
                         radius: 12
 
                         Text {
@@ -1502,7 +1584,7 @@ Rectangle {
 
                             Text {
                                 text: "Data Management"
-                                color: "#FFFFFF"
+                                color: Colors.textPrimary
                                 font.pixelSize: 20
                                 font.weight: Font.DemiBold
                             }
@@ -1510,8 +1592,9 @@ Rectangle {
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 120
-                                color: "#1A1A1A"
+                                color: Colors.surface
                                 radius: 16
+
                                 RowLayout {
                                     anchors.fill: parent
                                     anchors.margins: 20
@@ -1520,13 +1603,13 @@ Rectangle {
                                         Layout.fillWidth: true
                                         Text {
                                             text: "Export & Import Settings"
-                                            color: "#FFFFFF"
+                                            color: Colors.textPrimary
                                             font.pixelSize: 16
                                             font.weight: Font.Medium
                                         }
                                         Text {
                                             text: "Save or load your application settings (audio devices, volumes, theme)."
-                                            color: "#888888"
+                                            color: Colors.textSecondary
                                             font.pixelSize: 12
                                         }
                                     }
@@ -1535,13 +1618,14 @@ Rectangle {
                                         Rectangle {
                                             width: 120
                                             height: 40
-                                            color: "#2A2A2A"
+                                            color: Colors.surfaceLight
                                             radius: 8
-                                            border.color: "#3A3A3A"
+                                            border.color: Colors.border
+
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: "📤 Export"
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                             }
                                             MouseArea {
                                                 anchors.fill: parent
@@ -1551,13 +1635,13 @@ Rectangle {
                                         Rectangle {
                                             width: 120
                                             height: 40
-                                            color: "#2A2A2A"
+                                            color: Colors.surface
                                             radius: 8
-                                            border.color: "#3A3A3A"
+                                            border.color: Colors.border
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: "📥 Import"
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                             }
                                             MouseArea {
                                                 anchors.fill: parent
@@ -1576,7 +1660,7 @@ Rectangle {
 
                             Text {
                                 text: "Factory Reset"
-                                color: "#FFFFFF"
+                                color: Colors.textPrimary
                                 font.pixelSize: 20
                                 font.weight: Font.DemiBold
                             }
@@ -1584,7 +1668,7 @@ Rectangle {
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 120
-                                color: "#1A1A1A"
+                                color: Colors.background
                                 radius: 16
                                 RowLayout {
                                     anchors.fill: parent
@@ -1594,26 +1678,26 @@ Rectangle {
                                         Layout.fillWidth: true
                                         Text {
                                             text: "Reset All Settings & Hotkeys"
-                                            color: "#FFFFFF"
+                                            color: Colors.textOnPrimary
                                             font.pixelSize: 16
                                             font.weight: Font.Medium
                                         }
                                         Text {
                                             text: "This will restore everything to defaults. This action cannot be undone."
-                                            color: "#888888"
+                                            color: Colors.textSecondary
                                             font.pixelSize: 12
                                         }
                                     }
                                     Rectangle {
                                         width: 140
                                         height: 40
-                                        color: "#441A1A"
+                                        color: Colors.error
                                         radius: 8
-                                        border.color: "#662222"
+                                        border.color: Colors.error
                                         Text {
                                             anchors.centerIn: parent
                                             text: "⚠ Reset All"
-                                            color: "#FF6666"
+                                            color: Colors.textOnPrimary
                                             font.weight: Font.Bold
                                         }
                                         MouseArea {
