@@ -1543,7 +1543,7 @@ Rectangle {
                         property bool muteMicDuringPlayback: true
                         property bool persistentSettings: true
                         property bool clipIsRepeat: false
-                        property int reproductionMode: 0  // 0=Overlay(default), 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop
+                        property int reproductionMode: 0  // 0=Overlay(default), 1=Play/Pause, 2=Play/Stop, 3=Exclusive, 4=Loop
                         property real durationSec: 0.0
                         property real trimStartMs: 0.0
                         property real trimEndMs: 0.0
@@ -2280,8 +2280,8 @@ Rectangle {
                                 // Mode icons row
                                 RowLayout {
                                     id: modeSelectorRow
-                                    Layout.fillWidth: true
-                                    spacing: 10
+                                    Layout.alignment: Qt.AlignHCenter
+                                    spacing: 8
 
                                     property int selectedMode: clipEditorTab.reproductionMode  // Bind to clip's mode
                                     property bool ignoreNextChange: false  // Flag to prevent saving during load
@@ -2300,9 +2300,9 @@ Rectangle {
 
                                     // Overlay Mode
                                     Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
+                                        width: 36
+                                        height: 36
+                                        radius: 8
                                         color: parent.selectedMode === 0 ? "#00D9FF" : (overlayModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
                                         border.color: parent.selectedMode === 0 ? "#00D9FF" : "#3A3A3A"
                                         border.width: parent.selectedMode === 0 ? 2 : 1
@@ -2311,7 +2311,7 @@ Rectangle {
                                             anchors.centerIn: parent
                                             text: "▶"
                                             color: parent.parent.selectedMode === 0 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 18
+                                            font.pixelSize: 14
                                             font.weight: Font.Bold
                                         }
 
@@ -2333,9 +2333,9 @@ Rectangle {
 
                                     // Play/Pause Mode
                                     Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
+                                        width: 36
+                                        height: 36
+                                        radius: 8
                                         color: parent.selectedMode === 1 ? "#00D9FF" : (playPauseModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
                                         border.color: parent.selectedMode === 1 ? "#00D9FF" : "#3A3A3A"
                                         border.width: parent.selectedMode === 1 ? 2 : 1
@@ -2366,9 +2366,9 @@ Rectangle {
 
                                     // Play/Stop Mode
                                     Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
+                                        width: 36
+                                        height: 36
+                                        radius: 8
                                         color: parent.selectedMode === 2 ? "#00D9FF" : (playStopModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
                                         border.color: parent.selectedMode === 2 ? "#00D9FF" : "#3A3A3A"
                                         border.width: parent.selectedMode === 2 ? 2 : 1
@@ -2397,25 +2397,25 @@ Rectangle {
                                         }
                                     }
 
-                                    // Restart Mode
+                                    // Exclusive Playback Mode (NEW - mode 3)
                                     Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
-                                        color: parent.selectedMode === 3 ? "#00D9FF" : (restartModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                        width: 36
+                                        height: 36
+                                        radius: 8
+                                        color: parent.selectedMode === 3 ? "#00D9FF" : (exclusiveModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
                                         border.color: parent.selectedMode === 3 ? "#00D9FF" : "#3A3A3A"
                                         border.width: parent.selectedMode === 3 ? 2 : 1
 
                                         Text {
                                             anchors.centerIn: parent
-                                            text: "⟲"
+                                            text: "🔒"
                                             color: parent.parent.selectedMode === 3 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 20
+                                            font.pixelSize: 14
                                             font.weight: Font.Bold
                                         }
 
                                         MouseArea {
-                                            id: restartModeArea
+                                            id: exclusiveModeArea
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
@@ -2424,7 +2424,40 @@ Rectangle {
                                                 clipEditorTab.reproductionMode = 3;
                                                 if (root.selectedClipId !== -1) {
                                                     soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 3);
-                                                    console.log("Mode set to Loop (3)");
+                                                    console.log("Mode set to Exclusive Playback (3)");
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Loop Mode (was Restart, now mode 4)
+                                    Rectangle {
+                                        width: 36
+                                        height: 36
+                                        radius: 8
+                                        color: parent.selectedMode === 4 ? "#00D9FF" : (loopModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
+                                        border.color: parent.selectedMode === 4 ? "#00D9FF" : "#3A3A3A"
+                                        border.width: parent.selectedMode === 4 ? 2 : 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "⟲"
+                                            color: parent.parent.selectedMode === 4 ? "#000000" : "#FFFFFF"
+                                            font.pixelSize: 16
+                                            font.weight: Font.Bold
+                                        }
+
+                                        MouseArea {
+                                            id: loopModeArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                modeSelectorRow.selectedMode = 4;
+                                                clipEditorTab.reproductionMode = 4;
+                                                if (root.selectedClipId !== -1) {
+                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 4);
+                                                    console.log("Mode set to Loop (4)");
                                                 }
                                             }
                                         }
@@ -2444,9 +2477,9 @@ Rectangle {
                                         case 2:
                                             return "Second click stops and resets";
                                         case 3:
-                                            return "Always plays from beginning";
+                                            return "Stops all other sounds (exclusive)";
                                         case 4:
-                                            return "Endless loop until changed";
+                                            return "Loops from beginning, stops others";
                                         default:
                                             return "";
                                         }

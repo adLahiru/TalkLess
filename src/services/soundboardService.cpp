@@ -1337,7 +1337,8 @@ void SoundboardService::reproductionPlayingClip(const QVariantList& playingClipI
         }
 
         case 2: // Play/Stop -> stop previous clips
-        case 3: // Loop -> also stop previous clips
+        case 3: // Exclusive Playback -> stop previous clips
+        case 4: // Loop -> also stop previous clips
         {
             m_audioEngine->stopClip(slotId);
 
@@ -1387,12 +1388,12 @@ void SoundboardService::playClip(int clipId)
     const bool isPaused = m_audioEngine->isClipPaused(slotId);
 
     // Per-clip behavior (when user taps the same clip again)
-    // Mode 0 (Overlay), Mode 1 (Play/Pause), and Mode 2 (Play/Stop) all support toggle
-    if ((mode == 0 || mode == 1 || mode == 2) && isCurrentlyPlaying) {
+    // Mode 0 (Overlay), Mode 1 (Play/Pause), Mode 2 (Play/Stop), and Mode 3 (Exclusive) all support toggle
+    if ((mode == 0 || mode == 1 || mode == 2 || mode == 3) && isCurrentlyPlaying) {
         if (isPaused) {
             // For Mode 1: Pause other playing clips before resuming this one
-            // For Mode 2: Stop other playing clips before resuming this one
-            if (mode == 1 || mode == 2) {
+            // For Mode 2/3: Stop other playing clips before resuming this one
+            if (mode == 1 || mode == 2 || mode == 3) {
                 QVariantList others = playingClipIDs();
                 // Remove this clip from the list
                 for (int i = others.size() - 1; i >= 0; --i) {
@@ -1406,9 +1407,9 @@ void SoundboardService::playClip(int clipId)
                     if (mode == 1) {
                         qDebug() << "Resuming clip" << clipId << "- pausing" << others.size() << "other clips first";
                         reproductionPlayingClip(others, 1); // Pause others
-                    } else {
+                    } else if (mode == 2 || mode == 3) {
                         qDebug() << "Resuming clip" << clipId << "- stopping" << others.size() << "other clips first";
-                        reproductionPlayingClip(others, 2); // Stop others
+                        reproductionPlayingClip(others, mode); // Stop others
                     }
                 }
             }
@@ -1435,8 +1436,9 @@ void SoundboardService::playClip(int clipId)
 
     // Handle case where clip has a saved position but is not currently in audio engine
     // (e.g., it was paused when another clip started playing)
-    // Mode 0 (Overlay), Mode 1 (Play/Pause), and Mode 2 (Play/Stop) all support resuming from saved position
-    const bool hasSavedPosition = ((mode == 0 || mode == 1 || mode == 2) && clip->lastPlayedPosMs > 0.0);
+    // Mode 0 (Overlay), Mode 1 (Play/Pause), Mode 2 (Play/Stop), and Mode 3 (Exclusive) support resuming
+    // Mode 4 (Loop/Reset) always starts from beginning
+    const bool hasSavedPosition = ((mode == 0 || mode == 1 || mode == 2 || mode == 3) && clip->lastPlayedPosMs > 0.0);
 
     if (mode == 2 && isCurrentlyPlaying && !isPaused) {
         m_audioEngine->stopClip(slotId);
@@ -1474,8 +1476,11 @@ void SoundboardService::playClip(int clipId)
         // Stop Clip_A, play Clip_B
         reproductionPlayingClip(others, 2);
     } else if (mode == 3) {
-        // Stop other sound, set Clip_B to loop, play Clip_B
+        // Exclusive Playback: Stop all other sounds, play Clip_B
         reproductionPlayingClip(others, 3);
+    } else if (mode == 4) {
+        // Loop: Stop other sounds, play Clip_B in loop
+        reproductionPlayingClip(others, 4);
     }
     // mode == 0 overlay -> do nothing to others
 
@@ -1533,10 +1538,13 @@ void SoundboardService::playClip(int clipId)
     const float gainDb = (clip->volume <= 0) ? -60.0f : 20.0f * std::log10(clip->volume / 100.0f);
     m_audioEngine->setClipGain(slotId, gainDb);
 
-    // Apply loop behavior (Mode 3 forces repeat ON)
-    const bool loop = (mode == 3) ? true : clip->isRepeat;
-    if (mode == 3)
+    // Apply loop behavior (Mode 4 forces repeat ON)
+    const bool loop = (mode == 4) ? true : clip->isRepeat;
+    if (mode == 4) {
         clip->isRepeat = true;
+        clip->lastPlayedPosMs = 0.0; // Mode 4: Always start from beginning
+        qDebug() << "Mode 4 (Loop/Reset): forcing loop ON and starting from beginning";
+    }
 
     m_audioEngine->setClipLoop(slotId, loop);
     m_audioEngine->setClipTrim(slotId, clip->trimStartMs, clip->trimEndMs);
