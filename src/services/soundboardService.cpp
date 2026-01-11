@@ -8,8 +8,10 @@
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QUrl>
+#include <QDateTime>
+#include <QStandardPaths>
+#include <QDir>
 
-#include <cmath>
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
@@ -1538,6 +1540,64 @@ void SoundboardService::stopClip(int clipId)
 
     finalizeClipPlayback(clipId);
     qDebug() << "Stopped clip" << clipId << "in slot" << slotId;
+}
+
+bool SoundboardService::startRecording()
+{
+    if (!m_audioEngine)
+        return false;
+
+    m_lastRecordingPath = getRecordingOutputPath();
+    // Ensure directory exists
+    QDir().mkpath(QFileInfo(m_lastRecordingPath).absolutePath());
+
+    bool success = m_audioEngine->startRecording(m_lastRecordingPath.toStdString());
+    if (success) {
+        emit recordingStateChanged();
+    }
+    return success;
+}
+
+bool SoundboardService::stopRecording()
+{
+    if (!m_audioEngine)
+        return false;
+
+    bool success = m_audioEngine->stopRecording();
+    emit recordingStateChanged();
+    return success;
+}
+
+bool SoundboardService::isRecording() const
+{
+    if (!m_audioEngine)
+        return false;
+    return m_audioEngine->isRecording();
+}
+
+float SoundboardService::recordingDuration() const
+{
+    if (!m_audioEngine)
+        return 0.0f;
+    return m_audioEngine->getRecordingDuration();
+}
+
+
+QString SoundboardService::getRecordingOutputPath() const
+{
+    // Recordings folder in AppData
+    QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (root.isEmpty()) {
+        root = QDir::homePath() + "/.TalkLess";
+    }
+    QDir base(root);
+    QString recordingsPath = base.filePath("recordings");
+
+    // Generate filename with timestamp
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    QString filename = QString("recording_%1.wav").arg(timestamp);
+
+    return QDir(recordingsPath).filePath(filename);
 }
 
 void SoundboardService::finalizeClipPlayback(int clipId)
