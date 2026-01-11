@@ -8,9 +8,9 @@ import QtQuick.Layouts 1.15
 // Contains 5 tabs: Settings, Add, Record, Split, Audio
 Rectangle {
     id: root
-    color: "#1A1A1A"
+    color: Colors.surface
     radius: 16
-    border.color: "#2A2A2A"
+    border.color: Colors.border
     border.width: 1
 
     // Current active tab index
@@ -32,13 +32,15 @@ Rectangle {
 
             // Title (e.g., "F1" for slot name)
             Text {
-                text: "F1"
-                color: "#FFFFFF"
-                font.pixelSize: 20
+                text: tabNames[currentTab]
+                color: Colors.textPrimary
+                font.pixelSize: Typography.fontSizeLarge
                 font.weight: Font.Bold
             }
 
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+            }
 
             // Tab buttons row
             Row {
@@ -54,15 +56,15 @@ Rectangle {
                         width: 36
                         height: 36
                         radius: 8
-                        color: root.currentTab === tabButton.index ? "#333333" : (tabMouseArea.containsMouse ? "#2A2A2A" : "transparent")
-                        border.color: root.currentTab === tabButton.index ? "#444444" : "transparent"
+                        color: root.currentTab === tabButton.index ? Colors.surface : (tabMouseArea.containsMouse ? Colors.surface : "transparent")
+                        border.color: root.currentTab === tabButton.index ? Colors.border : "transparent"
                         border.width: 1
 
                         Text {
                             anchors.centerIn: parent
                             text: root.tabIcons[tabButton.index]
-                            color: root.currentTab === tabButton.index ? "#FFFFFF" : "#888888"
-                            font.pixelSize: 16
+                            color: root.currentTab === tabButton.index ? Colors.textPrimary : Colors.textSecondary
+                            font.pixelSize: Typography.fontSizeMedium
                         }
 
                         MouseArea {
@@ -74,7 +76,9 @@ Rectangle {
                         }
 
                         Behavior on color {
-                            ColorAnimation { duration: 150 }
+                            ColorAnimation {
+                                duration: 150
+                            }
                         }
                     }
                 }
@@ -85,7 +89,7 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 1
-            color: "#333333"
+            color: Colors.border
         }
 
         // Tab content area
@@ -101,15 +105,17 @@ Rectangle {
 
                 Text {
                     text: "Settings Tab"
-                    color: "#888888"
-                    font.pixelSize: 14
+                    color: Colors.textSecondary
+                    font.pixelSize: Typography.fontSizeMedium
                 }
                 Text {
                     text: "Configure clip settings here"
-                    color: "#666666"
-                    font.pixelSize: 12
+                    color: Colors.textSecondary
+                    font.pixelSize: Typography.fontSizeSmall
                 }
-                Item { Layout.fillHeight: true }
+                Item {
+                    Layout.fillHeight: true
+                }
             }
 
             // Add Tab (index 1)
@@ -120,15 +126,17 @@ Rectangle {
 
                 Text {
                     text: "Add Tab"
-                    color: "#888888"
-                    font.pixelSize: 14
+                    color: Colors.textSecondary
+                    font.pixelSize: Typography.fontSizeMedium
                 }
                 Text {
                     text: "Add new audio clips here"
-                    color: "#666666"
-                    font.pixelSize: 12
+                    color: Colors.textSecondary
+                    font.pixelSize: Typography.fontSizeSmall
                 }
-                Item { Layout.fillHeight: true }
+                Item {
+                    Layout.fillHeight: true
+                }
             }
 
             // Record Tab (index 2)
@@ -139,15 +147,17 @@ Rectangle {
 
                 Text {
                     text: "Record Tab"
-                    color: "#888888"
-                    font.pixelSize: 14
+                    color: Colors.textSecondary
+                    font.pixelSize: Typography.fontSizeMedium
                 }
                 Text {
                     text: "Record audio here"
-                    color: "#666666"
+                    color: Colors.textSecondary
                     font.pixelSize: 12
                 }
-                Item { Layout.fillHeight: true }
+                Item {
+                    Layout.fillHeight: true
+                }
             }
 
             // Split Tab (index 3)
@@ -158,15 +168,17 @@ Rectangle {
 
                 Text {
                     text: "Split Tab"
-                    color: "#888888"
-                    font.pixelSize: 14
+                    color: Colors.textSecondary
+                    font.pixelSize: Typography.fontSizeMedium
                 }
                 Text {
                     text: "Split and trim audio here"
-                    color: "#666666"
-                    font.pixelSize: 12
+                    color: Colors.textSecondary
+                    font.pixelSize: Typography.fontSizeSmall
                 }
-                Item { Layout.fillHeight: true }
+                Item {
+                    Layout.fillHeight: true
+                }
             }
 
             // Audio Tab (index 4)
@@ -177,15 +189,17 @@ Rectangle {
 
                 Text {
                     text: "Audio Tab"
-                    color: "#888888"
-                    font.pixelSize: 14
+                    color: Colors.textSecondary
+                    font.pixelSize: Typography.fontSizeMedium
                 }
                 Text {
                     text: "Audio playback settings here"
-                    color: "#666666"
-                    font.pixelSize: 12
+                    color: Colors.textSecondary
+                    font.pixelSize: Typography.fontSizeSmall
                 }
-                Item { Layout.fillHeight: true }
+                Item {
+                    Layout.fillHeight: true
+                }
             }
         }
     }

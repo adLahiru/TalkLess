@@ -105,11 +105,7 @@ qt_add_qml_module(appTalkLess
         qml/styles/Typography.qml
         qml/styles/Theme.qml
         qml/utils/Functions.qml
-    SOURCES
-        # src/view/soundboardview.h
-        # src/view/soundboardview.cpp
-        # src/view/audioplayerview.h
-        # src/view/audioplayerview.cpp
+
     RESOURCES
         # Sidebar navigation icons
         resources/icons/sidebar/ic_logo.png
@@ -135,7 +131,9 @@ qt_add_qml_module(appTalkLess
         resources/icons/uil_edit.svg
         # Images
         resources/images/background.png
+        resources/images/background_light.png
         resources/images/splashScreen.png
+        resources/images/Splash_Screen_light.png
         resources/images/audioClipDefaultBackground.png
         resources/images/addAudioBackground.png
         resources/images/sondboard.jpg
