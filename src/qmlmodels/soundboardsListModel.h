@@ -33,6 +33,7 @@ public:
     Q_INVOKABLE void reload();
     Q_INVOKABLE bool activateByRow(int row);
     Q_INVOKABLE bool activateById(int boardId);
+    Q_INVOKABLE bool toggleActiveById(int boardId);  // Toggle active state (for checkbox behavior)
     Q_INVOKABLE int rowForId(int boardId) const;
 
 

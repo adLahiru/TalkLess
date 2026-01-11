@@ -25,17 +25,20 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
     if (m_state.soundboards.isEmpty()) {
         int id = m_repo.createBoard("Default"); // creates board_1.json and updates index
         m_state = m_repo.loadIndex();
-        m_state.activeBoardId = id;
+        m_state.activeBoardIds.insert(id);
         m_repo.saveIndex(m_state);
     }
 
-    // 3) Activate the last active board
-    int idToActivate = m_state.activeBoardId;
-    if (idToActivate < 0 && !m_state.soundboards.isEmpty())
-        idToActivate = m_state.soundboards.first().id;
-
-    if (idToActivate >= 0)
-        activate(idToActivate);
+    // 3) Activate all saved active boards
+    if (m_state.activeBoardIds.isEmpty() && !m_state.soundboards.isEmpty()) {
+        // No active boards saved, activate the first one
+        activate(m_state.soundboards.first().id);
+    } else {
+        // Activate all saved active boards
+        for (int boardId : m_state.activeBoardIds) {
+            activate(boardId);
+        }
+    }
 
     // 4) Apply saved audio settings
     if (m_audioEngine) {
@@ -106,12 +109,43 @@ void SoundboardService::reloadIndex()
 
 int SoundboardService::activeBoardId() const
 {
-    return m_active ? m_active->id : -1;
+    // Returns first active board ID for backward compatibility
+    if (m_activeBoards.isEmpty())
+        return -1;
+    return m_activeBoards.begin().key();
 }
 
 QString SoundboardService::activeBoardName() const
 {
-    return m_active ? m_active->name : QString();
+    // Returns first active board name for backward compatibility
+    if (m_activeBoards.isEmpty())
+        return QString();
+    return m_activeBoards.begin().value().name;
+}
+
+QVariantList SoundboardService::activeBoardIdsList() const
+{
+    QVariantList list;
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        list.append(it.key());
+    }
+    return list;
+}
+
+bool SoundboardService::isBoardActive(int boardId) const
+{
+    return m_activeBoards.contains(boardId);
+}
+
+bool SoundboardService::toggleBoardActive(int boardId)
+{
+    if (m_activeBoards.contains(boardId)) {
+        // Deactivate this board
+        return deactivate(boardId);
+    } else {
+        // Activate this board
+        return activate(boardId);
+    }
 }
 
 void SoundboardService::setMasterGainDb(double db)
@@ -151,20 +185,41 @@ QString SoundboardService::getBoardName(int boardId) const
 
 bool SoundboardService::activate(int boardId)
 {
-    // Save current active board before switching
-    if (m_active) {
-        m_repo.saveBoard(*m_active);
+    // Check if already active
+    if (m_activeBoards.contains(boardId)) {
+        return true;
     }
 
     auto loaded = m_repo.loadBoard(boardId);
     if (!loaded)
         return false;
 
-    m_active = *loaded;
+    m_activeBoards[boardId] = *loaded;
     rebuildHotkeyIndex();
 
-    // Update index activeBoardId
-    m_state.activeBoardId = boardId;
+    // Update index activeBoardIds
+    m_state.activeBoardIds.insert(boardId);
+    m_repo.saveIndex(m_state);
+
+    emit activeBoardChanged();
+    emit activeClipsChanged();
+    emit boardsChanged();
+    return true;
+}
+
+bool SoundboardService::deactivate(int boardId)
+{
+    if (!m_activeBoards.contains(boardId)) {
+        return true; // Already not active
+    }
+
+    // Save the board before removing
+    m_repo.saveBoard(m_activeBoards[boardId]);
+    m_activeBoards.remove(boardId);
+    rebuildHotkeyIndex();
+
+    // Update index activeBoardIds
+    m_state.activeBoardIds.remove(boardId);
     m_repo.saveIndex(m_state);
 
     emit activeBoardChanged();
@@ -175,16 +230,22 @@ bool SoundboardService::activate(int boardId)
 
 bool SoundboardService::saveActive()
 {
-    if (!m_active)
+    if (m_activeBoards.isEmpty())
         return false;
 
-    const bool ok = m_repo.saveBoard(*m_active);
-    if (ok) {
+    bool allOk = true;
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        if (!m_repo.saveBoard(it.value())) {
+            allOk = false;
+        }
+    }
+    
+    if (allOk) {
         // reload index because clipCount/name might update
         m_state = m_repo.loadIndex();
         emit boardsChanged();
     }
-    return ok;
+    return allOk;
 }
 
 QString SoundboardService::normalizeHotkey(const QString& hotkey)
@@ -195,13 +256,14 @@ QString SoundboardService::normalizeHotkey(const QString& hotkey)
 void SoundboardService::rebuildHotkeyIndex()
 {
     m_hotkeyToClipId.clear();
-    if (!m_active)
-        return;
-
-    for (const auto& c : m_active->clips) {
-        const QString hk = normalizeHotkey(c.hotkey);
-        if (!hk.isEmpty()) {
-            m_hotkeyToClipId[hk] = c.id;
+    
+    // Build hotkey index from all active boards
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        for (const auto& c : it.value().clips) {
+            const QString hk = normalizeHotkey(c.hotkey);
+            if (!hk.isEmpty()) {
+                m_hotkeyToClipId[hk] = c.id;
+            }
         }
     }
 }
@@ -216,27 +278,32 @@ int SoundboardService::findActiveClipIdByHotkey(const QString& hotkey) const
 
 Clip* SoundboardService::findActiveClipById(int clipId)
 {
-    if (!m_active)
-        return nullptr;
-    for (auto& c : m_active->clips) {
-        if (c.id == clipId)
-            return &c;
+    // Search in all active boards
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        Soundboard& board = it.value();
+        for (auto& c : board.clips) {
+            if (c.id == clipId)
+                return &c;
+        }
     }
     return nullptr;
 }
 
 QVector<Clip> SoundboardService::getActiveClips() const
 {
-    if (!m_active)
-        return {};
-    return m_active->clips;
+    // Return clips from all active boards combined
+    QVector<Clip> allClips;
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        allClips.append(it.value().clips);
+    }
+    return allClips;
 }
 
 QVector<Clip> SoundboardService::getClipsForBoard(int boardId) const
 {
-    // If it's the active board, return from memory
-    if (m_active && m_active->id == boardId) {
-        return m_active->clips;
+    // If it's an active board, return from memory
+    if (m_activeBoards.contains(boardId)) {
+        return m_activeBoards.value(boardId).clips;
     }
 
     // Otherwise load from repository
@@ -249,8 +316,9 @@ QVector<Clip> SoundboardService::getClipsForBoard(int boardId) const
 QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
 {
     const Clip* clip = nullptr;
-    if (m_active && m_active->id == boardId) {
-        for (const auto& c : m_active->clips) {
+    if (m_activeBoards.contains(boardId)) {
+        const Soundboard& board = m_activeBoards.value(boardId);
+        for (const auto& c : board.clips) {
             if (c.id == clipId) {
                 clip = &c;
                 break;
@@ -353,10 +421,11 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
     if (filePaths.isEmpty())
         return false;
 
-    // If adding to active board, we can batch and save once
-    if (m_active && m_active->id == boardId) {
+    // If adding to an active board, we can batch and save once
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
         int maxId = 0;
-        for (const auto& x : m_active->clips)
+        for (const auto& x : board.clips)
             maxId = std::max(maxId, x.id);
 
         for (const QString& filePath : filePaths) {
@@ -378,7 +447,7 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
                 c.durationSec = m_audioEngine->getFileDuration(c.filePath.toStdString());
             }
 
-            m_active->clips.push_back(c);
+            board.clips.push_back(c);
         }
         rebuildHotkeyIndex();
         emit activeClipsChanged();
@@ -465,14 +534,15 @@ bool SoundboardService::addClipWithSettings(int boardId, const QString& filePath
 
 bool SoundboardService::deleteClip(int boardId, int clipId)
 {
-    // if deleting from active board (in memory)
-    if (m_active && m_active->id == boardId) {
+    // if deleting from an active board (in memory)
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
         bool found = false;
-        for (int i = 0; i < m_active->clips.size(); ++i) {
-            if (m_active->clips[i].id == clipId) {
-                if (m_active->clips[i].locked)
+        for (int i = 0; i < board.clips.size(); ++i) {
+            if (board.clips[i].id == clipId) {
+                if (board.clips[i].locked)
                     return false; // can't delete playing
-                m_active->clips.removeAt(i);
+                board.clips.removeAt(i);
                 found = true;
                 break;
             }
@@ -515,8 +585,9 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
     if (draft.filePath.trimmed().isEmpty())
         return false;
 
-    // if adding to active board (in memory)
-    if (m_active && m_active->id == boardId) {
+    // if adding to an active board (in memory)
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
         Clip c = draft;
 
         // default title if empty
@@ -532,7 +603,7 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
 
         // generate clip id (simple)
         int maxId = 0;
-        for (const auto& x : m_active->clips)
+        for (const auto& x : board.clips)
             maxId = std::max(maxId, x.id);
         c.id = maxId + 1;
 
@@ -541,7 +612,7 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
             c.durationSec = m_audioEngine->getFileDuration(c.filePath.toStdString());
         }
 
-        m_active->clips.push_back(c);
+        board.clips.push_back(c);
         rebuildHotkeyIndex();
 
         emit activeClipsChanged();
@@ -584,8 +655,9 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
 bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& updatedClip)
 {
     // active board update (enforce locked)
-    if (m_active && m_active->id == boardId) {
-        for (auto& c : m_active->clips) {
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (auto& c : board.clips) {
             if (c.id != clipId)
                 continue;
             if (c.locked)
@@ -645,8 +717,9 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const QString
                                           const QStringList& tags)
 {
     // active board update
-    if (m_active && m_active->id == boardId) {
-        for (auto& c : m_active->clips) {
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (auto& c : board.clips) {
             if (c.id != clipId)
                 continue;
             if (c.locked)
@@ -699,8 +772,9 @@ bool SoundboardService::updateClipImage(int boardId, int clipId, const QString& 
     }
 
     // active board update
-    if (m_active && m_active->id == boardId) {
-        for (auto& c : m_active->clips) {
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (auto& c : board.clips) {
             if (c.id != clipId)
                 continue;
             if (c.locked)
@@ -746,8 +820,9 @@ bool SoundboardService::updateClipAudioSettings(int boardId, int clipId, int vol
     speed = std::max(0.5, std::min(2.0, speed));
 
     // Active board update
-    if (m_active && m_active->id == boardId) {
-        for (auto& c : m_active->clips) {
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (auto& c : board.clips) {
             if (c.id != clipId)
                 continue;
             if (c.locked)
@@ -803,10 +878,11 @@ void SoundboardService::setClipVolume(int boardId, int clipId, int volume)
     volume = std::max(0, std::min(100, volume));
 
     // Only apply to active board (real-time, no save)
-    if (!m_active || m_active->id != boardId)
+    if (!m_activeBoards.contains(boardId))
         return;
 
-    for (auto& c : m_active->clips) {
+    Soundboard& board = m_activeBoards[boardId];
+    for (auto& c : board.clips) {
         if (c.id != clipId)
             continue;
 
@@ -830,8 +906,9 @@ void SoundboardService::setClipVolume(int boardId, int clipId, int volume)
 void SoundboardService::setClipRepeat(int boardId, int clipId, bool repeat)
 {
     // Active board update
-    if (m_active && m_active->id == boardId) {
-        for (auto& c : m_active->clips) {
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (auto& c : board.clips) {
             if (c.id != clipId)
                 continue;
 
@@ -856,8 +933,9 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
     mode = std::max(0, std::min(3, mode));
 
     // Active board update
-    if (m_active && m_active->id == boardId) {
-        for (auto& c : m_active->clips) {
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (auto& c : board.clips) {
             if (c.id != clipId)
                 continue;
 
@@ -907,8 +985,9 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
 void SoundboardService::setClipStopOtherSounds(int boardId, int clipId, bool stop)
 {
     // Active board update
-    if (m_active && m_active->id == boardId) {
-        for (auto& c : m_active->clips) {
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (auto& c : board.clips) {
             if (c.id != clipId)
                 continue;
             c.stopOtherSounds = stop;
@@ -936,8 +1015,9 @@ void SoundboardService::setClipStopOtherSounds(int boardId, int clipId, bool sto
 void SoundboardService::setClipMuteOtherSounds(int boardId, int clipId, bool mute)
 {
     // Active board update
-    if (m_active && m_active->id == boardId) {
-        for (auto& c : m_active->clips) {
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (auto& c : board.clips) {
             if (c.id != clipId)
                 continue;
             c.muteOtherSounds = mute;
@@ -971,8 +1051,9 @@ void SoundboardService::setClipMuteOtherSounds(int boardId, int clipId, bool mut
 void SoundboardService::setClipMuteMicDuringPlayback(int boardId, int clipId, bool mute)
 {
     // Active board update
-    if (m_active && m_active->id == boardId) {
-        for (auto& c : m_active->clips) {
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (auto& c : board.clips) {
             if (c.id != clipId)
                 continue;
             c.muteMicDuringPlayback = mute;
@@ -1000,8 +1081,9 @@ void SoundboardService::setClipMuteMicDuringPlayback(int boardId, int clipId, bo
 void SoundboardService::setClipTrim(int boardId, int clipId, double startMs, double endMs)
 {
     // Active board update
-    if (m_active && m_active->id == boardId) {
-        for (auto& c : m_active->clips) {
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (auto& c : board.clips) {
             if (c.id != clipId)
                 continue;
             if (c.trimStartMs == startMs && c.trimEndMs == endMs)
@@ -1038,7 +1120,7 @@ void SoundboardService::setClipTrim(int boardId, int clipId, double startMs, dou
 void SoundboardService::seekClip(int boardId, int clipId, double positionMs)
 {
     // Active board update
-    if (m_active && m_active->id == boardId) {
+    if (m_activeBoards.contains(boardId)) {
         // Update engine if this clip is in a slot
         if (m_clipIdToSlot.contains(clipId)) {
             m_audioEngine->seekClip(m_clipIdToSlot[clipId], positionMs);
@@ -1053,13 +1135,14 @@ bool SoundboardService::moveClip(int boardId, int fromIndex, int toIndex)
         return false;
 
     // Active board update
-    if (m_active && m_active->id == boardId) {
-        if (fromIndex >= m_active->clips.size() || toIndex >= m_active->clips.size())
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        if (fromIndex >= board.clips.size() || toIndex >= board.clips.size())
             return false;
 
         // Move clip within the vector
-        Clip clip = m_active->clips.takeAt(fromIndex);
-        m_active->clips.insert(toIndex, clip);
+        Clip clip = board.clips.takeAt(fromIndex);
+        board.clips.insert(toIndex, clip);
 
         emit activeClipsChanged();
         return saveActive();
@@ -1137,9 +1220,9 @@ bool SoundboardService::renameBoard(int boardId, const QString& newName)
     if (name.isEmpty())
         return false;
 
-    // If renaming active board (in memory)
-    if (m_active && m_active->id == boardId) {
-        m_active->name = name;
+    // If renaming an active board (in memory)
+    if (m_activeBoards.contains(boardId)) {
+        m_activeBoards[boardId].name = name;
         // saveActive() will call emit activeBoardChanged, emit boardsChanged, and reload index
         return saveActive();
     }
@@ -1166,20 +1249,11 @@ bool SoundboardService::deleteBoard(int boardId)
     if (m_state.soundboards.size() <= 1)
         return false;
 
-    // If deleting the active board, switch to another first
-    if (m_active && m_active->id == boardId) {
-        // Find another board to activate
-        int newActiveId = -1;
-        for (const auto& info : m_state.soundboards) {
-            if (info.id != boardId) {
-                newActiveId = info.id;
-                break;
-            }
-        }
-        if (newActiveId >= 0) {
-            activate(newActiveId);
-        }
-        m_active.reset();
+    // If deleting an active board, deactivate it first
+    if (m_activeBoards.contains(boardId)) {
+        m_activeBoards.remove(boardId);
+        m_state.activeBoardIds.remove(boardId);
+        rebuildHotkeyIndex();
     }
 
     // Delete from repository
@@ -1562,12 +1636,13 @@ double SoundboardService::getFileDuration(const QString& filePath) const
 QVariantList SoundboardService::playingClipIDs() const
 {
     QVariantList playingIds;
-    if (!m_active)
-        return playingIds;
-
-    for (const auto& clip : m_active->clips) {
-        if (isClipPlaying(clip.id)) {
-            playingIds.append(clip.id);
+    
+    // Check all active boards for playing clips
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        for (const auto& clip : it.value().clips) {
+            if (isClipPlaying(clip.id)) {
+                playingIds.append(clip.id);
+            }
         }
     }
     return playingIds;
@@ -1823,10 +1898,10 @@ bool SoundboardService::setBoardHotkey(int boardId, const QString& hotkey)
         }
     }
 
-    // If it's the active board, update in memory too
-    if (m_active && m_active->id == boardId) {
-        m_active->hotkey = hotkey;
-        m_repo.saveBoard(*m_active);
+    // If it's an active board, update in memory too
+    if (m_activeBoards.contains(boardId)) {
+        m_activeBoards[boardId].hotkey = hotkey;
+        m_repo.saveBoard(m_activeBoards[boardId]);
     } else {
         // Load, update, save the board
         auto loaded = m_repo.loadBoard(boardId);

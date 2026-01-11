@@ -243,7 +243,19 @@ AppState StorageRepository::loadIndex() const
 
     const auto root = doc.object();
     state.version = root.value("version").toInt(1);
-    state.activeBoardId = root.value("activeBoardId").toInt(-1);
+    
+    // Load active board IDs (supports both old single activeBoardId and new activeBoardIds array)
+    if (root.contains("activeBoardIds") && root.value("activeBoardIds").isArray()) {
+        const auto idsArr = root.value("activeBoardIds").toArray();
+        for (const auto& v : idsArr) {
+            int id = v.toInt(-1);
+            if (id >= 0) state.activeBoardIds.insert(id);
+        }
+    } else if (root.contains("activeBoardId")) {
+        // Migrate from old single activeBoardId format
+        int id = root.value("activeBoardId").toInt(-1);
+        if (id >= 0) state.activeBoardIds.insert(id);
+    }
 
     if (root.contains("settings") && root.value("settings").isObject()) {
         state.settings = settingsFromJson(root.value("settings").toObject());
@@ -264,7 +276,14 @@ bool StorageRepository::saveIndex(const AppState& state) const
 
     QJsonObject root;
     root["version"] = state.version;
-    root["activeBoardId"] = state.activeBoardId;
+    
+    // Save active board IDs as array
+    QJsonArray activeBoardIdsArr;
+    for (int id : state.activeBoardIds) {
+        activeBoardIdsArr.append(id);
+    }
+    root["activeBoardIds"] = activeBoardIdsArr;
+    
     root["settings"] = settingsToJson(state.settings);
 
     QJsonArray boardsArr;
@@ -341,10 +360,10 @@ int StorageRepository::createBoard(const QString& name)
     // Save board file + index update
     saveBoard(b);
 
-    // Ensure activeBoardId has a value if none exists
+    // Ensure at least one board is active if none exists
     state = loadIndex();
-    if (state.activeBoardId < 0) {
-        state.activeBoardId = id;
+    if (state.activeBoardIds.isEmpty()) {
+        state.activeBoardIds.insert(id);
         saveIndex(state);
     }
 
@@ -364,9 +383,9 @@ bool StorageRepository::deleteBoard(int boardId)
             break;
         }
     }
-    if (state.activeBoardId == boardId) {
-        state.activeBoardId = state.soundboards.isEmpty() ? -1 : state.soundboards.first().id;
-    }
+    
+    // Remove from active boards if present
+    state.activeBoardIds.remove(boardId);
 
     return saveIndex(state);
 }

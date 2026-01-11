@@ -61,7 +61,7 @@ QVariant SoundboardsListModel::data(const QModelIndex& index, int role) const
 
     case IsActiveRole:
         if (!m_service) return false;
-        return m_service->activeBoardId() == b.id;
+        return m_service->isBoardActive(b.id);
 
     default:
         return {};
@@ -105,6 +105,13 @@ bool SoundboardsListModel::activateById(int boardId)
     if (!m_service)
         return false;
     return m_service->activate(boardId);
+}
+
+bool SoundboardsListModel::toggleActiveById(int boardId)
+{
+    if (!m_service)
+        return false;
+    return m_service->toggleBoardActive(boardId);
 }
 
 void SoundboardsListModel::onBoardsChanged()

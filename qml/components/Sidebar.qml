@@ -158,11 +158,11 @@ Rectangle {
                         orientation: Gradient.Horizontal
                         GradientStop {
                             position: 0.0
-                            color: "#3B82F6"
+                            color: Colors.gradientPrimaryStart
                         }
                         GradientStop {
                             position: 1.0
-                            color: "#D214FD"
+                            color: Colors.gradientPrimaryEnd
                         }
                     }
                 }
@@ -176,11 +176,11 @@ Rectangle {
                         orientation: Gradient.Horizontal
                         GradientStop {
                             position: 0.0
-                            color: "#3B82F6"
+                            color: Colors.gradientPrimaryStart
                         }
                         GradientStop {
                             position: 1.0
-                            color: "#D214FD"
+                            color: Colors.gradientPrimaryEnd
                         }
                     }
                 }
@@ -347,35 +347,36 @@ Rectangle {
                             spacing: 10
                             z: 1  // Above the background
 
-                            // radio indicator - clicking this activates the soundboard
+                            // checkbox indicator - clicking this toggles the soundboard active state
                             Rectangle {
-                                id: radioIndicator
+                                id: checkboxIndicator
                                 width: 22
                                 height: 22
-                                radius: 11
+                                radius: 4  // Square with rounded corners for checkbox
                                 border.width: 2
                                 border.color: boardRow.active ? "#D214FD" : "#5AFFFFFF"
-                                color: radioMouse.containsMouse ? "#333333" : "transparent"
+                                color: checkboxMouse.containsMouse ? "#333333" : "transparent"
 
-                                Rectangle {
+                                // Checkmark icon when active
+                                Text {
                                     anchors.centerIn: parent
-                                    width: 12
-                                    height: 12
-                                    radius: 6
-                                    visible: boardRow.active
+                                    text: "✓"
+                                    font.pixelSize: 14
+                                    font.bold: true
                                     color: "#D214FD"
+                                    visible: boardRow.active
                                 }
 
                                 MouseArea {
-                                    id: radioMouse
+                                    id: checkboxMouse
                                     anchors.fill: parent
                                     anchors.margins: -4  // Make clickable area slightly larger
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
 
                                     onClicked: () => {
-                                        console.log("Radio clicked - activating board:", boardRow.boardId);
-                                        soundboardsModel.activateById(boardRow.boardId);
+                                        console.log("Checkbox clicked - toggling board:", boardRow.boardId);
+                                        soundboardsModel.toggleActiveById(boardRow.boardId);
                                     }
                                 }
                             }
