@@ -270,25 +270,25 @@ Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: 8
             spacing: 8
-            // Always visible - adapts layout based on collapsed state
+            visible: !root.isCollapsed
 
-            // Soundboards list - shows full layout when expanded, just images with checkbox when collapsed
+            // Soundboards list
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: root.isCollapsed ? 300 : 240
+                Layout.preferredHeight: 240
 
                 ListView {
                     id: boardsList
                     anchors.fill: parent
                     clip: true
-                    spacing: root.isCollapsed ? 8 : 10
+                    spacing: 10
 
                     model: soundboardsModel
 
                     delegate: Item {
                         id: boardRow
                         width: boardsList.width
-                        height: root.isCollapsed ? 52 : 56
+                        height: 56  // Reduced height
 
                         // from model roles - use required property for ComponentBehavior: Bound
                         required property int index
@@ -313,12 +313,7 @@ Rectangle {
                             acceptedButtons: Qt.LeftButton
 
                             onClicked: () => {
-                                if (root.isCollapsed) {
-                                    // In collapsed mode, clicking the image area toggles active state
-                                    // But we handle that in the checkbox overlay below
-                                    root.selectedBoardId = boardRow.boardId;
-                                    root.soundboardSelected(boardRow.boardId);
-                                } else if (root.editingBoardId === -1) {
+                                if (root.editingBoardId === -1) {
                                     // Select this soundboard (for viewing)
                                     root.selectedBoardId = boardRow.boardId;
                                     root.soundboardSelected(boardRow.boardId);
@@ -326,15 +321,13 @@ Rectangle {
                             }
 
                             onDoubleClicked: () => {
-                                if (!root.isCollapsed) {
-                                    root.editingBoardId = boardRow.boardId;
-                                }
+                                root.editingBoardId = boardRow.boardId;
                             }
                         }
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: root.isCollapsed ? 10 : 14
+                            radius: 14
                             // Show selection highlight (blue border) or active state (filled) or hover
                             color: {
                                 if (root.selectedBoardId === boardRow.boardId) {
@@ -349,80 +342,12 @@ Rectangle {
                             border.color: Colors.accent
                         }
 
-                        // Collapsed mode layout - just image with checkbox overlay
-                        Item {
-                            width: parent.height - 8  // Square, based on row height
-                            height: parent.height - 8
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            anchors.verticalCenter: parent.verticalCenter
-                            visible: root.isCollapsed
-
-                            // Soundboard image with rounded corners
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 10
-                                color: "#141414"
-
-                                Image {
-                                    anchors.fill: parent
-                                    fillMode: Image.PreserveAspectCrop
-                                    source: boardRow.boardImage || "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
-                                    layer.enabled: true
-                                    layer.effect: MultiEffect {
-                                        maskEnabled: true
-                                        maskSource: ShaderEffectSource {
-                                            sourceItem: Rectangle {
-                                                width: 48
-                                                height: 48
-                                                radius: 10
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Checkbox overlay in top-right corner
-                                Rectangle {
-                                    id: collapsedCheckbox
-                                    width: 14
-                                    height: 14
-                                    radius: 3
-                                    anchors.top: parent.top
-                                    anchors.right: parent.right
-                                    anchors.topMargin: 3
-                                    anchors.rightMargin: 3
-                                    color: boardRow.active ? "#D214FD" : "#80000000"
-                                    border.width: 1.5
-                                    border.color: boardRow.active ? "#D214FD" : "#FFFFFF"
-
-                                    // Checkmark when active
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "✓"
-                                        font.pixelSize: 9
-                                        font.bold: true
-                                        color: "#FFFFFF"
-                                        visible: boardRow.active
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            soundboardsModel.toggleActiveById(boardRow.boardId);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Expanded mode layout - full row with checkbox, image, name
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 10
                             anchors.rightMargin: 10
                             spacing: 10
                             z: 1  // Above the background
-                            visible: !root.isCollapsed
 
                             // checkbox indicator - clicking this toggles the soundboard active state
                             Rectangle {
@@ -643,12 +568,11 @@ Rectangle {
                 }
             }
 
-            // Add Soundboard button - matches design (hidden in collapsed mode)
+            // Add Soundboard button - matches design
             Button {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 48
                 text: "Add Soundboard"
-                visible: !root.isCollapsed
 
                 background: Rectangle {
                     radius: 12
@@ -713,37 +637,6 @@ Rectangle {
                     if (row >= 0) {
                         boardsList.positionViewAtIndex(row, ListView.End);
                         // Focus happens automatically when the TextField becomes visible
-                    }
-                }
-            }
-
-            // Collapsed mode: Add button as just a plus icon
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 44
-                radius: 10
-                color: addBtnMouse.containsMouse ? "#4D3F3F" : "#3D2F2F"
-                visible: root.isCollapsed
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "+"
-                    color: "#FFFFFF"
-                    font.pixelSize: 24
-                    font.weight: Font.Medium
-                }
-
-                MouseArea {
-                    id: addBtnMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        const newId = soundboardService.createBoard("New Soundboard");
-                        soundboardsModel.reload();
-                        // Expand sidebar to allow editing
-                        root.isCollapsed = false;
-                        root.editingBoardId = newId;
                     }
                 }
             }
