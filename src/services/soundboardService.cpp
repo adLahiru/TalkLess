@@ -2,16 +2,15 @@
 
 #include "audioEngine.h"
 
+#include <QDateTime>
 #include <QDebug>
+#include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
-#include <QUrl>
-#include <QDateTime>
 #include <QStandardPaths>
-#include <QDir>
-
+#include <QUrl>
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
@@ -241,7 +240,7 @@ bool SoundboardService::saveActive()
             allOk = false;
         }
     }
-    
+
     if (allOk) {
         // reload index because clipCount/name might update
         m_state = m_repo.loadIndex();
@@ -258,7 +257,7 @@ QString SoundboardService::normalizeHotkey(const QString& hotkey)
 void SoundboardService::rebuildHotkeyIndex()
 {
     m_hotkeyToClipId.clear();
-    
+
     // Build hotkey index from all active boards
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& c : it.value().clips) {
@@ -339,7 +338,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
                     map["hotkey"] = c.hotkey;
                     map["volume"] = c.volume;
                     map["speed"] = c.speed;
-                    map["isPlaying"] = c.isPlaying;  // Use stored state, not audio engine state
+                    map["isPlaying"] = c.isPlaying; // Use stored state, not audio engine state
                     map["isRepeat"] = c.isRepeat;
                     map["tags"] = c.tags;
                     map["reproductionMode"] = c.reproductionMode;
@@ -353,7 +352,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
                     map["durationSec"] = duration;
                     map["trimStartMs"] = c.trimStartMs;
                     map["trimEndMs"] = c.trimEndMs;
-                    map["lastPlayedPosMs"] = c.lastPlayedPosMs;  // For resuming playback
+                    map["lastPlayedPosMs"] = c.lastPlayedPosMs; // For resuming playback
                     return map;
                 }
             }
@@ -369,7 +368,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
         map["hotkey"] = clip->hotkey;
         map["volume"] = clip->volume;
         map["speed"] = clip->speed;
-        map["isPlaying"] = clip->isPlaying;  // Use stored state, not audio engine state
+        map["isPlaying"] = clip->isPlaying; // Use stored state, not audio engine state
         map["isRepeat"] = clip->isRepeat;
         map["tags"] = clip->tags;
         map["reproductionMode"] = clip->reproductionMode;
@@ -383,7 +382,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
         map["durationSec"] = duration;
         map["trimStartMs"] = clip->trimStartMs;
         map["trimEndMs"] = clip->trimEndMs;
-        map["lastPlayedPosMs"] = clip->lastPlayedPosMs;  // For resuming playback
+        map["lastPlayedPosMs"] = clip->lastPlayedPosMs; // For resuming playback
         return map;
     }
 
@@ -1320,16 +1319,20 @@ void SoundboardService::reproductionPlayingClip(const QVariantList& playingClipI
 
         case 1: // Play/Pause -> pause previous clips
         {
+            qDebug() << "reproductionPlayingClip: mode=1, about to pause clip" << cid << "in slot" << slotId;
             double pos = m_audioEngine->getClipPlaybackPositionMs(slotId);
             qDebug() << "Saving playback position:" << pos;
             Clip* clip = findActiveClipById(cid);
-            if (!clip)
+            if (!clip) {
+                qDebug() << "reproductionPlayingClip: clip" << cid << "not found, skipping";
                 continue;
+            }
             clip->lastPlayedPosMs = pos;
             clip->isPlaying = false; // Mark as not playing so UI shows correct state
             saveActive();
             m_audioEngine->pauseClip(slotId);
             emit clipPlaybackPaused(cid); // Notify UI that clip is paused
+            qDebug() << "reproductionPlayingClip: paused clip" << cid << "at position" << pos;
             break;
         }
 
@@ -1341,8 +1344,10 @@ void SoundboardService::reproductionPlayingClip(const QVariantList& playingClipI
             // update your UI state if you track it
             if (Clip* other = findActiveClipById(cid)) {
                 other->isPlaying = false;
+                other->lastPlayedPosMs = 0.0; // Reset position to beginning (STOP, not pause)
             }
 
+            qDebug() << "reproductionPlayingClip: stopped clip" << cid << "(reset position to 0)";
             emit clipPlaybackStopped(cid); // emit clipId (NOT slotId)
             break;
         }
@@ -1382,25 +1387,56 @@ void SoundboardService::playClip(int clipId)
     const bool isPaused = m_audioEngine->isClipPaused(slotId);
 
     // Per-clip behavior (when user taps the same clip again)
-    if (mode == 1 && isCurrentlyPlaying) {
+    // Mode 0 (Overlay), Mode 1 (Play/Pause), and Mode 2 (Play/Stop) all support toggle
+    if ((mode == 0 || mode == 1 || mode == 2) && isCurrentlyPlaying) {
         if (isPaused) {
-            // Resume from saved position
+            // For Mode 1: Pause other playing clips before resuming this one
+            // For Mode 2: Stop other playing clips before resuming this one
+            if (mode == 1 || mode == 2) {
+                QVariantList others = playingClipIDs();
+                // Remove this clip from the list
+                for (int i = others.size() - 1; i >= 0; --i) {
+                    bool ok = false;
+                    const int cid = others[i].toInt(&ok);
+                    if (ok && cid == clipId) {
+                        others.removeAt(i);
+                    }
+                }
+                if (!others.isEmpty()) {
+                    if (mode == 1) {
+                        qDebug() << "Resuming clip" << clipId << "- pausing" << others.size() << "other clips first";
+                        reproductionPlayingClip(others, 1); // Pause others
+                    } else {
+                        qDebug() << "Resuming clip" << clipId << "- stopping" << others.size() << "other clips first";
+                        reproductionPlayingClip(others, 2); // Stop others
+                    }
+                }
+            }
+
+            // Resume from saved position - clip is still loaded in audio engine
             m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
             m_audioEngine->resumeClip(slotId);
             clip->isPlaying = true;
-            qDebug() << "Resuming clip" << clipId << "from position" << clip->lastPlayedPosMs;
+            emit activeClipsChanged();
+            emit clipPlaybackStarted(clipId);
+            qDebug() << "Resuming paused clip" << clipId << "from position" << clip->lastPlayedPosMs;
         } else {
-            // User clicked a playing clip - STOP it (not pause) per user request
-            m_audioEngine->stopClip(slotId);
+            // User clicked a playing clip - PAUSE it and save position
+            clip->lastPlayedPosMs = m_audioEngine->getClipPlaybackPositionMs(slotId);
+            m_audioEngine->pauseClip(slotId);
             clip->isPlaying = false;
-            clip->lastPlayedPosMs = 0.0; // Reset position since we're stopping
-            emit clipPlaybackStopped(clipId);
-            qDebug() << "Stopped clip" << clipId << "(user clicked playing tile)";
+            emit activeClipsChanged();
+            emit clipPlaybackPaused(clipId);
+            qDebug() << "Paused clip" << clipId << "at position" << clip->lastPlayedPosMs;
         }
 
-        emit activeClipsChanged();
         return;
     }
+
+    // Handle case where clip has a saved position but is not currently in audio engine
+    // (e.g., it was paused when another clip started playing)
+    // Mode 0 (Overlay), Mode 1 (Play/Pause), and Mode 2 (Play/Stop) all support resuming from saved position
+    const bool hasSavedPosition = ((mode == 0 || mode == 1 || mode == 2) && clip->lastPlayedPosMs > 0.0);
 
     if (mode == 2 && isCurrentlyPlaying && !isPaused) {
         m_audioEngine->stopClip(slotId);
@@ -1415,6 +1451,8 @@ void SoundboardService::playClip(int clipId)
 
     // 1) Apply Clip_B reproduction to OTHER currently playing clips
     QVariantList others = playingClipIDs();
+    qDebug() << "playClip: clipId=" << clipId << "mode=" << mode << "others playing=" << others;
+
     // Remove this clip if it appears in the "playing" list
     for (int i = others.size() - 1; i >= 0; --i) {
         bool ok = false;
@@ -1424,8 +1462,13 @@ void SoundboardService::playClip(int clipId)
         }
     }
 
+    qDebug() << "playClip: after removing self, others=" << others;
+
+    qDebug() << "playClip: clipId=" << clipId << "mode=" << mode << "others size=" << others.size();
+
     if (mode == 1) {
         // Pause Clip_A, play Clip_B
+        qDebug() << "playClip: mode=1, calling reproductionPlayingClip to pause" << others.size() << "other clips";
         reproductionPlayingClip(others, 1);
     } else if (mode == 2) {
         // Stop Clip_A, play Clip_B
@@ -1498,19 +1541,15 @@ void SoundboardService::playClip(int clipId)
     m_audioEngine->setClipLoop(slotId, loop);
     m_audioEngine->setClipTrim(slotId, clip->trimStartMs, clip->trimEndMs);
 
-    // 3) Play Clip_B
-    m_audioEngine->setClipTrim(slotId, clip->trimStartMs, clip->trimEndMs);
-
     // Resume from saved position if applicable (mainly for Play/Pause mode)
-    if (clip->lastPlayedPosMs > 0.0) {
-        // Mode 1: Play/Pause - resume from last position
-        if (mode == 1) {
-            m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
-            qDebug() << "Resuming clip" << clipId << "from position" << clip->lastPlayedPosMs;
-        }
+    if (hasSavedPosition) {
+        m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
+        qDebug() << "Starting clip" << clipId << "from saved position" << clip->lastPlayedPosMs << "ms";
+    } else {
+        qDebug() << "Starting clip" << clipId << "from beginning";
     }
 
-    // 3) Play Clip_B
+    // Play the clip
     m_audioEngine->playClip(slotId);
 
     clip->isPlaying = true;
@@ -1583,7 +1622,6 @@ float SoundboardService::recordingDuration() const
         return 0.0f;
     return m_audioEngine->getRecordingDuration();
 }
-
 
 QString SoundboardService::getRecordingOutputPath() const
 {
@@ -1698,7 +1736,7 @@ double SoundboardService::getFileDuration(const QString& filePath) const
 QVariantList SoundboardService::playingClipIDs() const
 {
     QVariantList playingIds;
-    
+
     // Check all active boards for playing clips
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& clip : it.value().clips) {
