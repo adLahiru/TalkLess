@@ -1168,41 +1168,30 @@ Rectangle {
                         }
 
                         // Dropdown selector
-                        Rectangle {
+                        DropdownSelector {
+                            id: inputDeviceDropdown
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 44
-                            color: "#1A1A1A"
-                            radius: 8
-                            border.color: "#3A3A3A"
-                            border.width: 1
+                            icon: "🔴"
+                            placeholder: "Select Mic Device"
 
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 15
-                                anchors.rightMargin: 15
+                            selectedId: "-1"
 
-                                Text {
-                                    text: "Select Mic Device"
-                                    color: "#666666"
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 13
-                                    Layout.fillWidth: true
-                                }
+                            // initial can be empty; we’ll fill on open
+                            model: []
 
-                                // Dropdown arrow
-                                Text {
-                                    text: "▼"
-                                    color: "#808080"
-                                    font.pixelSize: 10
-                                }
+                            onAboutToOpen: {
+                                const list = soundboardService.getInputDevices()
+                                list.unshift({ id: "-1", name: "None", isDefault: false })
+                                model = list
                             }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Mic dropdown clicked")
+                            onItemSelected: function (id, name) {
+                                console.log("Recoding input device selected:", name, "(id:", id, ")");
+                                soundboardService.setRecodingInputDevice(id);
                             }
+
                         }
+
                     }
 
                     // Spacer

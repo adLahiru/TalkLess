@@ -59,6 +59,7 @@ public:
     QString selectedCaptureDeviceId() const { return m_state.settings.selectedCaptureDeviceId; }
     QString selectedPlaybackDeviceId() const { return m_state.settings.selectedPlaybackDeviceId; }
     QString selectedMonitorDeviceId() const { return m_state.settings.selectedMonitorDeviceId; }
+
     Q_INVOKABLE void setMasterGainDb(double db);
     Q_INVOKABLE void setMicGainDb(double db);
 
@@ -151,6 +152,7 @@ public:
     Q_INVOKABLE bool setInputDevice(const QString& deviceId);
     Q_INVOKABLE bool setOutputDevice(const QString& deviceId);
     Q_INVOKABLE bool setMonitorOutputDevice(const QString& deviceId);
+    Q_INVOKABLE bool setRecodingInputDevice(const QString& deviceId);
 
     // ---- Audio Level Monitoring ----
     Q_INVOKABLE float getMicPeakLevel() const;

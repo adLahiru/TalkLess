@@ -1811,6 +1811,7 @@ QVariantList SoundboardService::getInputDevices() const
         deviceMap["isDefault"] = device.isDefault;
         result.append(deviceMap);
     }
+    qDebug() << result ;
     return result;
 }
 
@@ -1851,6 +1852,23 @@ bool SoundboardService::setInputDevice(const QString& deviceId)
     }
     return success;
 }
+
+bool SoundboardService::setRecodingInputDevice(const QString& deviceId)
+{
+    if (!m_audioEngine) {
+        qWarning() << "AudioEngine not initialized";
+        return false;
+    }
+
+    bool success = m_audioEngine->setRecodingDevice(deviceId.toStdString());
+    if (success) {
+        qDebug() << "Input device set to:" << deviceId;
+    } else {
+        qWarning() << "Failed to set input device:" << deviceId;
+    }
+    return success;
+}
+
 
 bool SoundboardService::setOutputDevice(const QString& deviceId)
 {
