@@ -2,28 +2,55 @@ cmake_minimum_required(VERSION 3.16)
 
 project(TalkLess VERSION 0.1 LANGUAGES CXX)
 
-include(FetchContent)
-
+# ----------------------------
+# Global build settings
+# ----------------------------
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
-set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "" FORCE) 
-set(FFMPEG_ROOT "${CMAKE_SOURCE_DIR}/lib/ffmpeg")
 
-find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg )
+set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "" FORCE)
+
+include(FetchContent)
 
 # Fix for QHotkey's outdated cmake_minimum_required with newer CMake versions
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
 
+# ----------------------------
+# Qt
+# ----------------------------
+find_package(Qt6 6.5 REQUIRED COMPONENTS
+    Core
+    Quick
+    Qml
+    Multimedia
+    QuickControls2
+    Svg
+)
+
+qt_standard_project_setup(REQUIRES 6.5)
+
+# Optional: silence QML policy warning (QTP0004). Remove if you want to enforce qmldir layout.
+if(COMMAND qt_policy)
+    qt_policy(SET QTP0004 OLD)
+endif()
+
+# ----------------------------
+# QHotkey (FetchContent)
+# ----------------------------
 FetchContent_Declare(QHotkey
   GIT_REPOSITORY https://github.com/Skycoder42/QHotkey.git
   GIT_TAG master
 )
 FetchContent_MakeAvailable(QHotkey)
 
-qt_standard_project_setup(REQUIRES 6.5)
-
+# ----------------------------
+# App target
+# ----------------------------
 qt_add_executable(appTalkLess
     src/main.cpp
 
@@ -39,7 +66,7 @@ qt_add_executable(appTalkLess
     src/audioEngine.cpp
 
     # Controllers
-    src/controllers/hotkeyManager.h 
+    src/controllers/hotkeyManager.h
     src/controllers/hotkeyManager.cpp
     src/controllers/hotkeyvalidator.h
     src/controllers/hotkeyvalidator.cpp
@@ -52,8 +79,7 @@ qt_add_executable(appTalkLess
     src/qmlmodels/hotkeysModel.h
     src/qmlmodels/hotkeysModel.cpp
 
-
-    # services
+    # Services
     src/services/storageRepository.h
     src/services/storageRepository.cpp
     src/services/soundboardService.h
@@ -61,16 +87,17 @@ qt_add_executable(appTalkLess
 )
 
 # Mark singleton files before adding the QML module
-set_source_files_properties(qml/styles/Colors.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/styles/Colors.qml     PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 set_source_files_properties(qml/styles/Typography.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
-set_source_files_properties(qml/styles/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
-set_source_files_properties(qml/utils/Functions.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/styles/Theme.qml      PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/utils/Functions.qml   PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(appTalkLess
     URI TalkLess
     VERSION 1.0
     QML_FILES
         Main.qml
+
         # Components
         qml/components/SideBar.qml
         qml/components/HeaderBar.qml
@@ -99,51 +126,19 @@ qt_add_qml_module(appTalkLess
         qml/components/FileDropArea.qml
         qml/components/TrimWaveform.qml
         qml/components/AudioPlayerCard.qml
-        # qml/components/SoundboardListItem.qml
-        # qml/components/HeaderBar.qml
-        # qml/components/SettingsTabBar.qml
-        # qml/components/SettingsHeader.qml
-        # qml/components/ToggleSwitch.qml
-        # qml/components/DropdownSelect.qml
-        # qml/components/ActionButton.qml
-        # qml/components/HotkeyItem.qml
-        # qml/components/FeatureToggleItem.qml
-        # qml/components/AudioCard.qml
-        # qml/components/AddAudioCard.qml
-        # qml/components/AudioTag.qml
-        # qml/components/WaveformDisplay.qml
-        # qml/components/SettingsImportExport.qml
-        # qml/components/AudioPlayer.qml
-        # qml/components/VolumeMeter.qml
-        # qml/components/AudioDetailsPanel.qml
-        # qml/components/AddAudioPanel.qml
-        # qml/components/MetersPanel.qml
-        # qml/components/TeleprompterPanel.qml
-        # qml/components/AudioPanelTabs.qml
-        # qml/components/AddAudioContent.qml
-        # qml/components/RecordAudioContent.qml
+
         # Pages
         qml/pages/ApplicationSettingsView.qml
         qml/pages/SoundboardView.qml
-        # qml/pages/AudioDevicesTab.qml
-        # qml/pages/HotkeysTab.qml
-        # qml/pages/FeaturesTab.qml
-        # qml/pages/UIDisplayTab.qml
-        # qml/pages/UpdatesTab.qml
-        # qml/pages/SoundboardPage.qml
-        # qml/pages/VolumeMixerPage.qml
-        # qml/pages/SettingsManagementPage.qml
+
         # Styles (singletons)
         qml/styles/Colors.qml
         qml/styles/Typography.qml
         qml/styles/Theme.qml
+
         # Utils (singleton)
         qml/utils/Functions.qml
-    SOURCES
-        # src/view/soundboardview.h
-        # src/view/soundboardview.cpp
-        # src/view/audioplayerview.h
-        # src/view/audioplayerview.cpp
+
     RESOURCES
         # Sidebar navigation icons
         resources/icons/sidebar/ic_logo.png
@@ -176,51 +171,122 @@ qt_add_qml_module(appTalkLess
         resources/images/Subtract.svg
 )
 
-# Add include directories for QML type registration
-target_include_directories(appTalkLess PRIVATE 
-                        ${CMAKE_SOURCE_DIR}/src
-                        lib
-                        "${FFMPEG_ROOT}/include"
-                    )
+# Your own headers
+target_include_directories(appTalkLess PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/lib
+)
 
-find_library(FFMPEG_AVFORMAT_LIB   NAMES avformat   libavformat   PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
-find_library(FFMPEG_AVCODEC_LIB    NAMES avcodec    libavcodec    PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
-find_library(FFMPEG_AVUTIL_LIB     NAMES avutil     libavutil     PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
-find_library(FFMPEG_SWRESAMPLE_LIB NAMES swresample libswresample PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+# ----------------------------
+# FFmpeg (from vcpkg)
+# ----------------------------
+# vcpkg's ffmpeg port provides module-style integration (not CONFIG):
+#   find_package(FFMPEG REQUIRED)
+find_package(FFMPEG REQUIRED)
 
+target_include_directories(appTalkLess PRIVATE ${FFMPEG_INCLUDE_DIRS})
+# Some setups provide full paths in FFMPEG_LIBRARIES; linking directories is harmless.
+if(DEFINED FFMPEG_LIBRARY_DIRS)
+    target_link_directories(appTalkLess PRIVATE ${FFMPEG_LIBRARY_DIRS})
+endif()
+target_link_libraries(appTalkLess PRIVATE ${FFMPEG_LIBRARIES})
 
-# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
-# If you are developing for iOS or macOS you should consider setting an
-# explicit, fixed bundle identifier manually though.
+# ----------------------------
+# Link libraries (Qt + QHotkey)
+# ----------------------------
+target_link_libraries(appTalkLess PRIVATE
+    Qt6::Core
+    Qt6::Quick
+    Qt6::Qml
+    Qt6::Multimedia
+    Qt6::QuickControls2
+    Qt6::Svg
+    QHotkey::QHotkey
+)
+
+# ----------------------------
+# Runtime dependency deployment (FFmpeg) for Qt Creator Run
+# ----------------------------
+# Ensures the app runs from Qt Creator on Windows & macOS without editing PATH/DYLD_LIBRARY_PATH.
+if(DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
+
+  # Windows: copy vcpkg DLLs (FFmpeg etc.) next to the .exe
+  if(WIN32)
+    set(_vcpkg_bin      "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin")
+    set(_vcpkg_debugbin "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/debug/bin")
+
+    add_custom_command(TARGET appTalkLess POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "$<IF:$<CONFIG:Debug>,${_vcpkg_debugbin},${_vcpkg_bin}>"
+        "$<TARGET_FILE_DIR:appTalkLess>"
+      COMMENT "Copying vcpkg runtime DLLs next to appTalkLess.exe"
+    )
+  endif()
+
+  # macOS: copy FFmpeg dylibs into the .app bundle + set rpath to Frameworks
+  if(APPLE)
+    set(_vcpkg_lib      "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
+    set(_vcpkg_debuglib "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/debug/lib")
+
+    set_target_properties(appTalkLess PROPERTIES
+      # During build/run from build dir:
+      BUILD_RPATH "$<IF:$<CONFIG:Debug>,${_vcpkg_debuglib},${_vcpkg_lib}>"
+      # When bundled:
+      INSTALL_RPATH "@executable_path/../Frameworks"
+    )
+
+    file(GLOB _ffmpeg_dylibs_release
+      "${_vcpkg_lib}/libavcodec*.dylib*"
+      "${_vcpkg_lib}/libavformat*.dylib*"
+      "${_vcpkg_lib}/libavutil*.dylib*"
+      "${_vcpkg_lib}/libswresample*.dylib*"
+    )
+
+    file(GLOB _ffmpeg_dylibs_debug
+      "${_vcpkg_debuglib}/libavcodec*.dylib*"
+      "${_vcpkg_debuglib}/libavformat*.dylib*"
+      "${_vcpkg_debuglib}/libavutil*.dylib*"
+      "${_vcpkg_debuglib}/libswresample*.dylib*"
+    )
+
+    add_custom_command(TARGET appTalkLess POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_BUNDLE_DIR:appTalkLess>/Contents/Frameworks"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<IF:$<CONFIG:Debug>,${_ffmpeg_dylibs_debug},${_ffmpeg_dylibs_release}>"
+        "$<TARGET_BUNDLE_DIR:appTalkLess>/Contents/Frameworks"
+      COMMENT "Copying FFmpeg dylibs into app bundle (Contents/Frameworks)"
+    )
+  endif()
+
+endif()
+
+# ----------------------------
+# Platform specifics
+# ----------------------------
 set_target_properties(appTalkLess PROPERTIES
-#    MACOSX_BUNDLE_GUI_IDENTIFIER com.example.appTalkLess
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
 )
 
-target_link_libraries(appTalkLess
-    PRIVATE Qt6::Core
-    PRIVATE Qt6::Quick
-    PRIVATE Qt6::Qml
-    PRIVATE Qt6::Multimedia
-    PRIVATE Qt6::QuickControls2
-    PRIVATE Qt6::Svg
-    PRIVATE QHotkey::QHotkey
-)
-
-# Link Carbon framework for global hotkeys on macOS
 if(APPLE)
     target_link_libraries(appTalkLess PRIVATE "-framework Carbon")
-    
-    # Set custom Info.plist
     set_target_properties(appTalkLess PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/macos/Info.plist"
     )
 endif()
 
+# NOTE:
+# Do NOT call qt_finalize_executable(appTalkLess) here.
+# In your setup Qt finalizes automatically; calling it again causes "finalize twice" warnings.
+
+# ----------------------------
+# Install
+# ----------------------------
 include(GNUInstallDirs)
+
 install(TARGETS appTalkLess
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
