@@ -26,6 +26,8 @@ Item {
     property bool isPlaying: false
     property int clipId: -1  // The clip ID for fetching progress
     property real playbackProgress: 0.0  // 0.0 to 1.0 for progress display
+    property string filePath: ""  // File path for cross-soundboard operations
+    property int currentBoardId: -1  // Current board ID to identify source board
 
     // hover state
     property bool tileHover: false
@@ -37,7 +39,7 @@ Item {
     // actions
     signal playClicked
     signal stopClicked
-    signal copyClicked
+    signal sendToClicked
     signal pasteClicked
     signal clicked
     signal editBackgroundClicked
@@ -417,15 +419,19 @@ Item {
                             onClicked: { root.playClicked(); root.showActions = false } }
                     }
 
-                    // Copy
+                    // Send to other soundboard (arrow icon)
                     Rectangle {
                         width: 30
                         height: 30
                         radius: 15
-                        color: copyMA.containsMouse ? Colors.surfaceHighlight : "transparent"
-                        Text { anchors.centerIn: parent; text: "📋"; font.pixelSize: 14 }
-                        MouseArea { id: copyMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                            onClicked: { root.copyClicked(); root.showActions = false } }
+                        color: sendToMA.containsMouse ? Colors.surfaceHighlight : "transparent"
+                        Text { anchors.centerIn: parent; text: "➡️"; font.pixelSize: 14 }
+                        MouseArea { id: sendToMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: { 
+                                root.sendToClicked()
+                                soundboardSelectionPopup.open()
+                            } 
+                        }
                     }
 
                     // Edit bg
@@ -518,6 +524,192 @@ Item {
                 root.clicked()
                 root.playClicked()
                 root.showActions = false
+            }
+        }
+    }
+
+    // =========================
+    // Soundboard Selection Popup
+    // =========================
+    Popup {
+        id: soundboardSelectionPopup
+        
+        parent: Overlay.overlay
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        
+        x: Math.round((parent ? parent.width : 800) / 2 - width / 2)
+        y: Math.round((parent ? parent.height : 600) / 2 - height / 2)
+        width: 280
+        height: Math.min(400, boardsListView.contentHeight + 80)
+        
+        padding: 0
+        
+        background: Rectangle {
+            color: Colors.panelBg
+            radius: 12
+            border.width: 1
+            border.color: Colors.border
+            
+            // Shadow effect
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowColor: "#40000000"
+                shadowBlur: 20
+                shadowVerticalOffset: 8
+            }
+        }
+        
+        property var boardsList: []
+        
+        onOpened: {
+            // Fetch boards with clip status when popup opens
+            if (root.clipId >= 0) {
+                boardsList = soundboardService.getBoardsWithClipStatus(root.clipId)
+            }
+        }
+        
+        contentItem: Column {
+            spacing: 0
+            
+            // Header
+            Rectangle {
+                width: parent.width
+                height: 48
+                color: "transparent"
+                
+                Text {
+                    anchors.centerIn: parent
+                    text: "Copy to Soundboard"
+                    font.pixelSize: 14
+                    font.bold: true
+                    color: Colors.textPrimary
+                }
+                
+                // Close button
+                Rectangle {
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 8
+                    width: 32
+                    height: 32
+                    radius: 16
+                    color: closePopupMA.containsMouse ? Colors.surfaceLight : "transparent"
+                    
+                    Text {
+                        anchors.centerIn: parent
+                        text: "✕"
+                        font.pixelSize: 16
+                        color: Colors.textSecondary
+                    }
+                    
+                    MouseArea {
+                        id: closePopupMA
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: soundboardSelectionPopup.close()
+                    }
+                }
+            }
+            
+            // Divider
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Colors.border
+            }
+            
+            // Soundboards list
+            ListView {
+                id: boardsListView
+                width: parent.width
+                height: Math.min(300, contentHeight)
+                clip: true
+                
+                model: soundboardSelectionPopup.boardsList
+                
+                delegate: Item {
+                    width: boardsListView.width
+                    height: 44
+                    
+                    required property var modelData
+                    required property int index
+                    
+                    property bool isCurrentBoard: modelData.id === root.currentBoardId
+                    
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        radius: 8
+                        color: boardRowMA.containsMouse ? Colors.surfaceLight : "transparent"
+                        opacity: isCurrentBoard ? 0.5 : 1.0
+                        
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            spacing: 12
+                            
+                            // Checkbox
+                            Rectangle {
+                                width: 20
+                                height: 20
+                                radius: 4
+                                color: modelData.hasClip ? Colors.accent : "transparent"
+                                border.width: modelData.hasClip ? 0 : 2
+                                border.color: Colors.textSecondary
+                                
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "✓"
+                                    font.pixelSize: 14
+                                    font.bold: true
+                                    color: Colors.textOnPrimary
+                                    visible: modelData.hasClip
+                                }
+                            }
+                            
+                            // Board name
+                            Text {
+                                Layout.fillWidth: true
+                                text: modelData.name + (isCurrentBoard ? " (Current)" : "")
+                                font.pixelSize: 13
+                                color: isCurrentBoard ? Colors.textSecondary : Colors.textPrimary
+                                elide: Text.ElideRight
+                            }
+                        }
+                        
+                        MouseArea {
+                            id: boardRowMA
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: isCurrentBoard ? Qt.ArrowCursor : Qt.PointingHandCursor
+                            enabled: !isCurrentBoard
+                            
+                            onClicked: {
+                                if (modelData.hasClip) {
+                                    // Remove clip from board
+                                    soundboardService.removeClipByFilePath(modelData.id, root.filePath)
+                                } else {
+                                    // Copy clip to board
+                                    soundboardService.copyClipToBoard(root.clipId, modelData.id)
+                                }
+                                // Refresh the list
+                                soundboardSelectionPopup.boardsList = soundboardService.getBoardsWithClipStatus(root.clipId)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Bottom padding
+            Item {
+                width: parent.width
+                height: 12
             }
         }
     }

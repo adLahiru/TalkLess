@@ -37,4 +37,7 @@ struct Clip
 
     double durationSec = 0.0;           // Duration in seconds (or -1.0 if unknown)
     double lastPlayedPosMs = 0.0;       // Saved playback position for resuming
+    
+    // Track which boards this clip is shared with (for "send to board" feature)
+    QList<int> sharedBoardIds;          // List of board IDs where this clip exists
 };

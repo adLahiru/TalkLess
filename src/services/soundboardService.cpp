@@ -290,6 +290,38 @@ Clip* SoundboardService::findActiveClipById(int clipId)
     return nullptr;
 }
 
+std::optional<Clip> SoundboardService::findClipByIdAnyBoard(int clipId, int* outBoardId) const
+{
+    // First search in active boards (faster)
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        const Soundboard& board = it.value();
+        for (const auto& c : board.clips) {
+            if (c.id == clipId) {
+                if (outBoardId) *outBoardId = it.key();
+                return c;
+            }
+        }
+    }
+    
+    // Search in inactive boards
+    for (const auto& boardInfo : m_state.soundboards) {
+        if (m_activeBoards.contains(boardInfo.id))
+            continue; // Already searched
+            
+        auto loaded = m_repo.loadBoard(boardInfo.id);
+        if (loaded) {
+            for (const auto& c : loaded->clips) {
+                if (c.id == clipId) {
+                    if (outBoardId) *outBoardId = boardInfo.id;
+                    return c;
+                }
+            }
+        }
+    }
+    
+    return std::nullopt;
+}
+
 QVector<Clip> SoundboardService::getActiveClips() const
 {
     // Return clips from all active boards combined
@@ -599,10 +631,21 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
     if (draft.filePath.trimmed().isEmpty())
         return false;
 
+    // Sanitize file path - convert file:// URL to local path and fix double slashes
+    QString sanitizedPath = draft.filePath;
+    if (sanitizedPath.startsWith("file:")) {
+        sanitizedPath = QUrl(sanitizedPath).toLocalFile();
+    }
+    // Remove any duplicate leading slashes (e.g., "//Users" -> "/Users")
+    while (sanitizedPath.startsWith("//")) {
+        sanitizedPath = sanitizedPath.mid(1);
+    }
+
     // if adding to an active board (in memory)
     if (m_activeBoards.contains(boardId)) {
         Soundboard& board = m_activeBoards[boardId];
         Clip c = draft;
+        c.filePath = sanitizedPath;  // Use sanitized path
 
         // default title if empty
         if (c.title.trimmed().isEmpty()) {
@@ -625,6 +668,13 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
         if (m_audioEngine) {
             c.durationSec = m_audioEngine->getFileDuration(c.filePath.toStdString());
         }
+        
+        // Ensure shared board IDs includes current board if not already set
+        if (c.sharedBoardIds.isEmpty() || !c.sharedBoardIds.contains(boardId)) {
+            if (!c.sharedBoardIds.contains(boardId)) {
+                c.sharedBoardIds.append(boardId);
+            }
+        }
 
         board.clips.push_back(c);
         rebuildHotkeyIndex();
@@ -641,6 +691,7 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
     Soundboard b = *loaded;
 
     Clip c = draft;
+    c.filePath = sanitizedPath;  // Use sanitized path
     if (c.title.trimmed().isEmpty())
         c.title = QFileInfo(c.filePath).baseName();
     c.isPlaying = false;
@@ -654,6 +705,13 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
     // Get duration
     if (m_audioEngine) {
         c.durationSec = m_audioEngine->getFileDuration(c.filePath.toStdString());
+    }
+    
+    // Ensure shared board IDs includes current board if not already set
+    if (c.sharedBoardIds.isEmpty() || !c.sharedBoardIds.contains(boardId)) {
+        if (!c.sharedBoardIds.contains(boardId)) {
+            c.sharedBoardIds.append(boardId);
+        }
     }
 
     b.clips.push_back(c);
@@ -1210,6 +1268,299 @@ bool SoundboardService::pasteClip(int boardId)
 bool SoundboardService::canPaste() const
 {
     return m_clipboardClip.has_value();
+}
+
+QVariantList SoundboardService::getBoardsWithClipStatus(int clipId) const
+{
+    QVariantList result;
+
+    // First, find the clip to get its file path
+    QString clipFilePath;
+    
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        for (const auto& c : it.value().clips) {
+            if (c.id == clipId) {
+                clipFilePath = c.filePath;
+                break;
+            }
+        }
+        if (!clipFilePath.isEmpty())
+            break;
+    }
+
+    // If not found in active boards, search inactive boards
+    if (clipFilePath.isEmpty()) {
+        for (const auto& boardInfo : m_state.soundboards) {
+            if (!m_activeBoards.contains(boardInfo.id)) {
+                auto loaded = m_repo.loadBoard(boardInfo.id);
+                if (loaded) {
+                    for (const auto& c : loaded->clips) {
+                        if (c.id == clipId) {
+                            clipFilePath = c.filePath;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!clipFilePath.isEmpty())
+                break;
+        }
+    }
+
+    if (clipFilePath.isEmpty())
+        return result;
+
+    // Now collect ALL sharedBoardIds from all clips with the same file path
+    // This ensures we get the complete picture of where this clip exists
+    QSet<int> allSharedBoardIds;
+    
+    // Check active boards
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        for (const auto& c : it.value().clips) {
+            if (c.filePath == clipFilePath) {
+                // Add this board as it contains the clip
+                allSharedBoardIds.insert(it.key());
+                // Also add all sharedBoardIds from this clip
+                for (int boardId : c.sharedBoardIds) {
+                    allSharedBoardIds.insert(boardId);
+                }
+            }
+        }
+    }
+    
+    // Check inactive boards
+    for (const auto& boardInfo : m_state.soundboards) {
+        if (!m_activeBoards.contains(boardInfo.id)) {
+            auto loaded = m_repo.loadBoard(boardInfo.id);
+            if (loaded) {
+                for (const auto& c : loaded->clips) {
+                    if (c.filePath == clipFilePath) {
+                        // Add this board as it contains the clip
+                        allSharedBoardIds.insert(boardInfo.id);
+                        // Also add all sharedBoardIds from this clip
+                        for (int boardId : c.sharedBoardIds) {
+                            allSharedBoardIds.insert(boardId);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Iterate through all soundboards and check if clip exists
+    for (const auto& boardInfo : m_state.soundboards) {
+        QVariantMap boardEntry;
+        boardEntry["id"] = boardInfo.id;
+        boardEntry["name"] = boardInfo.name;
+        boardEntry["hasClip"] = allSharedBoardIds.contains(boardInfo.id);
+        result.append(boardEntry);
+    }
+
+    return result;
+}
+
+bool SoundboardService::copyClipToBoard(int sourceClipId, int targetBoardId)
+{
+    // Find the source clip from any board (active or inactive)
+    int sourceBoardId = -1;
+    auto sourceClipOpt = findClipByIdAnyBoard(sourceClipId, &sourceBoardId);
+    if (!sourceClipOpt.has_value()) {
+        qDebug() << "Source clip not found:" << sourceClipId;
+        return false;
+    }
+    
+    Clip sourceClip = sourceClipOpt.value();
+    QString clipFilePath = sourceClip.filePath;
+
+    // Check if clip already exists in target board (by file path)
+    if (m_activeBoards.contains(targetBoardId)) {
+        const Soundboard& board = m_activeBoards.value(targetBoardId);
+        for (const auto& c : board.clips) {
+            if (c.filePath == clipFilePath) {
+                qDebug() << "Clip already exists in target board";
+                return false; // Already exists
+            }
+        }
+    } else {
+        auto loaded = m_repo.loadBoard(targetBoardId);
+        if (loaded) {
+            for (const auto& c : loaded->clips) {
+                if (c.filePath == clipFilePath) {
+                    qDebug() << "Clip already exists in target board";
+                    return false; // Already exists
+                }
+            }
+        }
+    }
+
+    // Create a copy of the clip
+    Clip draft = sourceClip;
+    draft.hotkey = ""; // Clear hotkey for the new copy
+    draft.id = -1;     // Will be assigned a new ID
+    draft.isPlaying = false;
+    draft.locked = false;
+    
+    // Update shared board IDs - add both source and target boards
+    if (!draft.sharedBoardIds.contains(sourceBoardId) && sourceBoardId != -1) {
+        draft.sharedBoardIds.append(sourceBoardId);
+    }
+    if (!draft.sharedBoardIds.contains(targetBoardId)) {
+        draft.sharedBoardIds.append(targetBoardId);
+    }
+
+    qDebug() << "Copying clip:" << draft.title << "to board:" << targetBoardId;
+    bool ok = addClipToBoard(targetBoardId, draft);
+    if (ok) {
+        // Now sync the sharedBoardIds back to all clips with the same file path
+        syncSharedBoardIds(clipFilePath, draft.sharedBoardIds);
+        emit boardsChanged();
+        emit activeClipsChanged();
+    }
+    return ok;
+}
+
+void SoundboardService::syncSharedBoardIds(const QString& filePath, const QList<int>& sharedBoardIds)
+{
+    // Update all clips with the same file path in all active boards
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        Soundboard& board = it.value();
+        bool boardModified = false;
+        
+        for (auto& clip : board.clips) {
+            if (clip.filePath == filePath) {
+                clip.sharedBoardIds = sharedBoardIds;
+                boardModified = true;
+            }
+        }
+        
+        if (boardModified) {
+            m_repo.saveBoard(board);
+        }
+    }
+    
+    // Also update clips in inactive boards
+    for (const auto& boardInfo : m_state.soundboards) {
+        if (!m_activeBoards.contains(boardInfo.id)) {
+            auto loaded = m_repo.loadBoard(boardInfo.id);
+            if (loaded) {
+                bool boardModified = false;
+                
+                for (auto& clip : loaded->clips) {
+                    if (clip.filePath == filePath) {
+                        clip.sharedBoardIds = sharedBoardIds;
+                        boardModified = true;
+                    }
+                }
+                
+                if (boardModified) {
+                    m_repo.saveBoard(*loaded);
+                }
+            }
+        }
+    }
+}
+
+bool SoundboardService::removeClipByFilePath(int boardId, const QString& filePath)
+{
+    if (filePath.isEmpty())
+        return false;
+
+    // Active board case
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (int i = 0; i < board.clips.size(); ++i) {
+            if (board.clips[i].filePath == filePath) {
+                if (board.clips[i].locked)
+                    return false;
+
+                int clipId = board.clips[i].id;
+
+                // Stop the clip if playing
+                if (m_audioEngine && m_clipIdToSlot.contains(clipId)) {
+                    int slotId = m_clipIdToSlot[clipId];
+                    m_audioEngine->stopClip(slotId);
+                    m_audioEngine->unloadClip(slotId);
+                    m_clipIdToSlot.remove(clipId);
+                }
+
+                board.clips.removeAt(i);
+                rebuildHotkeyIndex();
+                
+                // Update sharedBoardIds in all other clips with the same file path
+                removeFromSharedBoardIds(filePath, boardId);
+                
+                emit activeClipsChanged();
+                emit clipPlaybackStopped(clipId);
+                return saveActive();
+            }
+        }
+        return false;
+    }
+
+    // Inactive board case
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded)
+        return false;
+
+    Soundboard b = *loaded;
+    for (int i = 0; i < b.clips.size(); ++i) {
+        if (b.clips[i].filePath == filePath) {
+            b.clips.removeAt(i);
+            const bool ok = m_repo.saveBoard(b);
+            if (ok) {
+                // Update sharedBoardIds in all other clips with the same file path
+                removeFromSharedBoardIds(filePath, boardId);
+                
+                m_state = m_repo.loadIndex();
+                emit boardsChanged();
+            }
+            return ok;
+        }
+    }
+    return false;
+}
+
+void SoundboardService::removeFromSharedBoardIds(const QString& filePath, int boardIdToRemove)
+{
+    // Remove boardIdToRemove from sharedBoardIds for all clips with this file path
+    
+    // Update active boards
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        Soundboard& board = it.value();
+        bool boardModified = false;
+        
+        for (auto& clip : board.clips) {
+            if (clip.filePath == filePath) {
+                clip.sharedBoardIds.removeAll(boardIdToRemove);
+                boardModified = true;
+            }
+        }
+        
+        if (boardModified) {
+            m_repo.saveBoard(board);
+        }
+    }
+    
+    // Update inactive boards
+    for (const auto& boardInfo : m_state.soundboards) {
+        if (!m_activeBoards.contains(boardInfo.id)) {
+            auto loaded = m_repo.loadBoard(boardInfo.id);
+            if (loaded) {
+                bool boardModified = false;
+                
+                for (auto& clip : loaded->clips) {
+                    if (clip.filePath == filePath) {
+                        clip.sharedBoardIds.removeAll(boardIdToRemove);
+                        boardModified = true;
+                    }
+                }
+                
+                if (boardModified) {
+                    m_repo.saveBoard(*loaded);
+                }
+            }
+        }
+    }
 }
 
 int SoundboardService::createBoard(const QString& name)
