@@ -858,7 +858,7 @@ Rectangle {
             AudioPlayerCard {
                 id: audioPlayerCard
                 Layout.preferredWidth: 228
-                Layout.preferredHeight: 140
+                Layout.preferredHeight: 175
                 Layout.alignment: Qt.AlignHCenter
                 Layout.bottomMargin: 10
 
@@ -883,6 +883,55 @@ Rectangle {
 
                 // Bind isPlaying state
                 isPlaying: root.displayedClipData ? root.displayedClipData.isPlaying : false
+
+                // Waveform progress - bind totalTime from clip duration (in seconds)
+                totalTime: (root.displayedClipData && root.displayedClipData.durationSec > 0) 
+                           ? root.displayedClipData.durationSec : 210
+
+                // currentTime is updated by the timer below
+                property real playbackPositionMs: 0
+                property int lastClipId: -1  // Track which clip we're displaying
+
+                // Timer to poll playback position - runs when playing
+                Timer {
+                    id: audioPlayerTimer
+                    interval: 50  // Update every 50ms for smoother sync
+                    repeat: true
+                    running: audioPlayerCard.isPlaying && root.displayedClipData !== null
+                    onTriggered: {
+                        if (root.displayedClipData) {
+                            audioPlayerCard.playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
+                        }
+                    }
+                }
+
+                // Convert ms to seconds for currentTime
+                currentTime: playbackPositionMs / 1000.0
+
+                // Sync position immediately when playback state changes
+                onIsPlayingChanged: {
+                    if (root.displayedClipData) {
+                        // Always sync position when state changes
+                        playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
+                    }
+                }
+
+                // Reset position when switching to a different clip
+                onDisplayedClipDataChanged: {
+                    if (root.displayedClipData) {
+                        if (lastClipId !== root.displayedClipData.clipId) {
+                            // New clip - get current position from backend
+                            playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
+                            lastClipId = root.displayedClipData.clipId
+                        }
+                    } else {
+                        playbackPositionMs = 0
+                        lastClipId = -1
+                    }
+                }
+
+                // Helper to access displayed clip data from handlers
+                property var displayedClipData: root.displayedClipData
 
                 // Play/Pause the displayed clip
                 onPlayClicked: {
