@@ -675,7 +675,7 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
             n.isPlaying = c.isPlaying;
             n.locked = c.locked;
 
-            if (n.reproductionMode == 3)
+            if (n.reproductionMode == 4)
                 n.isRepeat = true;
             c = n;
 
@@ -703,7 +703,7 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
         n.isPlaying = false;
         n.locked = false;
 
-        if (n.reproductionMode == 3)
+        if (n.reproductionMode == 4)
             n.isRepeat = true;
         c = n;
 
@@ -1376,7 +1376,8 @@ void SoundboardService::playClip(int clipId)
     const int slotId = getOrAssignSlot(clipId);
 
     // IMPORTANT: reproductionMode of *Clip_B* affects *previous playing clips*.
-    const int mode = clip->reproductionMode; // 0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Loop
+    // 0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop
+    const int mode = clip->reproductionMode;
 
     const bool isCurrentlyPlaying = m_audioEngine->isClipPlaying(slotId);
     const bool isPaused = m_audioEngine->isClipPaused(slotId);
@@ -1442,8 +1443,11 @@ void SoundboardService::playClip(int clipId)
         // Stop Clip_A, play Clip_B
         reproductionPlayingClip(others, 2);
     } else if (mode == 3) {
-        // Stop other sound, set Clip_B to loop, play Clip_B
-        reproductionPlayingClip(others, 3);
+        // Restart mode - stop other sounds, play from beginning (no loop)
+        reproductionPlayingClip(others, 2); // Stop others like mode 2
+    } else if (mode == 4) {
+        // Loop mode - stop other sounds, set Clip_B to loop, play Clip_B
+        reproductionPlayingClip(others, 2); // Stop others
     }
     // mode == 0 overlay -> do nothing to others
 
@@ -1501,9 +1505,9 @@ void SoundboardService::playClip(int clipId)
     const float gainDb = (clip->volume <= 0) ? -60.0f : 20.0f * std::log10(clip->volume / 100.0f);
     m_audioEngine->setClipGain(slotId, gainDb);
 
-    // Apply loop behavior (Mode 3 forces repeat ON)
-    const bool loop = (mode == 3) ? true : clip->isRepeat;
-    if (mode == 3)
+    // Apply loop behavior (Mode 4 forces repeat ON, Mode 3 is restart without loop)
+    const bool loop = (mode == 4) ? true : clip->isRepeat;
+    if (mode == 4)
         clip->isRepeat = true;
 
     m_audioEngine->setClipLoop(slotId, loop);

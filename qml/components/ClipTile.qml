@@ -45,15 +45,29 @@ Item {
     signal webClicked
 
     // =========================
-    // Auto close (2 seconds)
+    // Auto close timer
     // =========================
     Timer {
         id: autoCloseTimer
-        interval: 1000
+        interval: 500
         repeat: false
         onTriggered: {
             if (!root.actionHover && !root.tileHover) {
                 root.showActions = false
+            }
+        }
+    }
+
+    // =========================
+    // Hover delay timer (0.5s before showing action bar)
+    // =========================
+    Timer {
+        id: hoverDelayTimer
+        interval: 500
+        repeat: false
+        onTriggered: {
+            if (root.tileHover) {
+                root.openActionsAboveTile()
             }
         }
     }
@@ -405,13 +419,23 @@ Item {
 
             onEntered: {
                 root.tileHover = true
-                root.openActionsAboveTile()
+                // Start the hover delay timer - action bar shows after 0.5s
+                hoverDelayTimer.restart()
             }
             onExited: {
                 root.tileHover = false
+                // Cancel the hover delay if mouse left before 0.5s
+                hoverDelayTimer.stop()
                 // Don't close immediately - let autoCloseTimer handle it
                 if (!root.actionHover) {
                     autoCloseTimer.restart()
+                }
+            }
+
+            onPositionChanged: {
+                // Reset the hover delay timer when mouse moves
+                if (root.tileHover && !root.showActions) {
+                    hoverDelayTimer.restart()
                 }
             }
 

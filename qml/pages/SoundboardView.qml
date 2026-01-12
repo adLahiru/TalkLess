@@ -2535,7 +2535,7 @@ Rectangle {
                                     spacing: 8
 
                                     // change this to your real theme flag
-                                    property bool isLightTheme: Colors.currentTheme === Colors.LightTheme
+                                    property bool isLightTheme: Colors.currentTheme === "light"
 
                                     // helper: pick correct svg for mode + theme
                                     function modeIconSource(mode) {
