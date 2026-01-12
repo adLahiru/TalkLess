@@ -2228,16 +2228,29 @@ double SoundboardService::getClipPlaybackProgress(int clipId) const
     if (!m_clipIdToSlot.contains(clipId))
         return 0.0;
 
-    // Find the clip to get its duration
+    // Find the clip to get its duration and trim points
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& clip : it.value().clips) {
             if (clip.id == clipId) {
-                double durationMs = clip.durationSec * 1000.0;
-                if (durationMs <= 0.0)
+                double totalDurationMs = clip.durationSec * 1000.0;
+                if (totalDurationMs <= 0.0)
                     return 0.0;
 
+                double trimStartMs = clip.trimStartMs;
+                double trimEndMs = clip.trimEndMs > 0.0 ? clip.trimEndMs : totalDurationMs;
+                
+                // Calculate effective duration (the portion of the clip that actually plays)
+                double effectiveDurationMs = trimEndMs - trimStartMs;
+                if (effectiveDurationMs <= 0.0)
+                    return 0.0;
+
+                // Get current position (returns trimStartMs + played time)
                 double positionMs = m_audioEngine->getClipPlaybackPositionMs(m_clipIdToSlot[clipId]);
-                double progress = positionMs / durationMs;
+                
+                // Calculate progress within the trimmed region
+                double playedMs = positionMs - trimStartMs;
+                double progress = playedMs / effectiveDurationMs;
+                
                 return std::clamp(progress, 0.0, 1.0);
             }
         }

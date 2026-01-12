@@ -1171,9 +1171,22 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 
         if (framesRead == 0) {
             if (slot->loop.load(std::memory_order_relaxed)) {
+                // Wait for ring buffer to drain before looping (so audio plays completely)
+                while (slot->queuedMainFrames.load(std::memory_order_relaxed) > 0) {
+                    if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping) break;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                }
+                
+                // Check if we were stopped while waiting
+                if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping) break;
+                
                 double sMs = slot->trimStartMs.load(std::memory_order_relaxed);
                 ma_uint64 sFrame = (ma_uint64)((sMs / 1000.0) * dec.outputSampleRate);
                 ma_decoder_seek_to_pcm_frame(&dec, sFrame);
+                
+                // Reset playback frame count to 0 so progress bar resets
+                slot->playbackFrameCount.store(0, std::memory_order_relaxed);
+                
                 // Notify that clip looped
                 {
                     std::lock_guard<std::mutex> lock(engine->callbackMutex);
@@ -1193,9 +1206,22 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
             ma_uint64 endFrame = (ma_uint64)((endMs / 1000.0) * dec.outputSampleRate);
             if (curFrame >= endFrame) {
                 if (slot->loop.load(std::memory_order_relaxed)) {
+                    // Wait for ring buffer to drain before looping (so audio plays completely)
+                    while (slot->queuedMainFrames.load(std::memory_order_relaxed) > 0) {
+                        if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping) break;
+                        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                    }
+                    
+                    // Check if we were stopped while waiting
+                    if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping) break;
+                    
                     double sMs = slot->trimStartMs.load(std::memory_order_relaxed);
                     ma_uint64 sFrame = (ma_uint64)((sMs / 1000.0) * dec.outputSampleRate);
                     ma_decoder_seek_to_pcm_frame(&dec, sFrame);
+                    
+                    // Reset playback frame count to 0 so progress bar resets
+                    slot->playbackFrameCount.store(0, std::memory_order_relaxed);
+                    
                     // Notify that clip looped
                     {
                         std::lock_guard<std::mutex> lock(engine->callbackMutex);
