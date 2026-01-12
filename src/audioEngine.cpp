@@ -816,6 +816,12 @@ void AudioEngine::setClipErrorCallback(ClipErrorCallback cb)
     clipErrorCallback = std::move(cb);
 }
 
+void AudioEngine::setClipLoopedCallback(ClipLoopedCallback cb)
+{
+    std::lock_guard<std::mutex> lock(callbackMutex);
+    clipLoopedCallback = std::move(cb);
+}
+
 // ------------------------------------------------------------
 // Main callback + processing
 // ------------------------------------------------------------
@@ -1168,6 +1174,11 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
                 double sMs = slot->trimStartMs.load(std::memory_order_relaxed);
                 ma_uint64 sFrame = (ma_uint64)((sMs / 1000.0) * dec.outputSampleRate);
                 ma_decoder_seek_to_pcm_frame(&dec, sFrame);
+                // Notify that clip looped
+                {
+                    std::lock_guard<std::mutex> lock(engine->callbackMutex);
+                    if (engine->clipLoopedCallback) engine->clipLoopedCallback(slotId);
+                }
                 continue;
             }
             naturalEnd = true;
@@ -1185,6 +1196,11 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
                     double sMs = slot->trimStartMs.load(std::memory_order_relaxed);
                     ma_uint64 sFrame = (ma_uint64)((sMs / 1000.0) * dec.outputSampleRate);
                     ma_decoder_seek_to_pcm_frame(&dec, sFrame);
+                    // Notify that clip looped
+                    {
+                        std::lock_guard<std::mutex> lock(engine->callbackMutex);
+                        if (engine->clipLoopedCallback) engine->clipLoopedCallback(slotId);
+                    }
                 } else {
                     naturalEnd = true;
                     break;

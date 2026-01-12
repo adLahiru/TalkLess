@@ -56,7 +56,7 @@ Item {
         interval: 800
         repeat: false
         onTriggered: {
-            if (!root.actionHover && !root.tileHover) {
+            if (!popupHover.hovered) {
                 root.showActions = false;
             }
         }
@@ -122,7 +122,7 @@ Item {
 
     // Action bar sizing
     readonly property int actionBarHeight: 40
-    readonly property int actionBarWidth: 240
+    readonly property int actionBarWidth: 150
     readonly property int popupMargin: 8
 
     Rectangle {
@@ -198,19 +198,20 @@ Item {
             id: progressOverlayContainer
             anchors.fill: parent
             anchors.margins: 2 * root.scaleFactor
-            visible: root.isPlaying
+            visible: root.isPlaying && root.playbackProgress > 0.001
             z: 5  // Above background, below UI elements
             clip: true
 
             // Rounded clip mask - applied to the entire container
-            layer.enabled: true
+            layer.enabled: visible && width > 0 && height > 0
             layer.effect: MultiEffect {
                 maskEnabled: true
                 maskSource: ShaderEffectSource {
                     sourceItem: Rectangle {
-                        width: progressOverlayContainer.width
-                        height: progressOverlayContainer.height
-                        radius: 14 * root.scaleFactor
+                        width: Math.max(1, progressOverlayContainer.width)
+                        height: Math.max(1, progressOverlayContainer.height)
+                        // Ensure radius doesn't exceed half dimensions
+                        radius: Math.min(14 * root.scaleFactor, width / 2, height / 2)
                     }
                     live: true
                 }
@@ -222,9 +223,14 @@ Item {
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
-                width: parent.width * root.playbackProgress
-                radius: 14 * root.scaleFactor
+                // Ensure minimum width of 1 to prevent invalid geometry, clamp progress
+                readonly property real safeProgress: Math.max(0, Math.min(1, root.playbackProgress))
+                width: Math.max(1, parent.width * safeProgress)
+                // Ensure radius doesn't exceed half the width to prevent scene graph crashes
+                radius: Math.min(14 * root.scaleFactor, width / 2, height / 2)
                 clip: true
+                // Only show when there's meaningful progress to display
+                visible: root.isPlaying && safeProgress > 0.001
 
                 // Gradient effect for the progress overlay
                 gradient: Gradient {
@@ -417,6 +423,18 @@ Item {
                 width: actionBarWidth
                 height: actionBarHeight
 
+                HoverHandler {
+                    id: popupHover
+                    onHoveredChanged: {
+                        root.actionHover = hovered;
+                        if (hovered)
+                            autoCloseTimer.stop();
+                        else
+                            autoCloseTimer.start();
+                    }
+                }
+
+                
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
@@ -480,6 +498,7 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             onEntered: {
                                 // Prevent flicker when moving between buttons
+                                autoCloseTimer.restart();
                                 autoCloseTimer.stop();
                             }
                             onClicked: {
@@ -517,7 +536,7 @@ Item {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onEntered: {
-                                // Prevent flicker when moving between buttons
+                                autoCloseTimer.restart();
                                 autoCloseTimer.stop();
                             }
                             onClicked: {
@@ -555,7 +574,7 @@ Item {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onEntered: {
-                                // Prevent flicker when moving between buttons
+                                autoCloseTimer.restart();
                                 autoCloseTimer.stop();
                             }
                             onClicked: {

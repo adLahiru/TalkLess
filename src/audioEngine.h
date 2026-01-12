@@ -33,6 +33,7 @@ public:
 
     using ClipFinishedCallback = std::function<void(int slotId)>;
     using ClipErrorCallback    = std::function<void(int slotId)>;
+    using ClipLoopedCallback   = std::function<void(int slotId)>;
 
     static constexpr int MAX_CLIPS = 16;
     static constexpr ma_uint32 ENGINE_SR = 48000;
@@ -153,6 +154,7 @@ public:
     // ---------------------------
     void setClipFinishedCallback(ClipFinishedCallback callback);
     void setClipErrorCallback(ClipErrorCallback callback);
+    void setClipLoopedCallback(ClipLoopedCallback callback);
 
 private:
     enum class ClipState { Stopped, Playing, Paused, Draining, Stopping };
@@ -298,6 +300,7 @@ private:
     std::mutex callbackMutex;
     ClipFinishedCallback clipFinishedCallback;
     ClipErrorCallback clipErrorCallback;
+    ClipLoopedCallback clipLoopedCallback;
 
     // Recording
     std::atomic<bool> recording{false};

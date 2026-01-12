@@ -34,7 +34,7 @@ Rectangle {
 
     property int currentIndex: 0
     property int editingBoardId: -1
-    property int selectedBoardId: soundboardService.activeBoardId()  // Track which board is selected (for viewing), initialize to first active board
+    property int selectedBoardId: soundboardService?.activeBoardId() ?? -1  // Track which board is selected (for viewing), initialize to first active board
     signal selected(string route)
     signal soundboardSelected(int boardId)  // Emitted when a soundboard is selected
 

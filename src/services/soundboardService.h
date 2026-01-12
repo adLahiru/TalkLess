@@ -230,6 +230,7 @@ signals:
     void clipPlaybackStarted(int clipId);
     void clipPlaybackStopped(int clipId);
     void clipPlaybackPaused(int clipId);
+    void clipLooped(int clipId);  // Emitted when a looping clip restarts from the beginning
     void clipUpdated(int boardId, int clipId);
 
     void playSelectedRequested();

@@ -46,6 +46,8 @@ Rectangle {
         property var clipProgressMap: ({})
         
         onTriggered: {
+            if (!soundboardService) return;
+            
             // Get all currently playing clip IDs
             var playingIds = soundboardService.playingClipIDs();
             var newMap = {};
@@ -53,7 +55,8 @@ Rectangle {
             for (var i = 0; i < playingIds.length; i++) {
                 var clipId = playingIds[i];
                 var progress = soundboardService.getClipPlaybackProgress(clipId);
-                newMap[clipId] = progress;
+                // Clamp progress to valid range to prevent rendering issues
+                newMap[clipId] = Math.max(0, Math.min(1, progress));
             }
             
             // Only update if there are changes (avoid unnecessary re-renders)
@@ -263,6 +266,11 @@ Rectangle {
             }
             root.updateDisplayedClipData();
         }
+
+        function onClipLooped(clipId) {
+            // Update the UI when a looping clip restarts - this helps reset progress display
+            root.updateDisplayedClipData();
+        }
     }
 
     // Load fonts at root level
@@ -430,7 +438,7 @@ Rectangle {
 
                         // Main text
                         Text {
-                            text: clipsModel.boardName || "Soundboard"
+                            text: clipsModel?.boardName ?? "Soundboard"
                             color: Colors.textPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 28
@@ -563,8 +571,8 @@ Rectangle {
                 // Base size range, scaled by slotSizeScale (0.5 to 1.5)
                 readonly property real baseMinTileWidth: 120
                 readonly property real baseMaxTileWidth: 180
-                readonly property real minTileWidth: baseMinTileWidth * soundboardService.slotSizeScale
-                readonly property real maxTileWidth: baseMaxTileWidth * soundboardService.slotSizeScale
+                readonly property real minTileWidth: baseMinTileWidth * (soundboardService?.slotSizeScale ?? 1.0)
+                readonly property real maxTileWidth: baseMaxTileWidth * (soundboardService?.slotSizeScale ?? 1.0)
 
                 // Calculate number of columns based on available width
                 // Default to 5 columns for normal displays, but adjust based on space
@@ -679,7 +687,7 @@ Rectangle {
                         id: boardContextMenu
                         MenuItem {
                             text: "Paste Clip"
-                            enabled: soundboardService.canPaste
+                            enabled: soundboardService?.canPaste ?? false
                             onTriggered: {
                                 const bId = clipsModel.boardId;
                                 if (bId !== -1 && soundboardService.pasteClip(bId)) {
@@ -1283,7 +1291,7 @@ Rectangle {
                         root.selectedClipId = clipsModel.data(firstIndex, 257);
                     }
                 }
-                isMuted: !soundboardService.isMicEnabled()
+                isMuted: !(soundboardService?.isMicEnabled() ?? true)
                 onMuteClicked: {
                     soundboardService.setMicEnabled(!isMuted);
                 }
@@ -1545,10 +1553,10 @@ Rectangle {
 
                             // Button color changes based on hover + recording state
                             color: micButtonArea.containsMouse
-                                   ? (soundboardService.isRecording ? "#7F1D1D" : "#4A4A4A")
-                                   : (soundboardService.isRecording ? "#991B1B" : "#3A3A3A")
+                                   ? ((soundboardService?.isRecording ?? false) ? "#7F1D1D" : "#4A4A4A")
+                                   : ((soundboardService?.isRecording ?? false) ? "#991B1B" : "#3A3A3A")
 
-                            border.color: soundboardService.isRecording ? "#EF4444" : "#4A4A4A"
+                            border.color: (soundboardService?.isRecording ?? false) ? "#EF4444" : "#4A4A4A"
                             border.width: 1
 
                             // subtle pulse ring while recording
@@ -1561,10 +1569,10 @@ Rectangle {
                                 border.width: 2
                                 border.color: "#EF4444"
                                 opacity: 0.0
-                                visible: soundboardService.isRecording
+                                visible: soundboardService?.isRecording ?? false
 
                                 SequentialAnimation on opacity {
-                                    running: soundboardService.isRecording
+                                    running: soundboardService?.isRecording ?? false
                                     loops: Animation.Infinite
                                     NumberAnimation { to: 0.35; duration: 450 }
                                     NumberAnimation { to: 0.05; duration: 450 }
@@ -1586,7 +1594,7 @@ Rectangle {
                                 anchors.fill: micIcon
                                 colorization: 1.0
                                 // blue when recording (or red if you prefer)
-                                colorizationColor: soundboardService.isRecording ? "#EF4444" : "#FFFFFF"
+                                colorizationColor: (soundboardService?.isRecording ?? false) ? "#EF4444" : "#FFFFFF"
                             }
 
                             MouseArea {
@@ -1595,7 +1603,7 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    if (soundboardService.isRecording) {
+                                    if (soundboardService?.isRecording ?? false) {
                                         soundboardService.stopRecording()
                                     } else {
                                         // If your C++ startRecording needs a name/path, change this call accordingly.
@@ -1609,7 +1617,7 @@ Rectangle {
                         }
 
                         Text {
-                            text: soundboardService.isRecording ? "Stop Recording" : "Start Recording"
+                            text: (soundboardService?.isRecording ?? false) ? "Stop Recording" : "Start Recording"
                             color: "#888888"
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 10
@@ -1669,8 +1677,8 @@ Rectangle {
                         WaveformDisplay {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 90
-                            currentTime: soundboardService.recordingDuration
-                            totalDuration: Math.max(soundboardService.recordingDuration, 10)
+                            currentTime: soundboardService?.recordingDuration ?? 0
+                            totalDuration: Math.max(soundboardService?.recordingDuration ?? 0, 10)
                         }
                     }
 
@@ -2495,7 +2503,7 @@ Rectangle {
                                             var seekMs = pos * clipEditorTab.durationSec * 1000.0;
 
                                             // If playing, seek audio
-                                            if (soundboardService.isClipPlaying(root.selectedClipId)) {
+                                            if (soundboardService?.isClipPlaying(root.selectedClipId) ?? false) {
                                                 soundboardService.seekClip(clipsModel.boardId, root.selectedClipId, seekMs);
                                             } else {
                                                 // If not playing, just update visual cursor
@@ -2507,7 +2515,7 @@ Rectangle {
                                     Timer {
                                         id: playbackTimer
                                         interval: 50
-                                        running: root.selectedClipId !== -1 && soundboardService.isClipPlaying(root.selectedClipId)
+                                        running: root.selectedClipId !== -1 && (soundboardService?.isClipPlaying(root.selectedClipId) ?? false)
                                         repeat: true
                                         onTriggered: {
                                             waveform.currentTime = soundboardService.getClipPlaybackPositionMs(root.selectedClipId) / 1000.0;
@@ -2695,7 +2703,7 @@ Rectangle {
                                                 cursorShape: parent.parent.isReadOnly ? Qt.ForbiddenCursor : Qt.PointingHandCursor
                                                 enabled: !parent.parent.isReadOnly
                                                 onClicked: {
-                                                    if (root.selectedClipId !== -1) {
+                                                    if (root.selectedClipId !== -1 && soundboardService) {
                                                         clipEditorTab.stopOtherSounds = !clipEditorTab.stopOtherSounds;
                                                         soundboardService.setClipStopOtherSounds(clipsModel.boardId, root.selectedClipId, clipEditorTab.stopOtherSounds);
                                                     }
@@ -2735,7 +2743,7 @@ Rectangle {
                                                 anchors.fill: parent
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
-                                                    if (root.selectedClipId !== -1) {
+                                                    if (root.selectedClipId !== -1 && soundboardService) {
                                                         clipEditorTab.muteOtherSounds = !clipEditorTab.muteOtherSounds;
                                                         soundboardService.setClipMuteOtherSounds(clipsModel.boardId, root.selectedClipId, clipEditorTab.muteOtherSounds);
                                                         // If muteOtherSounds is enabled, also enable muteMicDuringPlayback
@@ -2784,7 +2792,7 @@ Rectangle {
                                                 cursorShape: clipEditorTab.muteOtherSounds ? Qt.ForbiddenCursor : Qt.PointingHandCursor
                                                 enabled: !clipEditorTab.muteOtherSounds
                                                 onClicked: {
-                                                    if (root.selectedClipId !== -1) {
+                                                    if (root.selectedClipId !== -1 && soundboardService) {
                                                         clipEditorTab.muteMicDuringPlayback = !clipEditorTab.muteMicDuringPlayback;
                                                         soundboardService.setClipMuteMicDuringPlayback(clipsModel.boardId, root.selectedClipId, clipEditorTab.muteMicDuringPlayback);
                                                     }
@@ -2863,7 +2871,7 @@ Rectangle {
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
                                                     // Toggle repeat - real-time update, saved immediately
-                                                    if (root.selectedClipId !== -1) {
+                                                    if (root.selectedClipId !== -1 && clipsModel) {
                                                         clipEditorTab.clipIsRepeat = !clipEditorTab.clipIsRepeat;
                                                         clipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
                                                     }

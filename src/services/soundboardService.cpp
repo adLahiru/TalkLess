@@ -96,6 +96,23 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
                     this, [this, finishedClipId]() { finalizeClipPlayback(finishedClipId); }, Qt::QueuedConnection);
             }
         });
+        
+        m_audioEngine->setClipLoopedCallback([this](int slotId) {
+            // Find which clipId was in this slot
+            int loopedClipId = -1;
+            for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it) {
+                if (it.value() == slotId) {
+                    loopedClipId = it.key();
+                    break;
+                }
+            }
+
+            if (loopedClipId != -1) {
+                // Emit signal on the main thread
+                QMetaObject::invokeMethod(
+                    this, [this, loopedClipId]() { emit clipLooped(loopedClipId); }, Qt::QueuedConnection);
+            }
+        });
     }
 
     // 8) Notify UI
@@ -1071,7 +1088,7 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
 
             c.reproductionMode = mode;
 
-            // Mode 4 (Loop) should turn on repeat, Mode 3 (Restart) should not
+            // Mode 4 (Loop) should turn on repeat, all other modes should turn it off
             if (mode == 4) {
                 c.isRepeat = true;
                 // Apply immediately to audio engine if currently assigned to a slot
@@ -1079,10 +1096,10 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
                     m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], true);
                 }
             } else {
-                // For all other modes (including mode 3 restart), don't force loop
-                // Keep existing isRepeat value unless it was mode 4 before
+                // For all other modes (including mode 3 restart), turn off loop
+                c.isRepeat = false;
                 if (m_clipIdToSlot.contains(clipId) && m_audioEngine) {
-                    m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], c.isRepeat);
+                    m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], false);
                 }
             }
 
@@ -1105,6 +1122,8 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
             // Only mode 4 (Loop) forces repeat on
             if (mode == 4)
                 c.isRepeat = true;
+            else
+                c.isRepeat = false;
             m_repo.saveBoard(b);
             m_state = m_repo.loadIndex();
             return;
