@@ -174,6 +174,7 @@ private:
         // Ring buffers (float stereo)
         void*     ringBufferMainData = nullptr;
         void*     ringBufferMonData  = nullptr;
+        
         ma_pcm_rb ringBufferMain{};
         ma_pcm_rb ringBufferMon{};
 
