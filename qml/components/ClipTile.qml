@@ -49,7 +49,7 @@ Item {
     // =========================
     Timer {
         id: autoCloseTimer
-        interval: 500
+        interval: 1000
         repeat: false
         onTriggered: {
             if (!root.actionHover && !root.tileHover) {
