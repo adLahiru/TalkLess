@@ -157,8 +157,8 @@ ApplicationWindow {
                     console.log("Soundboard selected:", boardId);
                     // Switch to soundboard view
                     contentStack.currentIndex = 0;
-                    // Activate the board so clips can be played
-                    soundboardService.activate(boardId);
+                    // Don't activate the board - just view it
+                    // Activation should only happen via checkbox
                     clipsModel.boardId = boardId;
                     clipsModel.reload();
                 }

@@ -53,7 +53,7 @@ Item {
     // =========================
     Timer {
         id: autoCloseTimer
-        interval: 500
+        interval: 800
         repeat: false
         onTriggered: {
             if (!root.actionHover && !root.tileHover) {
@@ -63,11 +63,11 @@ Item {
     }
 
     // =========================
-    // Hover delay timer (0.5s before showing action bar)
+    // Hover delay timer (0.3s before showing action bar)
     // =========================
     Timer {
         id: hoverDelayTimer
-        interval: 500
+        interval: 300
         repeat: false
         onTriggered: {
             if (root.tileHover) {

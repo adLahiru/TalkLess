@@ -246,6 +246,7 @@ private:
     void finalizeClipPlayback(int clipId);
     void syncSharedBoardIds(const QString& filePath, const QList<int>& sharedBoardIds);
     void removeFromSharedBoardIds(const QString& filePath, int boardId);
+    QString extractAudioArtwork(const QString& audioFilePath);
 
 private:
     // Reserve last engine slot for recording preview so it never collides with normal clip slots.

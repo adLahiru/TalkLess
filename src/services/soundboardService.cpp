@@ -2,6 +2,7 @@
 
 #include "audioEngine.h"
 
+#include <QCryptographicHash>
 #include <QDateTime>
 #include <QDebug>
 #include <QDir>
@@ -9,6 +10,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QProcess>
 #include <QStandardPaths>
 #include <QUrl>
 
@@ -673,6 +675,11 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
         } else {
             c.title = c.title.trimmed();
         }
+        
+        // Extract artwork if no image set
+        if (c.imgPath.isEmpty()) {
+            c.imgPath = extractAudioArtwork(c.filePath);
+        }
 
         // runtime defaults
         c.isPlaying = false;
@@ -714,6 +721,12 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
     c.filePath = sanitizedPath;  // Use sanitized path
     if (c.title.trimmed().isEmpty())
         c.title = QFileInfo(c.filePath).baseName();
+    
+    // Extract artwork if no image set
+    if (c.imgPath.isEmpty()) {
+        c.imgPath = extractAudioArtwork(c.filePath);
+    }
+    
     c.isPlaying = false;
     c.locked = false;
 
@@ -2721,4 +2734,62 @@ void SoundboardService::resetSettings()
 
     m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
+}
+
+QString SoundboardService::extractAudioArtwork(const QString& audioFilePath)
+{
+    if (audioFilePath.isEmpty())
+        return QString();
+
+    QFileInfo fileInfo(audioFilePath);
+    if (!fileInfo.exists())
+        return QString();
+
+    // Create artwork cache directory
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/artwork_cache";
+    QDir().mkpath(cacheDir);
+
+    // Generate unique filename based on audio file path hash
+    QByteArray hash = QCryptographicHash::hash(audioFilePath.toUtf8(), QCryptographicHash::Md5);
+    QString artworkPath = cacheDir + "/" + hash.toHex() + ".jpg";
+
+    // Check if already extracted
+    if (QFileInfo::exists(artworkPath)) {
+        return artworkPath;
+    }
+
+    // Try using ffmpeg to extract artwork
+    QProcess process;
+    process.setProgram("ffmpeg");
+    process.setArguments({
+        "-i", audioFilePath,
+        "-an",                  // No audio
+        "-vcodec", "mjpeg",     // Use MJPEG codec for cover art
+        "-vf", "scale=512:512:force_original_aspect_ratio=decrease", // Resize
+        "-y",                   // Overwrite
+        artworkPath
+    });
+
+    process.start();
+    if (!process.waitForFinished(5000)) { // 5 second timeout
+        process.kill();
+        qDebug() << "FFmpeg timeout extracting artwork from:" << audioFilePath;
+        return QString();
+    }
+
+    if (process.exitCode() != 0) {
+        // FFmpeg failed - may not have embedded artwork
+        qDebug() << "No embedded artwork found in:" << audioFilePath;
+        QFile::remove(artworkPath); // Clean up any partial file
+        return QString();
+    }
+
+    // Verify the file was created and has content
+    QFileInfo artworkInfo(artworkPath);
+    if (artworkInfo.exists() && artworkInfo.size() > 0) {
+        qDebug() << "Extracted artwork to:" << artworkPath;
+        return artworkPath;
+    }
+
+    return QString();
 }
