@@ -3,8 +3,8 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
-import TalkLess
 import QtQuick.Layouts
+import "../styles"
 
 Rectangle {
     id: root
@@ -53,7 +53,7 @@ Rectangle {
         width: tabRow.width + 20
         height: 48
         radius: 24
-        color: Colors.surface
+        color: Colors.surfaceDark
     }
 
     // Tab row on top of the gray background
@@ -87,11 +87,11 @@ Rectangle {
                     orientation: Gradient.Horizontal
                     GradientStop {
                         position: 0.0
-                        color: Colors.gradientPrimaryStart
+                        color: Colors.accent
                     }
                     GradientStop {
                         position: 1.0
-                        color: Colors.gradientPrimaryEnd
+                        color: Colors.secondary
                     }
                 }
 
@@ -99,7 +99,7 @@ Rectangle {
                     id: tabText
                     anchors.centerIn: parent
                     text: tabItem.title
-                    color: Colors.textPrimary
+                    color: tabItem.isSelected ? Colors.textOnPrimary : Colors.textPrimary
                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                     font.pixelSize: Typography.fontSizeMedium
                     font.weight: tabItem.isSelected ? Font.Medium : Font.Normal

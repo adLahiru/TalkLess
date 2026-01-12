@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../styles"
 
 Item {
     id: root
@@ -11,8 +12,8 @@ Item {
     property string label: "Volume"
     property real level: 0.5  // 0.0 to 1.0
     property real dbValue: -15
-    property color fillColorStart: "#22C55E"
-    property color fillColorEnd: "#4ADE80"
+    property color fillColorStart: Colors.success
+    property color fillColorEnd: Qt.lighter(Colors.success, 1.2)
     
     implicitHeight: contentColumn.height
 
@@ -28,7 +29,7 @@ Item {
 
         Text {
             text: root.label
-            color: "#FFFFFF"
+            color: Colors.textPrimary
             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
             font.pixelSize: 15
         }
@@ -37,7 +38,7 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 32
-            color: "#2A2A2A"
+            color: Colors.surfaceLight
             radius: 16
 
             Rectangle {
@@ -63,7 +64,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: root.dbValue.toFixed(0) + "dB"
-                    color: "#FFFFFF"
+                    color: Colors.textOnPrimary
                     font.pixelSize: 10
                     font.weight: Font.Medium
                 }

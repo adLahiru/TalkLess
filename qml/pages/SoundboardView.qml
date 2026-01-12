@@ -8,17 +8,25 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import QtQuick.Dialogs
 import "../components"
-import TalkLess
+import "../styles"
 
 Rectangle {
     id: root
     color: Colors.background
-    radius: Theme.radiusLarge
+    radius: 10
 
     property int selectedClipId: -1  // Keep track of which clip is selected
     property int playingClipId: -1   // Last started clip that is still playing
     property var displayedClipData: null // Data currently shown in the player card
     property int hotkeyEditingClipId: -1 // Track which clip's hotkey is being edited from a tile
+
+    // Drag and drop state for clip reordering
+    property bool isDragging: false
+    property int dragSourceIndex: -1
+    property int dragTargetIndex: -1
+    property string dragClipTitle: ""
+    property string dragClipImage: ""
+    property point dragPosition: Qt.point(0, 0)
 
     property bool isDetached: false
     signal requestDetach
@@ -210,6 +218,7 @@ Rectangle {
             root.updateDisplayedClipData();
         }
 
+
         function onClipPlaybackPaused(clipId) {
             // Update the UI when a clip is paused (but keep it as the displayed clip)
             root.updateDisplayedClipData();
@@ -276,9 +285,8 @@ Rectangle {
                 // Dark overlay for text readability
                 Rectangle {
                     anchors.fill: parent
-                    radius: 16
-                    color: Colors.backgroundDark
-                    opacity: root.enabled ? 1.0 : 0.6
+                    color: "#000000"
+                    opacity: 0.3
                 }
 
                 // Three dots menu button - top right corner
@@ -291,7 +299,7 @@ Rectangle {
                     width: 28
                     height: 28
                     radius: 6
-                    color: moreMouseArea.containsMouse || moreOptionsMenu.visible ? Qt.alpha(Colors.white, 0.2) : Qt.alpha(Colors.white, 0.15)
+                    color: moreMouseArea.containsMouse || moreOptionsMenu.visible ? "#33FFFFFF" : "#22FFFFFF"
 
                     // Three vertical dots
                     Column {
@@ -304,7 +312,7 @@ Rectangle {
                                 width: 3
                                 height: 3
                                 radius: 1.5
-                                color: Colors.white
+                                color: "#FFFFFF"
                             }
                         }
                     }
@@ -334,7 +342,7 @@ Rectangle {
                         padding: 8
 
                         background: Rectangle {
-                            color: Colors.surfaceDark
+                            color: Colors.surface
                             radius: 8
                             border.color: Colors.border
                             border.width: 1
@@ -361,9 +369,6 @@ Rectangle {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: menuItem.modelData
                                         color: menuItem.modelData === "Delete" ? Colors.error : Colors.textPrimary
-                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                        font.pixelSize: 14
-                                        font.weight: Font.Normal
                                     }
 
                                     MouseArea {
@@ -402,7 +407,7 @@ Rectangle {
                         // Main text
                         Text {
                             text: clipsModel.boardName || "Soundboard"
-                            color: Colors.white
+                            color: Colors.textPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 28
                             font.weight: Font.DemiBold
@@ -411,7 +416,7 @@ Rectangle {
                         // Secondary text
                         Text {
                             text: "Manage and trigger your audio clips"
-                            color: Colors.white
+                            color: Colors.textPrimary
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 15
                             font.weight: Font.Normal
@@ -441,14 +446,14 @@ Rectangle {
                             }
                             GradientStop {
                                 position: 1.0
-                                color: addMouseArea.containsMouse ? Colors.primaryLight : Colors.accent
+                                color: addMouseArea.containsMouse ? Colors.secondary : "#D214FD"
                             }
                         }
 
                         Text {
                             anchors.centerIn: parent
                             text: "Add Soundboard"
-                            color: Colors.textPrimary
+                            color: Colors.textOnPrimary
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 13
                             font.weight: Font.Medium
@@ -474,7 +479,7 @@ Rectangle {
                         Layout.preferredHeight: 40
                         Layout.alignment: Qt.AlignVCenter
                         radius: 8
-                        color: disconnectMouseArea.containsMouse ? Qt.rgba(Colors.error.r, Colors.error.g, Colors.error.b, 0.1) : Colors.surfaceDark
+                        color: disconnectMouseArea.containsMouse ? Qt.rgba(Colors.error.r, Colors.error.g, Colors.error.b, 0.1) : Colors.surface
                         border.color: disconnectMouseArea.containsMouse ? Colors.error : Colors.border
                         border.width: 1
 
@@ -529,7 +534,7 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 color: Colors.surfaceDark
-                radius: Theme.radiusLarge
+                radius: 12
 
                 // Tile sizing properties - responsive layout with scale factor
                 readonly property real tileSpacing: 15
@@ -600,9 +605,9 @@ Rectangle {
                         // Visual feedback for file dragging
                         Rectangle {
                             anchors.fill: parent
-                            color: "#2a00ff00"
+                            color: Qt.rgba(Colors.success.r, Colors.success.g, Colors.success.b, 0.2)
                             visible: parent.containsDrag
-                            border.color: "#00ff00"
+                            border.color: Colors.success
                             border.width: 3
                             radius: 12
 
@@ -614,14 +619,14 @@ Rectangle {
                                 Text {
                                     Layout.alignment: Qt.AlignHCenter
                                     text: "+"
-                                    color: "#00ff00"
+                                    color: Colors.success
                                     font.pixelSize: 64
                                     font.weight: Font.Light
 
                                     layer.enabled: true
                                     layer.effect: MultiEffect {
                                         colorization: 1.0
-                                        colorizationColor: "#00ff00"
+                                        colorizationColor: Colors.success
                                         blurEnabled: true
                                         blur: 0.5
                                     }
@@ -630,7 +635,7 @@ Rectangle {
                                 Text {
                                     Layout.alignment: Qt.AlignHCenter
                                     text: "Drop audio files to add to soundboard"
-                                    color: "#00ff00"
+                                    color: Colors.success
                                     font.pixelSize: 22
                                     font.weight: Font.DemiBold
                                 }
@@ -670,6 +675,30 @@ Rectangle {
                         width: parent.width
                         spacing: contentArea.tileSpacing
 
+                        // Helper function to calculate drop index from position
+                        function getDropIndexFromPosition(globalX, globalY) {
+                            // Map position to grid coordinates
+                            var localPos = clipsGrid.mapFromItem(clipsFlickable, globalX, globalY);
+                            var x = localPos.x;
+                            var y = localPos.y;
+                            
+                            // Calculate column and row
+                            var tileWidthWithSpacing = contentArea.tileWidth + contentArea.tileSpacing;
+                            var tileHeightWithSpacing = contentArea.tileHeight + contentArea.tileSpacing;
+                            
+                            var col = Math.floor(x / tileWidthWithSpacing);
+                            var row = Math.floor(y / tileHeightWithSpacing);
+                            
+                            // Clamp to valid range
+                            col = Math.max(0, Math.min(col, contentArea.columnsCount - 1));
+                            
+                            // Calculate index (accounting for AddAudioTile at position 0)
+                            var index = row * contentArea.columnsCount + col - 1; // -1 for AddAudioTile
+                            
+                            // Clamp to valid clip range
+                            return Math.max(0, Math.min(index, clipsModel.count - 1));
+                        }
+
                         // Add Audio Tile (first item)
                         AddAudioTile {
                             id: addAudioTile
@@ -679,6 +708,7 @@ Rectangle {
                             onClicked: {
                                 console.log("Add Audio clicked - opening add audio panel");
                                 rightSidebar.currentTabIndex = 1;
+                                audioFileDialog.open()
                             }
                         }
 
@@ -703,11 +733,116 @@ Rectangle {
                                 // Store original position for drag reset
                                 property real startX: 0
                                 property real startY: 0
+                                property bool isBeingDragged: false
+
+                                // Check if this is the drop target position
+                                property bool isDropTarget: root.isDragging && root.dragTargetIndex === clipWrapper.index && root.dragSourceIndex !== clipWrapper.index
+                                property bool isDropTargetLeft: isDropTarget && root.dragSourceIndex > clipWrapper.index
+                                property bool isDropTargetRight: isDropTarget && root.dragSourceIndex < clipWrapper.index
+
+                                // Visual offset when item is dragged over
+                                property real visualOffsetX: {
+                                    if (!root.isDragging) return 0;
+                                    if (clipWrapper.index === root.dragSourceIndex) return 0;
+                                    
+                                    // Items between source and target shift to make room
+                                    if (root.dragSourceIndex < root.dragTargetIndex) {
+                                        // Dragging right - items in between shift left
+                                        if (clipWrapper.index > root.dragSourceIndex && clipWrapper.index <= root.dragTargetIndex) {
+                                            return -(contentArea.tileWidth + contentArea.tileSpacing) * 0.15;
+                                        }
+                                    } else if (root.dragSourceIndex > root.dragTargetIndex) {
+                                        // Dragging left - items in between shift right
+                                        if (clipWrapper.index >= root.dragTargetIndex && clipWrapper.index < root.dragSourceIndex) {
+                                            return (contentArea.tileWidth + contentArea.tileSpacing) * 0.15;
+                                        }
+                                    }
+                                    return 0;
+                                }
+
+                                // Animate the offset
+                                Behavior on visualOffsetX {
+                                    NumberAnimation {
+                                        duration: 200
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
+
+                                // Apply the transform
+                                transform: Translate {
+                                    x: clipWrapper.isBeingDragged ? 0 : clipWrapper.visualOffsetX
+                                }
+
+                                // Fade out the source position when dragging
+                                opacity: clipWrapper.isBeingDragged ? 0.3 : 1.0
+                                Behavior on opacity {
+                                    NumberAnimation { duration: 150 }
+                                }
 
                                 // For drag-drop visual feedback
                                 Drag.active: dragHandler.active
                                 Drag.hotSpot.x: width / 2
                                 Drag.hotSpot.y: height / 2
+
+                                // Drop indicator - left edge
+                                Rectangle {
+                                    id: dropIndicatorLeft
+                                    visible: clipWrapper.isDropTargetLeft
+                                    width: 4
+                                    height: parent.height
+                                    x: -contentArea.tileSpacing / 2 - 2
+                                    y: 0
+                                    radius: 2
+                                    color: "#3B82F6"
+                                    
+                                    // Glow effect
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: 12
+                                        height: parent.height
+                                        radius: 6
+                                        color: "#3B82F6"
+                                        opacity: 0.3
+                                    }
+
+                                    // Pulsing animation
+                                    SequentialAnimation on opacity {
+                                        running: clipWrapper.isDropTargetLeft
+                                        loops: Animation.Infinite
+                                        NumberAnimation { from: 1.0; to: 0.6; duration: 500; easing.type: Easing.InOutQuad }
+                                        NumberAnimation { from: 0.6; to: 1.0; duration: 500; easing.type: Easing.InOutQuad }
+                                    }
+                                }
+
+                                // Drop indicator - right edge
+                                Rectangle {
+                                    id: dropIndicatorRight
+                                    visible: clipWrapper.isDropTargetRight
+                                    width: 4
+                                    height: parent.height
+                                    x: parent.width + contentArea.tileSpacing / 2 - 2
+                                    y: 0
+                                    radius: 2
+                                    color: "#3B82F6"
+                                    
+                                    // Glow effect
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: 12
+                                        height: parent.height
+                                        radius: 6
+                                        color: "#3B82F6"
+                                        opacity: 0.3
+                                    }
+
+                                    // Pulsing animation
+                                    SequentialAnimation on opacity {
+                                        running: clipWrapper.isDropTargetRight
+                                        loops: Animation.Infinite
+                                        NumberAnimation { from: 1.0; to: 0.6; duration: 500; easing.type: Easing.InOutQuad }
+                                        NumberAnimation { from: 0.6; to: 1.0; duration: 500; easing.type: Easing.InOutQuad }
+                                    }
+                                }
 
                                 ClipTile {
                                     id: clipTile
@@ -726,14 +861,13 @@ Rectangle {
                                     }
                                     isPlaying: clipWrapper.clipIsPlaying
 
-                                    // Make tile semi-transparent when dragging
-                                    opacity: dragHandler.active ? 0.7 : 1.0
-
                                     onClicked: {
                                         // Selecting the clip updates the sidebar
                                         console.log("ClipTile clicked - index:", clipWrapper.index, "clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle);
                                         soundboardService.setCurrentlySelectedClip(clipWrapper.clipId);
+                                        soundboardService.playClip(clipWrapper.clipId);
                                     }
+
                                     onPlayClicked: {
                                         console.log("ClipTile playClicked - clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle, "filePath:", clipWrapper.filePath);
                                         soundboardService.playClip(clipWrapper.clipId);
@@ -779,10 +913,18 @@ Rectangle {
                                 // Drag handler for reordering
                                 DragHandler {
                                     id: dragHandler
-                                    target: clipWrapper.parent === clipsGrid ? null : clipWrapper
+                                    target: null  // We handle position manually
 
                                     onActiveChanged: {
                                         if (active) {
+                                            // Set dragging state
+                                            clipWrapper.isBeingDragged = true;
+                                            root.isDragging = true;
+                                            root.dragSourceIndex = clipWrapper.index;
+                                            root.dragTargetIndex = clipWrapper.index;
+                                            root.dragClipTitle = clipWrapper.clipTitle;
+                                            root.dragClipImage = clipWrapper.imgPath;
+
                                             // Store the starting position
                                             clipWrapper.startX = clipWrapper.x;
                                             clipWrapper.startY = clipWrapper.y;
@@ -790,48 +932,180 @@ Rectangle {
                                             clipWrapper.parent = clipsFlickable;
                                             clipWrapper.z = 100;
                                         } else {
-                                            // Find drop target based on position
-                                            var dropIndex = -1;
-                                            var centerX = clipWrapper.x + clipWrapper.width / 2;
-                                            var centerY = clipWrapper.y + clipWrapper.height / 2;
-
-                                            for (var i = 0; i < clipsRepeater.count; i++) {
-                                                if (i === clipWrapper.index)
-                                                    continue;
-                                                var item = clipsRepeater.itemAt(i);
-                                                if (item) {
-                                                    var itemPos = item.mapToItem(clipsFlickable, 0, 0);
-                                                    if (centerX >= itemPos.x && centerX <= itemPos.x + item.width && centerY >= itemPos.y && centerY <= itemPos.y + item.height) {
-                                                        dropIndex = i;
-                                                        break;
-                                                    }
-                                                }
-                                            }
+                                            // Clear dragging state first
+                                            clipWrapper.isBeingDragged = false;
+                                            var finalDropIndex = root.dragTargetIndex;
+                                            var sourceIndex = root.dragSourceIndex;
+                                            
+                                            // Reset global drag state
+                                            root.isDragging = false;
+                                            root.dragSourceIndex = -1;
+                                            root.dragTargetIndex = -1;
+                                            root.dragClipTitle = "";
+                                            root.dragClipImage = "";
 
                                             // Reparent back to grid
                                             clipWrapper.parent = clipsGrid;
                                             clipWrapper.z = 0;
 
                                             // If dropped on a valid position, reorder
-                                            if (dropIndex >= 0 && dropIndex !== clipWrapper.index) {
-                                                console.log("Moving clip from", clipWrapper.index, "to", dropIndex);
-                                                soundboardService.moveClip(clipsModel.boardId, clipWrapper.index, dropIndex);
+                                            if (finalDropIndex >= 0 && finalDropIndex !== sourceIndex) {
+                                                console.log("Moving clip from", sourceIndex, "to", finalDropIndex);
+                                                soundboardService.moveClip(clipsModel.boardId, sourceIndex, finalDropIndex);
                                                 clipsModel.reload();
+                                            }
+                                        }
+                                    }
+
+                                    // Update target position while dragging
+                                    onCentroidChanged: {
+                                        if (active) {
+                                            var pos = centroid.position;
+                                            var globalPos = clipWrapper.mapToItem(clipsFlickable, pos.x, pos.y);
+                                            root.dragPosition = Qt.point(globalPos.x, globalPos.y);
+                                            
+                                            // Move the clipWrapper to follow the drag
+                                            if (clipWrapper.parent === clipsFlickable) {
+                                                clipWrapper.x = globalPos.x - clipWrapper.width / 2;
+                                                clipWrapper.y = globalPos.y - clipWrapper.height / 2;
+                                            }
+                                            
+                                            // Calculate drop target
+                                            var newTargetIndex = clipsGrid.getDropIndexFromPosition(globalPos.x, globalPos.y);
+                                            if (newTargetIndex !== root.dragTargetIndex) {
+                                                root.dragTargetIndex = newTargetIndex;
                                             }
                                         }
                                     }
                                 }
 
-                                // Drop area for receiving dragged items
+                                // Drop area for receiving dragged items - now with improved feedback
                                 DropArea {
+                                    id: dropArea
                                     anchors.fill: parent
+                                    enabled: root.isDragging && clipWrapper.index !== root.dragSourceIndex
 
+                                    onEntered: function(drag) {
+                                        if (clipWrapper.index !== root.dragSourceIndex) {
+                                            root.dragTargetIndex = clipWrapper.index;
+                                        }
+                                    }
+
+                                    // Highlight overlay when this is a drop target
                                     Rectangle {
                                         anchors.fill: parent
-                                        color: parent.containsDrag ? "#4400FF00" : "transparent"
+                                        color: parent.containsDrag ? Qt.rgba(Colors.success.r, Colors.success.g, Colors.success.b, 0.25) : "transparent"
                                         radius: 16
                                         border.width: parent.containsDrag ? 2 : 0
-                                        border.color: "#00FF00"
+                                        border.color: Colors.success
+                                    }
+                                }
+                            }
+                        }
+
+                        // Drag preview overlay - shows a ghost of the dragged clip
+                        Item {
+                            id: dragPreviewContainer
+                            parent: clipsFlickable
+                            visible: root.isDragging
+                            z: 1000
+                            
+                            // Position at drag location
+                            x: root.dragPosition.x - contentArea.tileWidth / 2
+                            y: root.dragPosition.y - contentArea.tileHeight / 2
+
+                            Rectangle {
+                                id: dragPreview
+                                width: contentArea.tileWidth
+                                height: contentArea.tileHeight
+                                radius: 16
+                                color: "#1F1F1F"
+                                border.width: 3
+                                border.color: "#3B82F6"
+                                opacity: 0.9
+                                visible: root.isDragging
+
+                                // Scale up slightly for emphasis
+                                scale: 1.05
+
+                                // Clip image
+                                Image {
+                                    id: previewImage
+                                    anchors.fill: parent
+                                    anchors.margins: 3
+                                    source: {
+                                        if (root.dragClipImage.length === 0) {
+                                            return "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png";
+                                        } else if (root.dragClipImage.startsWith("qrc:") || root.dragClipImage.startsWith("file:") || root.dragClipImage.startsWith("http")) {
+                                            return root.dragClipImage;
+                                        } else {
+                                            return "file:///" + root.dragClipImage;
+                                        }
+                                    }
+                                    fillMode: Image.PreserveAspectCrop
+                                    
+                                    // Rounded corners
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        maskEnabled: true
+                                        maskThresholdMin: 0.5
+                                        maskSpreadAtMin: 1.0
+                                        maskSource: ShaderEffectSource {
+                                            sourceItem: Rectangle {
+                                                width: previewImage.width
+                                                height: previewImage.height
+                                                radius: 14
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Title overlay
+                                Rectangle {
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.bottom: parent.bottom
+                                    height: 30
+                                    color: "#CC000000"
+                                    radius: 12
+                                    
+                                    // Only bottom corners rounded
+                                    Rectangle {
+                                        anchors.top: parent.top
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        height: parent.radius
+                                        color: parent.color
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: root.dragClipTitle || "Moving..."
+                                        color: "#FFFFFF"
+                                        font.pixelSize: 12
+                                        font.weight: Font.Medium
+                                        elide: Text.ElideRight
+                                        width: parent.width - 16
+                                        horizontalAlignment: Text.AlignHCenter
+                                    }
+                                }
+
+                                // Move icon overlay
+                                Rectangle {
+                                    anchors.top: parent.top
+                                    anchors.right: parent.right
+                                    anchors.margins: 8
+                                    width: 24
+                                    height: 24
+                                    radius: 12
+                                    color: "#3B82F6"
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "⋮⋮"
+                                        color: "#FFFFFF"
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
                                     }
                                 }
                             }
@@ -856,7 +1130,7 @@ Rectangle {
             AudioPlayerCard {
                 id: audioPlayerCard
                 Layout.preferredWidth: 228
-                Layout.preferredHeight: 140
+                Layout.preferredHeight: 175
                 Layout.alignment: Qt.AlignHCenter
                 Layout.bottomMargin: 10
 
@@ -882,16 +1156,64 @@ Rectangle {
                 // Bind isPlaying state
                 isPlaying: root.displayedClipData ? root.displayedClipData.isPlaying : false
 
-                // Toggle playback - backend handles reproduction mode behavior
+                // Waveform progress - bind totalTime from clip duration (in seconds)
+                totalTime: (root.displayedClipData && root.displayedClipData.durationSec > 0) 
+                           ? root.displayedClipData.durationSec : 210
+
+                // currentTime is updated by the timer below
+                property real playbackPositionMs: 0
+                property int lastClipId: -1  // Track which clip we're displaying
+
+                // Timer to poll playback position - runs when playing
+                Timer {
+                    id: audioPlayerTimer
+                    interval: 50  // Update every 50ms for smoother sync
+                    repeat: true
+                    running: audioPlayerCard.isPlaying && root.displayedClipData !== null
+                    onTriggered: {
+                        if (root.displayedClipData) {
+                            audioPlayerCard.playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
+                        }
+                    }
+                }
+
+                // Convert ms to seconds for currentTime
+                currentTime: playbackPositionMs / 1000.0
+
+                // Sync position immediately when playback state changes
+                onIsPlayingChanged: {
+                    if (root.displayedClipData) {
+                        // Always sync position when state changes
+                        playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
+                    }
+                }
+
+                // Reset position when switching to a different clip
+                onDisplayedClipDataChanged: {
+                    if (root.displayedClipData) {
+                        if (lastClipId !== root.displayedClipData.clipId) {
+                            // New clip - get current position from backend
+                            playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
+                            lastClipId = root.displayedClipData.clipId
+                        }
+                    } else {
+                        playbackPositionMs = 0
+                        lastClipId = -1
+                    }
+                }
+
+                // Helper to access displayed clip data from handlers
+                property var displayedClipData: root.displayedClipData
+
+                // Play/Pause the displayed clip
                 onPlayClicked: {
                     if (root.displayedClipData) {
                         soundboardService.playClip(root.displayedClipData.clipId);
                     }
                 }
                 onPauseClicked: {
-                    // Also call playClip - backend toggles based on reproduction mode
                     if (root.displayedClipData) {
-                        soundboardService.playClip(root.displayedClipData.clipId);
+                        soundboardService.stopClip(root.displayedClipData.clipId);
                     }
                 }
 
@@ -964,16 +1286,16 @@ Rectangle {
             Layout.rightMargin: 0
 
             // Glassmorphism effect
-            color: Colors.panelBg
+            color: Colors.cardBg
             border.color: Colors.border
             border.width: 1
 
             // Rounded only on left side if desired, but let's keep it simple and clean
             radius: 0 // Flush to the right side edge looks better for fixed sidebar
 
-            // Tab state: 0=Settings, 1=Plus, 2=Record, 3=Teleprompter, 4=Speaker
+            // Tab state: 0=Editor, 1=Plus, 2=Record, 3=Teleprompter, 4=Speaker
             property int currentTabIndex: 0  // Default to Record tab
-            property var tabState: ["Settings", "Add Audio", "Record", "Teleprompter", "Outputs"]
+            property var tabState: ["Clip Editor", "Add Audio", "Recording", "Teleprompter", "Speaker"]
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 12
@@ -1047,19 +1369,22 @@ Rectangle {
 
                 // Recording Tab Content (Tab 2)
                 ColumnLayout {
+                    id: recordingTab
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: 6
                     visible: rightSidebar.currentTabIndex === 2
 
-                    // Name Audio File Section
+                    // ============================================================
+                    // Name Audio File (SINGLE INPUT - fixed duplicate name issue)
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
 
-                        // Header with title and icon
+                        // Header with title and clipboard icon
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
@@ -1067,17 +1392,13 @@ Rectangle {
                             Text {
                                 text: "Name Audio File"
                                 color: Colors.textPrimary
-
                                 font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                 font.pixelSize: 14
                                 font.weight: Font.DemiBold
                             }
 
-                            Item {
-                                Layout.fillWidth: true
-                            }
+                            Item { Layout.fillWidth: true }
 
-                            // Clipboard/paste icon
                             Rectangle {
                                 width: 24
                                 height: 24
@@ -1108,13 +1429,13 @@ Rectangle {
                             }
                         }
 
-                        // Text Input Field
+                        // Text Input Field (single input used for saving)
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 44
-                            color: "#1A1A1A"
+                            color: Colors.surface
                             radius: 8
-                            border.color: "#3A3A3A"
+                            border.color: Colors.border
                             border.width: 1
 
                             RowLayout {
@@ -1125,16 +1446,16 @@ Rectangle {
 
                                 Text {
                                     text: "Enter Name Here:"
-                                    color: "#808080"
+                                    color: Colors.textSecondary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
-                                    visible: audioNameInput.text === ""
+                                    visible: recordingNameInput.text === ""
                                 }
 
                                 TextInput {
-                                    id: audioNameInput
+                                    id: recordingNameInput
                                     Layout.fillWidth: true
-                                    color: "#FFFFFF"
+                                    color: Colors.textPrimary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
                                     clip: true
@@ -1142,7 +1463,7 @@ Rectangle {
                                     Text {
                                         anchors.fill: parent
                                         text: "_ _ _ _ _ _ _ _ _ _ _ _ _ _"
-                                        color: "#666666"
+                                        color: Colors.textDisabled
                                         font.family: parent.font.family
                                         font.pixelSize: parent.font.pixelSize
                                         visible: !parent.text && !parent.activeFocus
@@ -1152,7 +1473,9 @@ Rectangle {
                         }
                     }
 
+                    // ============================================================
                     // Input Source Section
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
@@ -1161,74 +1484,78 @@ Rectangle {
 
                         Text {
                             text: "Input Source"
-                            color: "#FFFFFF"
+                            color: Colors.textPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 14
                             font.weight: Font.DemiBold
                         }
 
-                        // Dropdown selector
-                        Rectangle {
+                        DropdownSelector {
+                            id: inputDeviceDropdown
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 44
-                            color: "#1A1A1A"
-                            radius: 8
-                            border.color: "#3A3A3A"
-                            border.width: 1
+                            icon: "🔴"
+                            placeholder: "Select Mic Device"
+                            selectedId: "-1"
+                            model: []
 
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 15
-                                anchors.rightMargin: 15
-
-                                Text {
-                                    text: "Select Mic Device"
-                                    color: "#666666"
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 13
-                                    Layout.fillWidth: true
-                                }
-
-                                // Dropdown arrow
-                                Text {
-                                    text: "▼"
-                                    color: "#808080"
-                                    font.pixelSize: 10
-                                }
+                            onAboutToOpen: {
+                                const list = soundboardService.getInputDevices()
+                                list.unshift({ id: "-1", name: "None", isDefault: false })
+                                model = list
                             }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Mic dropdown clicked")
+                            onItemSelected: function (id, name) {
+                                console.log("Recording input device selected:", name, "(id:", id, ")");
+                                soundboardService.setRecordingInputDevice(id);
                             }
                         }
                     }
 
                     // Spacer
-                    Item {
-                        Layout.preferredHeight: 4
-                    }
+                    Item { Layout.preferredHeight: 4 }
 
-                    // Start Recording Button Section
+                    // ============================================================
+                    // Start/Stop Recording Button Section
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 8
 
-                        // Recording state
-                        readonly property bool isRecording: soundboardService.isRecording
-
-                        // Microphone button with gray background
                         Rectangle {
                             id: micButton
-                            Layout.preferredWidth: 30
-                            Layout.preferredHeight: 30
+                            Layout.preferredWidth: 36
+                            Layout.preferredHeight: 36
                             Layout.alignment: Qt.AlignHCenter
-                            radius: 15
-                            color: micButtonArea.containsMouse ? "#4A4A4A" : "#3A3A3A"
-                            border.color: "#4A4A4A"
+                            radius: 18
+
+                            // Button color changes based on hover + recording state
+                            color: micButtonArea.containsMouse
+                                   ? (soundboardService.isRecording ? "#7F1D1D" : "#4A4A4A")
+                                   : (soundboardService.isRecording ? "#991B1B" : "#3A3A3A")
+
+                            border.color: soundboardService.isRecording ? "#EF4444" : "#4A4A4A"
                             border.width: 1
+
+                            // subtle pulse ring while recording
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: parent.width + 10
+                                height: parent.height + 10
+                                radius: (parent.width + 10) / 2
+                                color: "transparent"
+                                border.width: 2
+                                border.color: "#EF4444"
+                                opacity: 0.0
+                                visible: soundboardService.isRecording
+
+                                SequentialAnimation on opacity {
+                                    running: soundboardService.isRecording
+                                    loops: Animation.Infinite
+                                    NumberAnimation { to: 0.35; duration: 450 }
+                                    NumberAnimation { to: 0.05; duration: 450 }
+                                }
+                            }
 
                             Image {
                                 id: micIcon
@@ -1244,7 +1571,8 @@ Rectangle {
                                 source: micIcon
                                 anchors.fill: micIcon
                                 colorization: 1.0
-                                colorizationColor: parent.parent.isRecording ? Colors.accent : Colors.textPrimary
+                                // blue when recording (or red if you prefer)
+                                colorizationColor: soundboardService.isRecording ? "#EF4444" : "#FFFFFF"
                             }
 
                             MouseArea {
@@ -1254,49 +1582,44 @@ Rectangle {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     if (soundboardService.isRecording) {
-                                        soundboardService.stopRecording();
+                                        soundboardService.stopRecording()
                                     } else {
-                                        soundboardService.startRecording();
+                                        // If your C++ startRecording needs a name/path, change this call accordingly.
+                                        // Example: soundboardService.startRecording(recordingNameInput.text)
+                                        soundboardService.startRecording()
                                     }
                                 }
                             }
 
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
+                            Behavior on color { ColorAnimation { duration: 150 } }
                         }
 
-                        // Start Recording text
                         Text {
-                            text: parent.isRecording ? "Stop Recording" : "Start Recording"
-                            color: Colors.textSecondary // Changed for light mode visibility
+                            text: soundboardService.isRecording ? "Stop Recording" : "Start Recording"
+                            color: "#888888"
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                            font.pixelSize: 9
+                            font.pixelSize: 10
                             font.weight: Font.Normal
                             Layout.alignment: Qt.AlignHCenter
                         }
                     }
 
                     // Spacer
-                    Item {
-                        Layout.preferredHeight: 8
-                    }
+                    Item { Layout.preferredHeight: 8 }
 
+                    // ============================================================
                     // Trim Audio Section
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
 
-                        // Header with scissors icon and title
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
 
-                            // Scissors icon
                             Rectangle {
                                 width: 16
                                 height: 16
@@ -1316,20 +1639,19 @@ Rectangle {
                                     source: scissorsIcon
                                     anchors.fill: scissorsIcon
                                     colorization: 1.0
-                                    colorizationColor: Colors.textPrimary // Changed for light mode visibility
+                                    colorizationColor: Colors.textPrimary
                                 }
                             }
 
                             Text {
                                 text: "Trim Audio"
-                                color: Colors.textPrimary // Changed for light mode visibility
+                                color: Colors.textPrimary
                                 font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
                             }
                         }
 
-                        // Waveform Display
                         WaveformDisplay {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 90
@@ -1339,85 +1661,18 @@ Rectangle {
                     }
 
                     // Spacer
-                    Item {
-                        Layout.preferredHeight: 4
-                    }
+                    Item { Layout.preferredHeight: 6 }
 
-                    // Name Audio File Section (for saving)
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 5
-                        Layout.rightMargin: 5
-                        spacing: 4
-
-                        Text {
-                            text: "Name Audio File"
-                            color: Colors.textPrimary // Changed for light mode visibility
-                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                        }
-
-                        // Text Input Field
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 36
-                            color: Colors.background // Changed for theme
-                            radius: 6
-                            border.color: Colors.border // Changed for theme
-                            border.width: 1
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 4
-
-                                Text {
-                                    text: "Enter Name Here:"
-                                    color: Colors.textSecondary // Changed for theme
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 11
-                                    visible: saveNameInput.text === ""
-                                }
-
-                                TextInput {
-                                    id: saveNameInput
-                                    Layout.fillWidth: true
-                                    color: Colors.textPrimary // Changed for theme
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 11
-                                    clip: true
-
-                                    Text {
-                                        anchors.fill: parent
-                                        text: "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _"
-                                        color: Colors.textSecondary // Changed for theme
-                                        font.family: parent.font.family
-                                        font.pixelSize: parent.font.pixelSize
-                                        visible: !parent.text && !parent.activeFocus
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Spacer
-                    Item {
-                        Layout.preferredHeight: 6
-                    }
-
+                    // ============================================================
                     // Cancel and Save buttons
+                    // ============================================================
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
 
-                        // Spacer to push buttons to right
-                        Item {
-                            Layout.fillWidth: true
-                        }
+                        Item { Layout.fillWidth: true }
 
                         // Cancel button
                         Rectangle {
@@ -1425,14 +1680,13 @@ Rectangle {
                             Layout.preferredHeight: 36
                             color: cancelBtnArea.containsMouse ? Colors.surfaceLight : Colors.surface
                             radius: 8
-                            border.color: Colors.border
                             border.width: 1
+                            border.color: Colors.border
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "Cancel"
                                 color: Colors.textPrimary
-
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
@@ -1444,41 +1698,29 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    saveNameInput.text = "";
-                                    audioNameInput.text = "";
+                                    recordingNameInput.text = "";
                                     rightSidebar.currentTabIndex = 0;
                                 }
                             }
 
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
+                            Behavior on color { ColorAnimation { duration: 150 } }
                         }
 
-                        // Save button (gradient)
+                        // Save button
                         Rectangle {
                             Layout.preferredWidth: 80
                             Layout.preferredHeight: 36
                             radius: 8
                             gradient: Gradient {
                                 orientation: Gradient.Horizontal
-                                GradientStop {
-                                    position: 0.0
-                                    color: saveBtnArea.containsMouse ? Colors.primaryLight : Colors.primary
-                                }
-                                GradientStop {
-                                    position: 1.0
-                                    color: saveBtnArea.containsMouse ? Colors.secondary : Colors.accent
-                                }
+                                GradientStop { position: 0.0; color: saveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6" }
+                                GradientStop { position: 1.0; color: saveBtnArea.containsMouse ? "#E040FB" : "#D214FD" }
                             }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "Save"
                                 color: Colors.textOnPrimary
-
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
@@ -1492,15 +1734,18 @@ Rectangle {
                                 onClicked: {
                                     console.log("Save clicked");
                                     const boardId = clipsModel.boardId;
+
                                     if (boardId >= 0 && soundboardService.lastRecordingPath !== "") {
-                                        const title = saveNameInput.text.trim() || audioNameInput.text.trim() || "New Recording";
-                                        const success = soundboardService.addClipWithTitle(boardId, "file:///" + soundboardService.lastRecordingPath, title);
+                                        const title = recordingNameInput.text.trim() || "New Recording";
+                                        const success = soundboardService.addClipWithTitle(
+                                            boardId,
+                                            "file:///" + soundboardService.lastRecordingPath,
+                                            title
+                                        );
+
                                         if (success) {
                                             clipsModel.reload();
-                                            // Clear inputs
-                                            saveNameInput.text = "";
-                                            audioNameInput.text = "";
-                                            // Switch back to editor tab
+                                            recordingNameInput.text = "";
                                             rightSidebar.currentTabIndex = 0;
                                         }
                                     } else {
@@ -1512,9 +1757,7 @@ Rectangle {
                     }
 
                     // Fill remaining space
-                    Item {
-                        Layout.fillHeight: true
-                    }
+                    Item { Layout.fillHeight: true }
                 }
 
                 // Settings Tab Content (Tab 0) - New Modern Clip Editor
@@ -1550,7 +1793,7 @@ Rectangle {
                         property bool muteMicDuringPlayback: true
                         property bool persistentSettings: true
                         property bool clipIsRepeat: false
-                        property int reproductionMode: 0  // 0=Overlay(default), 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop
+                        property int reproductionMode: 0  // 0=Overlay(default), 1=Play/Pause, 2=Play/Stop, 3=Exclusive, 4=Loop
                         property real durationSec: 0.0
                         property real trimStartMs: 0.0
                         property real trimEndMs: 0.0
@@ -1596,7 +1839,7 @@ Rectangle {
 
                             Text {
                                 text: "No Clip Selected"
-                                color: "#888888"
+                                color: Colors.textPrimary
                                 font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                 font.pixelSize: 14
                                 font.weight: Font.DemiBold
@@ -1605,7 +1848,7 @@ Rectangle {
 
                             Text {
                                 text: "Select a clip to edit its\nsettings and properties"
-                                color: "#666666"
+                                color: Colors.textSecondary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
                                 Layout.alignment: Qt.AlignHCenter
@@ -1632,15 +1875,15 @@ Rectangle {
                                 // Background with clip image or default
                                 Rectangle {
                                     anchors.fill: parent
-                                    color: "#1A1A1A"
+                                    color: Colors.surfaceDark // was #1A1A1A
                                     radius: 12
 
                                     // Clip preview image
                                     Image {
                                         id: clipPreviewImage
                                         anchors.centerIn: parent
-                                        width: 80
-                                        height: 80
+                                        width: 100
+                                        height: 100
                                         fillMode: Image.PreserveAspectFit
                                         source: {
                                             const imgPath = clipEditorTab.editingClipImgPath;
@@ -1705,7 +1948,7 @@ Rectangle {
                                         width: 24
                                         height: 24
                                         radius: 4
-                                        color: editImageArea.containsMouse ? "#444444" : "#333333"
+                                        color: editImageArea.containsMouse ? Colors.surfaceLight : Colors.surface // was #444444/#333333
 
                                         Text {
                                             anchors.centerIn: parent
@@ -1738,7 +1981,7 @@ Rectangle {
                                     Layout.preferredWidth: implicitWidth + 20
                                     Layout.maximumWidth: 180
                                     horizontalAlignment: Text.AlignHCenter
-                                    color: "#FFFFFF"
+                                    color: Colors.textPrimary // was #FFFFFF
                                     font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                     font.pixelSize: 16
                                     font.weight: Font.DemiBold
@@ -1773,7 +2016,7 @@ Rectangle {
                                     Text {
                                         anchors.centerIn: parent
                                         text: "Enter title..."
-                                        color: "#666666"
+                                        color: Colors.textSecondary // was #666666
                                         font: parent.font
                                         visible: !parent.text && !parent.activeFocus
                                     }
@@ -1790,6 +2033,7 @@ Rectangle {
                                         anchors.centerIn: parent
                                         text: "✏️"
                                         font.pixelSize: 12
+                                        color: Colors.textPrimary
                                         opacity: 0.7
                                     }
 
@@ -1810,7 +2054,7 @@ Rectangle {
 
                                 Text {
                                     text: "Hotkey"
-                                    color: "#AAAAAA"
+                                    color: Colors.textSecondary // was #AAAAAA
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 12
                                     font.weight: Font.Medium
@@ -1819,15 +2063,15 @@ Rectangle {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 36
-                                    color: "#1A1A1A"
+                                    color: Colors.surfaceDark // was #1A1A1A
                                     radius: 8
-                                    border.color: hotkeyArea.containsMouse ? "#8B5CF6" : "#3A3A3A"
+                                    border.color: hotkeyArea.containsMouse ? Colors.accent : Colors.border // was #8B5CF6 / #3A3A3A
                                     border.width: 1
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: clipEditorTab.editingClipHotkey !== "" ? clipEditorTab.editingClipHotkey : "Not Set"
-                                        color: clipEditorTab.editingClipHotkey !== "" ? "#FFFFFF" : "#666666"
+                                        color: clipEditorTab.editingClipHotkey !== "" ? Colors.textPrimary : Colors.textSecondary // was #FFFFFF / #666666
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 12
                                         font.weight: clipEditorTab.editingClipHotkey !== "" ? Font.DemiBold : Font.Normal
@@ -1850,8 +2094,8 @@ Rectangle {
                                     width: 36
                                     height: 36
                                     radius: 8
-                                    color: clearHotkeyArea.containsMouse ? "#3A3A3A" : "transparent"
-                                    border.color: clearHotkeyArea.containsMouse ? "#FF4D4D" : "transparent"
+                                    color: clearHotkeyArea.containsMouse ? Colors.surfaceLight : "transparent"
+                                    border.color: clearHotkeyArea.containsMouse ? Colors.error : "transparent"
                                     border.width: 1
                                     visible: clipEditorTab.editingClipHotkey !== ""
 
@@ -1875,153 +2119,155 @@ Rectangle {
                                 }
                             }
 
-                            // ===== PLAYBACK CONTROLS =====
-                            RowLayout {
-                                Layout.alignment: Qt.AlignHCenter
-                                spacing: 6
+        //                     // ===== PLAYBACK CONTROLS =====
+        //                     RowLayout {
+        //                         Layout.alignment: Qt.AlignHCenter
+        //                         spacing: 6
 
-                                // Previous button
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: prevBtnArea.containsMouse ? "#3A3A3A" : "transparent"
+        //                         // Previous button
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: prevBtnArea.containsMouse ? "#3A3A3A" : "transparent"
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "◀"
-                                        color: "#FFFFFF"
-                                        font.pixelSize: 10
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "◀"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 10
+        //                             }
 
-                                    MouseArea {
-                                        id: prevBtnArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Previous clicked")
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 id: prevBtnArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: console.log("Previous clicked")
+        //                             }
+        //                         }
 
-                                // Skip backward button
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: skipBackArea.containsMouse ? "#3A3A3A" : "transparent"
+        //                         // Skip backward button
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: skipBackArea.containsMouse ? "#3A3A3A" : "transparent"
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "⏮"
-                                        color: "#FFFFFF"
-                                        font.pixelSize: 12
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "⏮"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 12
+        //                             }
 
-                                    MouseArea {
-                                        id: skipBackArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Skip backward clicked")
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 id: skipBackArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: console.log("Skip backward clicked")
+        //                             }
+        //                         }
 
-                                // Main Play Button (larger, gradient)
-                                Rectangle {
-                                    width: 36
-                                    height: 36
-                                    radius: 18
+        //                         // Main Play Button (larger, gradient)
+        //                         Rectangle {
+        //                             width: 36
+        //                             height: 36
+        //                             radius: 18
 
-                                    gradient: Gradient {
-                                        orientation: Gradient.Horizontal
-                                        GradientStop {
-                                            position: 0.0
-                                            color: Colors.accent
-                                        }
-                                        GradientStop {
-                                            position: 1.0
-                                            color: "#8B5CF6"
-                                        }
-                                    }
+        //                             gradient: Gradient {
+        //                                 orientation: Gradient.Horizontal
+        //                                 GradientStop {
+        //                                     position: 0.0
+        //                                     color: "#3B82F6"
+        //                                 }
+        //                                 GradientStop {
+        //                                     position: 1.0
+        //                                     color: "#8B5CF6"
+        //                                 }
+        //                             }
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: root.displayedClipData && root.displayedClipData.isPlaying ? "⏸" : "▶"
-                                        color: "#FFFFFF"
-                                        font.pixelSize: 14
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: root.displayedClipData && root.displayedClipData.isPlaying ? "⏸" : "▶"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 14
+        //                             }
 
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            // Let the backend handle reproduction mode behavior
-                                            // (playClip toggles based on clip's reproductionMode)
-                                            if (root.selectedClipId !== -1) {
-                                                soundboardService.playClip(root.selectedClipId);
-                                            }
-                                        }
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 anchors.fill: parent
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: {
+        //                                     if (root.selectedClipId !== -1) {
+        //                                         if (soundboardService.isClipPlaying(root.selectedClipId)) {
+        //                                             soundboardService.stopClip(root.selectedClipId);
+        //                                         } else {
+        //                                             soundboardService.playClip(root.selectedClipId);
+        //                                         }
+        //                                     }
+        //                                 }
+        //                             }
+        //                         }
 
-                                // Skip forward button
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: skipFwdArea.containsMouse ? "#3A3A3A" : "transparent"
+        //                         // Skip forward button
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: skipFwdArea.containsMouse ? "#3A3A3A" : "transparent"
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "⏭"
-                                        color: "#FFFFFF"
-                                        font.pixelSize: 12
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "⏭"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 12
+        //                             }
 
-                                    MouseArea {
-                                        id: skipFwdArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Skip forward clicked")
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 id: skipFwdArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: console.log("Skip forward clicked")
+        //                             }
+        //                         }
 
-                                // Loop button - toggles repeat for selected clip
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: {
-                                        // Active when repeat is on
-                                        if (clipEditorTab.clipIsRepeat) {
-                                            return loopBtnArea.containsMouse ? "#7C3AED" : "#8B5CF6";
-                                        }
-                                        return loopBtnArea.containsMouse ? "#3A3A3A" : "transparent";
-                                    }
+        //                         // Loop button - toggles repeat for selected clip
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: {
+        //                                 // Active when repeat is on
+        //                                 if (clipEditorTab.clipIsRepeat) {
+        //                                     return loopBtnArea.containsMouse ? "#7C3AED" : "#8B5CF6";
+        //                                 }
+        //                                 return loopBtnArea.containsMouse ? "#3A3A3A" : "transparent";
+        //                             }
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "🔁"
-                                        color: clipEditorTab.clipIsRepeat ? "#FFFFFF" : "#888888"
-                                        font.pixelSize: 12
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "🔁"
+        //                                 color: clipEditorTab.clipIsRepeat ? "#FFFFFF" : "#888888"
+        //                                 font.pixelSize: 12
+        //                             }
 
-                                    MouseArea {
-                                        id: loopBtnArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            // Toggle repeat for selected clip
-                                            if (root.selectedClipId !== -1) {
-                                                clipEditorTab.clipIsRepeat = !clipEditorTab.clipIsRepeat;
-                                                clipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+        //                             MouseArea {
+        //                                 id: loopBtnArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: {
+        //                                     // Toggle repeat for selected clip
+        //                                     if (root.selectedClipId !== -1) {
+        //                                         clipEditorTab.clipIsRepeat = !clipEditorTab.clipIsRepeat;
+        //                                         clipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
+        //                                     }
+        //                                 }
+        //                             }
+        //                         }
+        //                     }
 
                             // ===== VOICE VOLUME SLIDER =====
                             ColumnLayout {
@@ -2033,7 +2279,7 @@ Rectangle {
 
                                     Text {
                                         text: "Voice Volume"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary // was #FFFFFF
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 12
                                     }
@@ -2044,7 +2290,7 @@ Rectangle {
 
                                     Text {
                                         text: Math.round(clipEditorTab.clipVolume)
-                                        color: "#AAAAAA"
+                                        color: Colors.textSecondary // was #AAAAAA
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 11
                                     }
@@ -2072,7 +2318,7 @@ Rectangle {
                                         width: volumeSlider.availableWidth
                                         height: 4
                                         radius: 2
-                                        color: "#3A3A3A"
+                                        color: Colors.surfaceLight // was #3A3A3A
 
                                         Rectangle {
                                             width: volumeSlider.visualPosition * parent.width
@@ -2082,11 +2328,11 @@ Rectangle {
                                                 orientation: Gradient.Horizontal
                                                 GradientStop {
                                                     position: 0.0
-                                                    color: Colors.accent
+                                                    color: Colors.gradientPrimaryStart
                                                 }
                                                 GradientStop {
                                                     position: 1.0
-                                                    color: "#8B5CF6"
+                                                    color: Colors.gradientPrimaryEnd
                                                 }
                                             }
                                         }
@@ -2098,7 +2344,7 @@ Rectangle {
                                         width: 14
                                         height: 14
                                         radius: 7
-                                        color: "#FFFFFF"
+                                        color: Colors.textOnPrimary
                                     }
                                 }
                             }
@@ -2113,7 +2359,7 @@ Rectangle {
 
                                     Text {
                                         text: "Speed"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary // was #FFFFFF
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 12
                                     }
@@ -2124,7 +2370,7 @@ Rectangle {
 
                                     Text {
                                         text: clipEditorTab.clipSpeed.toFixed(1) + "x"
-                                        color: "#AAAAAA"
+                                        color: Colors.textSecondary // was #AAAAAA
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 11
                                     }
@@ -2153,7 +2399,7 @@ Rectangle {
                                         width: speedSlider.availableWidth
                                         height: 4
                                         radius: 2
-                                        color: "#3A3A3A"
+                                        color: Colors.surfaceLight // was #3A3A3A
 
                                         Rectangle {
                                             width: speedSlider.visualPosition * parent.width
@@ -2163,11 +2409,11 @@ Rectangle {
                                                 orientation: Gradient.Horizontal
                                                 GradientStop {
                                                     position: 0.0
-                                                    color: Colors.accent
+                                                    color: Colors.gradientPrimaryStart
                                                 }
                                                 GradientStop {
                                                     position: 1.0
-                                                    color: "#8B5CF6"
+                                                    color: Colors.gradientPrimaryEnd
                                                 }
                                             }
                                         }
@@ -2179,7 +2425,7 @@ Rectangle {
                                         width: 14
                                         height: 14
                                         radius: 7
-                                        color: "#FFFFFF"
+                                        color: Colors.textOnPrimary
                                     }
                                 }
                             }
@@ -2199,7 +2445,7 @@ Rectangle {
 
                                     Text {
                                         text: "Trim Audio"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary // was #FFFFFF
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 12
                                         font.weight: Font.DemiBold
@@ -2275,172 +2521,96 @@ Rectangle {
 
                                     Text {
                                         text: "Reproduction Mode"
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary // was #FFFFFF
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 13
                                         font.weight: Font.DemiBold
                                     }
                                 }
 
-                                // Mode icons row
+                                // Mode icons row (SVG + blue circle when selected)
                                 RowLayout {
                                     id: modeSelectorRow
-                                    Layout.fillWidth: true
-                                    spacing: 10
+                                    Layout.alignment: Qt.AlignHCenter
+                                    spacing: 8
 
-                                    property int selectedMode: clipEditorTab.reproductionMode  // Bind to clip's mode
-                                    property bool ignoreNextChange: false  // Flag to prevent saving during load
+                                    // change this to your real theme flag
+                                    property bool isLightTheme: Colors.currentTheme === "light"
 
-                                    // Update backend ONLY when user clicks, not during load
-                                    onSelectedModeChanged: {
-                                        if (ignoreNextChange) {
-                                            ignoreNextChange = false;  // Reset flag
-                                            return;  // Don't save during load
-                                        }
-                                        if (root.selectedClipId !== -1) {
-                                            soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, selectedMode);
-                                            console.log("Reproduction mode changed to:", selectedMode, "- SAVED!");
+                                    // helper: pick correct svg for mode + theme
+                                    function modeIconSource(mode) {
+                                        const base = "qrc:/qt/qml/TalkLess/resources/icons/reproduction/"
+                                        const suffix = isLightTheme ? "_light.svg" : "_dark.svg"
+                                        switch (mode) {
+                                        case 0: return base + "overlay" + suffix
+                                        case 1: return base + "play-pause" + suffix
+                                        case 2: return base + "play-stop" + suffix
+                                        case 3: return base + "restart" + suffix
+                                        case 4: return base + "loop" + suffix
+                                        default: return ""
                                         }
                                     }
 
-                                    // Overlay Mode
-                                    Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
-                                        color: parent.selectedMode === 0 ? "#00D9FF" : (overlayModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 0 ? "#00D9FF" : "#3A3A3A"
-                                        border.width: parent.selectedMode === 0 ? 2 : 1
+                                    // reusable button
+                                    component ModeButton: Rectangle {
+                                        required property int mode
+                                        property bool selected: clipEditorTab.reproductionMode === mode
 
-                                        Text {
+                                        width: 36
+                                        height: 36
+                                        radius: 8
+                                        color: ma.containsMouse ? Colors.surfaceDark : Colors.surface
+                                        border.width: 1
+
+                                        Rectangle {
                                             anchors.centerIn: parent
-                                            text: "▶"
-                                            color: parent.parent.selectedMode === 0 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 18
-                                            font.weight: Font.Bold
+                                            width: 28
+                                            height: 28
+                                            radius: 14
+                                            visible: parent.selected
+                                            color: "#00D9FF"
+                                        }
+
+                                        Image {
+                                            anchors.centerIn: parent
+                                            source: modeSelectorRow.modeIconSource(parent.mode)
+                                            width: 18
+                                            height: 18
+                                            sourceSize.width: width
+                                            sourceSize.height: height
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            mipmap: true
                                         }
 
                                         MouseArea {
-                                            id: overlayModeArea
+                                            id: ma
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                modeSelectorRow.selectedMode = 0;
-                                                clipEditorTab.reproductionMode = 0;
                                                 if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 0);
-                                                    console.log("Mode set to Overlay (0)");
+                                                    clipEditorTab.reproductionMode = parent.mode
+                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, parent.mode)
+                                                    console.log("Reproduction mode changed to:", parent.mode, "- SAVED!")
                                                 }
                                             }
                                         }
                                     }
 
-                                    // Play/Pause Mode
-                                    Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
-                                        color: parent.selectedMode === 1 ? "#00D9FF" : (playPauseModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 1 ? "#00D9FF" : "#3A3A3A"
-                                        border.width: parent.selectedMode === 1 ? 2 : 1
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "▶⏸"
-                                            color: parent.parent.selectedMode === 1 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 14
-                                            font.weight: Font.Bold
-                                        }
-
-                                        MouseArea {
-                                            id: playPauseModeArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                modeSelectorRow.selectedMode = 1;
-                                                clipEditorTab.reproductionMode = 1;
-                                                if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 1);
-                                                    console.log("Mode set to Play/Pause (1)");
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Play/Stop Mode
-                                    Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
-                                        color: parent.selectedMode === 2 ? "#00D9FF" : (playStopModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 2 ? "#00D9FF" : "#3A3A3A"
-                                        border.width: parent.selectedMode === 2 ? 2 : 1
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "▶⏹"
-                                            color: parent.parent.selectedMode === 2 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 14
-                                            font.weight: Font.Bold
-                                        }
-
-                                        MouseArea {
-                                            id: playStopModeArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                modeSelectorRow.selectedMode = 2;
-                                                clipEditorTab.reproductionMode = 2;
-                                                if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 2);
-                                                    console.log("Mode set to Play/Stop (2)");
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Restart Mode
-                                    Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
-                                        color: parent.selectedMode === 3 ? "#00D9FF" : (restartModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 3 ? "#00D9FF" : "#3A3A3A"
-                                        border.width: parent.selectedMode === 3 ? 2 : 1
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "⟲"
-                                            color: parent.parent.selectedMode === 3 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 20
-                                            font.weight: Font.Bold
-                                        }
-
-                                        MouseArea {
-                                            id: restartModeArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                modeSelectorRow.selectedMode = 3;
-                                                clipEditorTab.reproductionMode = 3;
-                                                if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 3);
-                                                    console.log("Mode set to Loop (3)");
-                                                }
-                                            }
-                                        }
-                                    }
+                                    ModeButton { mode: 0 }
+                                    ModeButton { mode: 1 }
+                                    ModeButton { mode: 2 }
+                                    ModeButton { mode: 3 }
+                                    ModeButton { mode: 4 }
                                 }
+
 
                                 // Mode description text
                                 Text {
                                     Layout.fillWidth: true
                                     text: {
-                                        const mode = modeSelectorRow.selectedMode; // Use modeSelectorRow directly
+                                        const mode = parent.children[1].selectedMode;
                                         switch (mode) {
                                         case 0:
                                             return "Sound plays with other sounds";
@@ -2449,14 +2619,14 @@ Rectangle {
                                         case 2:
                                             return "Second click stops and resets";
                                         case 3:
-                                            return "Always plays from beginning";
+                                            return "Plays from start, pauses others";
                                         case 4:
-                                            return "Endless loop until changed";
+                                            return "Loops from beginning, stops others";
                                         default:
                                             return "";
                                         }
                                     }
-                                    color: "#888888"
+                                    color: Colors.textSecondary // was #AAAAAA
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 10
                                     wrapMode: Text.WordWrap
@@ -2470,7 +2640,7 @@ Rectangle {
 
                                 Text {
                                     text: "Playback Behavior"
-                                    color: "#FFFFFF"
+                                    color: Colors.textOnPrimary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 12
                                     font.weight: Font.DemiBold
@@ -2494,14 +2664,14 @@ Rectangle {
                                             radius: 4
                                             // Force checked when mode is Play/Stop (mode 2), force unchecked when Play/Pause (mode 1)
                                             property bool effectiveValue: clipEditorTab.reproductionMode === 2 ? true : (clipEditorTab.reproductionMode === 1 ? false : clipEditorTab.stopOtherSounds)
-                                            color: effectiveValue ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: effectiveValue ? "#8B5CF6" : "#4A4A4A"
+                                            color: effectiveValue ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: effectiveValue ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: parent.effectiveValue ? "✓" : ""
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
                                             }
@@ -2521,7 +2691,7 @@ Rectangle {
 
                                         Text {
                                             text: clipEditorTab.reproductionMode === 2 ? "Stop other sounds on play (auto)" : clipEditorTab.reproductionMode === 1 ? "Stop other sounds on play (disabled)" : "Stop other sounds on play"
-                                            color: parent.isReadOnly ? "#888888" : "#CCCCCC"
+                                            color: parent.isReadOnly ? Colors.textDisabled : Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2535,14 +2705,14 @@ Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            color: clipEditorTab.muteOtherSounds ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: clipEditorTab.muteOtherSounds ? "#8B5CF6" : "#4A4A4A"
+                                            color: clipEditorTab.muteOtherSounds ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: clipEditorTab.muteOtherSounds ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: clipEditorTab.muteOtherSounds ? "✓" : ""
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
                                             }
@@ -2565,7 +2735,7 @@ Rectangle {
 
                                         Text {
                                             text: "Mute other sounds"
-                                            color: "#CCCCCC"
+                                            color: Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2583,14 +2753,14 @@ Rectangle {
                                             radius: 4
                                             // Force checked when muteOtherSounds is enabled
                                             property bool effectiveValue: clipEditorTab.muteOtherSounds || clipEditorTab.muteMicDuringPlayback
-                                            color: effectiveValue ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: effectiveValue ? "#8B5CF6" : "#4A4A4A"
+                                            color: effectiveValue ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: effectiveValue ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: parent.effectiveValue ? "✓" : ""
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
                                             }
@@ -2610,7 +2780,7 @@ Rectangle {
 
                                         Text {
                                             text: clipEditorTab.muteOtherSounds ? "Mute mic during playback (auto)" : "Mute mic during playback"
-                                            color: clipEditorTab.muteOtherSounds ? "#888888" : "#CCCCCC"
+                                            color: clipEditorTab.muteOtherSounds ? Colors.textDisabled : Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2624,14 +2794,14 @@ Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            color: clipEditorTab.persistentSettings ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: clipEditorTab.persistentSettings ? "#8B5CF6" : "#4A4A4A"
+                                            color: clipEditorTab.persistentSettings ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: clipEditorTab.persistentSettings ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: clipEditorTab.persistentSettings ? "✓" : ""
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
                                             }
@@ -2648,7 +2818,7 @@ Rectangle {
 
                                         Text {
                                             text: "Persistent settings"
-                                            color: "#CCCCCC"
+                                            color: Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2662,14 +2832,14 @@ Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            color: clipEditorTab.clipIsRepeat ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: clipEditorTab.clipIsRepeat ? "#8B5CF6" : "#4A4A4A"
+                                            color: clipEditorTab.clipIsRepeat ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: clipEditorTab.clipIsRepeat ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: clipEditorTab.clipIsRepeat ? "✓" : ""
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
                                             }
@@ -2689,7 +2859,7 @@ Rectangle {
 
                                         Text {
                                             text: "Loop playback"
-                                            color: "#CCCCCC"
+                                            color: Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2704,7 +2874,7 @@ Rectangle {
 
                                 Text {
                                     text: "Add Tag"
-                                    color: "#FFFFFF"
+                                    color: Colors.textOnPrimary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 12
                                     font.weight: Font.DemiBold
@@ -2713,7 +2883,7 @@ Rectangle {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 36
-                                    color: "#1A1A1A"
+                                    color: Colors.surfaceDark
                                     radius: 18
                                     border.color: addTagInput.activeFocus ? "#8B5CF6" : "#3A3A3A"
                                     border.width: 1
@@ -2724,7 +2894,7 @@ Rectangle {
                                         anchors.leftMargin: 16
                                         anchors.rightMargin: 16
                                         verticalAlignment: TextInput.AlignVCenter
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 12
                                         clip: true
@@ -2747,7 +2917,7 @@ Rectangle {
                                             anchors.leftMargin: 0
                                             verticalAlignment: Text.AlignVCenter
                                             text: "Add tag and press enter"
-                                            color: "#666666"
+                                            color: Colors.textSecondary
                                             font: parent.font
                                             visible: !parent.text && !parent.activeFocus
                                         }
@@ -2770,13 +2940,13 @@ Rectangle {
                                             width: tagText.implicitWidth + 24
                                             height: 24
                                             radius: 12
-                                            color: "#3A3A3A"
+                                            color: Colors.surfaceDark
 
                                             Text {
                                                 id: tagText
                                                 anchors.centerIn: parent
                                                 text: modelData
-                                                color: Colors.textSecondary
+                                                color: Colors.textPrimary
                                                 font.pixelSize: 10
                                             }
 
@@ -2854,7 +3024,7 @@ Rectangle {
 
                         Text {
                             text: "Name Audio File"
-                            color: "#FFFFFF"
+                            color: Colors.textOnPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 14
                             font.weight: Font.DemiBold
@@ -2864,9 +3034,9 @@ Rectangle {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 44
-                            color: "#1A1A1A"
+                            color: Colors.surfaceDark
                             radius: 8
-                            border.color: "#3A3A3A"
+                            border.color: Colors.border
                             border.width: 1
 
                             RowLayout {
@@ -2877,7 +3047,7 @@ Rectangle {
 
                                 Text {
                                     text: "Enter Name Here:"
-                                    color: "#808080"
+                                    color: Colors.textSecondary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
                                     visible: uploadAudioNameInput.text === ""
@@ -2886,7 +3056,7 @@ Rectangle {
                                 TextInput {
                                     id: uploadAudioNameInput
                                     Layout.fillWidth: true
-                                    color: "#FFFFFF"
+                                    color: Colors.textPrimary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
                                     clip: true
@@ -2894,7 +3064,7 @@ Rectangle {
                                     Text {
                                         anchors.fill: parent
                                         text: "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _"
-                                        color: "#666666"
+                                        color: Colors.textSecondary
                                         font.family: parent.font.family
                                         font.pixelSize: parent.font.pixelSize
                                         visible: !parent.text && !parent.activeFocus
@@ -2913,7 +3083,7 @@ Rectangle {
 
                         Text {
                             text: "Assign to Slot"
-                            color: "#FFFFFF"
+                            color: Colors.textOnPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 14
                             font.weight: Font.DemiBold
@@ -2923,9 +3093,9 @@ Rectangle {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 44
-                            color: "#1A1A1A"
+                            color: Colors.surfaceDark
                             radius: 8
-                            border.color: "#3A3A3A"
+                            border.color: Colors.border
                             border.width: 1
 
                             RowLayout {
@@ -2935,7 +3105,7 @@ Rectangle {
 
                                 Text {
                                     text: "Select Available Slot"
-                                    color: "#AAAAAA"
+                                    color: Colors.textSecondary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
                                     Layout.fillWidth: true
@@ -2944,7 +3114,7 @@ Rectangle {
                                 // Dropdown arrow
                                 Text {
                                     text: "▼"
-                                    color: "#808080"
+                                    color: Colors.textSecondary
                                     font.pixelSize: 10
                                 }
                             }
@@ -3006,7 +3176,7 @@ Rectangle {
 
                         Text {
                             text: "Trim Audio"
-                            color: "#FFFFFF"
+                            color: Colors.textOnPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 14
                             font.weight: Font.DemiBold
@@ -3056,7 +3226,7 @@ Rectangle {
                             Text {
                                 anchors.centerIn: parent
                                 text: "Cancel"
-                                color: "#FFFFFF"
+                                color: Colors.textOnPrimary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 13
                                 font.weight: Font.Medium
@@ -3086,18 +3256,18 @@ Rectangle {
                                 orientation: Gradient.Horizontal
                                 GradientStop {
                                     position: 0.0
-                                    color: uploadSaveBtnArea.containsMouse ? Colors.primaryLight : Colors.accent
+                                    color: uploadSaveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6"
                                 }
                                 GradientStop {
                                     position: 1.0
-                                    color: uploadSaveBtnArea.containsMouse ? Colors.primaryLight : Colors.accent
+                                    color: uploadSaveBtnArea.containsMouse ? "#E040FB" : "#D214FD"
                                 }
                             }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "Save"
-                                color: "#FFFFFF"
+                                color: Colors.textOnPrimary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 13
                                 font.weight: Font.Medium
@@ -3165,7 +3335,7 @@ Rectangle {
 
                     Text {
                         text: "Teleprompter"
-                        color: Colors.textPrimary
+                        color: Colors.textOnPrimary
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
@@ -3192,7 +3362,7 @@ Rectangle {
 
                     Text {
                         text: "Audio Output"
-                        color: Colors.textPrimary
+                        color: Colors.textOnPrimary
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
@@ -3223,7 +3393,7 @@ Rectangle {
         width: 32
         height: 32
         radius: 8
-        color: isActive ? Qt.alpha(Colors.accent, 0.15) : (mouse.containsMouse ? Colors.surfaceLight : "transparent")
+        color: isActive ? Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.2) : (mouse.containsMouse ? Colors.surfaceLight : "transparent")
         border.color: isActive ? Colors.accent : "transparent"
         border.width: 1
 

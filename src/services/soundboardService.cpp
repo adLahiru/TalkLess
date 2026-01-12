@@ -2,15 +2,16 @@
 
 #include "audioEngine.h"
 
-#include <QDateTime>
 #include <QDebug>
-#include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
-#include <QStandardPaths>
 #include <QUrl>
+#include <QDateTime>
+#include <QStandardPaths>
+#include <QDir>
+
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
@@ -240,7 +241,7 @@ bool SoundboardService::saveActive()
             allOk = false;
         }
     }
-
+    
     if (allOk) {
         // reload index because clipCount/name might update
         m_state = m_repo.loadIndex();
@@ -257,7 +258,7 @@ QString SoundboardService::normalizeHotkey(const QString& hotkey)
 void SoundboardService::rebuildHotkeyIndex()
 {
     m_hotkeyToClipId.clear();
-
+    
     // Build hotkey index from all active boards
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& c : it.value().clips) {
@@ -674,7 +675,7 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
             n.isPlaying = c.isPlaying;
             n.locked = c.locked;
 
-            if (n.reproductionMode == 3)
+            if (n.reproductionMode == 4)
                 n.isRepeat = true;
             c = n;
 
@@ -702,7 +703,7 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
         n.isPlaying = false;
         n.locked = false;
 
-        if (n.reproductionMode == 3)
+        if (n.reproductionMode == 4)
             n.isRepeat = true;
         c = n;
 
@@ -944,17 +945,18 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
 
             c.reproductionMode = mode;
 
-            // "When we selected loop mode it should be turn on the repeat"
-            if (mode == 3) {
+            // Mode 4 (Loop) should turn on repeat, Mode 3 (Restart) should not
+            if (mode == 4) {
                 c.isRepeat = true;
                 // Apply immediately to audio engine if currently assigned to a slot
                 if (m_clipIdToSlot.contains(clipId) && m_audioEngine) {
                     m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], true);
                 }
             } else {
-                c.isRepeat = false;
+                // For all other modes (including mode 3 restart), don't force loop
+                // Keep existing isRepeat value unless it was mode 4 before
                 if (m_clipIdToSlot.contains(clipId) && m_audioEngine) {
-                    m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], false);
+                    m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], c.isRepeat);
                 }
             }
 
@@ -975,10 +977,9 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
     for (auto& c : b.clips) {
         if (c.id == clipId) {
             c.reproductionMode = mode;
-            if (mode == 3)
+            // Only mode 4 (Loop) forces repeat on
+            if (mode == 4)
                 c.isRepeat = true;
-            else
-                c.isRepeat = false;
             m_repo.saveBoard(b);
             return;
         }
@@ -1375,34 +1376,24 @@ void SoundboardService::playClip(int clipId)
     const int slotId = getOrAssignSlot(clipId);
 
     // IMPORTANT: reproductionMode of *Clip_B* affects *previous playing clips*.
-    const int mode = clip->reproductionMode; // 0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Loop
+    // 0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop
+    const int mode = clip->reproductionMode;
 
     const bool isCurrentlyPlaying = m_audioEngine->isClipPlaying(slotId);
     const bool isPaused = m_audioEngine->isClipPaused(slotId);
 
     // Per-clip behavior (when user taps the same clip again)
-    // Mode 0 (Overlay): Stop the clip when clicked again
-    if (mode == 0 && isCurrentlyPlaying && !isPaused) {
-        m_audioEngine->stopClip(slotId);
-        clip->isPlaying = false;
-        emit activeClipsChanged();
-        emit clipPlaybackStopped(clipId);
-        qDebug() << "Stopped overlay clip" << clipId;
-        return;
-    }
-
-    // Mode 1 (Play/Pause): Pause when playing, resume when paused
     if (mode == 1 && isCurrentlyPlaying) {
         if (isPaused) {
-            // Resume from saved position
+            // Resume from saved position - clip is still loaded in audio engine
             m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
             m_audioEngine->resumeClip(slotId);
             clip->isPlaying = true;
             emit activeClipsChanged();
             emit clipPlaybackStarted(clipId);
-            qDebug() << "Resuming clip" << clipId << "from position" << clip->lastPlayedPosMs;
+            qDebug() << "Resuming paused clip" << clipId << "from position" << clip->lastPlayedPosMs;
         } else {
-            // Pause the clip (save position for later resume)
+            // User clicked a playing clip - PAUSE it and save position
             clip->lastPlayedPosMs = m_audioEngine->getClipPlaybackPositionMs(slotId);
             m_audioEngine->pauseClip(slotId);
             clip->isPlaying = false;
@@ -1410,10 +1401,14 @@ void SoundboardService::playClip(int clipId)
             emit clipPlaybackPaused(clipId);
             qDebug() << "Paused clip" << clipId << "at position" << clip->lastPlayedPosMs;
         }
+
         return;
     }
 
-    // Mode 2 (Play/Stop): Stop when playing
+    // Handle case where clip has a saved position but is not currently in audio engine
+    // (e.g., it was paused when another clip started playing)
+    const bool hasSavedPosition = (mode == 1 && clip->lastPlayedPosMs > 0.0);
+
     if (mode == 2 && isCurrentlyPlaying && !isPaused) {
         m_audioEngine->stopClip(slotId);
         clip->isPlaying = false;
@@ -1422,22 +1417,13 @@ void SoundboardService::playClip(int clipId)
         return;
     }
 
-    // Mode 3 (Loop): Stop when playing
-    if (mode == 3 && isCurrentlyPlaying && !isPaused) {
-        m_audioEngine->stopClip(slotId);
-        clip->isPlaying = false;
-        clip->isRepeat = false; // Turn off loop when stopped
-        emit activeClipsChanged();
-        emit clipPlaybackStopped(clipId);
-        qDebug() << "Stopped loop clip" << clipId;
-        return;
-    }
-
     // If user taps a paused clip in Play/Stop mode: restart from beginning
     // (fall through)
 
     // 1) Apply Clip_B reproduction to OTHER currently playing clips
     QVariantList others = playingClipIDs();
+    qDebug() << "playClip: clipId=" << clipId << "mode=" << mode << "others playing=" << others;
+    
     // Remove this clip if it appears in the "playing" list
     for (int i = others.size() - 1; i >= 0; --i) {
         bool ok = false;
@@ -1446,16 +1432,22 @@ void SoundboardService::playClip(int clipId)
             others.removeAt(i);
         }
     }
+    
+    qDebug() << "playClip: after removing self, others=" << others;
 
     if (mode == 1) {
         // Pause Clip_A, play Clip_B
+        qDebug() << "playClip: mode=1, calling reproductionPlayingClip to pause others";
         reproductionPlayingClip(others, 1);
     } else if (mode == 2) {
         // Stop Clip_A, play Clip_B
         reproductionPlayingClip(others, 2);
     } else if (mode == 3) {
-        // Stop other sound, set Clip_B to loop, play Clip_B
-        reproductionPlayingClip(others, 3);
+        // Restart mode - stop other sounds, play from beginning (no loop)
+        reproductionPlayingClip(others, 2); // Stop others like mode 2
+    } else if (mode == 4) {
+        // Loop mode - stop other sounds, set Clip_B to loop, play Clip_B
+        reproductionPlayingClip(others, 2); // Stop others
     }
     // mode == 0 overlay -> do nothing to others
 
@@ -1513,27 +1505,23 @@ void SoundboardService::playClip(int clipId)
     const float gainDb = (clip->volume <= 0) ? -60.0f : 20.0f * std::log10(clip->volume / 100.0f);
     m_audioEngine->setClipGain(slotId, gainDb);
 
-    // Apply loop behavior (Mode 3 forces repeat ON)
-    const bool loop = (mode == 3) ? true : clip->isRepeat;
-    if (mode == 3)
+    // Apply loop behavior (Mode 4 forces repeat ON, Mode 3 is restart without loop)
+    const bool loop = (mode == 4) ? true : clip->isRepeat;
+    if (mode == 4)
         clip->isRepeat = true;
 
     m_audioEngine->setClipLoop(slotId, loop);
     m_audioEngine->setClipTrim(slotId, clip->trimStartMs, clip->trimEndMs);
 
-    // 3) Play Clip_B
-    m_audioEngine->setClipTrim(slotId, clip->trimStartMs, clip->trimEndMs);
-
     // Resume from saved position if applicable (mainly for Play/Pause mode)
-    if (clip->lastPlayedPosMs > 0.0) {
-        // Mode 1: Play/Pause - resume from last position
-        if (mode == 1) {
-            m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
-            qDebug() << "Resuming clip" << clipId << "from position" << clip->lastPlayedPosMs;
-        }
+    if (hasSavedPosition) {
+        m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
+        qDebug() << "Starting clip" << clipId << "from saved position" << clip->lastPlayedPosMs << "ms";
+    } else {
+        qDebug() << "Starting clip" << clipId << "from beginning";
     }
 
-    // 3) Play Clip_B
+    // Play the clip
     m_audioEngine->playClip(slotId);
 
     clip->isPlaying = true;
@@ -1607,6 +1595,7 @@ float SoundboardService::recordingDuration() const
     return m_audioEngine->getRecordingDuration();
 }
 
+
 QString SoundboardService::getRecordingOutputPath() const
 {
     // Recordings folder in AppData
@@ -1622,6 +1611,51 @@ QString SoundboardService::getRecordingOutputPath() const
     QString filename = QString("recording_%1.wav").arg(timestamp);
 
     return QDir(recordingsPath).filePath(filename);
+}
+
+bool SoundboardService::setRecordingInputDevice(const QString& deviceId)
+{
+    if (!m_audioEngine)
+        return false;
+
+    // Set the recording input device (capture device for recording)
+    bool success = m_audioEngine->setCaptureDevice(deviceId.toStdString());
+    if (success) {
+        emit settingsChanged();
+    }
+    return success;
+}
+
+bool SoundboardService::playLastRecordingPreview()
+{
+    if (!m_audioEngine || m_lastRecordingPath.isEmpty())
+        return false;
+
+    // Use the preview slot to play the last recording
+    // loadClip returns a pair<double, double> with duration info, check if first > 0 for success
+    auto result = m_audioEngine->loadClip(kPreviewSlot, m_lastRecordingPath.toStdString());
+    bool success = result.first > 0.0;
+    if (success) {
+        m_audioEngine->playClip(kPreviewSlot);
+        m_recordingPreviewPlaying = true;
+        emit recordingStateChanged();
+    }
+    return success;
+}
+
+void SoundboardService::stopLastRecordingPreview()
+{
+    if (!m_audioEngine)
+        return;
+
+    m_audioEngine->stopClip(kPreviewSlot);
+    m_recordingPreviewPlaying = false;
+    emit recordingStateChanged();
+}
+
+bool SoundboardService::isRecordingPreviewPlaying() const
+{
+    return m_recordingPreviewPlaying;
 }
 
 void SoundboardService::finalizeClipPlayback(int clipId)
@@ -1720,7 +1754,7 @@ double SoundboardService::getFileDuration(const QString& filePath) const
 QVariantList SoundboardService::playingClipIDs() const
 {
     QVariantList playingIds;
-
+    
     // Check all active boards for playing clips
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& clip : it.value().clips) {
@@ -2100,6 +2134,55 @@ void SoundboardService::setHotkeyMode(const QString& mode)
     emit settingsChanged();
 }
 
+void SoundboardService::setBufferSizeFrames(int frames)
+{
+    // Validate: only allow common buffer sizes
+    if (frames != 256 && frames != 512 && frames != 1024 && frames != 2048 && frames != 4096)
+        return;
+    if (m_state.settings.bufferSizeFrames == frames)
+        return;
+    m_state.settings.bufferSizeFrames = frames;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+    // Note: Audio engine needs restart to apply new buffer settings
+}
+
+void SoundboardService::setBufferPeriods(int periods)
+{
+    // Validate: only allow 2, 3, or 4 periods
+    if (periods < 2 || periods > 4)
+        return;
+    if (m_state.settings.bufferPeriods == periods)
+        return;
+    m_state.settings.bufferPeriods = periods;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
+void SoundboardService::setSampleRate(int rate)
+{
+    // Validate: only allow common sample rates
+    if (rate != 44100 && rate != 48000 && rate != 96000)
+        return;
+    if (m_state.settings.sampleRate == rate)
+        return;
+    m_state.settings.sampleRate = rate;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
+void SoundboardService::setAudioChannels(int channels)
+{
+    // Validate: only allow mono (1) or stereo (2)
+    if (channels != 1 && channels != 2)
+        return;
+    if (m_state.settings.channels == channels)
+        return;
+    m_state.settings.channels = channels;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
 bool SoundboardService::exportSettings(const QString& filePath)
 {
     QString path = filePath;
@@ -2122,6 +2205,11 @@ bool SoundboardService::exportSettings(const QString& filePath)
     settings["micEnabled"] = m_state.settings.micEnabled;
     settings["micPassthroughEnabled"] = m_state.settings.micPassthroughEnabled;
     settings["micSoundboardBalance"] = m_state.settings.micSoundboardBalance;
+    // Audio buffer settings
+    settings["bufferSizeFrames"] = m_state.settings.bufferSizeFrames;
+    settings["bufferPeriods"] = m_state.settings.bufferPeriods;
+    settings["sampleRate"] = m_state.settings.sampleRate;
+    settings["channels"] = m_state.settings.channels;
 
     root["settings"] = settings;
     root["version"] = m_state.version;
@@ -2174,6 +2262,11 @@ bool SoundboardService::importSettings(const QString& filePath)
             s.value("micPassthroughEnabled").toBool(m_state.settings.micPassthroughEnabled);
         m_state.settings.micSoundboardBalance =
             (float)s.value("micSoundboardBalance").toDouble(m_state.settings.micSoundboardBalance);
+        // Audio buffer settings
+        m_state.settings.bufferSizeFrames = s.value("bufferSizeFrames").toInt(m_state.settings.bufferSizeFrames);
+        m_state.settings.bufferPeriods = s.value("bufferPeriods").toInt(m_state.settings.bufferPeriods);
+        m_state.settings.sampleRate = s.value("sampleRate").toInt(m_state.settings.sampleRate);
+        m_state.settings.channels = s.value("channels").toInt(m_state.settings.channels);
 
         // Save updated state
         m_repo.saveIndex(m_state);

@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import "../styles"
 
 Rectangle {
     id: root
@@ -31,7 +32,7 @@ Rectangle {
         onPaint: {
             var ctx = getContext("2d");
             ctx.clearRect(0, 0, width, height);
-            ctx.strokeStyle = root.isDragHovered ? "#3B82F6" : "#666666";
+            ctx.strokeStyle = root.isDragHovered ? Colors.accent.toString() : Colors.textTertiary.toString();
             ctx.lineWidth = 2;
             ctx.setLineDash([10, 6]);
 
@@ -70,7 +71,7 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 2
         radius: 10
-        color: root.isDragHovered ? "#1A3B82F6" : (dropMouseArea.containsMouse ? "#0AFFFFFF" : "transparent")
+        color: root.isDragHovered ? Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.1) : (dropMouseArea.containsMouse ? Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.04) : "transparent")
 
         Behavior on color {
             ColorAnimation {

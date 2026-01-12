@@ -4,7 +4,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "qml/components"
 import "qml/pages"
-import TalkLess
+import "qml/styles"
 
 ApplicationWindow {
     id: mainWindow
@@ -18,6 +18,21 @@ ApplicationWindow {
     visibility: Window.Windowed
     title: qsTr("TalkLess")
     color: Colors.background
+
+    // Link Backend Theme & Settings to UI Singleton
+    Connections {
+        target: soundboardService
+        function onSettingsChanged() {
+            Colors.setTheme(soundboardService.theme)
+            Colors.setAccent(soundboardService.accentColor)
+        }
+    }
+
+    Component.onCompleted: {
+        // Initialize Theme from Backend
+        Colors.setTheme(soundboardService.theme)
+        Colors.setAccent(soundboardService.accentColor)
+    }
 
     property bool isSoundboardDetached: false
 
@@ -49,13 +64,6 @@ ApplicationWindow {
         }
     }
 
-    // Connections for global state are now handled in the singletons themselves
-
-    Component.onCompleted: {
-        Colors.setTheme(soundboardService.theme.toLowerCase());
-        Colors.setAccentColor(soundboardService.accentColor);
-    }
-
     // ---- Toast Notification ----
     Rectangle {
         id: toastMessage
@@ -75,7 +83,6 @@ ApplicationWindow {
         color: Colors.cardBg
         border.width: 1
         border.color: Colors.border
-
         opacity: 0
         z: 999
 
@@ -91,7 +98,6 @@ ApplicationWindow {
             anchors.centerIn: parent
             text: toastMessage.text
             color: Colors.textPrimary
-
             font.pixelSize: 14
             font.weight: Font.Medium
         }
@@ -276,7 +282,7 @@ ApplicationWindow {
         id: splashScreen
         anchors.fill: parent
         z: 1000  // Always on top
-        color: Colors.black
+        color: Colors.background
         visible: opacity > 0
 
         Image {

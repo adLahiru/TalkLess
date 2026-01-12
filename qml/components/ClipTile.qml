@@ -3,29 +3,34 @@ pragma ComponentBehavior: Bound
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import TalkLess
 import QtQuick.Effects
+import "../styles"
 
 Item {
     id: root
+
     // Base dimensions matching SoundboardView calculation
     readonly property real baseWidth: 180
-    readonly property real baseHeight: baseWidth * 79 / 111  // 111:79 aspect ratio = ~128.1
-
-    // Scale factor for proportional sizing - based on actual width vs base width
+    readonly property real baseHeight: baseWidth * 79 / 111
     readonly property real scaleFactor: width / baseWidth
 
-    // Default size (can be overridden by parent)
     width: baseWidth
     height: baseHeight
 
     // data
-    property string title: ""  // Optional - only shows if not empty (e.g., "Morning")
+    property string title: ""
     property url imageSource: "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png"
     property string hotkeyText: "Alt+F2+Shift"
     property bool selected: false
     property bool showActions: false
-    property bool isPlaying: false  // Track playback state
+    property bool isPlaying: false
+
+    // hover state
+    property bool tileHover: false
+    property bool actionHover: false
+
+    // hover scale amount (change to 1.05 / 1.10 as you like)
+    readonly property real hoverScale: 1.06
 
     // actions
     signal playClicked
@@ -39,86 +44,174 @@ Item {
     signal editClicked
     signal webClicked
 
+    // =========================
+    // Auto close timer
+    // =========================
+    Timer {
+        id: autoCloseTimer
+        interval: 500
+        repeat: false
+        onTriggered: {
+            if (!root.actionHover && !root.tileHover) {
+                root.showActions = false
+            }
+        }
+    }
+
+    // =========================
+    // Hover delay timer (0.5s before showing action bar)
+    // =========================
+    Timer {
+        id: hoverDelayTimer
+        interval: 500
+        repeat: false
+        onTriggered: {
+            if (root.tileHover) {
+                root.openActionsAboveTile()
+            }
+        }
+    }
+
+    // =========================
+    // Position popup above tile
+    // =========================
+    function openActionsAboveTile() {
+        // Prevent repositioning while already visible (avoids following mouse)
+        if (root.showActions)
+            return
+
+        actionPopup.parent = Overlay.overlay
+
+        // Ensure popup has size before positioning
+        actionPopup.width = actionBarWidth
+        actionPopup.height = actionBarHeight
+
+        var overlay = actionPopup.parent
+
+        // tile top-left in overlay coords
+        var tilePos = root.mapToItem(overlay, 0, 0)
+
+        // center above tile
+        var x = tilePos.x + (root.width - actionPopup.width) / 2
+        var yAbove = tilePos.y - actionPopup.height - popupMargin
+        var yInside = tilePos.y + popupMargin
+
+        // clamp X inside overlay
+        var minX = 8
+        var maxX = overlay.width - actionPopup.width - 8
+        x = Math.max(minX, Math.min(x, maxX))
+
+        // choose Y: above if possible, otherwise inside top
+        var y = (yAbove >= 8) ? yAbove : yInside
+
+        // clamp Y too
+        var minY = 8
+        var maxY = overlay.height - actionPopup.height - 8
+        y = Math.max(minY, Math.min(y, maxY))
+
+        // set position ONCE (no bindings)
+        actionPopup.x = x
+        actionPopup.y = y
+
+        root.showActions = true
+        autoCloseTimer.restart()
+    }
+
+    // Action bar sizing
+    readonly property int actionBarHeight: 40
+    readonly property int actionBarWidth: 240
+    readonly property int popupMargin: 8
+
     Rectangle {
         id: card
         anchors.fill: parent
         radius: 16 * root.scaleFactor
         color: Colors.cardBg
         border.width: Math.max(1, 2 * root.scaleFactor)
-        border.color: root.selected ? Colors.accent : Colors.border
-
+        border.color: Colors.border
         clip: true
+
+        // -------------------------
+        // Hover animation (scale)
+        // -------------------------
+        transformOrigin: Item.Center
+        scale: root.tileHover ? root.hoverScale : 1.0
+
+        Behavior on scale {
+            NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        // Optional: subtle shadow-like effect using border color/opacity tweak
+        Behavior on border.color {
+            ColorAnimation { duration: 140 }
+        }
+        border.color: root.tileHover ? Colors.accent : Colors.border
 
         // Background image with rounded corners
         Item {
             id: imageContainer
             anchors.fill: parent
-            anchors.margins: 2 * root.scaleFactor  // Account for border
+            anchors.margins: 2 * root.scaleFactor
 
-            // The actual image (hidden, used as source for masking)
             Image {
                 id: backgroundImage
                 anchors.fill: parent
                 source: root.imageSource
                 fillMode: Image.PreserveAspectCrop
                 smooth: true
-                visible: false  // Hidden, used as source for MultiEffect
-            }
-
-            // Mask shape
-            Rectangle {
-                id: imageMask
-                anchors.fill: parent
-                radius: 14 * root.scaleFactor  // Slightly less than card radius to account for border
                 visible: false
             }
 
-            // Apply the mask using MultiEffect
+            Rectangle {
+                id: imageMask
+                anchors.fill: parent
+                radius: 14 * root.scaleFactor
+                visible: false
+            }
+
             MultiEffect {
                 anchors.fill: backgroundImage
                 source: backgroundImage
                 maskEnabled: true
-                maskSource: ShaderEffectSource {
-                    sourceItem: imageMask
-                    live: false
-                }
+                maskSource: ShaderEffectSource { sourceItem: imageMask; live: false }
                 visible: backgroundImage.status === Image.Ready
             }
         }
 
-        // Yellowish translucent overlay on left half of tile
+        // Left overlay tint
         Item {
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            width: parent.width * 0.5  // Left half of tile
+            width: parent.width * 0.5
             clip: true
 
             Rectangle {
                 anchors.fill: parent
-                anchors.rightMargin: -16 * root.scaleFactor  // Extend right to hide right-side corners
-                radius: 16 * root.scaleFactor  // Match card radius
-                color: Qt.alpha(Colors.accent, 0.15)
-                opacity: 0.5
+                anchors.rightMargin: -16 * root.scaleFactor
+                radius: 16 * root.scaleFactor
+                color: Qt.rgba(Colors.surface.r, Colors.surface.g, Colors.surface.b, 0.22)
+                opacity: 0.2
             }
         }
 
-        // Tag pill (top-left) - starts from left edge, only right corners rounded
+        // Tag pill
         Item {
             id: tagPill
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.topMargin: 10 * root.scaleFactor
             height: 28 * root.scaleFactor
-            // Width is content-based but limited to 60% of tile width
             width: Math.min(tagText.implicitWidth + 20 * root.scaleFactor, parent.width * 0.6)
             visible: root.title !== ""
             clip: true
 
-            // Background with right-side rounded corners only
             Rectangle {
                 anchors.fill: parent
-                anchors.leftMargin: -16 * root.scaleFactor  // Extend left to hide left corners
+                anchors.leftMargin: -16 * root.scaleFactor
                 radius: 14 * root.scaleFactor
                 color: Colors.accent
             }
@@ -126,18 +219,18 @@ Item {
             Text {
                 id: tagText
                 anchors.centerIn: parent
-                anchors.horizontalCenterOffset: 4 * root.scaleFactor  // Slight offset for padding
-                width: parent.width - 16 * root.scaleFactor  // Leave padding on both sides
+                anchors.horizontalCenterOffset: 4 * root.scaleFactor
+                width: parent.width - 16 * root.scaleFactor
                 text: root.title
                 color: Colors.textOnPrimary
                 font.pixelSize: Math.max(10, 14 * root.scaleFactor)
                 font.weight: Font.DemiBold
-                elide: Text.ElideRight  // Truncate with ellipsis if text is too long
+                elide: Text.ElideRight
                 horizontalAlignment: Text.AlignHCenter
             }
         }
 
-        // Bottom hotkey bar - thin translucent black bar at bottom only
+        // Hotkey bar bg
         Rectangle {
             id: hotkeyBar
             anchors.left: parent.left
@@ -148,11 +241,11 @@ Item {
             anchors.bottomMargin: 6 * root.scaleFactor
             height: 28 * root.scaleFactor
             radius: 10 * root.scaleFactor
-            color: Colors.black
-            opacity: 0.5
+            color: Colors.panelBg
+            opacity: 0.7
         }
 
-        // Hotkey bar content (on top of the translucent background)
+        // Hotkey bar content
         Item {
             anchors.left: parent.left
             anchors.right: parent.right
@@ -168,21 +261,18 @@ Item {
                 anchors.rightMargin: 8 * root.scaleFactor
                 spacing: 6 * root.scaleFactor
 
-                // Hotkey container
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 20 * root.scaleFactor
-                    color: root.hotkeyText !== "" ? Qt.alpha(Colors.black, 0.4) : Qt.alpha(Colors.accent, 0.15)
+                    color: root.hotkeyText !== "" ? "rgba(0, 0, 0, 0.4)" : Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.15)
                     radius: 4 * root.scaleFactor
-                    border.color: root.hotkeyText !== "" ? "transparent" : Qt.alpha(Colors.accent, 0.3)
+                    border.color: root.hotkeyText !== "" ? "transparent" : Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.3)
                     border.width: root.hotkeyText !== "" ? 0 : 1
 
                     Text {
-                        id: hotkeyDisplayText
                         anchors.fill: parent
                         text: root.hotkeyText !== "" ? root.hotkeyText : "Assign"
-                        color: root.hotkeyText !== "" ? Colors.white : Colors.accent
-
+                        color: root.hotkeyText !== "" ? "#FFFFFF" : Colors.accent
                         font.pixelSize: Math.max(8, 12 * root.scaleFactor)
                         font.weight: root.hotkeyText !== "" ? Font.Medium : Font.DemiBold
                         elide: Text.ElideRight
@@ -192,9 +282,9 @@ Item {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: function (mouse) {
-                                root.hotkeyClicked();
-                                mouse.accepted = true;
+                            onClicked: function(mouse) {
+                                root.hotkeyClicked()
+                                mouse.accepted = true
                             }
                         }
                     }
@@ -202,249 +292,157 @@ Item {
             }
         }
 
-        // Action Bar - toggled by right click
-        Rectangle {
-            id: actionPopupBar
-            anchors.top: parent.top
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.topMargin: 8 * root.scaleFactor
-            width: Math.min(240 * root.scaleFactor, parent.width - 16 * root.scaleFactor) // Widened for Copy and Paste buttons
-            height: 40 * root.scaleFactor
-            radius: 20 * root.scaleFactor
-            color: Colors.surfaceDark
-            border.color: Colors.accent
+        // =========================
+        // ACTION POPUP (Top of tile)
+        // =========================
+        Popup {
+            id: actionPopup
+            parent: Overlay.overlay
+            modal: false
+            focus: false
+            padding: 0
+            closePolicy: Popup.NoAutoClose
+            visible: root.showActions
+            z: 999
 
-            border.width: 1
-            opacity: root.showActions ? 1.0 : 0.0
-            visible: opacity > 0
-            z: 20 // Above everything
+            background: Rectangle {
+                radius: 20
+                color: Qt.rgba(Colors.panelBg.r, Colors.panelBg.g, Colors.panelBg.b, 0.9)
+                border.color: Colors.accent
+                border.width: 1
+            }
 
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: 150
+            contentItem: Item {
+                width: actionBarWidth
+                height: actionBarHeight
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                    onEntered: { root.actionHover = true; autoCloseTimer.stop() }
+                    onExited:  {
+                        root.actionHover = false;
+                        autoCloseTimer.start()
+                    }
+                }
+
+                RowLayout {
+                    anchors.centerIn: parent
+                    spacing: 2 * root.scaleFactor
+
+                    // Play/Stop
+                    Rectangle {
+                        width: 30
+                        height: 30
+                        radius: 15
+                        color: playMA.containsMouse ? Colors.surfaceHighlight : "transparent"
+                        Text { anchors.centerIn: parent; text: root.isPlaying ? "⏹️" : "▶️"; font.pixelSize: 14 }
+                        MouseArea { id: playMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: { root.playClicked(); root.showActions = false } }
+                    }
+
+                    // Copy
+                    Rectangle {
+                        width: 30
+                        height: 30
+                        radius: 15
+                        color: copyMA.containsMouse ? Colors.surfaceHighlight : "transparent"
+                        Text { anchors.centerIn: parent; text: "📋"; font.pixelSize: 14 }
+                        MouseArea { id: copyMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: { root.copyClicked(); root.showActions = false } }
+                    }
+
+                    // Edit bg
+                    Rectangle {
+                        width: 30
+                        height: 30
+                        radius: 15
+                        color: bgMA.containsMouse ? Colors.surfaceHighlight : "transparent"
+                        Text { anchors.centerIn: parent; text: "🖼️"; font.pixelSize: 14 }
+                        MouseArea { id: bgMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: { root.editBackgroundClicked(); root.showActions = false } }
+                    }
+
+                    // Web
+                    Rectangle {
+                        width: 30
+                        height: 30
+                        radius: 15
+                        color: webMA.containsMouse ? Colors.surfaceHighlight : "transparent"
+                        Text { anchors.centerIn: parent; text: "🌐"; font.pixelSize: 14 }
+                        MouseArea { id: webMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: { root.webClicked(); root.showActions = false } }
+                    }
+
+                    // Edit
+                    Rectangle {
+                        width: 30
+                        height: 30
+                        radius: 15
+                        color: editMA.containsMouse ? Colors.surfaceHighlight : "transparent"
+                        Text { anchors.centerIn: parent; text: "✏️"; font.pixelSize: 14 }
+                        MouseArea { id: editMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: { root.editClicked(); root.showActions = false } }
+                    }
+
+                    // Delete
+                    Rectangle {
+                        width: 30
+                        height: 30
+                        radius: 15
+                        color: delMA.containsMouse ? Colors.surfaceHighlight : "transparent"
+                        Text { anchors.centerIn: parent; text: "🗑️"; font.pixelSize: 14 }
+                        MouseArea { id: delMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: { root.deleteClicked(); root.showActions = false } }
+                    }
                 }
             }
 
-            RowLayout {
-                anchors.centerIn: parent
-                spacing: 2 * root.scaleFactor
-
-                // Play/Stop Button
-                Rectangle {
-                    width: 30 * root.scaleFactor
-                    height: 30 * root.scaleFactor
-                    radius: 15 * root.scaleFactor
-                    color: playActionMouseArea.containsMouse ? Colors.surfaceLight : "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: root.isPlaying ? "⏹️" : "▶️"
-                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
-                    }
-
-                    MouseArea {
-                        id: playActionMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            // Always call playClicked - backend handles pause/resume based on mode
-                            root.playClicked();
-                            root.showActions = false;
-                        }
-                    }
-                }
-
-                // Copy Button (Clipboard)
-                Rectangle {
-                    width: 30 * root.scaleFactor
-                    height: 30 * root.scaleFactor
-                    radius: 15 * root.scaleFactor
-                    color: copyActionMouseArea.containsMouse ? "#444444" : "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "📋"
-                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
-                    }
-
-                    MouseArea {
-                        id: copyActionMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root.copyClicked();
-                            root.showActions = false;
-                        }
-                    }
-                }
-
-                // Paste Button (Clipboard Paste)
-                Rectangle {
-                    width: 30 * root.scaleFactor
-                    height: 30 * root.scaleFactor
-                    radius: 15 * root.scaleFactor
-                    color: pasteActionMouseArea.containsMouse ? "#444444" : "transparent"
-                    opacity: soundboardService.canPaste ? 1.0 : 0.4
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "📥"
-                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
-                    }
-
-                    MouseArea {
-                        id: pasteActionMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        enabled: soundboardService.canPaste
-                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: {
-                            root.pasteClicked();
-                            root.showActions = false;
-                        }
-                    }
-                }
-
-                // Edit Background Button
-                Rectangle {
-                    width: 30 * root.scaleFactor
-                    height: 30 * root.scaleFactor
-                    radius: 15 * root.scaleFactor
-                    color: editBgActionMouseArea.containsMouse ? "#444444" : "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "🖼️"
-                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
-                    }
-
-                    MouseArea {
-                        id: editBgActionMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root.editBackgroundClicked();
-                            root.showActions = false;
-                        }
-                    }
-                }
-
-                // Web/Globe Button
-                Rectangle {
-                    width: 30 * root.scaleFactor
-                    height: 30 * root.scaleFactor
-                    radius: 15 * root.scaleFactor
-                    color: webActionMouseArea.containsMouse ? "#444444" : "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "🌐"
-                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
-                    }
-
-                    MouseArea {
-                        id: webActionMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root.webClicked();
-                            root.showActions = false;
-                        }
-                    }
-                }
-
-                // Edit Settings Button
-                Rectangle {
-                    width: 30 * root.scaleFactor
-                    height: 30 * root.scaleFactor
-                    radius: 15 * root.scaleFactor
-                    color: editActionMouseArea.containsMouse ? "#444444" : "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "✏️"
-                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
-                    }
-
-                    MouseArea {
-                        id: editActionMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root.editClicked();
-                            root.showActions = false;
-                        }
-                    }
-                }
-
-                // Delete Button
-                Rectangle {
-                    width: 30 * root.scaleFactor
-                    height: 30 * root.scaleFactor
-                    radius: 15 * root.scaleFactor
-                    color: deleteActionMouseArea.containsMouse ? "#444444" : "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "🗑️"
-                        font.pixelSize: Math.max(10, 14 * root.scaleFactor)
-                    }
-
-                    MouseArea {
-                        id: deleteActionMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root.deleteClicked();
-                            root.showActions = false;
-                        }
-                    }
+            onVisibleChanged: {
+                if (!visible) {
+                    root.actionHover = false
+                    autoCloseTimer.stop()
                 }
             }
         }
 
-        // Whole card click (for selecting/opening/playing) - BELOW the buttons in z-order
+        // =========================
+        // Main mouse handling
+        // =========================
         MouseArea {
             id: cardMouseArea
             anchors.fill: parent
             hoverEnabled: true
-            z: -1  // Lower z so buttons get clicks first
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onClicked: function (mouse) {
-                if (mouse.button === Qt.RightButton) {
-                    root.showActions = !root.showActions;
-                } else {
-                    // Left click: Select and toggle play/pause
-                    root.clicked(); // Updates selection sidebar
-                    // Always call playClicked - backend handles pause/resume based on reproduction mode
-                    root.playClicked();
-                    root.showActions = false; // Hide bar on play
-                }
-            }
+            acceptedButtons: Qt.LeftButton
             cursorShape: Qt.PointingHandCursor
-        }
 
-        Menu {
-            id: clipContextMenu
-            MenuItem {
-                text: "Copy Clip"
-                onTriggered: root.copyClicked()
+            onEntered: {
+                root.tileHover = true
+                // Start the hover delay timer - action bar shows after 0.5s
+                hoverDelayTimer.restart()
             }
-            MenuItem {
-                text: "Paste Clip"
-                enabled: soundboardService.canPaste
-                onTriggered: {
-                    const bId = clipsModel.boardId;
-                    if (bId !== -1 && soundboardService.pasteClip(bId)) {
-                        clipsModel.reload();
-                    }
+            onExited: {
+                root.tileHover = false
+                // Cancel the hover delay if mouse left before 0.5s
+                hoverDelayTimer.stop()
+                // Don't close immediately - let autoCloseTimer handle it
+                if (!root.actionHover) {
+                    autoCloseTimer.restart()
                 }
+            }
+
+            onPositionChanged: {
+                // Reset the hover delay timer when mouse moves
+                if (root.tileHover && !root.showActions) {
+                    hoverDelayTimer.restart()
+                }
+            }
+
+            onClicked: function(mouse) {
+                root.clicked()
+                root.playClicked()
+                root.showActions = false
             }
         }
     }

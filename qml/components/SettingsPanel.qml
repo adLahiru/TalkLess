@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../styles"
 
 Rectangle {
     id: root
@@ -12,7 +13,7 @@ Rectangle {
     
     default property alias content: contentContainer.data
     
-    color: "#1A1A1A"
+    color: Colors.panelBg
     radius: 16
 
     FontLoader {
@@ -28,7 +29,7 @@ Rectangle {
         // Title
         Text {
             text: root.title
-            color: "#FFFFFF"
+            color: Colors.textPrimary
             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
             font.pixelSize: 20
             font.weight: Font.DemiBold

@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import "../styles"
 
 Item {
     id: root
@@ -32,7 +33,7 @@ Item {
             id: labelText
             visible: root.showLabel && root.label !== ""
             text: root.label
-            color: "#FFFFFF"
+            color: Colors.textPrimary
             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
             font.pixelSize: 14
         }
@@ -42,7 +43,7 @@ Item {
             id: dropdown
             Layout.preferredWidth: 200
             Layout.preferredHeight: 40
-            color: "#2A2A2A"
+            color: Colors.surfaceLight
             radius: 8
 
             RowLayout {
@@ -52,7 +53,7 @@ Item {
 
                 Text {
                     text: root.value
-                    color: "#AAAAAA"
+                    color: Colors.textSecondary
                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                     font.pixelSize: 14
                     Layout.fillWidth: true
@@ -60,7 +61,7 @@ Item {
 
                 Text {
                     text: "▼"
-                    color: "#666666"
+                    color: Colors.textTertiary
                     font.pixelSize: 12
                 }
             }

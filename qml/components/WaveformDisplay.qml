@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../styles"
 
 Item {
     id: root
@@ -60,7 +61,7 @@ Item {
             // Current time label
             Text {
                 text: root.formatTime(root.currentTime)
-                color: "#FFFFFF"
+                color: Colors.textPrimary
                 font.pixelSize: 11
                 font.family: "Arial"
                 Layout.preferredWidth: 30
@@ -71,7 +72,7 @@ Item {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: "#2A2A2A"
+                color: Colors.surfaceLight
                 radius: 4
                 clip: true
                 
@@ -80,7 +81,7 @@ Item {
                     x: parent.width * root.trimStart
                     width: parent.width * (root.trimEnd - root.trimStart)
                     height: parent.height
-                    color: "#1A3A5C"  // Dark blue shade
+                    color: Qt.darker(Colors.accent, 1.5)  // Dark blue shade
                 }
                 
                 // Waveform bars
@@ -104,7 +105,7 @@ Item {
                             height: amplitude * (parent.height - 8)
                             anchors.verticalCenter: parent.verticalCenter
                             radius: 1
-                            color: isPlayed ? "#FFFFFF" : (isInTrimRegion ? "#6B7280" : "#4B5563")
+                            color: isPlayed ? Colors.textPrimary : (isInTrimRegion ? Colors.textSecondary : Colors.textDisabled)
                         }
                     }
                 }
@@ -115,7 +116,7 @@ Item {
                     x: parent.width * root.trimStart - 2
                     width: 3
                     height: parent.height
-                    color: "#3B82F6"
+                    color: Colors.accent
                     radius: 1
                     
                     MouseArea {
@@ -142,7 +143,7 @@ Item {
                     x: parent.width * root.trimEnd - 1
                     width: 3
                     height: parent.height
-                    color: "#3B82F6"
+                    color: Colors.accent
                     radius: 1
                     
                     MouseArea {
@@ -167,7 +168,7 @@ Item {
             // Total duration label
             Text {
                 text: root.formatTime(root.totalDuration)
-                color: "#888888"
+                color: Colors.textSecondary
                 font.pixelSize: 11
                 font.family: "Arial"
                 Layout.preferredWidth: 30
@@ -190,7 +191,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: "↻"
-                    color: "#888888"
+                    color: Colors.textSecondary
                     font.pixelSize: 16
                 }
                 
@@ -210,7 +211,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: "⏮"
-                    color: "#888888"
+                    color: Colors.textSecondary
                     font.pixelSize: 14
                 }
                 
@@ -226,12 +227,12 @@ Item {
                 width: 36
                 height: 36
                 radius: 18
-                color: playButtonArea.containsMouse ? "#4A9AF7" : "#3B82F6"
+                color: playButtonArea.containsMouse ? Qt.lighter(Colors.accent, 1.2) : Colors.accent
                 
                 Text {
                     anchors.centerIn: parent
                     text: root.isPlaying ? "⏸" : "▶"
-                    color: "#FFFFFF"
+                    color: Colors.textOnPrimary
                     font.pixelSize: 14
                     anchors.horizontalCenterOffset: root.isPlaying ? 0 : 1
                 }
@@ -261,7 +262,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: "⏭"
-                    color: "#888888"
+                    color: Colors.textSecondary
                     font.pixelSize: 14
                 }
                 
@@ -281,7 +282,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: "⇌"
-                    color: "#888888"
+                    color: Colors.textSecondary
                     font.pixelSize: 16
                 }
                 

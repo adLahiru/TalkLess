@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import "../styles"
 
 Item {
     id: root
@@ -24,7 +25,7 @@ Item {
                 radius: root.dotSize / 2
 
                 // Green for active, grey/white for inactive
-                color: (index < root.activeDots) ? "#2DFF6A" : "#D9D9D9"
+                color: (index < root.activeDots) ? Colors.success : Colors.textDisabled
                 opacity: (index < root.activeDots) ? 1.0 : 0.6
             }
         }

@@ -6,7 +6,7 @@ QtObject {
     property string currentTheme: "dark"
 
     // Primary Colors (Driven by Accent)
-    property color accent: "#7C3AED" // Default purple
+    property color accent: "#3B82F6" // Default Blue (requested start of gradient)
     property color primary: accent
     property color primaryDark: Qt.darker(accent, 1.3)
     property color primaryLight: Qt.lighter(accent, 1.3)
@@ -55,40 +55,16 @@ QtObject {
 
     // Gradients - Premium Look
     property color gradientPrimaryStart: accent
-    property color gradientPrimaryEnd: Qt.lighter(accent, 1.5)
+    property color gradientPrimaryEnd: (accent == "#3B82F6" || accent == "#3b82f6") ? "#D214FD" : Qt.lighter(accent, 1.5)
     property color gradientBgStart: currentTheme === "light" ? "#F8FAFC" : "#0C0C0E"
     property color gradientBgEnd: currentTheme === "light" ? "#F1F5F9" : "#141416"
 
     // Logic: Self-Update from Service
     function setTheme(theme) {
-        if (!theme)
-            return;
-        let t = theme.toLowerCase();
-        if (t === "light" || t === "dark") {
-            currentTheme = t;
-        } else {
-            currentTheme = "dark";
-        }
+        currentTheme = theme
     }
 
-    function setAccentColor(color) {
-        if (color && color.length >= 4) {
-            accent = color;
-        }
-    }
-
-    readonly property Connections _serviceConnections: Connections {
-        target: typeof soundboardService !== "undefined" ? soundboardService : null
-        function onSettingsChanged() {
-            setTheme(soundboardService.theme);
-            setAccentColor(soundboardService.accentColor);
-        }
-    }
-
-    Component.onCompleted: {
-        if (typeof soundboardService !== "undefined") {
-            setTheme(soundboardService.theme);
-            setAccentColor(soundboardService.accentColor);
-        }
+    function setAccent(newAccent) {
+        accent = newAccent
     }
 }

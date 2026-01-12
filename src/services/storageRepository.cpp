@@ -29,6 +29,11 @@ static QJsonObject settingsToJson(const AppSettings& s)
     o["micEnabled"] = s.micEnabled;
     o["micPassthroughEnabled"] = s.micPassthroughEnabled;
     o["micSoundboardBalance"] = s.micSoundboardBalance;
+    // Audio buffer settings
+    o["bufferSizeFrames"] = s.bufferSizeFrames;
+    o["bufferPeriods"] = s.bufferPeriods;
+    o["sampleRate"] = s.sampleRate;
+    o["channels"] = s.channels;
     return o;
 }
 
@@ -49,6 +54,11 @@ static AppSettings settingsFromJson(const QJsonObject& o)
     s.micEnabled = o.value("micEnabled").toBool(true);
     s.micPassthroughEnabled = o.value("micPassthroughEnabled").toBool(true);
     s.micSoundboardBalance = (float)o.value("micSoundboardBalance").toDouble(0.5);
+    // Audio buffer settings
+    s.bufferSizeFrames = o.value("bufferSizeFrames").toInt(1024);
+    s.bufferPeriods = o.value("bufferPeriods").toInt(3);
+    s.sampleRate = o.value("sampleRate").toInt(48000);
+    s.channels = o.value("channels").toInt(2);
     return s;
 }
 

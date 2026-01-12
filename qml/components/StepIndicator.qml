@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../styles"
 
 Item {
     id: root
@@ -14,8 +15,8 @@ Item {
     property string minLabel: "Low"
     property string maxLabel: "High"
     property string description: ""
-    property color activeColor: "#22C55E"
-    property color inactiveColor: "#3A3A3A"
+    property color activeColor: Colors.success
+    property color inactiveColor: Colors.surfaceLight
     
     implicitHeight: contentColumn.height
 
@@ -34,7 +35,7 @@ Item {
 
             Text {
                 text: root.label
-                color: "#FFFFFF"
+                color: Colors.textPrimary
                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                 font.pixelSize: 14
             }
@@ -64,13 +65,13 @@ Item {
             Layout.fillWidth: true
             Text { 
                 text: root.minLabel
-                color: "#666666"
+                color: Colors.textSecondary
                 font.pixelSize: 11 
             }
             Item { Layout.fillWidth: true }
             Text { 
                 text: root.maxLabel
-                color: "#666666"
+                color: Colors.textSecondary
                 font.pixelSize: 11 
             }
         }
@@ -78,7 +79,7 @@ Item {
         // Description
         Text {
             text: root.description
-            color: "#666666"
+            color: Colors.textSecondary
             font.pixelSize: 12
             visible: root.description.length > 0
             Layout.fillWidth: true

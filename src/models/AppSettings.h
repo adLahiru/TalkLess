@@ -20,4 +20,10 @@ struct AppSettings
     bool micEnabled = true;
     bool micPassthroughEnabled = true;
     float micSoundboardBalance = 0.5f;
+
+    // Audio buffer settings
+    int bufferSizeFrames = 1024;    // Period size in frames (512, 1024, 2048, 4096)
+    int bufferPeriods = 3;          // Number of periods (2, 3, 4)
+    int sampleRate = 48000;         // Sample rate (44100, 48000, 96000)
+    int channels = 2;               // Channels (1=Mono, 2=Stereo)
 };

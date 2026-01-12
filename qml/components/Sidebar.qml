@@ -8,12 +8,12 @@ import "../styles"
 
 Rectangle {
     id: root
-    color: Colors.backgroundDark
-    radius: Theme.radiusLarge
+    color: Colors.surfaceDark
+    radius: 10
 
     // Collapsible state
     property bool isCollapsed: false
-
+    
     // Animated width based on collapsed state
     Behavior on Layout.preferredWidth {
         NumberAnimation {
@@ -97,7 +97,6 @@ Rectangle {
                 height: 36
                 radius: 8
                 color: toggleMouse.containsMouse ? Colors.surfaceLight : "transparent"
-
                 Layout.alignment: Qt.AlignRight
 
                 Text {
@@ -114,7 +113,7 @@ Rectangle {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        root.isCollapsed = !root.isCollapsed;
+                        root.isCollapsed = !root.isCollapsed
                     }
                 }
             }
@@ -205,10 +204,9 @@ Rectangle {
                         width: 34
                         height: 34
                         radius: 12
-                        color: rowItem.isSelected ? Colors.white : Qt.alpha(Colors.accent, 0.3)
+                        color: rowItem.isSelected ? Colors.textOnPrimary : Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.3)
                         border.width: 1
-                        border.color: rowItem.isSelected ? Colors.white : Qt.alpha(Colors.accent, 0.3)
-
+                        border.color: rowItem.isSelected ? Colors.textOnPrimary : Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.3)
                         Layout.alignment: root.isCollapsed ? Qt.AlignHCenter : Qt.AlignVCenter
 
                         Image {
@@ -225,7 +223,7 @@ Rectangle {
                             anchors.fill: iconImage
                             source: iconImage
                             colorization: 1.0
-                            colorizationColor: rowItem.isSelected ? Colors.accent : Qt.alpha(Colors.white, 0.85)
+                            colorizationColor: rowItem.isSelected ? Colors.accent : Qt.rgba(Colors.textPrimary.r, Colors.textPrimary.g, Colors.textPrimary.b, 0.86)
                         }
                     }
 
@@ -260,7 +258,7 @@ Rectangle {
             Layout.preferredHeight: 2
             Layout.leftMargin: -18  // Extend to edge
             Layout.rightMargin: -18  // Extend to edge
-            color: Colors.border
+            color: Colors.surfaceLight
         }
 
         // ==========================
@@ -270,12 +268,12 @@ Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: 8
             spacing: 8
-            // Always visible - adapts layout based on collapsed state
+            // Always visible - shows different layout based on collapsed state
 
-            // Soundboards list - shows full layout when expanded, just images with checkbox when collapsed
+            // Soundboards list
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: root.isCollapsed ? 300 : 240
+                Layout.preferredHeight: root.isCollapsed ? 180 : 240
 
                 ListView {
                     id: boardsList
@@ -288,7 +286,7 @@ Rectangle {
                     delegate: Item {
                         id: boardRow
                         width: boardsList.width
-                        height: root.isCollapsed ? 52 : 56
+                        height: root.isCollapsed ? 48 : 56
 
                         // from model roles - use required property for ComponentBehavior: Bound
                         required property int index
@@ -313,12 +311,7 @@ Rectangle {
                             acceptedButtons: Qt.LeftButton
 
                             onClicked: () => {
-                                if (root.isCollapsed) {
-                                    // In collapsed mode, clicking the image area toggles active state
-                                    // But we handle that in the checkbox overlay below
-                                    root.selectedBoardId = boardRow.boardId;
-                                    root.soundboardSelected(boardRow.boardId);
-                                } else if (root.editingBoardId === -1) {
+                                if (root.editingBoardId === -1) {
                                     // Select this soundboard (for viewing)
                                     root.selectedBoardId = boardRow.boardId;
                                     root.soundboardSelected(boardRow.boardId);
@@ -334,11 +327,11 @@ Rectangle {
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: root.isCollapsed ? 10 : 14
+                            radius: root.isCollapsed ? 12 : 14
                             // Show selection highlight (blue border) or active state (filled) or hover
                             color: {
                                 if (root.selectedBoardId === boardRow.boardId) {
-                                    return Qt.alpha(Colors.accent, 0.15);  // Light accent for selected
+                                    return Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.1);  // Light blue for selected
                                 } else if (mouse2.containsMouse) {
                                     return Colors.surfaceLight;
                                 } else {
@@ -351,16 +344,15 @@ Rectangle {
 
                         // Collapsed mode layout - just image with checkbox overlay
                         Item {
-                            width: parent.height - 8  // Square, based on row height
-                            height: parent.height - 8
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.centerIn: parent
+                            width: 44
+                            height: 44
                             visible: root.isCollapsed
 
-                            // Soundboard image with rounded corners
+                            // Soundboard image - rounded corners with layer mask
                             Rectangle {
                                 anchors.fill: parent
-                                radius: 10
+                                radius: 12
                                 color: "#141414"
 
                                 Image {
@@ -372,50 +364,56 @@ Rectangle {
                                         maskEnabled: true
                                         maskSource: ShaderEffectSource {
                                             sourceItem: Rectangle {
-                                                width: 48
-                                                height: 48
-                                                radius: 10
+                                                width: 44
+                                                height: 44
+                                                radius: 12
                                             }
                                         }
                                     }
                                 }
+                            }
 
-                                // Checkbox overlay in top-right corner
-                                Rectangle {
-                                    id: collapsedCheckbox
-                                    width: 14
-                                    height: 14
-                                    radius: 3
-                                    anchors.top: parent.top
-                                    anchors.right: parent.right
-                                    anchors.topMargin: 3
-                                    anchors.rightMargin: 3
-                                    color: boardRow.active ? "#D214FD" : "#80000000"
-                                    border.width: 1.5
-                                    border.color: boardRow.active ? "#D214FD" : "#FFFFFF"
+                            // Checkbox overlay on top-right corner
+                            Rectangle {
+                                id: collapsedCheckbox
+                                width: 18
+                                height: 18
+                                radius: 4
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.rightMargin: -4
+                                anchors.topMargin: -4
+                                z: 10
+                                border.width: 2
+                                border.color: boardRow.active ? "#D214FD" : "#AAFFFFFF"
+                                color: collapsedCheckboxMouse.containsMouse ? "#333333" : (boardRow.active ? "#2A2A2A" : "#1A1A1A")
 
-                                    // Checkmark when active
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "✓"
-                                        font.pixelSize: 9
-                                        font.bold: true
-                                        color: "#FFFFFF"
-                                        visible: boardRow.active
-                                    }
+                                // Checkmark icon when active
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "✓"
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                    color: "#D214FD"
+                                    visible: boardRow.active
+                                }
 
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            soundboardsModel.toggleActiveById(boardRow.boardId);
-                                        }
+                                MouseArea {
+                                    id: collapsedCheckboxMouse
+                                    anchors.fill: parent
+                                    anchors.margins: -4
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+
+                                    onClicked: () => {
+                                        console.log("Collapsed checkbox clicked - toggling board:", boardRow.boardId);
+                                        soundboardsModel.toggleActiveById(boardRow.boardId);
                                     }
                                 }
                             }
                         }
 
-                        // Expanded mode layout - full row with checkbox, image, name
+                        // Expanded mode layout - full row with checkbox, image, name, delete
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 10
@@ -430,10 +428,10 @@ Rectangle {
                                 width: 22
                                 height: 22
                                 radius: 4  // Square with rounded corners for checkbox
-                                border.width: 2
-                                border.color: boardRow.active ? Colors.accent : Qt.alpha(Colors.white, 0.35)
+                                border.width: boardRow.active ? 0 : 2
+                                border.color: boardRow.active ? "transparent" : (checkboxMouse.containsMouse ? Colors.accent : Qt.alpha(Colors.white, 0.35))
 
-                                color: checkboxMouse.containsMouse ? Colors.surfaceLight : "transparent"
+                                color: boardRow.active ? Colors.accent : (checkboxMouse.containsMouse ? Colors.surfaceLight : "transparent")
 
                                 // Checkmark icon when active
                                 Text {
@@ -481,17 +479,10 @@ Rectangle {
                                 }
 
                                 // Use ShaderEffectSource and OpacityMask via layer
-                                // Translucent overlay
                                 Rectangle {
                                     anchors.fill: parent
                                     radius: 12
-                                    color: Colors.black
-                                    opacity: Colors.currentTheme === "light" ? 0.2 : 0.55
-                                }
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: 12
-                                    color: "#141414"
+                                    color: Colors.surface
 
                                     Image {
                                         anchors.fill: parent
@@ -541,14 +532,13 @@ Rectangle {
                                     Layout.preferredHeight: 28
 
                                     background: Rectangle {
-                                        color: Colors.backgroundDark
+                                        color: Colors.background
                                         radius: 6
-                                        border.color: Colors.accent
+                                        border.color: Colors.gradientPrimaryEnd
                                         border.width: 1
                                     }
 
                                     color: Colors.textPrimary
-
                                     font.pixelSize: 14
                                     font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
 
@@ -602,11 +592,11 @@ Rectangle {
                                 gradient: Gradient {
                                     GradientStop {
                                         position: 0.0
-                                        color: deleteBtnMouse.containsMouse ? Colors.error : Colors.surfaceDark
+                                        color: deleteBtnMouse.containsMouse ? Colors.error : Colors.surfaceLight
                                     }
                                     GradientStop {
                                         position: 1.0
-                                        color: deleteBtnMouse.containsMouse ? Colors.errorDark : Colors.surface
+                                        color: deleteBtnMouse.containsMouse ? Colors.errorLight : Colors.surface
                                     }
                                 }
 
@@ -643,66 +633,79 @@ Rectangle {
                 }
             }
 
-            // Add Soundboard button - matches design (hidden in collapsed mode)
+            // Add Soundboard button - shows in both modes
             Button {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 48
+                Layout.preferredHeight: root.isCollapsed ? 44 : 48
                 text: "Add Soundboard"
-                visible: !root.isCollapsed
 
                 background: Rectangle {
                     radius: 12
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop {
-                            position: 0.0
-                            color: Colors.surfaceDark
-                        }
-                        GradientStop {
-                            position: 1.0
-                            color: Colors.surface
-                        }
-                    }
-                    border.color: Colors.border
-                    border.width: 1
+                    color: Colors.surfaceLight  // Brown/maroon background -> Surface Highlight
                 }
 
-                contentItem: RowLayout {
+                contentItem: Item {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
-                    spacing: 12
 
-                    // Plus icon in rounded square
+                    // Collapsed mode - just centered plus icon
                     Rectangle {
+                        visible: root.isCollapsed
+                        anchors.centerIn: parent
                         width: 36
                         height: 36
                         radius: 8
-                        color: Colors.accent
+                        color: "#4F3B3B"
 
                         Text {
                             anchors.centerIn: parent
                             text: "+"
-                            color: Colors.textOnPrimary
+                            color: "#FFFFFF"
                             font.pixelSize: 20
-                            font.weight: Font.DemiBold
+                            font.weight: Font.Normal
                         }
                     }
 
-                    Text {
-                        text: "Add Soundboard"
-                        color: Colors.textPrimary
-                        font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
-                        font.pixelSize: 14
-                        font.weight: Font.DemiBold
-                        Layout.fillWidth: true
+                    // Expanded mode - full row layout
+                    RowLayout {
+                        visible: !root.isCollapsed
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 12
+
+                        // Plus icon in rounded square
+                        Rectangle {
+                            width: 52
+                            height: 36
+                            radius: 8
+                            color: "#4F3B3B"
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "+"
+                                color: "#FFFFFF"
+                                font.pixelSize: 20
+                                font.weight: Font.Normal
+                            }
+                        }
+
+                        Text {
+                            text: "Add Soundboard"
+                            color: "#FFFFFF"
+                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
+                            font.pixelSize: 14
+                            font.weight: Font.DemiBold
+                            Layout.fillWidth: true
+                        }
                     }
                 }
 
                 onClicked: {
                     // Create immediately with a placeholder name
                     const newId = soundboardService.createBoard("New Soundboard");
-                    root.editingBoardId = newId;
+                    if (!root.isCollapsed) {
+                        root.editingBoardId = newId;
+                    }
 
                     // Refresh model (usually boardsChanged triggers reload automatically,
                     // but calling reload makes it immediate)
@@ -713,37 +716,6 @@ Rectangle {
                     if (row >= 0) {
                         boardsList.positionViewAtIndex(row, ListView.End);
                         // Focus happens automatically when the TextField becomes visible
-                    }
-                }
-            }
-
-            // Collapsed mode: Add button as just a plus icon
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 44
-                radius: 10
-                color: addBtnMouse.containsMouse ? "#4D3F3F" : "#3D2F2F"
-                visible: root.isCollapsed
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "+"
-                    color: "#FFFFFF"
-                    font.pixelSize: 24
-                    font.weight: Font.Medium
-                }
-
-                MouseArea {
-                    id: addBtnMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        const newId = soundboardService.createBoard("New Soundboard");
-                        soundboardsModel.reload();
-                        // Expand sidebar to allow editing
-                        root.isCollapsed = false;
-                        root.editingBoardId = newId;
                     }
                 }
             }
@@ -768,7 +740,7 @@ Rectangle {
         }
 
         background: Rectangle {
-            color: Colors.panelBg
+            color: Colors.surface
             radius: 12
             border.color: Colors.border
             border.width: 1
@@ -795,9 +767,8 @@ Rectangle {
                     onClicked: deleteConfirmDialog.close()
 
                     background: Rectangle {
-                        color: parent.hovered ? Colors.surfaceLight : Colors.surface
+                        color: parent.hovered ? Qt.lighter(Colors.surfaceLight, 1.2) : Colors.surfaceLight
                         radius: 8
-                        border.color: Colors.border
                     }
                     contentItem: Text {
                         text: parent.text
@@ -820,7 +791,7 @@ Rectangle {
                     }
 
                     background: Rectangle {
-                        color: parent.hovered ? Colors.errorLight : Colors.error
+                        color: parent.hovered ? Colors.error : Colors.error
                         radius: 8
                     }
                     contentItem: Text {
@@ -837,3 +808,4 @@ Rectangle {
         }
     }
 }
+

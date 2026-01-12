@@ -3,17 +3,18 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import "../styles"
 
 Rectangle {
     id: root
     
     property string text: "Button"
-    property color gradientStart: "#3B82F6"  // Blue
-    property color gradientEnd: "#D946EF"    // Purple
+    property color gradientStart: Colors.accent  // Default accent
+    property color gradientEnd: Colors.secondary    // Default secondary
     property bool isGradient: true
-    property color flatColor: "#2A2A2A"
-    property color textColor: "#FFFFFF"
-    property color borderColor: "#3A3A3A"
+    property color flatColor: Colors.surface
+    property color textColor: Colors.textOnPrimary
+    property color borderColor: Colors.border
     property bool hasBorder: false
     
     signal clicked()

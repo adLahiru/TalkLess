@@ -1,8 +1,6 @@
 import QtQuick
 import QtQuick.Controls
-import TalkLess
 import QtQuick.Layouts
-
 import QtQuick.Effects
 import QtQuick.Dialogs
 import "../components"
@@ -11,7 +9,7 @@ import "../styles"
 Rectangle {
     id: root
     color: Colors.background
-    radius: Theme.radiusLarge
+    radius: 10
 
     // Properties for dynamic banner text
     property string bannerMainText: "Microphone Control & Mixer"
@@ -21,9 +19,6 @@ Rectangle {
     property real micPeakLevel: 0.0
     property real masterPeakLevel: 0.0
     property real monitorPeakLevel: 0.0
-    property color backgroundColor: Colors.surface
-    property color hoverColor: Colors.surfaceLight
-    property color textColor: Colors.textPrimary
 
     function restartUI() {
         mainLoader.active = false;
@@ -86,7 +81,7 @@ Rectangle {
 
         ColumnLayout {
             anchors.fill: parent
-            spacing: Theme.spacingLarge
+            spacing: 20
 
             // Background Banner at the top
             BackgroundBanner {
@@ -151,8 +146,8 @@ Rectangle {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 380
-                            color: Colors.surface
-                            radius: Theme.radiusLarge
+                            color: Colors.panelBg
+                            radius: 16
 
                             ColumnLayout {
                                 anchors.fill: parent
@@ -174,8 +169,15 @@ Rectangle {
                                     Layout.fillWidth: true
                                     icon: "🎤"
                                     placeholder: "Select Input Device"
-                                    model: soundboardService.getInputDevices()
+
                                     selectedId: soundboardService.selectedCaptureDeviceId
+
+                                    // initial can be empty; we’ll fill on open
+                                    model: []
+
+                                    onAboutToOpen: {
+                                        model = soundboardService.getInputDevices();
+                                    }
 
                                     onItemSelected: function (id, name) {
                                         console.log("Input device selected:", name, "(id:", id, ")");
@@ -194,7 +196,7 @@ Rectangle {
                                         width: 52
                                         height: 28
                                         radius: 14
-                                        color: alwaysOnToggle.isOn ? Colors.success : Colors.border
+                                        color: alwaysOnToggle.isOn ? Colors.success : Colors.surfaceLight
 
                                         property bool isOn: soundboardService.micEnabled
                                         onIsOnChanged: {
@@ -206,7 +208,7 @@ Rectangle {
                                             width: 22
                                             height: 22
                                             radius: 11
-                                            color: Colors.textPrimary
+                                            color: alwaysOnToggle.isOn ? Colors.textPrimary : Colors.border
                                             x: alwaysOnToggle.isOn ? parent.width - width - 3 : 3
                                             anchors.verticalCenter: parent.verticalCenter
 
@@ -232,7 +234,7 @@ Rectangle {
 
                                     Text {
                                         text: "Always-On Mic"
-                                        color: Colors.textSecondary
+                                        color: Colors.textPrimary
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 15
                                     }
@@ -242,7 +244,7 @@ Rectangle {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 50
-                                    color: Colors.surfaceDark
+                                    color: Colors.surface
                                     radius: 12
                                     border.width: 1
                                     border.color: Colors.border
@@ -288,7 +290,7 @@ Rectangle {
                                     text: "Mixer Controls"
                                     color: Colors.textPrimary
                                     font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                                    font.pixelSize:Typography.fontSizeLarge
+                                    font.pixelSize: Typography.fontSizeLarge
                                     font.weight: Font.DemiBold
                                 }
 
@@ -446,7 +448,7 @@ Rectangle {
                                         width: 52
                                         height: 28
                                         radius: 14
-                                        color: outputToggle.isOn ? Colors.success : Colors.border
+                                        color: outputToggle.isOn ? Colors.success : Colors.surfaceLight
 
                                         property bool isOn: soundboardService.micPassthroughEnabled
                                         onIsOnChanged: {
@@ -556,36 +558,29 @@ Rectangle {
                                     font.pixelSize: 14
                                 }
 
-                                Rectangle {
-                                    width: 200
+                                // Sample Rate Dropdown
+                                DropdownSelector {
+                                    id: sampleRateDropdown
+                                    Layout.preferredWidth: 200
                                     height: 40
-                                    color: Colors.backgroundDark
-                                    radius: 8
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 12
-                                        anchors.rightMargin: 12
-
-                                        Text {
-                                            text: "48 kHz"
-                                            color: Colors.textSecondary
-                                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                            font.pixelSize: 14
-                                            Layout.fillWidth: true
+                                    placeholder: "Select Sample Rate"
+                                    selectedId: soundboardService.sampleRate.toString()
+                                    model: [
+                                        {
+                                            id: "44100",
+                                            name: "44.1 kHz"
+                                        },
+                                        {
+                                            id: "48000",
+                                            name: "48 kHz"
+                                        },
+                                        {
+                                            id: "96000",
+                                            name: "96 kHz"
                                         }
-
-                                        Text {
-                                            text: "▼"
-                                            color: Colors.textSecondary
-                                            font.pixelSize: 12
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Sample Rate clicked")
+                                    ]
+                                    onItemSelected: function (id, name) {
+                                        soundboardService.setSampleRate(parseInt(id));
                                     }
                                 }
                             }
@@ -601,85 +596,128 @@ Rectangle {
                                     font.pixelSize: 14
                                 }
 
-                                Rectangle {
-                                    width: 200
+                                // Channels Dropdown
+                                DropdownSelector {
+                                    id: channelsDropdown
+                                    Layout.preferredWidth: 200
                                     height: 40
-                                    color: Colors.backgroundDark
-                                    radius: 8
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 12
-                                        anchors.rightMargin: 12
-
-                                        Text {
-                                            text: "Stereo"
-                                            color: Colors.textSecondary
-                                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                            font.pixelSize: 14
-                                            Layout.fillWidth: true
+                                    placeholder: "Select Channels"
+                                    selectedId: soundboardService.audioChannels.toString()
+                                    model: [
+                                        {
+                                            id: "1",
+                                            name: "Mono"
+                                        },
+                                        {
+                                            id: "2",
+                                            name: "Stereo"
                                         }
-
-                                        Text {
-                                            text: "▼"
-                                            color: Colors.textSecondary
-                                            font.pixelSize: 12
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Channels clicked")
+                                    ]
+                                    onItemSelected: function (id, name) {
+                                        soundboardService.setAudioChannels(parseInt(id));
                                     }
                                 }
                             }
                         }
 
-                        // Row 2: Driver Mode
+                        // Row 2: Buffer Size
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 12
+                            spacing: 40
 
-                            Text {
-                                text: "Driver Mode:"
-                                color: Colors.textPrimary
-                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                font.pixelSize: 14
-                            }
+                            RowLayout {
+                                spacing: 12
 
-                            Rectangle {
-                                width: 200
-                                height: 40
-                                color: Colors.backgroundDark
-                                radius: 8
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: 12
-
-                                    Text {
-                                        text: "WASAPI"
-                                        color: Colors.textSecondary
-                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                        font.pixelSize: 14
-                                        Layout.fillWidth: true
-                                    }
-
-                                    Text {
-                                        text: "▼"
-                                        color: Colors.textSecondary
-                                        font.pixelSize: 12
-                                    }
+                                Text {
+                                    text: "Buffer Size:"
+                                    color: Colors.textPrimary
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 14
                                 }
 
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: console.log("Driver Mode clicked")
+                                // Buffer Size Dropdown
+                                DropdownSelector {
+                                    id: bufferSizeDropdown
+                                    Layout.preferredWidth: 200
+                                    height: 40
+                                    placeholder: "Select Buffer Size"
+                                    selectedId: soundboardService.bufferSizeFrames.toString()
+                                    model: [
+                                        {
+                                            id: "256",
+                                            name: "256 samples (Low latency)"
+                                        },
+                                        {
+                                            id: "512",
+                                            name: "512 samples"
+                                        },
+                                        {
+                                            id: "1024",
+                                            name: "1024 samples (Recommended)"
+                                        },
+                                        {
+                                            id: "2048",
+                                            name: "2048 samples"
+                                        },
+                                        {
+                                            id: "4096",
+                                            name: "4096 samples (High stability)"
+                                        }
+                                    ]
+                                    onItemSelected: function (id, name) {
+                                        soundboardService.setBufferSizeFrames(parseInt(id));
+                                    }
                                 }
                             }
+
+                            // Buffer Periods
+                            RowLayout {
+                                spacing: 12
+
+                                Text {
+                                    text: "Buffer Periods:"
+                                    color: Colors.textPrimary
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 14
+                                }
+
+                                // Buffer Periods Dropdown
+                                DropdownSelector {
+                                    id: bufferPeriodsDropdown
+                                    Layout.preferredWidth: 200
+                                    height: 40
+                                    placeholder: "Select Periods"
+                                    selectedId: soundboardService.bufferPeriods.toString()
+                                    model: [
+                                        {
+                                            id: "2",
+                                            name: "2 periods (Low latency)"
+                                        },
+                                        {
+                                            id: "3",
+                                            name: "3 periods (Recommended)"
+                                        },
+                                        {
+                                            id: "4",
+                                            name: "4 periods (High stability)"
+                                        }
+                                    ]
+                                    onItemSelected: function (id, name) {
+                                        soundboardService.setBufferPeriods(parseInt(id));
+                                    }
+                                }
+                            }
+                        }
+
+                        // Note about restarting
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 8
+                            text: "⚠ Changes require app restart to take effect"
+                            color: Colors.textSecondary
+                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                            font.pixelSize: 12
+                            font.italic: true
                         }
                     }
                 }
@@ -708,8 +746,8 @@ Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: leftPaneColumn.implicitHeight + 40
                                 color: Colors.surface
-                                radius: Theme.radiusLarge
-                                border.color: Colors.border
+                                radius: 16
+                                border.color: Colors.surfaceHighlight
 
                                 ColumnLayout {
                                     id: leftPaneColumn
@@ -722,10 +760,9 @@ Rectangle {
                                         Text {
                                             text: "Language Selection"
                                             color: Colors.textPrimary
-                                            font.pixelSize: Typography.fontSizeNormal
-                                            font.weight: Typography.fontWeightMedium
+                                            font.pixelSize: 14
+                                            font.weight: Font.Medium
                                         }
-
                                         DropdownSelector {
                                             id: langDropdown
                                             Layout.fillWidth: true
@@ -750,46 +787,49 @@ Rectangle {
                                         Text {
                                             text: "Theme Mode"
                                             color: Colors.textPrimary
-                                            font.pixelSize: Typography.fontSizeNormal
-                                            font.weight: Typography.fontWeightMedium
+                                            font.pixelSize: 14
+                                            font.weight: Font.Medium
                                         }
-
                                         RowLayout {
                                             spacing: 20
                                             Repeater {
-                                                model: ["Light", "Dark"]
+                                                model: [
+                                                    {
+                                                        label: "Light",
+                                                        value: "light"
+                                                    },
+                                                    {
+                                                        label: "Dark",
+                                                        value: "dark"
+                                                    }
+                                                ]
                                                 delegate: RowLayout {
-                                                    id: themeDelegate
-                                                    required property var modelData
-
                                                     spacing: 8
                                                     Rectangle {
                                                         width: 16
                                                         height: 16
                                                         radius: 8
                                                         color: "transparent"
-                                                        border.color: Colors.border
+                                                        border.color: Colors.textPrimary
                                                         border.width: 1
-
                                                         Rectangle {
                                                             anchors.centerIn: parent
                                                             width: 8
                                                             height: 8
                                                             radius: 4
-                                                            color: Colors.primary
-
-                                                            visible: soundboardService.theme === themeDelegate.modelData
+                                                            color: Colors.accent
+                                                            // Check case-insensitive to be safe, or direct match
+                                                            visible: soundboardService.theme.toLowerCase() === modelData.value
                                                         }
                                                     }
                                                     Text {
-                                                        text: themeDelegate.modelData
+                                                        text: modelData.label
                                                         color: Colors.textPrimary
-                                                        font.pixelSize: Typography.fontSizeNormal
+                                                        font.pixelSize: 14
                                                     }
-
                                                     MouseArea {
                                                         anchors.fill: parent
-                                                        onClicked: soundboardService.setTheme(themeDelegate.modelData)
+                                                        onClicked: soundboardService.setTheme(modelData.value)
                                                     }
                                                 }
                                             }
@@ -801,14 +841,12 @@ Rectangle {
                                         Text {
                                             text: "Base Theme Color"
                                             color: Colors.textPrimary
-
                                             font.pixelSize: 14
                                             font.weight: Font.Medium
                                         }
                                         Text {
                                             text: "Choose your primary accent color for buttons, highlights, and icons."
                                             color: Colors.textSecondary
-
                                             font.pixelSize: 12
                                             Layout.fillWidth: true
                                             wrapMode: Text.WordWrap
@@ -816,56 +854,18 @@ Rectangle {
                                         RowLayout {
                                             spacing: 12
                                             Repeater {
-                                                model: ["#EF4444", "#D946EF", "#22C55E", "#EAB308", "#06B6D4", "#F97316"]
+                                                model: ["#3B82F6", "#EF4444", "#D946EF", "#22C55E", "#EAB308", "#06B6D4", "#F97316"]
                                                 delegate: Rectangle {
-                                                    id: colorDelegate
-                                                    required property var modelData
                                                     width: 32
                                                     height: 32
                                                     radius: 16
-                                                    color: colorDelegate.modelData
-                                                    border.color: Colors.white
-                                                    border.width: soundboardService.accentColor === colorDelegate.modelData ? 2 : 0
+                                                    color: modelData
+                                                    border.color: Colors.textPrimary
+                                                    border.width: soundboardService.accentColor === modelData ? 2 : 0
                                                     MouseArea {
                                                         anchors.fill: parent
-                                                        onClicked: soundboardService.setAccentColor(colorDelegate.modelData)
+                                                        onClicked: soundboardService.setAccentColor(modelData)
                                                     }
-                                                }
-                                            }
-                                        }
-
-                                        // Gradient Preview Section
-                                        ColumnLayout {
-                                            spacing: 8
-                                            Layout.topMargin: 8
-                                            Text {
-                                                text: "Primary Gradient Preview"
-                                                color: Colors.textSecondary
-                                                font.pixelSize: 12
-                                                font.weight: Typography.fontWeightMedium
-                                            }
-                                            Rectangle {
-                                                Layout.fillWidth: true
-                                                Layout.preferredHeight: 40
-                                                radius: Theme.radiusMedium
-                                                gradient: Gradient {
-                                                    orientation: Gradient.Horizontal
-                                                    GradientStop {
-                                                        position: 0.0
-                                                        color: Colors.gradientPrimaryStart
-                                                    }
-                                                    GradientStop {
-                                                        position: 1.0
-                                                        color: Colors.gradientPrimaryEnd
-                                                    }
-                                                }
-
-                                                Text {
-                                                    anchors.centerIn: parent
-                                                    text: "Sample Text"
-                                                    color: Colors.textOnPrimary
-                                                    font.pixelSize: 13
-                                                    font.weight: Font.Medium
                                                 }
                                             }
                                         }
@@ -884,9 +884,9 @@ Rectangle {
                                             Rectangle {
                                                 Layout.fillWidth: true
                                                 height: 36
-                                                color: Colors.backgroundDark
+                                                color: Colors.background
                                                 radius: 6
-                                                border.color: Colors.border
+                                                border.color: Colors.surfaceHighlight
                                                 TextInput {
                                                     id: customColorInput
                                                     anchors.fill: parent
@@ -895,16 +895,15 @@ Rectangle {
                                                     color: Colors.textPrimary
                                                     font.pixelSize: 13
                                                     text: soundboardService.accentColor
+                                                    onEditingFinished: soundboardService.setAccentColor(text)
                                                 }
                                             }
-
                                             Rectangle {
                                                 width: 60
                                                 height: 36
-                                                color: Colors.surface
+                                                color: Colors.surfaceHighlight
                                                 radius: 6
-                                                border.width: 1
-                                                border.color: Colors.border
+                                                border.color: Colors.surfaceHighlight
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: "Apply"
@@ -926,8 +925,8 @@ Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: rightPaneColumn.implicitHeight + 40
                                 color: Colors.surface
-                                radius: Theme.radiusLarge
-                                border.color: Colors.border
+                                radius: 16
+                                border.color: Colors.surfaceHighlight
 
                                 ColumnLayout {
                                     id: rightPaneColumn
@@ -940,10 +939,9 @@ Rectangle {
                                         Text {
                                             text: "Slot Size"
                                             color: Colors.textPrimary
-                                            font.pixelSize: Typography.fontSizeNormal
-                                            font.weight: Typography.fontWeightMedium
+                                            font.pixelSize: 14
+                                            font.weight: Font.Medium
                                         }
-
                                         RowLayout {
                                             spacing: 12
                                             Text {
@@ -994,7 +992,6 @@ Rectangle {
                                                 }
                                             ]
                                             delegate: RowLayout {
-                                                id: slotDelegate
                                                 required property var modelData
                                                 spacing: 10
                                                 Rectangle {
@@ -1002,26 +999,25 @@ Rectangle {
                                                     height: 16
                                                     radius: 8
                                                     color: "transparent"
-                                                    border.color: Colors.border
+                                                    border.color: Colors.textPrimary
                                                     border.width: 1
                                                     Rectangle {
                                                         anchors.centerIn: parent
                                                         width: 8
                                                         height: 8
                                                         radius: 4
-                                                        color: Colors.primary
-                                                        visible: Math.abs(soundboardService.slotSizeScale - slotDelegate.modelData.scale) < 0.1
+                                                        color: Colors.accent
+                                                        visible: Math.abs(soundboardService.slotSizeScale - modelData.scale) < 0.1
                                                     }
                                                 }
                                                 Text {
-                                                    text: slotDelegate.modelData.name
+                                                    text: modelData.name
                                                     color: Colors.textPrimary
                                                     font.pixelSize: 14
                                                 }
-
                                                 MouseArea {
                                                     anchors.fill: parent
-                                                    onClicked: soundboardService.setSlotSizeScale(slotDelegate.modelData.scale)
+                                                    onClicked: soundboardService.setSlotSizeScale(modelData.scale)
                                                 }
                                             }
                                         }
@@ -1072,7 +1068,6 @@ Rectangle {
                         Label {
                             text: "Audio & Devices"
                             color: Colors.textPrimary
-
                             font.pixelSize: 20
                             anchors.left: panel.left
                             anchors.leftMargin: 22
@@ -1087,7 +1082,7 @@ Rectangle {
                             anchors.centerIn: parent
                             radius: 10
                             color: Colors.surface
-                            border.color: Colors.border
+                            border.color: Colors.surfaceHighlight
 
                             ColumnLayout {
                                 anchors.fill: parent
@@ -1144,7 +1139,7 @@ Rectangle {
 
                                     Label {
                                         text: "Speaker Output:"
-                                        color: Colors.textSecondary
+                                        color: Colors.textPrimary
                                         font.pixelSize: 14
                                         Layout.preferredWidth: 110
                                     }
@@ -1153,8 +1148,14 @@ Rectangle {
                                         id: speakerOutputDropdown
                                         Layout.preferredWidth: 280
                                         placeholder: "Select Output Device"
-                                        model: soundboardService.getOutputDevices()
                                         selectedId: soundboardService.selectedPlaybackDeviceId
+
+                                        // initial can be empty; we’ll fill on open
+                                        model: []
+
+                                        onAboutToOpen: {
+                                            model = soundboardService.getOutputDevices();
+                                        }
 
                                         onItemSelected: function (id, name) {
                                             console.log("Speaker output selected:", name);
@@ -1188,8 +1189,14 @@ Rectangle {
                                         id: secondOutputDropdown
                                         Layout.preferredWidth: 280
                                         placeholder: "Select Monitor Device"
-                                        model: soundboardService.getOutputDevices()
+
                                         selectedId: soundboardService.selectedMonitorDeviceId
+
+                                        model: []
+
+                                        onAboutToOpen: {
+                                            model = soundboardService.getOutputDevices();
+                                        }
 
                                         onItemSelected: function (id, name) {
                                             console.log("Monitor output selected:", name);
@@ -1214,7 +1221,7 @@ Rectangle {
 
                                     Label {
                                         text: "Master Volume:"
-                                        color: Colors.textSecondary
+                                        color: Colors.textPrimary
                                         font.pixelSize: 14
                                         Layout.preferredWidth: 110
                                     }
@@ -1227,7 +1234,6 @@ Rectangle {
                                             id: masterVolumeSlider
                                             anchors.fill: parent
                                             from: -60
-
                                             to: 0
                                             stepSize: 1
                                             value: soundboardService.masterGainDb
@@ -1241,7 +1247,7 @@ Rectangle {
                                                 height: 10
                                                 radius: 5
                                                 color: Colors.textPrimary
-                                                border.color: Colors.backgroundDark
+                                                border.color: Colors.surfaceHighlight
                                                 border.width: 1
 
                                                 x: masterVolumeSlider.leftPadding + masterVolumeSlider.visualPosition * (masterVolumeSlider.availableWidth - width)
@@ -1256,7 +1262,7 @@ Rectangle {
                                                     anchors.bottomMargin: 6
 
                                                     background: Rectangle {
-                                                        color: Colors.backgroundDark
+                                                        color: Colors.surfaceHighlight
                                                         radius: 4
                                                         opacity: 0.85
                                                     }
@@ -1284,6 +1290,13 @@ Rectangle {
                                     id: refreshButton
                                     text: "Refresh Devices"
                                     onClicked: console.log("Refresh Devices clicked")
+
+                                    background: Rectangle {
+                                        color: parent.hovered ? Colors.surfaceLight : Colors.surface
+                                        radius: 8
+                                        border.color: Colors.border
+                                        border.width: 1
+                                    }
 
                                     contentItem: Text {
                                         text: refreshButton.text
@@ -1315,7 +1328,7 @@ Rectangle {
                         id: hotkeysContent
                         width: parent.width - 20  // Leave room for scrollbar
                         implicitHeight: hotkeysColumn.implicitHeight + 56  // Column height + margins
-                        color: Colors.panelBg
+                        color: Colors.background
                         radius: 12
 
                         property int tabIndex: 0 // 0 system, 1 preference
@@ -1338,8 +1351,8 @@ Rectangle {
                                 Rectangle {
                                     height: 55
                                     radius: 8
-                                    color: Colors.panelBg
-                                    border.color: Colors.border
+                                    color: Colors.surface
+                                    border.color: Colors.surfaceHighlight
                                     border.width: 1
 
                                     RowLayout {
@@ -1351,13 +1364,14 @@ Rectangle {
                                             text: "System Hotkeys"
                                             width: 200
                                             height: parent.height
-                                            checkable: true
-                                            checked: hotkeysContent.tabIndex === 0
+                                            // Manual active state management to avoid binding loops
+                                            property bool isActive: hotkeysContent.tabIndex === 0
+
                                             onClicked: hotkeysContent.tabIndex = 0
 
                                             contentItem: Text {
                                                 text: systemHotkeysButton.text
-                                                color: systemHotkeysButton.checked ? Colors.textOnPrimary : Colors.textSecondary
+                                                color: systemHotkeysButton.isActive ? Colors.textOnPrimary : Colors.textSecondary
                                                 font.pixelSize: 15
                                                 font.weight: Font.Medium
                                                 horizontalAlignment: Text.AlignHCenter
@@ -1369,6 +1383,7 @@ Rectangle {
                                                 color: "transparent"
 
                                                 gradient: Gradient {
+                                                    orientation: Gradient.Horizontal
                                                     GradientStop {
                                                         position: 0.0
                                                         color: Colors.gradientPrimaryStart
@@ -1380,7 +1395,13 @@ Rectangle {
                                                 }
 
                                                 // turn gradient on/off
-                                                opacity: systemHotkeysButton.checked ? 1.0 : 0.0
+                                                opacity: systemHotkeysButton.isActive ? 1.0 : 0.0
+
+                                                Behavior on opacity {
+                                                    NumberAnimation {
+                                                        duration: 150
+                                                    }
+                                                }
                                             }
                                         }
 
@@ -1389,13 +1410,14 @@ Rectangle {
                                             text: "My Preference"
                                             width: 200
                                             height: parent.height
-                                            checkable: true
-                                            checked: hotkeysContent.tabIndex === 1
+                                            // Manual active state management
+                                            property bool isActive: hotkeysContent.tabIndex === 1
+
                                             onClicked: hotkeysContent.tabIndex = 1
 
                                             contentItem: Text {
                                                 text: myPreferenceButton.text
-                                                color: myPreferenceButton.checked ? Colors.textOnPrimary : Colors.textSecondary
+                                                color: myPreferenceButton.isActive ? Colors.textOnPrimary : Colors.textSecondary
                                                 font.pixelSize: 15
                                                 font.weight: Font.Medium
                                                 horizontalAlignment: Text.AlignHCenter
@@ -1407,6 +1429,7 @@ Rectangle {
                                                 color: "transparent"
 
                                                 gradient: Gradient {
+                                                    orientation: Gradient.Horizontal
                                                     GradientStop {
                                                         position: 0.0
                                                         color: Colors.gradientPrimaryStart
@@ -1418,7 +1441,13 @@ Rectangle {
                                                 }
 
                                                 // turn gradient on/off
-                                                opacity: myPreferenceButton.checked ? 1.0 : 0.0
+                                                opacity: myPreferenceButton.isActive ? 1.0 : 0.0
+
+                                                Behavior on opacity {
+                                                    NumberAnimation {
+                                                        duration: 150
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -1435,29 +1464,19 @@ Rectangle {
                                     height: 30
                                     onClicked: hotkeyManager.undoHotkeyChanges()
 
-                                    contentItem: Item {
-                                        Image {
-                                            id: resetIcon
-                                            source: "qrc:/qt/qml/TalkLess/resources/icons/actions/ic_refresh.svg"
-                                            anchors.centerIn: parent
-                                            width: 18
-                                            height: 18
-                                            fillMode: Image.PreserveAspectFit
-                                            smooth: true
-                                            visible: false
-                                        }
-
-                                        MultiEffect {
-                                            anchors.fill: resetIcon
-                                            source: resetIcon
-                                            colorization: 1.0
-                                            colorizationColor: Colors.textPrimary
-                                        }
+                                    contentItem: Image {
+                                        id: resetIcon
+                                        source: "qrc:/qt/qml/TalkLess/resources/icons/actions/ic_refresh.svg"
+                                        anchors.centerIn: parent
+                                        width: 18
+                                        height: 18
+                                        fillMode: Image.PreserveAspectFit
+                                        smooth: true
                                     }
 
                                     background: Rectangle {
                                         radius: 8
-                                        color: Colors.panelBg
+                                        color: Colors.surface
                                         border.color: Colors.border
                                         border.width: 1
                                     }
@@ -1481,16 +1500,15 @@ Rectangle {
                                     }
 
                                     background: Rectangle {
-                                        id: saveBtnArea
                                         radius: 10
                                         gradient: Gradient {
                                             GradientStop {
                                                 position: 0.0
-                                                color: saveBtnArea.containsMouse ? Colors.primaryLight : Colors.primary
+                                                color: Colors.gradientPrimaryStart
                                             }
                                             GradientStop {
                                                 position: 1.0
-                                                color: saveBtnArea.containsMouse ? Colors.primary : Colors.primaryDark
+                                                color: Colors.gradientPrimaryEnd
                                             }
                                         }
                                     }
@@ -1550,8 +1568,7 @@ Rectangle {
                         id: aiContent
                         width: parent.width
                         height: 200
-                        color: Colors.background
-
+                        color: Colors.surface
                         radius: 12
 
                         Text {
@@ -1594,7 +1611,6 @@ Rectangle {
                                 Layout.preferredHeight: 120
                                 color: Colors.surface
                                 radius: 16
-
                                 RowLayout {
                                     anchors.fill: parent
                                     anchors.margins: 20
@@ -1618,14 +1634,13 @@ Rectangle {
                                         Rectangle {
                                             width: 120
                                             height: 40
-                                            color: Colors.surfaceLight
+                                            color: Colors.surfaceHighlight
                                             radius: 8
-                                            border.color: Colors.border
-
+                                            border.color: Colors.surfaceHighlight
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: "📤 Export"
-                                                color: Colors.textOnPrimary
+                                                color: Colors.textPrimary
                                             }
                                             MouseArea {
                                                 anchors.fill: parent
@@ -1635,13 +1650,13 @@ Rectangle {
                                         Rectangle {
                                             width: 120
                                             height: 40
-                                            color: Colors.surface
+                                            color: Colors.surfaceHighlight
                                             radius: 8
-                                            border.color: Colors.border
+                                            border.color: Colors.surfaceHighlight
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: "📥 Import"
-                                                color: Colors.textOnPrimary
+                                                color: Colors.textPrimary
                                             }
                                             MouseArea {
                                                 anchors.fill: parent
@@ -1668,7 +1683,7 @@ Rectangle {
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 120
-                                color: Colors.background
+                                color: Colors.surface
                                 radius: 16
                                 RowLayout {
                                     anchors.fill: parent
@@ -1678,7 +1693,7 @@ Rectangle {
                                         Layout.fillWidth: true
                                         Text {
                                             text: "Reset All Settings & Hotkeys"
-                                            color: Colors.textOnPrimary
+                                            color: Colors.textPrimary
                                             font.pixelSize: 16
                                             font.weight: Font.Medium
                                         }
@@ -1691,13 +1706,13 @@ Rectangle {
                                     Rectangle {
                                         width: 140
                                         height: 40
-                                        color: Colors.error
+                                        color: Qt.rgba(Colors.error.r, Colors.error.g, Colors.error.b, 0.2)
                                         radius: 8
                                         border.color: Colors.error
                                         Text {
                                             anchors.centerIn: parent
                                             text: "⚠ Reset All"
-                                            color: Colors.textOnPrimary
+                                            color: Colors.error
                                             font.weight: Font.Bold
                                         }
                                         MouseArea {

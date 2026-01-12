@@ -2,13 +2,15 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../styles"
+
 
 Rectangle {
     id: root
-
+    
     // Pass comma-separated text like "Line 1,Line 2" or empty string for no text
     property string displayText: ""
-
+    
     // Computed properties for the two lines
     readonly property var textLines: displayText.length > 0 ? displayText.split(",") : []
     readonly property string line1: textLines.length > 0 ? textLines[0].trim() : ""
@@ -20,7 +22,7 @@ Rectangle {
     implicitHeight: 200
     radius: 16
     clip: true
-    color: "transparent"
+    color: backgroundImage.status === Image.Error ? "red" : (backgroundImage.status === Image.Loading ? "blue" : "transparent")
 
     // Load Poppins font (SemiBold 600)
     FontLoader {
@@ -39,7 +41,15 @@ Rectangle {
         id: backgroundImage
         anchors.fill: parent
         source: Colors.bannerImage
-        fillMode: Image.PreserveAspectCrop
+        fillMode: Image.Stretch
+
+        onStatusChanged: {
+            if (status === Image.Error) {
+                console.log("BackgroundBanner Image Error loading: " + source);
+            } else if (status === Image.Ready) {
+                console.log("BackgroundBanner Image Loaded: " + source);
+            }
+        }
     }
 
     // Dark overlay for better text readability (only when text is shown)
@@ -47,13 +57,11 @@ Rectangle {
         anchors.fill: parent
         radius: root.radius
         color: Colors.black
-        opacity: root.hasText ? 0.4 : 0
+        opacity: root.hasText ? 0.3 : 0
         visible: root.hasText
-
+        
         Behavior on opacity {
-            NumberAnimation {
-                duration: 200
-            }
+            NumberAnimation { duration: 200 }
         }
     }
 
@@ -67,15 +75,13 @@ Rectangle {
         opacity: root.hasText ? 1 : 0
 
         Behavior on opacity {
-            NumberAnimation {
-                duration: 200
-            }
+            NumberAnimation { duration: 200 }
         }
 
         // Line 1 - Main text (Poppins SemiBold 27.51px)
         Text {
             text: root.line1
-            color: "#FFFFFF"
+            color: Colors.white
             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
             font.pixelSize: 28
             font.weight: Font.DemiBold
@@ -86,7 +92,7 @@ Rectangle {
         // Line 2 - Secondary text (Inter Regular 15.29px)
         Text {
             text: root.line2
-            color: "#FFFFFF"
+            color: Colors.white
             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
             font.pixelSize: 15
             font.weight: Font.Normal
