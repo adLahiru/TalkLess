@@ -25,19 +25,32 @@ Rectangle {
         mainLoader.active = true;
     }
 
+    // Store previous device lists to detect changes
+    property var previousInputDevices: []
+    property var previousOutputDevices: []
+
+    // Signal to notify dropdowns to refresh
+    signal deviceRefreshRequested()
+
     // Function to refresh device selections from backend
     function refreshDeviceSelections() {
-        // Update input device dropdown
-        if (inputDeviceDropdown) {
-            inputDeviceDropdown.selectedId = soundboardService.selectedCaptureDeviceId;
-        }
-        // Update output device dropdown
-        if (speakerOutputDropdown) {
-            speakerOutputDropdown.selectedId = soundboardService.selectedPlaybackDeviceId;
-        }
-        // Update monitor device dropdown
-        if (secondOutputDropdown) {
-            secondOutputDropdown.selectedId = soundboardService.selectedMonitorDeviceId;
+        // Emit signal to refresh dropdowns inside the loader
+        deviceRefreshRequested();
+    }
+
+    // Function to check if device list has changed
+    function checkDeviceChanges() {
+        var currentInputDevices = soundboardService.getInputDevices();
+        var currentOutputDevices = soundboardService.getOutputDevices();
+        
+        var inputChanged = JSON.stringify(currentInputDevices) !== JSON.stringify(previousInputDevices);
+        var outputChanged = JSON.stringify(currentOutputDevices) !== JSON.stringify(previousOutputDevices);
+        
+        if (inputChanged || outputChanged) {
+            console.log("Audio devices changed, refreshing...");
+            previousInputDevices = currentInputDevices;
+            previousOutputDevices = currentOutputDevices;
+            refreshDeviceSelections();
         }
     }
 
@@ -45,6 +58,29 @@ Rectangle {
     onVisibleChanged: {
         if (visible) {
             refreshDeviceSelections();
+            // Store initial device lists
+            previousInputDevices = soundboardService.getInputDevices();
+            previousOutputDevices = soundboardService.getOutputDevices();
+        }
+    }
+
+    // Timer to periodically check for device changes (hotplug detection)
+    Timer {
+        id: devicePollTimer
+        interval: 2000  // Check every 2 seconds
+        running: root.visible  // Only run when settings view is visible
+        repeat: true
+        onTriggered: {
+            root.checkDeviceChanges();
+        }
+    }
+
+    // Connection to handle audioDevicesChanged signal from backend
+    Connections {
+        target: soundboardService
+        function onAudioDevicesChanged() {
+            console.log("Audio devices changed signal received");
+            root.refreshDeviceSelections();
         }
     }
 
@@ -207,6 +243,14 @@ Rectangle {
 
                                     Component.onCompleted: {
                                         model = soundboardService.getInputDevices();
+                                    }
+
+                                    Connections {
+                                        target: root
+                                        function onDeviceRefreshRequested() {
+                                            inputDeviceDropdown.model = soundboardService.getInputDevices();
+                                            inputDeviceDropdown.selectedId = soundboardService.selectedCaptureDeviceId;
+                                        }
                                     }
 
                                     onAboutToOpen: {
@@ -1205,6 +1249,14 @@ Rectangle {
                                             model = soundboardService.getOutputDevices();
                                         }
 
+                                        Connections {
+                                            target: root
+                                            function onDeviceRefreshRequested() {
+                                                speakerOutputDropdown.model = soundboardService.getOutputDevices();
+                                                speakerOutputDropdown.selectedId = soundboardService.selectedPlaybackDeviceId;
+                                            }
+                                        }
+
                                         onAboutToOpen: {
                                             model = soundboardService.getOutputDevices();
                                         }
@@ -1248,6 +1300,14 @@ Rectangle {
 
                                         Component.onCompleted: {
                                             model = soundboardService.getOutputDevices();
+                                        }
+
+                                        Connections {
+                                            target: root
+                                            function onDeviceRefreshRequested() {
+                                                secondOutputDropdown.model = soundboardService.getOutputDevices();
+                                                secondOutputDropdown.selectedId = soundboardService.selectedMonitorDeviceId;
+                                            }
                                         }
 
                                         onAboutToOpen: {
@@ -1345,7 +1405,10 @@ Rectangle {
                                 Button {
                                     id: refreshButton
                                     text: "Refresh Devices"
-                                    onClicked: console.log("Refresh Devices clicked")
+                                    onClicked: {
+                                        soundboardService.refreshAudioDevices();
+                                        root.refreshDeviceSelections();
+                                    }
 
                                     background: Rectangle {
                                         color: parent.hovered ? Colors.surfaceLight : Colors.surface

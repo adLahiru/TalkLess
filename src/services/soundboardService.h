@@ -183,6 +183,7 @@ public:
     Q_INVOKABLE bool setOutputDevice(const QString& deviceId);
     Q_INVOKABLE bool setMonitorOutputDevice(const QString& deviceId);
     Q_INVOKABLE bool setRecordingInputDevice(const QString& deviceId);
+    Q_INVOKABLE void refreshAudioDevices();
 
     // ---- Audio Level Monitoring ----
     Q_INVOKABLE float getMicPeakLevel() const;
@@ -235,6 +236,7 @@ signals:
     void clipSelectionRequested(int clipId);
     void clipboardChanged();
     void recordingStateChanged();
+    void audioDevicesChanged();
 
 private:
     void rebuildHotkeyIndex();

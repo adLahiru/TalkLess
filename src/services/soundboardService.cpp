@@ -2296,6 +2296,20 @@ bool SoundboardService::setMonitorOutputDevice(const QString& deviceId)
     return success;
 }
 
+void SoundboardService::refreshAudioDevices()
+{
+    if (!m_audioEngine) {
+        qWarning() << "AudioEngine not initialized";
+        return;
+    }
+
+    // Refresh both playback and input devices
+    m_audioEngine->refreshPlaybackDevices();
+    
+    qDebug() << "Audio devices refreshed";
+    emit audioDevicesChanged();
+}
+
 // ============================================================================
 // AUDIO LEVEL MONITORING
 // ============================================================================
