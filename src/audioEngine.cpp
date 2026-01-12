@@ -128,6 +128,11 @@ bool AudioEngine::initDevice()
         cfg.sampleRate        = (t.sr == 0 ? ENGINE_SR : t.sr);
         cfg.dataCallback      = &AudioEngine::audioCallback;
         cfg.pUserData         = this;
+        
+        // Use larger buffer for better compatibility with virtual audio cables
+        // and to reduce crackling/popping
+        cfg.periodSizeInFrames = 1024;  // ~21ms at 48kHz
+        cfg.periods = 3;  // Triple buffering for stability
 
         applyDeviceSelection(cfg);
 
@@ -177,6 +182,8 @@ bool AudioEngine::initMonitorDevice()
     cfg.sampleRate        = ENGINE_SR;
     cfg.dataCallback      = &AudioEngine::monitorCallback;
     cfg.pUserData         = this;
+    cfg.periodSizeInFrames = 1024;  // ~21ms at 48kHz - helps with VB-Cable
+    cfg.periods            = 3;    // Triple buffering for stability
 
     if (selectedMonitorPlaybackSet) {
         cfg.playback.pDeviceID = &selectedMonitorPlaybackDeviceIdStruct;
@@ -227,6 +234,8 @@ bool AudioEngine::initRecordingInputDevice()
     cfg.sampleRate       = ENGINE_SR;
     cfg.dataCallback     = &AudioEngine::recordingInputCallback;
     cfg.pUserData        = this;
+    cfg.periodSizeInFrames = 1024;  // ~21ms at 48kHz - helps with VB-Cable
+    cfg.periods            = 3;     // Triple buffering for stability
 
     if (selectedRecordingCaptureSet) {
         cfg.capture.pDeviceID = &selectedRecordingCaptureDeviceIdStruct;

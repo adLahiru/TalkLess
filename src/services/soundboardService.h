@@ -47,6 +47,12 @@ public:
     Q_PROPERTY(float micSoundboardBalance READ getMicSoundboardBalance WRITE setMicSoundboardBalance NOTIFY settingsChanged)
     Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
 
+    // Audio buffer settings
+    Q_PROPERTY(int bufferSizeFrames READ bufferSizeFrames WRITE setBufferSizeFrames NOTIFY settingsChanged)
+    Q_PROPERTY(int bufferPeriods READ bufferPeriods WRITE setBufferPeriods NOTIFY settingsChanged)
+    Q_PROPERTY(int sampleRate READ sampleRate WRITE setSampleRate NOTIFY settingsChanged)
+    Q_PROPERTY(int audioChannels READ audioChannels WRITE setAudioChannels NOTIFY settingsChanged)
+
     Q_PROPERTY(bool isRecording READ isRecording NOTIFY recordingStateChanged)
     Q_PROPERTY(QString lastRecordingPath READ lastRecordingPath NOTIFY recordingStateChanged)
     Q_PROPERTY(float recordingDuration READ recordingDuration NOTIFY recordingStateChanged)
@@ -79,6 +85,19 @@ public:
 
     QString hotkeyMode() const { return m_state.settings.hotkeyMode; }
     Q_INVOKABLE void setHotkeyMode(const QString& mode);
+
+    // Audio buffer settings getters/setters
+    int bufferSizeFrames() const { return m_state.settings.bufferSizeFrames; }
+    Q_INVOKABLE void setBufferSizeFrames(int frames);
+
+    int bufferPeriods() const { return m_state.settings.bufferPeriods; }
+    Q_INVOKABLE void setBufferPeriods(int periods);
+
+    int sampleRate() const { return m_state.settings.sampleRate; }
+    Q_INVOKABLE void setSampleRate(int rate);
+
+    int audioChannels() const { return m_state.settings.channels; }
+    Q_INVOKABLE void setAudioChannels(int channels);
 
     Q_INVOKABLE bool exportSettings(const QString& filePath);
     Q_INVOKABLE bool importSettings(const QString& filePath);

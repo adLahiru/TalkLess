@@ -945,17 +945,18 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
 
             c.reproductionMode = mode;
 
-            // "When we selected loop mode it should be turn on the repeat"
-            if (mode == 3) {
+            // Mode 4 (Loop) should turn on repeat, Mode 3 (Restart) should not
+            if (mode == 4) {
                 c.isRepeat = true;
                 // Apply immediately to audio engine if currently assigned to a slot
                 if (m_clipIdToSlot.contains(clipId) && m_audioEngine) {
                     m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], true);
                 }
             } else {
-                c.isRepeat = false;
+                // For all other modes (including mode 3 restart), don't force loop
+                // Keep existing isRepeat value unless it was mode 4 before
                 if (m_clipIdToSlot.contains(clipId) && m_audioEngine) {
-                    m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], false);
+                    m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], c.isRepeat);
                 }
             }
 
@@ -976,10 +977,9 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
     for (auto& c : b.clips) {
         if (c.id == clipId) {
             c.reproductionMode = mode;
-            if (mode == 3)
+            // Only mode 4 (Loop) forces repeat on
+            if (mode == 4)
                 c.isRepeat = true;
-            else
-                c.isRepeat = false;
             m_repo.saveBoard(b);
             return;
         }
@@ -2134,6 +2134,55 @@ void SoundboardService::setHotkeyMode(const QString& mode)
     emit settingsChanged();
 }
 
+void SoundboardService::setBufferSizeFrames(int frames)
+{
+    // Validate: only allow common buffer sizes
+    if (frames != 256 && frames != 512 && frames != 1024 && frames != 2048 && frames != 4096)
+        return;
+    if (m_state.settings.bufferSizeFrames == frames)
+        return;
+    m_state.settings.bufferSizeFrames = frames;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+    // Note: Audio engine needs restart to apply new buffer settings
+}
+
+void SoundboardService::setBufferPeriods(int periods)
+{
+    // Validate: only allow 2, 3, or 4 periods
+    if (periods < 2 || periods > 4)
+        return;
+    if (m_state.settings.bufferPeriods == periods)
+        return;
+    m_state.settings.bufferPeriods = periods;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
+void SoundboardService::setSampleRate(int rate)
+{
+    // Validate: only allow common sample rates
+    if (rate != 44100 && rate != 48000 && rate != 96000)
+        return;
+    if (m_state.settings.sampleRate == rate)
+        return;
+    m_state.settings.sampleRate = rate;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
+void SoundboardService::setAudioChannels(int channels)
+{
+    // Validate: only allow mono (1) or stereo (2)
+    if (channels != 1 && channels != 2)
+        return;
+    if (m_state.settings.channels == channels)
+        return;
+    m_state.settings.channels = channels;
+    m_repo.saveIndex(m_state);
+    emit settingsChanged();
+}
+
 bool SoundboardService::exportSettings(const QString& filePath)
 {
     QString path = filePath;
@@ -2156,6 +2205,11 @@ bool SoundboardService::exportSettings(const QString& filePath)
     settings["micEnabled"] = m_state.settings.micEnabled;
     settings["micPassthroughEnabled"] = m_state.settings.micPassthroughEnabled;
     settings["micSoundboardBalance"] = m_state.settings.micSoundboardBalance;
+    // Audio buffer settings
+    settings["bufferSizeFrames"] = m_state.settings.bufferSizeFrames;
+    settings["bufferPeriods"] = m_state.settings.bufferPeriods;
+    settings["sampleRate"] = m_state.settings.sampleRate;
+    settings["channels"] = m_state.settings.channels;
 
     root["settings"] = settings;
     root["version"] = m_state.version;
@@ -2208,6 +2262,11 @@ bool SoundboardService::importSettings(const QString& filePath)
             s.value("micPassthroughEnabled").toBool(m_state.settings.micPassthroughEnabled);
         m_state.settings.micSoundboardBalance =
             (float)s.value("micSoundboardBalance").toDouble(m_state.settings.micSoundboardBalance);
+        // Audio buffer settings
+        m_state.settings.bufferSizeFrames = s.value("bufferSizeFrames").toInt(m_state.settings.bufferSizeFrames);
+        m_state.settings.bufferPeriods = s.value("bufferPeriods").toInt(m_state.settings.bufferPeriods);
+        m_state.settings.sampleRate = s.value("sampleRate").toInt(m_state.settings.sampleRate);
+        m_state.settings.channels = s.value("channels").toInt(m_state.settings.channels);
 
         // Save updated state
         m_repo.saveIndex(m_state);
