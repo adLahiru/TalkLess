@@ -113,24 +113,24 @@ QVariant ClipsListModel::data(const QModelIndex& index, int role) const
 QHash<int, QByteArray> ClipsListModel::roleNames() const
 {
     return {
-        {         IdRole,        "clipId"},
-        {   FilePathRole,      "filePath"},
-        {    ImgPathRole,       "imgPath"},
-        {     HotkeyRole,        "hotkey"},
-        {      TitleRole,     "clipTitle"},
-        {TrimStartMsRole,   "trimStartMs"},
-        {  TrimEndMsRole,     "trimEndMs"},
-        {     VolumeRole,   "clipVolume"},
-        {      SpeedRole,    "clipSpeed"},
-        {  IsPlayingRole, "clipIsPlaying"},
-        {   IsRepeatRole,      "isRepeat"},
-        {     LockedRole,        "locked"},
-        {       TagsRole,          "tags"},
-        {ReproductionModeRole, "reproductionMode"},
-        {StopOtherSoundsRole, "stopOtherSounds"},
-        {MuteOtherSoundsRole, "muteOtherSounds"},
+        {                   IdRole,                "clipId"},
+        {             FilePathRole,              "filePath"},
+        {              ImgPathRole,               "imgPath"},
+        {               HotkeyRole,                "hotkey"},
+        {                TitleRole,             "clipTitle"},
+        {          TrimStartMsRole,           "trimStartMs"},
+        {            TrimEndMsRole,             "trimEndMs"},
+        {               VolumeRole,            "clipVolume"},
+        {                SpeedRole,             "clipSpeed"},
+        {            IsPlayingRole,         "clipIsPlaying"},
+        {             IsRepeatRole,              "isRepeat"},
+        {               LockedRole,                "locked"},
+        {                 TagsRole,                  "tags"},
+        {     ReproductionModeRole,      "reproductionMode"},
+        {      StopOtherSoundsRole,       "stopOtherSounds"},
+        {      MuteOtherSoundsRole,       "muteOtherSounds"},
         {MuteMicDuringPlaybackRole, "muteMicDuringPlayback"},
-        {      DurationSecRole,      "durationSec"}
+        {          DurationSecRole,           "durationSec"}
     };
 }
 
