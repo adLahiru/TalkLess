@@ -192,7 +192,7 @@ Item {
             id: progressOverlayContainer
             anchors.fill: parent
             anchors.margins: 2 * root.scaleFactor
-            visible: root.isPlaying && root.playbackProgress > 0
+            visible: root.isPlaying
             z: 5  // Above background, below UI elements
             clip: true
 
@@ -217,6 +217,8 @@ Item {
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 width: parent.width * root.playbackProgress
+                radius: 14 * root.scaleFactor
+                clip: true
                 
                 // Gradient effect for the progress overlay
                 gradient: Gradient {
@@ -233,24 +235,23 @@ Item {
                         easing.type: Easing.Linear
                     }
                 }
-            }
 
-            // Leading edge glow effect
-            Rectangle {
-                visible: root.playbackProgress > 0.05 && root.playbackProgress < 0.95
-                x: progressFill.width - 2
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: 4
-                color: Colors.accent
-                opacity: 0.8
+                // Leading edge glow effect - now inside the fill to respect rounded corners
+                Rectangle {
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: 4
+                    color: Colors.accent
+                    opacity: 0.8
 
-                // Glow animation
-                SequentialAnimation on opacity {
-                    running: root.isPlaying
-                    loops: Animation.Infinite
-                    NumberAnimation { from: 0.8; to: 1.0; duration: 400; easing.type: Easing.InOutQuad }
-                    NumberAnimation { from: 1.0; to: 0.8; duration: 400; easing.type: Easing.InOutQuad }
+                    // Glow animation
+                    SequentialAnimation on opacity {
+                        running: root.isPlaying
+                        loops: Animation.Infinite
+                        NumberAnimation { from: 0.8; to: 1.0; duration: 400; easing.type: Easing.InOutQuad }
+                        NumberAnimation { from: 1.0; to: 0.8; duration: 400; easing.type: Easing.InOutQuad }
+                    }
                 }
             }
         }
