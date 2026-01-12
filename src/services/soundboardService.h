@@ -267,6 +267,7 @@ private:
     QHash<int, int> m_clipIdToSlot;
     int m_nextSlot = 0;
     QSet<int> m_clipsThatMutedMic;
+    QHash<int, QList<int>> m_pausedByClip;  // Maps clipId -> list of clip IDs that were paused when this clip started
 
     std::optional<Clip> m_clipboardClip;
     QString m_lastRecordingPath;

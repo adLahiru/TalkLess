@@ -1356,11 +1356,13 @@ QVariantList SoundboardService::getBoardsWithClipStatus(int clipId) const
 
     // First, find the clip to get its file path
     QString clipFilePath;
+    int sourceBoardId = -1;
     
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& c : it.value().clips) {
             if (c.id == clipId) {
                 clipFilePath = c.filePath;
+                sourceBoardId = it.key();
                 break;
             }
         }
@@ -1377,6 +1379,7 @@ QVariantList SoundboardService::getBoardsWithClipStatus(int clipId) const
                     for (const auto& c : loaded->clips) {
                         if (c.id == clipId) {
                             clipFilePath = c.filePath;
+                            sourceBoardId = boardInfo.id;
                             break;
                         }
                     }
@@ -1390,49 +1393,37 @@ QVariantList SoundboardService::getBoardsWithClipStatus(int clipId) const
     if (clipFilePath.isEmpty())
         return result;
 
-    // Now collect ALL sharedBoardIds from all clips with the same file path
-    // This ensures we get the complete picture of where this clip exists
-    QSet<int> allSharedBoardIds;
-    
-    // Check active boards
-    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
-        for (const auto& c : it.value().clips) {
-            if (c.filePath == clipFilePath) {
-                // Add this board as it contains the clip
-                allSharedBoardIds.insert(it.key());
-                // Also add all sharedBoardIds from this clip
-                for (int boardId : c.sharedBoardIds) {
-                    allSharedBoardIds.insert(boardId);
+    // Check each board to see if a clip with this file path actually exists
+    for (const auto& boardInfo : m_state.soundboards) {
+        bool hasClip = false;
+        
+        // Check active boards
+        if (m_activeBoards.contains(boardInfo.id)) {
+            const Soundboard& board = m_activeBoards.value(boardInfo.id);
+            for (const auto& c : board.clips) {
+                if (c.filePath == clipFilePath) {
+                    hasClip = true;
+                    break;
                 }
             }
-        }
-    }
-    
-    // Check inactive boards
-    for (const auto& boardInfo : m_state.soundboards) {
-        if (!m_activeBoards.contains(boardInfo.id)) {
+        } else {
+            // Check inactive boards
             auto loaded = m_repo.loadBoard(boardInfo.id);
             if (loaded) {
                 for (const auto& c : loaded->clips) {
                     if (c.filePath == clipFilePath) {
-                        // Add this board as it contains the clip
-                        allSharedBoardIds.insert(boardInfo.id);
-                        // Also add all sharedBoardIds from this clip
-                        for (int boardId : c.sharedBoardIds) {
-                            allSharedBoardIds.insert(boardId);
-                        }
+                        hasClip = true;
+                        break;
                     }
                 }
             }
         }
-    }
-
-    // Iterate through all soundboards and check if clip exists
-    for (const auto& boardInfo : m_state.soundboards) {
+        
         QVariantMap boardEntry;
         boardEntry["id"] = boardInfo.id;
         boardEntry["name"] = boardInfo.name;
-        boardEntry["hasClip"] = allSharedBoardIds.contains(boardInfo.id);
+        boardEntry["hasClip"] = hasClip;
+        boardEntry["isCurrent"] = (boardInfo.id == sourceBoardId);
         result.append(boardEntry);
     }
 
@@ -1877,10 +1868,25 @@ void SoundboardService::playClip(int clipId)
 
     qDebug() << "playClip: after removing self, others=" << others;
 
+    // Track which clips we're pausing for this clip (for resuming later)
+    QList<int> pausedClipIds;
+
     if (mode == 1) {
-        // Pause Clip_A, play Clip_B
+        // Pause Clip_A, play Clip_B - track paused clips for resuming later
         qDebug() << "playClip: mode=1, calling reproductionPlayingClip to pause others";
+        for (const QVariant& v : others) {
+            bool ok = false;
+            int otherId = v.toInt(&ok);
+            if (ok) {
+                pausedClipIds.append(otherId);
+            }
+        }
         reproductionPlayingClip(others, 1);
+        
+        // Store which clips were paused by this clip
+        if (!pausedClipIds.isEmpty()) {
+            m_pausedByClip[clipId] = pausedClipIds;
+        }
     } else if (mode == 2) {
         // Stop Clip_A, play Clip_B
         reproductionPlayingClip(others, 2);
@@ -1904,14 +1910,31 @@ void SoundboardService::playClip(int clipId)
             }
         }
     } else if (clip->muteOtherSounds && !others.isEmpty()) {
-        // Pause (mute) all other playing clips
+        // Pause (mute) all other playing clips and track them for resuming later
+        QList<int> mutedClipIds;
         for (const QVariant& v : others) {
             bool ok = false;
             int otherId = v.toInt(&ok);
             if (ok && m_clipIdToSlot.contains(otherId)) {
-                m_audioEngine->pauseClip(m_clipIdToSlot[otherId]);
+                int otherSlotId = m_clipIdToSlot[otherId];
+                if (m_audioEngine->isClipPlaying(otherSlotId) && !m_audioEngine->isClipPaused(otherSlotId)) {
+                    // Save position before pausing
+                    Clip* otherClip = findActiveClipById(otherId);
+                    if (otherClip) {
+                        otherClip->lastPlayedPosMs = m_audioEngine->getClipPlaybackPositionMs(otherSlotId);
+                        otherClip->isPlaying = false;
+                    }
+                    m_audioEngine->pauseClip(otherSlotId);
+                    mutedClipIds.append(otherId);
+                    emit clipPlaybackPaused(otherId);
+                }
             }
         }
+        // Track which clips were muted by this clip for resuming later
+        if (!mutedClipIds.isEmpty()) {
+            m_pausedByClip[clipId] = mutedClipIds;
+        }
+        emit activeClipsChanged();
     }
 
     // Mute mic if muteMicDuringPlayback is enabled for this clip
@@ -2108,6 +2131,25 @@ void SoundboardService::finalizeClipPlayback(int clipId)
         clip->lastPlayedPosMs = 0.0; // Reset position
         emit activeClipsChanged();
         saveActive();
+    }
+
+    // Resume clips that were paused by this clip (Play/Pause mode)
+    if (m_pausedByClip.contains(clipId)) {
+        QList<int> pausedClips = m_pausedByClip.take(clipId);
+        for (int pausedClipId : pausedClips) {
+            Clip* pausedClip = findActiveClipById(pausedClipId);
+            if (pausedClip && m_clipIdToSlot.contains(pausedClipId)) {
+                int slotId = m_clipIdToSlot[pausedClipId];
+                // Check if the clip is still in a paused state (not stopped by user)
+                if (m_audioEngine->isClipPaused(slotId)) {
+                    m_audioEngine->resumeClip(slotId);
+                    pausedClip->isPlaying = true;
+                    emit clipPlaybackStarted(pausedClipId);
+                    qDebug() << "Resumed paused clip" << pausedClipId << "after clip" << clipId << "stopped";
+                }
+            }
+        }
+        emit activeClipsChanged();
     }
 
     // Restore mic if this clip had muted it and no other mic-muting clips are playing

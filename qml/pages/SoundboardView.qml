@@ -2676,16 +2676,17 @@ Rectangle {
                                     // Stop other sounds on play
                                     RowLayout {
                                         spacing: 8
-                                        // Disabled when mode is Play/Stop (mode 2) or Play/Pause (mode 1)
-                                        property bool isReadOnly: clipEditorTab.reproductionMode === 1 || clipEditorTab.reproductionMode === 2
+                                        // Disabled when mode is Overlay (0), Play/Pause (1), or Play/Stop (2)
+                                        property bool isReadOnly: clipEditorTab.reproductionMode === 0 || clipEditorTab.reproductionMode === 1 || clipEditorTab.reproductionMode === 2
                                         opacity: isReadOnly ? 0.5 : 1.0
 
                                         Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            // Force checked when mode is Play/Stop (mode 2), force unchecked when Play/Pause (mode 1)
-                                            property bool effectiveValue: clipEditorTab.reproductionMode === 2 ? true : (clipEditorTab.reproductionMode === 1 ? false : clipEditorTab.stopOtherSounds)
+                                            // Force checked when mode is Play/Stop (2), force unchecked when Overlay (0) or Play/Pause (1)
+                                            property bool effectiveValue: clipEditorTab.reproductionMode === 2 ? true : 
+                                                (clipEditorTab.reproductionMode === 0 || clipEditorTab.reproductionMode === 1 ? false : clipEditorTab.stopOtherSounds)
                                             color: effectiveValue ? Colors.gradientPrimaryStart : Colors.surfaceDark
                                             border.color: effectiveValue ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
@@ -2712,7 +2713,9 @@ Rectangle {
                                         }
 
                                         Text {
-                                            text: clipEditorTab.reproductionMode === 2 ? "Stop other sounds on play (auto)" : clipEditorTab.reproductionMode === 1 ? "Stop other sounds on play (disabled)" : "Stop other sounds on play"
+                                            text: clipEditorTab.reproductionMode === 2 ? "Stop other sounds on play (auto)" : 
+                                                clipEditorTab.reproductionMode === 1 ? "Stop other sounds on play (disabled)" : 
+                                                clipEditorTab.reproductionMode === 0 ? "Stop other sounds on play (disabled)" : "Stop other sounds on play"
                                             color: parent.isReadOnly ? Colors.textDisabled : Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
@@ -2722,18 +2725,23 @@ Rectangle {
                                     // Mute other sounds
                                     RowLayout {
                                         spacing: 8
+                                        // Disabled when mode is Overlay (0)
+                                        property bool isReadOnly: clipEditorTab.reproductionMode === 0
+                                        opacity: isReadOnly ? 0.5 : 1.0
 
                                         Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            color: clipEditorTab.muteOtherSounds ? Colors.gradientPrimaryStart : Colors.surfaceDark
-                                            border.color: clipEditorTab.muteOtherSounds ? Colors.gradientPrimaryEnd : Colors.border
+                                            // Force unchecked when Overlay mode
+                                            property bool effectiveValue: clipEditorTab.reproductionMode === 0 ? false : clipEditorTab.muteOtherSounds
+                                            color: effectiveValue ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: effectiveValue ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: clipEditorTab.muteOtherSounds ? "✓" : ""
+                                                text: parent.effectiveValue ? "✓" : ""
                                                 color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
@@ -2741,7 +2749,8 @@ Rectangle {
 
                                             MouseArea {
                                                 anchors.fill: parent
-                                                cursorShape: Qt.PointingHandCursor
+                                                cursorShape: parent.parent.isReadOnly ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+                                                enabled: !parent.parent.isReadOnly
                                                 onClicked: {
                                                     if (root.selectedClipId !== -1 && soundboardService) {
                                                         clipEditorTab.muteOtherSounds = !clipEditorTab.muteOtherSounds;
@@ -2749,6 +2758,7 @@ Rectangle {
                                                         // If muteOtherSounds is enabled, also enable muteMicDuringPlayback
                                                         if (clipEditorTab.muteOtherSounds) {
                                                             clipEditorTab.muteMicDuringPlayback = true;
+                                                            soundboardService.setClipMuteMicDuringPlayback(clipsModel.boardId, root.selectedClipId, true);
                                                         }
                                                     }
                                                 }
@@ -2756,8 +2766,8 @@ Rectangle {
                                         }
 
                                         Text {
-                                            text: "Mute other sounds"
-                                            color: Colors.textPrimary
+                                            text: clipEditorTab.reproductionMode === 0 ? "Mute other sounds (disabled)" : "Mute other sounds"
+                                            color: parent.isReadOnly ? Colors.textDisabled : Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
