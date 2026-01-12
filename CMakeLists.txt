@@ -57,8 +57,8 @@ qt_add_executable(appTalkLess
     src/miniaudio_impl.cpp
 
     # Controllers
-    src/controllers/hotkeyManager.h
-    src/controllers/hotkeyManager.cpp
+    src/controllers/hotkeymanager.h
+    src/controllers/hotkeymanager.cpp
     src/controllers/hotkeyvalidator.h
     src/controllers/hotkeyvalidator.cpp
 
