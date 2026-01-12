@@ -256,8 +256,8 @@ Rectangle {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 2
-            Layout.leftMargin: -18  // Extend to edge
-            Layout.rightMargin: -18  // Extend to edge
+            Layout.leftMargin: -18  // Extend to edge consistently
+            Layout.rightMargin: -18  // Extend to edge consistently
             color: "#2D2D2D"
         }
 
@@ -268,25 +268,25 @@ Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: 8
             spacing: 8
-            visible: !root.isCollapsed
+            // Always visible - shows different layout based on collapsed state
 
             // Soundboards list
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 240
+                Layout.preferredHeight: root.isCollapsed ? 180 : 240
 
                 ListView {
                     id: boardsList
                     anchors.fill: parent
                     clip: true
-                    spacing: 10
+                    spacing: root.isCollapsed ? 8 : 10
 
                     model: soundboardsModel
 
                     delegate: Item {
                         id: boardRow
                         width: boardsList.width
-                        height: 56  // Reduced height
+                        height: root.isCollapsed ? 48 : 56
 
                         // from model roles - use required property for ComponentBehavior: Bound
                         required property int index
@@ -319,13 +319,15 @@ Rectangle {
                             }
 
                             onDoubleClicked: () => {
-                                root.editingBoardId = boardRow.boardId;
+                                if (!root.isCollapsed) {
+                                    root.editingBoardId = boardRow.boardId;
+                                }
                             }
                         }
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: 14
+                            radius: root.isCollapsed ? 12 : 14
                             // Show selection highlight (blue border) or active state (filled) or hover
                             color: {
                                 if (root.selectedBoardId === boardRow.boardId) {
@@ -340,12 +342,85 @@ Rectangle {
                             border.color: "#3B82F6"
                         }
 
+                        // Collapsed mode layout - just image with checkbox overlay
+                        Item {
+                            anchors.centerIn: parent
+                            width: 44
+                            height: 44
+                            visible: root.isCollapsed
+
+                            // Soundboard image - rounded corners with layer mask
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 12
+                                color: "#141414"
+
+                                Image {
+                                    anchors.fill: parent
+                                    fillMode: Image.PreserveAspectCrop
+                                    source: boardRow.boardImage || "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        maskEnabled: true
+                                        maskSource: ShaderEffectSource {
+                                            sourceItem: Rectangle {
+                                                width: 44
+                                                height: 44
+                                                radius: 12
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Checkbox overlay on top-right corner
+                            Rectangle {
+                                id: collapsedCheckbox
+                                width: 18
+                                height: 18
+                                radius: 4
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.rightMargin: -4
+                                anchors.topMargin: -4
+                                z: 10
+                                border.width: 2
+                                border.color: boardRow.active ? "#D214FD" : "#AAFFFFFF"
+                                color: collapsedCheckboxMouse.containsMouse ? "#333333" : (boardRow.active ? "#2A2A2A" : "#1A1A1A")
+
+                                // Checkmark icon when active
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "✓"
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                    color: "#D214FD"
+                                    visible: boardRow.active
+                                }
+
+                                MouseArea {
+                                    id: collapsedCheckboxMouse
+                                    anchors.fill: parent
+                                    anchors.margins: -4
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+
+                                    onClicked: () => {
+                                        console.log("Collapsed checkbox clicked - toggling board:", boardRow.boardId);
+                                        soundboardsModel.toggleActiveById(boardRow.boardId);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Expanded mode layout - full row with checkbox, image, name, delete
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 10
                             anchors.rightMargin: 10
                             spacing: 10
                             z: 1  // Above the background
+                            visible: !root.isCollapsed
 
                             // checkbox indicator - clicking this toggles the soundboard active state
                             Rectangle {
@@ -556,10 +631,10 @@ Rectangle {
                 }
             }
 
-            // Add Soundboard button - matches design
+            // Add Soundboard button - shows in both modes
             Button {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 48
+                Layout.preferredHeight: root.isCollapsed ? 44 : 48
                 text: "Add Soundboard"
 
                 background: Rectangle {
@@ -567,15 +642,14 @@ Rectangle {
                     color: "#3D2F2F"  // Brown/maroon background
                 }
 
-                contentItem: RowLayout {
+                contentItem: Item {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
-                    spacing: 12
 
-                    // Plus icon in rounded square
+                    // Collapsed mode - just centered plus icon
                     Rectangle {
-                        width: 52
+                        visible: root.isCollapsed
+                        anchors.centerIn: parent
+                        width: 36
                         height: 36
                         radius: 8
                         color: "#4F3B3B"
@@ -589,20 +663,47 @@ Rectangle {
                         }
                     }
 
-                    Text {
-                        text: "Add Soundboard"
-                        color: "#FFFFFF"
-                        font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
-                        font.pixelSize: 14
-                        font.weight: Font.DemiBold
-                        Layout.fillWidth: true
+                    // Expanded mode - full row layout
+                    RowLayout {
+                        visible: !root.isCollapsed
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 12
+
+                        // Plus icon in rounded square
+                        Rectangle {
+                            width: 52
+                            height: 36
+                            radius: 8
+                            color: "#4F3B3B"
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "+"
+                                color: "#FFFFFF"
+                                font.pixelSize: 20
+                                font.weight: Font.Normal
+                            }
+                        }
+
+                        Text {
+                            text: "Add Soundboard"
+                            color: "#FFFFFF"
+                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
+                            font.pixelSize: 14
+                            font.weight: Font.DemiBold
+                            Layout.fillWidth: true
+                        }
                     }
                 }
 
                 onClicked: {
                     // Create immediately with a placeholder name
                     const newId = soundboardService.createBoard("New Soundboard");
-                    root.editingBoardId = newId;
+                    if (!root.isCollapsed) {
+                        root.editingBoardId = newId;
+                    }
 
                     // Refresh model (usually boardsChanged triggers reload automatically,
                     // but calling reload makes it immediate)
