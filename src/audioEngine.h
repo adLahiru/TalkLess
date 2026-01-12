@@ -69,6 +69,12 @@ public:
     // ---------------------------
     // Device selection
     // ---------------------------
+    // Pre-select devices (use before starting, does not reinitialize)
+    bool preselectPlaybackDevice(const std::string& deviceId);
+    bool preselectCaptureDevice(const std::string& deviceId);
+    bool preselectMonitorPlaybackDevice(const std::string& deviceId);
+    
+    // Set devices (use after starting, reinitializes device)
     bool setPlaybackDevice(const std::string& deviceId);
     bool setCaptureDevice(const std::string& deviceId);
     bool setMonitorPlaybackDevice(const std::string& deviceId);
@@ -200,6 +206,9 @@ private:
 
     // Context rebuild (hotplug refresh)
     bool rebuildContextAndDevices(bool restartRunning);
+    
+    // Refresh device ID structs after context rebuild (lookup by string ID)
+    void refreshDeviceIdStructs();
 
     // DSP helpers
     static float dBToLinear(float db);

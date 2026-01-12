@@ -27,7 +27,37 @@ ApplicationWindow {
         }
     }
 
+    // ---- Global Audio Device Hotplug Detection ----
+    // This runs globally so device changes are detected even when not in settings view
+    property var lastKnownInputDevices: []
+    property var lastKnownOutputDevices: []
+    
+    Timer {
+        id: globalDevicePollTimer
+        interval: 2000  // Check every 2 seconds
+        running: true   // Always run
+        repeat: true
+        onTriggered: {
+            var currentInputDevices = soundboardService.getInputDevices();
+            var currentOutputDevices = soundboardService.getOutputDevices();
+            
+            var inputChanged = JSON.stringify(currentInputDevices) !== JSON.stringify(mainWindow.lastKnownInputDevices);
+            var outputChanged = JSON.stringify(currentOutputDevices) !== JSON.stringify(mainWindow.lastKnownOutputDevices);
+            
+            if (inputChanged || outputChanged) {
+                console.log("[Hotplug] Audio devices changed, refreshing audio engine...");
+                mainWindow.lastKnownInputDevices = currentInputDevices;
+                mainWindow.lastKnownOutputDevices = currentOutputDevices;
+                // This will rebuild context and refresh device ID structs
+                soundboardService.refreshAudioDevices();
+            }
+        }
+    }
+    
     Component.onCompleted: {
+        // Store initial device lists for hotplug detection
+        lastKnownInputDevices = soundboardService.getInputDevices();
+        lastKnownOutputDevices = soundboardService.getOutputDevices();
         // Initialize Theme from Backend
         Colors.setTheme(soundboardService.theme)
         Colors.setAccent(soundboardService.accentColor)

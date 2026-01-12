@@ -16,12 +16,7 @@
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
-    // Initialize audio engine
-    if (!m_audioEngine->startAudioDevice()) {
-        qWarning() << "Failed to start audio device";
-    }
-
-    // 1) Load index (might not exist)
+    // 1) Load index (might not exist) - BEFORE starting audio to apply saved devices
     m_state = m_repo.loadIndex();
 
     // 2) First launch: no boards -> create one
@@ -43,21 +38,26 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
         }
     }
 
-    // 4) Apply saved audio settings
+    // 4) Pre-select saved audio devices BEFORE starting audio engine
+    //    This ensures we initialize with the correct devices from the start
     if (m_audioEngine) {
-        m_audioEngine->setMasterGainDB(static_cast<float>(m_state.settings.masterGainDb));
-        m_audioEngine->setMicGainDB(static_cast<float>(m_state.settings.micGainDb));
-
+        // Pre-select devices (just sets internal state without initializing)
         if (!m_state.settings.selectedCaptureDeviceId.isEmpty()) {
-            m_audioEngine->setCaptureDevice(m_state.settings.selectedCaptureDeviceId.toStdString());
+            qDebug() << "Pre-selecting saved capture device:" << m_state.settings.selectedCaptureDeviceId;
+            m_audioEngine->preselectCaptureDevice(m_state.settings.selectedCaptureDeviceId.toStdString());
         }
         if (!m_state.settings.selectedPlaybackDeviceId.isEmpty()) {
-            m_audioEngine->setPlaybackDevice(m_state.settings.selectedPlaybackDeviceId.toStdString());
+            qDebug() << "Pre-selecting saved playback device:" << m_state.settings.selectedPlaybackDeviceId;
+            m_audioEngine->preselectPlaybackDevice(m_state.settings.selectedPlaybackDeviceId.toStdString());
         }
         if (!m_state.settings.selectedMonitorDeviceId.isEmpty()) {
-            m_audioEngine->setMonitorPlaybackDevice(m_state.settings.selectedMonitorDeviceId.toStdString());
+            qDebug() << "Pre-selecting saved monitor device:" << m_state.settings.selectedMonitorDeviceId;
+            m_audioEngine->preselectMonitorPlaybackDevice(m_state.settings.selectedMonitorDeviceId.toStdString());
         }
 
+        // Apply other audio settings
+        m_audioEngine->setMasterGainDB(static_cast<float>(m_state.settings.masterGainDb));
+        m_audioEngine->setMicGainDB(static_cast<float>(m_state.settings.micGainDb));
         m_audioEngine->setMicEnabled(m_state.settings.micEnabled);
         m_audioEngine->setMicPassthroughEnabled(m_state.settings.micPassthroughEnabled);
         m_audioEngine->setMicSoundboardBalance(m_state.settings.micSoundboardBalance);
@@ -66,7 +66,19 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
                  << "dB, Mic:" << m_state.settings.micGainDb << "dB";
     }
 
-    // 5) Setup AudioEngine callbacks
+    // 5) Now start audio device with correct devices already configured
+    if (!m_audioEngine->startAudioDevice()) {
+        qWarning() << "Failed to start audio device";
+    }
+    
+    // 6) Start monitor device if a monitor output was configured
+    if (!m_state.settings.selectedMonitorDeviceId.isEmpty()) {
+        if (!m_audioEngine->startMonitorDevice()) {
+            qWarning() << "Failed to start monitor device";
+        }
+    }
+
+    // 7) Setup AudioEngine callbacks
     if (m_audioEngine) {
         m_audioEngine->setClipFinishedCallback([this](int slotId) {
             // Find which clipId was in this slot
@@ -86,7 +98,7 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
         });
     }
 
-    // 6) Notify UI
+    // 8) Notify UI
     emit boardsChanged();
     emit activeBoardChanged();
     emit activeClipsChanged();

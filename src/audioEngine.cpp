@@ -331,6 +331,8 @@ bool AudioEngine::rebuildContextAndDevices(bool restartRunning)
     static std::mutex m;
     std::lock_guard<std::mutex> lock(m);
 
+    std::cout << "[AudioEngine] Rebuilding context and devices..." << std::endl;
+
     const bool mainWasRunning    = deviceRunning.load(std::memory_order_acquire);
     const bool monWasRunning     = monitorRunning.load(std::memory_order_acquire);
     const bool recInWasRunning   = recordingInputRunning.load(std::memory_order_acquire);
@@ -342,7 +344,7 @@ bool AudioEngine::rebuildContextAndDevices(bool restartRunning)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(30));
 
-    // uninit devices (but keep selection IDs)
+    // uninit devices (but keep selection string IDs)
     if (device) {
         ma_device_uninit(device);
         delete device;
@@ -367,7 +369,11 @@ bool AudioEngine::rebuildContextAndDevices(bool restartRunning)
     }
     if (!initContext()) return false;
 
-    // reinit devices
+    // CRITICAL: Refresh device ID structs after rebuilding context
+    // The ma_device_id structs become stale after context rebuild
+    refreshDeviceIdStructs();
+
+    // reinit devices with refreshed device ID structs
     if (!initDevice()) return false;
     // monitor optional
     if (selectedMonitorPlaybackSet) {
@@ -383,6 +389,8 @@ bool AudioEngine::rebuildContextAndDevices(bool restartRunning)
         if (monWasRunning)  startMonitorDevice();
         if (recInWasRunning) startRecordingInputDevice();
     }
+    
+    std::cout << "[AudioEngine] Context and devices rebuilt successfully" << std::endl;
     return true;
 }
 
@@ -396,6 +404,83 @@ bool AudioEngine::refreshInputDevices()
 {
     // rebuild and restart anything that was running
     return rebuildContextAndDevices(true);
+}
+
+// ------------------------------------------------------------
+// Refresh device ID structs after context rebuild
+// ------------------------------------------------------------
+void AudioEngine::refreshDeviceIdStructs()
+{
+    // After rebuilding context, the ma_device_id structs are stale.
+    // We need to re-lookup each device by its string ID.
+    
+    if (selectedPlaybackSet && !selectedPlaybackDeviceId.empty()) {
+        auto devices = enumeratePlaybackDevices();
+        bool found = false;
+        for (const auto& d : devices) {
+            if (d.id == selectedPlaybackDeviceId || d.name == selectedPlaybackDeviceId) {
+                selectedPlaybackDeviceIdStruct = d.deviceId;
+                found = true;
+                std::cout << "[AudioEngine] Refreshed playback device struct: " << d.name << std::endl;
+                break;
+            }
+        }
+        if (!found) {
+            std::cout << "[AudioEngine] Previously selected playback device not found: " << selectedPlaybackDeviceId << std::endl;
+            selectedPlaybackSet = false;  // Device no longer available
+        }
+    }
+    
+    if (selectedCaptureSet && !selectedCaptureDeviceId.empty()) {
+        auto devices = enumerateCaptureDevices();
+        bool found = false;
+        for (const auto& d : devices) {
+            if (d.id == selectedCaptureDeviceId || d.name == selectedCaptureDeviceId) {
+                selectedCaptureDeviceIdStruct = d.deviceId;
+                found = true;
+                std::cout << "[AudioEngine] Refreshed capture device struct: " << d.name << std::endl;
+                break;
+            }
+        }
+        if (!found) {
+            std::cout << "[AudioEngine] Previously selected capture device not found: " << selectedCaptureDeviceId << std::endl;
+            selectedCaptureSet = false;  // Device no longer available
+        }
+    }
+    
+    if (selectedMonitorPlaybackSet && !selectedMonitorPlaybackDeviceId.empty()) {
+        auto devices = enumeratePlaybackDevices();
+        bool found = false;
+        for (const auto& d : devices) {
+            if (d.id == selectedMonitorPlaybackDeviceId || d.name == selectedMonitorPlaybackDeviceId) {
+                selectedMonitorPlaybackDeviceIdStruct = d.deviceId;
+                found = true;
+                std::cout << "[AudioEngine] Refreshed monitor device struct: " << d.name << std::endl;
+                break;
+            }
+        }
+        if (!found) {
+            std::cout << "[AudioEngine] Previously selected monitor device not found: " << selectedMonitorPlaybackDeviceId << std::endl;
+            selectedMonitorPlaybackSet = false;  // Device no longer available
+        }
+    }
+    
+    if (selectedRecordingCaptureSet && !selectedRecordingCaptureDeviceId.empty()) {
+        auto devices = enumerateCaptureDevices();
+        bool found = false;
+        for (const auto& d : devices) {
+            if (d.id == selectedRecordingCaptureDeviceId || d.name == selectedRecordingCaptureDeviceId) {
+                selectedRecordingCaptureDeviceIdStruct = d.deviceId;
+                found = true;
+                std::cout << "[AudioEngine] Refreshed recording input device struct: " << d.name << std::endl;
+                break;
+            }
+        }
+        if (!found) {
+            std::cout << "[AudioEngine] Previously selected recording input device not found: " << selectedRecordingCaptureDeviceId << std::endl;
+            selectedRecordingCaptureSet = false;  // Device no longer available
+        }
+    }
 }
 
 // ------------------------------------------------------------
@@ -502,6 +587,55 @@ bool AudioEngine::reinitializeMonitorDevice(bool restart)
     return true;
 }
 
+// ------------------------------------------------------------
+// Preselect devices (for use before starting audio)
+// These just set the internal selection without reinitializing
+// ------------------------------------------------------------
+bool AudioEngine::preselectPlaybackDevice(const std::string& deviceId)
+{
+    auto devices = enumeratePlaybackDevices();
+    for (const auto& d : devices) {
+        if (d.id == deviceId || d.name == deviceId) {
+            selectedPlaybackDeviceId       = d.id;
+            selectedPlaybackDeviceIdStruct = d.deviceId;
+            selectedPlaybackSet            = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioEngine::preselectCaptureDevice(const std::string& deviceId)
+{
+    auto devices = enumerateCaptureDevices();
+    for (const auto& d : devices) {
+        if (d.id == deviceId || d.name == deviceId) {
+            selectedCaptureDeviceId       = d.id;
+            selectedCaptureDeviceIdStruct = d.deviceId;
+            selectedCaptureSet            = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioEngine::preselectMonitorPlaybackDevice(const std::string& deviceId)
+{
+    auto devices = enumeratePlaybackDevices();
+    for (const auto& d : devices) {
+        if (d.id == deviceId || d.name == deviceId) {
+            selectedMonitorPlaybackDeviceId       = d.id;
+            selectedMonitorPlaybackDeviceIdStruct = d.deviceId;
+            selectedMonitorPlaybackSet            = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+// ------------------------------------------------------------
+// Set devices (reinitializes running device)
+// ------------------------------------------------------------
 bool AudioEngine::setPlaybackDevice(const std::string& deviceId)
 {
     auto devices = enumeratePlaybackDevices();
@@ -510,9 +644,11 @@ bool AudioEngine::setPlaybackDevice(const std::string& deviceId)
             selectedPlaybackDeviceId       = d.id;
             selectedPlaybackDeviceIdStruct = d.deviceId;
             selectedPlaybackSet            = true;
+            std::cout << "[AudioEngine] Switching playback device to: " << d.name << std::endl;
             return reinitializeDevice(true);
         }
     }
+    std::cerr << "[AudioEngine] Playback device not found: " << deviceId << std::endl;
     return false;
 }
 
@@ -524,9 +660,11 @@ bool AudioEngine::setCaptureDevice(const std::string& deviceId)
             selectedCaptureDeviceId       = d.id;
             selectedCaptureDeviceIdStruct = d.deviceId;
             selectedCaptureSet            = true;
+            std::cout << "[AudioEngine] Switching capture device to: " << d.name << std::endl;
             return reinitializeDevice(true);
         }
     }
+    std::cerr << "[AudioEngine] Capture device not found: " << deviceId << std::endl;
     return false;
 }
 
@@ -538,9 +676,11 @@ bool AudioEngine::setMonitorPlaybackDevice(const std::string& deviceId)
             selectedMonitorPlaybackDeviceId       = d.id;
             selectedMonitorPlaybackDeviceIdStruct = d.deviceId;
             selectedMonitorPlaybackSet            = true;
+            std::cout << "[AudioEngine] Switching monitor playback device to: " << d.name << std::endl;
             return reinitializeMonitorDevice(true);
         }
     }
+    std::cerr << "[AudioEngine] Monitor playback device not found: " << deviceId << std::endl;
     return false;
 }
 
