@@ -2,7 +2,6 @@
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QQmlContext>
-#include <QDebug>
 
 #include "services/soundboardService.h"
 #include "qmlmodels/soundboardsListModel.h"
@@ -17,39 +16,35 @@ int main(int argc, char* argv[])
     QGuiApplication::setOrganizationName("TalkLess");
     QGuiApplication::setOrganizationDomain("talkless.app");
     QGuiApplication::setApplicationName("TalkLess");
-    // Keep process alive even if window closes/minimizes
     app.setQuitOnLastWindowClosed(true);
 
-           // Create QML engine FIRST
     QQmlApplicationEngine engine;
 
-           // Backend
+    // Backend
     SoundboardService soundboardService;
 
-           // Model for QML
+    // Model for QML
     SoundboardsListModel soundboardsModel;
     soundboardsModel.setService(&soundboardService);
 
-           // Clips model for QML
+    // Clips model for QML
     ClipsListModel clipsModel;
     clipsModel.setService(&soundboardService);
 
-           // Hotkey Manager
+    // Hotkey Manager
     HotkeyManager hotkeyManager;
-    
-           // Connect hotkey manager to soundboard service for soundboard hotkeys
     hotkeyManager.setSoundboardService(&soundboardService);
 
-           // Connect hotkey actions to soundboard service (modular signal-slot connection)
+    // Connect hotkey actions to soundboard service
     QObject::connect(&hotkeyManager, &HotkeyManager::actionTriggered,
                      &soundboardService, &SoundboardService::handleHotkeyAction);
 
-           // Auto-save hotkeys when application closes
+    // Auto-save hotkeys when application closes
     QObject::connect(&app, &QGuiApplication::aboutToQuit, [&hotkeyManager]() {
         hotkeyManager.saveHotkeysOnClose();
     });
 
-           // Expose to QML
+    // Expose to QML
     engine.rootContext()->setContextProperty("soundboardService", &soundboardService);
     engine.rootContext()->setContextProperty("soundboardsModel", &soundboardsModel);
     engine.rootContext()->setContextProperty("clipsModel", &clipsModel);
@@ -61,6 +56,9 @@ int main(int argc, char* argv[])
         Qt::QueuedConnection);
 
     engine.loadFromModule("TalkLess", "Main");
+
+    if (engine.rootObjects().isEmpty())
+        return -1;
 
     return app.exec();
 }

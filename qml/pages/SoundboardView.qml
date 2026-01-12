@@ -334,33 +334,39 @@ Rectangle {
                         padding: 8
 
                         background: Rectangle {
-                                color: Colors.surface
-                                radius: 8
-                                border.color: Colors.border
-                                border.width: 1
-                            }
+                            color: Colors.surface
+                            radius: 8
+                            border.color: Colors.border
+                            border.width: 1
+                        }
 
-                            contentItem: Column {
-                                spacing: 4
+                        contentItem: Column {
+                            spacing: 4
 
-                                Repeater {
-                                    model: ["Select Slots", "Detach Window", "Edit Cover", "Delete"]
+                            Repeater {
+                                model: ["Select Slots", "Detach Window", "Edit Cover", "Delete"]
 
-                                    delegate: Rectangle {
-                                        id: menuItem
-                                        width: 144
-                                        height: 36
-                                        radius: 6
-                                        color: menuItemMouse.containsMouse ? Colors.surfaceLight : "transparent"
+                                delegate: Rectangle {
+                                    id: menuItem
+                                    width: 144
+                                    height: 36
+                                    radius: 6
+                                    color: menuItemMouse.containsMouse ? Colors.surfaceLight : "transparent"
 
-                                        required property string modelData
+                                    required property string modelData
 
-                                        Text {
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: 12
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            text: menuItem.modelData
-                                            color: menuItem.modelData === "Delete" ? Colors.error : Colors.textPrimary
+                                    Text {
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 12
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: menuItem.modelData
+                                        color: menuItem.modelData === "Delete" ? Colors.error : Colors.textPrimary
+                                    }
+
+                                    MouseArea {
+                                        id: menuItemMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
                                             console.log("Menu item clicked:", menuItem.modelData);
