@@ -9,7 +9,7 @@ Item {
     id: root
 
     // Base dimensions matching SoundboardView calculation
-    property real baseWidth: 180
+    readonly property real baseWidth: 180
     readonly property real baseHeight: baseWidth * 79 / 111
     readonly property real scaleFactor: width / baseWidth
 
@@ -27,6 +27,9 @@ Item {
     // hover state
     property bool tileHover: false
     property bool actionHover: false
+
+    // hover scale amount (change to 1.05 / 1.10 as you like)
+    readonly property real hoverScale: 1.06
 
     // actions
     signal playClicked
@@ -112,6 +115,25 @@ Item {
         border.width: Math.max(1, 2 * root.scaleFactor)
         border.color: "#EDEDED"
         clip: true
+
+        // -------------------------
+        // Hover animation (scale)
+        // -------------------------
+        transformOrigin: Item.Center
+        scale: root.tileHover ? root.hoverScale : 1.0
+
+        Behavior on scale {
+            NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        // Optional: subtle shadow-like effect using border color/opacity tweak
+        Behavior on border.color {
+            ColorAnimation { duration: 140 }
+        }
+        border.color: root.tileHover ? "#3B82F6" : "#EDEDED"
 
         // Background image with rounded corners
         Item {
@@ -296,16 +318,20 @@ Item {
 
                     // Play/Stop
                     Rectangle {
-                        width: 30 ; height: 30 * root; radius: 15
+                        width: 30
+                        height: 30
+                        radius: 15
                         color: playMA.containsMouse ? "#444444" : "transparent"
-                        Text { anchors.centerIn: parent; text: root.isPlaying ? "⏹️" : "▶️"; font.pixelSize: 14  }
+                        Text { anchors.centerIn: parent; text: root.isPlaying ? "⏹️" : "▶️"; font.pixelSize: 14 }
                         MouseArea { id: playMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: { root.playClicked(); root.showActions = false } }
                     }
 
                     // Copy
                     Rectangle {
-                        width: 30 ; height: 30 ; radius: 15
+                        width: 30
+                        height: 30
+                        radius: 15
                         color: copyMA.containsMouse ? "#444444" : "transparent"
                         Text { anchors.centerIn: parent; text: "📋"; font.pixelSize: 14 }
                         MouseArea { id: copyMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
@@ -314,36 +340,44 @@ Item {
 
                     // Edit bg
                     Rectangle {
-                        width: 30 ; height: 30 ; radius: 15
+                        width: 30
+                        height: 30
+                        radius: 15
                         color: bgMA.containsMouse ? "#444444" : "transparent"
-                        Text { anchors.centerIn: parent; text: "🖼️"; font.pixelSize: Math.max(10, 14 ) }
+                        Text { anchors.centerIn: parent; text: "🖼️"; font.pixelSize: 14 }
                         MouseArea { id: bgMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: { root.editBackgroundClicked(); root.showActions = false } }
                     }
 
                     // Web
                     Rectangle {
-                        width: 30 ; height: 30 ; radius: 15
+                        width: 30
+                        height: 30
+                        radius: 15
                         color: webMA.containsMouse ? "#444444" : "transparent"
-                        Text { anchors.centerIn: parent; text: "🌐"; font.pixelSize: Math.max(10, 14 ) }
+                        Text { anchors.centerIn: parent; text: "🌐"; font.pixelSize: 14 }
                         MouseArea { id: webMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: { root.webClicked(); root.showActions = false } }
                     }
 
                     // Edit
                     Rectangle {
-                        width: 30 ; height: 30 ; radius: 15
+                        width: 30
+                        height: 30
+                        radius: 15
                         color: editMA.containsMouse ? "#444444" : "transparent"
-                        Text { anchors.centerIn: parent; text: "✏️"; font.pixelSize: Math.max(10, 14 ) }
+                        Text { anchors.centerIn: parent; text: "✏️"; font.pixelSize: 14 }
                         MouseArea { id: editMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: { root.editClicked(); root.showActions = false } }
                     }
 
                     // Delete
                     Rectangle {
-                        width: 30 ; height: 30 ; radius: 15
+                        width: 30
+                        height: 30
+                        radius: 15
                         color: delMA.containsMouse ? "#444444" : "transparent"
-                        Text { anchors.centerIn: parent; text: "🗑️"; font.pixelSize: Math.max(10, 14 ) }
+                        Text { anchors.centerIn: parent; text: "🗑️"; font.pixelSize: 14 }
                         MouseArea { id: delMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: { root.deleteClicked(); root.showActions = false } }
                     }
@@ -368,22 +402,16 @@ Item {
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             cursorShape: Qt.PointingHandCursor
 
-            onEntered: { root.tileHover = true;
-                        baseWidth * 1.01
-            }
-            onExited:  {
-                root.tileHover = false
-            }
+            onEntered: { root.tileHover = true }
+            onExited:  { root.tileHover = false }
 
             onClicked: function(mouse) {
                 if (mouse.button === Qt.RightButton) {
-                    // open above clip (top-center)
                     root.openActionsAboveTile()
                     mouse.accepted = true
                 } else if (mouse.button === Qt.LeftButton) {
                     root.clicked()
                     root.playClicked()
-                    // optional: hide actions on left click
                     root.showActions = false
                 }
             }
