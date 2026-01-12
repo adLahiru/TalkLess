@@ -757,7 +757,10 @@ Rectangle {
                                         RowLayout {
                                             spacing: 20
                                             Repeater {
-                                                model: ["Light", "Dark"]
+                                                model: [
+                                                    { label: "Light", value: "light" },
+                                                    { label: "Dark", value: "dark" }
+                                                ]
                                                 delegate: RowLayout {
                                                     spacing: 8
                                                     Rectangle {
@@ -773,17 +776,18 @@ Rectangle {
                                                             height: 8
                                                             radius: 4
                                                             color: Colors.accent
-                                                            visible: soundboardService.theme === modelData
+                                                            // Check case-insensitive to be safe, or direct match
+                                                            visible: soundboardService.theme.toLowerCase() === modelData.value
                                                         }
                                                     }
                                                     Text {
-                                                        text: modelData
+                                                        text: modelData.label
                                                         color: Colors.textPrimary
                                                         font.pixelSize: 14
                                                     }
                                                     MouseArea {
                                                         anchors.fill: parent
-                                                        onClicked: soundboardService.setTheme(modelData)
+                                                        onClicked: soundboardService.setTheme(modelData.value)
                                                     }
                                                 }
                                             }

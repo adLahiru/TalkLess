@@ -19,6 +19,21 @@ ApplicationWindow {
     title: qsTr("TalkLess")
     color: Colors.background
 
+    // Link Backend Theme & Settings to UI Singleton
+    Connections {
+        target: soundboardService
+        function onSettingsChanged() {
+            Colors.setTheme(soundboardService.theme)
+            Colors.setAccent(soundboardService.accentColor)
+        }
+    }
+
+    Component.onCompleted: {
+        // Initialize Theme from Backend
+        Colors.setTheme(soundboardService.theme)
+        Colors.setAccent(soundboardService.accentColor)
+    }
+
     property bool isSoundboardDetached: false
 
     // ---- Hotkey Capture Popup ----

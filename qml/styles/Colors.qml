@@ -64,4 +64,8 @@ QtObject {
     function setTheme(theme) {
         currentTheme = theme
     }
+
+    function setAccent(color) {
+        accent = color
+    }
 }
