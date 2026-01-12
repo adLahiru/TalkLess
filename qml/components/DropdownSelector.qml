@@ -129,9 +129,9 @@ Rectangle {
         z: 1000
         
         background: Rectangle {
-            color: "#1A1A1A"
+            color: Colors.surface
             radius: 10
-            border.color: "#444444"
+            border.color: Colors.border
             border.width: 1
             
             // Shadow effect
@@ -139,10 +139,10 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: -2
                 z: -1
-                color: "transparent"
+                color: Colors.shadow
                 radius: 12
-                border.color: "#000000"
-                border.width: 4
+                border.color: "transparent"
+                border.width: 0
                 opacity: 0.3
             }
         }

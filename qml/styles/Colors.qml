@@ -6,7 +6,6 @@ QtObject {
     property string currentTheme: "dark"
 
     // Primary Colors (Driven by Accent)
-    // Primary Colors (Driven by Accent)
     property color accent: "#3B82F6" // Default Blue (requested start of gradient)
     property color primary: accent
     property color primaryDark: Qt.darker(accent, 1.3)
@@ -65,7 +64,7 @@ QtObject {
         currentTheme = theme
     }
 
-    function setAccent(color) {
-        accent = color
+    function setAccent(newAccent) {
+        accent = newAccent
     }
 }

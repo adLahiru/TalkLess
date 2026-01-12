@@ -208,7 +208,7 @@ Rectangle {
                                             width: 22
                                             height: 22
                                             radius: 11
-                                            color: Colors.textPrimary
+                                            color: alwaysOnToggle.isOn ? Colors.textPrimary : Colors.border
                                             x: alwaysOnToggle.isOn ? parent.width - width - 3 : 3
                                             anchors.verticalCenter: parent.verticalCenter
 
@@ -448,7 +448,7 @@ Rectangle {
                                         width: 52
                                         height: 28
                                         radius: 14
-                                        color: outputToggle.isOn ? Colors.success : Colors.border
+                                        color: outputToggle.isOn ? Colors.success : Colors.surfaceLight
 
                                         property bool isOn: soundboardService.micPassthroughEnabled
                                         onIsOnChanged: {

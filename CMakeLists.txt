@@ -257,3 +257,29 @@ install(TARGETS appTalkLess
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+ 
+ #   - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+ #   D e p l o y m e n t   ( P o s t - B u i l d )  
+ #   - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+ i f ( W I N 3 2 )  
+         #   A t t e m p t   t o   f i n d   w i n d e p l o y q t  
+         f i n d _ p a c k a g e ( Q t 6   C O M P O N E N T S   C o r e   R E Q U I R E D )  
+         g e t _ t a r g e t _ p r o p e r t y ( _ q m a k e _ e x e c u t a b l e   Q t 6 : : q m a k e   I M P O R T E D _ L O C A T I O N )  
+         g e t _ f i l e n a m e _ c o m p o n e n t ( _ q t _ b i n _ d i r   " $ { _ q m a k e _ e x e c u t a b l e } "   D I R E C T O R Y )  
+         f i n d _ p r o g r a m ( W I N D E P L O Y Q T _ E X E C U T A B L E   w i n d e p l o y q t   H I N T S   " $ { _ q t _ b i n _ d i r } " )  
+  
+         i f ( W I N D E P L O Y Q T _ E X E C U T A B L E )  
+                 m e s s a g e ( S T A T U S   " F o u n d   w i n d e p l o y q t :   $ { W I N D E P L O Y Q T _ E X E C U T A B L E } " )  
+                 a d d _ c u s t o m _ c o m m a n d ( T A R G E T   a p p T a l k L e s s   P O S T _ B U I L D  
+                         C O M M A N D   " $ { W I N D E P L O Y Q T _ E X E C U T A B L E } "  
+                                 - - q m l d i r   " $ { C M A K E _ S O U R C E _ D I R } / q m l "  
+                                 - - d i r   " $ < T A R G E T _ F I L E _ D I R : a p p T a l k L e s s > "  
+                                 - - n o - c o m p i l e r - r u n t i m e  
+                                 " $ < T A R G E T _ F I L E : a p p T a l k L e s s > "  
+                         C O M M E N T   " R u n n i n g   w i n d e p l o y q t   t o   d e p l o y   Q t   d e p e n d e n c i e s . . . "  
+                 )  
+         e l s e ( )  
+                 m e s s a g e ( W A R N I N G   " w i n d e p l o y q t   n o t   f o u n d !   Y o u   m a y   n e e d   t o   r u n   i t   m a n u a l l y . " )  
+         e n d i f ( )  
+ e n d i f ( )  
+ 

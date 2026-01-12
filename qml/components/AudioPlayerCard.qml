@@ -35,16 +35,27 @@ Item {
     Item {
         anchors.fill: parent
         
-        // SVG Background shape - positioned at bottom to leave room for play button
-        Image {
+        // Background shape - positioned at bottom to leave room for play button
+        Rectangle {
             id: backgroundSvg
             anchors.bottom: parent.bottom
             anchors.horizontalCenter: parent.horizontalCenter
             width: 268 * root.scaleFactor  // 228
             height: 141 * root.scaleFactor  // ~120
-            source: "qrc:/qt/qml/TalkLess/resources/images/Subtract.svg"
-            fillMode: Image.PreserveAspectFit
-            smooth: true
+            color: Colors.surface
+            radius: 24
+            border.color: Colors.border
+            border.width: 1
+
+            // Optional: Add a shadow
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowColor: Colors.shadow
+                shadowBlur: 16
+                shadowVerticalOffset: 4
+                shadowHorizontalOffset: 0
+            }
         }
         
         // Play button - smaller, positioned in the center notch
@@ -135,7 +146,7 @@ Item {
             Text {
                 anchors.centerIn: parent
                 text: "⏮"
-                color: prevButtonArea.containsMouse ? "#FFFFFF" : "#AAAAAA"
+                color: prevButtonArea.containsMouse ? Colors.textPrimary : Colors.textSecondary
                 font.pixelSize: 16
             }
             
@@ -162,7 +173,7 @@ Item {
             Text {
                 anchors.centerIn: parent
                 text: "⏭"
-                color: nextButtonArea.containsMouse ? "#FFFFFF" : "#AAAAAA"
+                color: nextButtonArea.containsMouse ? Colors.textPrimary : Colors.textSecondary
                 font.pixelSize: 16
             }
             
@@ -197,7 +208,7 @@ Item {
                     text: "🎤"
                     font.pixelSize: 16
                     opacity: root.isMuted ? 0.4 : 1.0
-                    color: muteButtonArea.containsMouse ? "#FFFFFF" : "#888888"
+                    color: muteButtonArea.containsMouse ? Colors.textPrimary : Colors.textSecondary
                 }
                 
                 // Diagonal slash when muted

@@ -334,42 +334,33 @@ Rectangle {
                         padding: 8
 
                         background: Rectangle {
-                            color: "#1F1F1F"
-                            radius: 8
-                            border.color: "#333333"
-                            border.width: 1
-                        }
+                                color: Colors.surface
+                                radius: 8
+                                border.color: Colors.border
+                                border.width: 1
+                            }
 
-                        contentItem: Column {
-                            spacing: 4
+                            contentItem: Column {
+                                spacing: 4
 
-                            Repeater {
-                                model: ["Select Slots", "Detach Window", "Edit Cover", "Delete"]
+                                Repeater {
+                                    model: ["Select Slots", "Detach Window", "Edit Cover", "Delete"]
 
-                                delegate: Rectangle {
-                                    id: menuItem
-                                    width: 144
-                                    height: 36
-                                    radius: 6
-                                    color: menuItemMouse.containsMouse ? "#333333" : "transparent"
+                                    delegate: Rectangle {
+                                        id: menuItem
+                                        width: 144
+                                        height: 36
+                                        radius: 6
+                                        color: menuItemMouse.containsMouse ? Colors.surfaceLight : "transparent"
 
-                                    required property string modelData
+                                        required property string modelData
 
-                                    Text {
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 12
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: menuItem.modelData
-                                        color: menuItem.modelData === "Delete" ? "#FF6B6B" : "#FFFFFF"
-                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                        font.pixelSize: 14
-                                        font.weight: Font.Normal
-                                    }
-
-                                    MouseArea {
-                                        id: menuItemMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
+                                        Text {
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: 12
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: menuItem.modelData
+                                            color: menuItem.modelData === "Delete" ? Colors.error : Colors.textPrimary
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
                                             console.log("Menu item clicked:", menuItem.modelData);
@@ -474,7 +465,7 @@ Rectangle {
                         Layout.preferredHeight: 40
                         Layout.alignment: Qt.AlignVCenter
                         radius: 8
-                        color: disconnectMouseArea.containsMouse ? Qt.rgba(Colors.error.r, Colors.error.g, Colors.error.b, 0.1) : Colors.surfaceDark
+                        color: disconnectMouseArea.containsMouse ? Qt.rgba(Colors.error.r, Colors.error.g, Colors.error.b, 0.1) : Colors.surface
                         border.color: disconnectMouseArea.containsMouse ? Colors.error : Colors.border
                         border.width: 1
 
@@ -528,7 +519,7 @@ Rectangle {
                 id: contentArea
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: "#0d0d0d"
+                color: Colors.surfaceDark
                 radius: 12
 
                 // Tile sizing properties - responsive layout with scale factor
@@ -600,9 +591,9 @@ Rectangle {
                         // Visual feedback for file dragging
                         Rectangle {
                             anchors.fill: parent
-                            color: "#2a00ff00"
+                            color: Qt.rgba(Colors.success.r, Colors.success.g, Colors.success.b, 0.2)
                             visible: parent.containsDrag
-                            border.color: "#00ff00"
+                            border.color: Colors.success
                             border.width: 3
                             radius: 12
 
@@ -614,14 +605,14 @@ Rectangle {
                                 Text {
                                     Layout.alignment: Qt.AlignHCenter
                                     text: "+"
-                                    color: "#00ff00"
+                                    color: Colors.success
                                     font.pixelSize: 64
                                     font.weight: Font.Light
 
                                     layer.enabled: true
                                     layer.effect: MultiEffect {
                                         colorization: 1.0
-                                        colorizationColor: "#00ff00"
+                                        colorizationColor: Colors.success
                                         blurEnabled: true
                                         blur: 0.5
                                     }
@@ -630,7 +621,7 @@ Rectangle {
                                 Text {
                                     Layout.alignment: Qt.AlignHCenter
                                     text: "Drop audio files to add to soundboard"
-                                    color: "#00ff00"
+                                    color: Colors.success
                                     font.pixelSize: 22
                                     font.weight: Font.DemiBold
                                 }
@@ -831,10 +822,10 @@ Rectangle {
 
                                     Rectangle {
                                         anchors.fill: parent
-                                        color: parent.containsDrag ? "#4400FF00" : "transparent"
+                                        color: parent.containsDrag ? Qt.rgba(Colors.success.r, Colors.success.g, Colors.success.b, 0.25) : "transparent"
                                         radius: 16
                                         border.width: parent.containsDrag ? 2 : 0
-                                        border.color: "#00FF00"
+                                        border.color: Colors.success
                                     }
                                 }
                             }
@@ -1071,7 +1062,7 @@ Rectangle {
 
                             Text {
                                 text: "Name Audio File"
-                                color: "#FFFFFF"
+                                color: Colors.textPrimary
                                 font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                 font.pixelSize: 14
                                 font.weight: Font.DemiBold
@@ -1098,7 +1089,7 @@ Rectangle {
                                     source: clipboardIcon
                                     anchors.fill: clipboardIcon
                                     colorization: 1.0
-                                    colorizationColor: "#FFFFFF"
+                                    colorizationColor: Colors.textPrimary
                                 }
 
                                 MouseArea {
@@ -1113,9 +1104,9 @@ Rectangle {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 44
-                            color: "#1A1A1A"
+                            color: Colors.surface
                             radius: 8
-                            border.color: "#3A3A3A"
+                            border.color: Colors.border
                             border.width: 1
 
                             RowLayout {
@@ -1126,7 +1117,7 @@ Rectangle {
 
                                 Text {
                                     text: "Enter Name Here:"
-                                    color: "#808080"
+                                    color: Colors.textSecondary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
                                     visible: recordingNameInput.text === ""
@@ -1135,7 +1126,7 @@ Rectangle {
                                 TextInput {
                                     id: recordingNameInput
                                     Layout.fillWidth: true
-                                    color: "#FFFFFF"
+                                    color: Colors.textPrimary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
                                     clip: true
@@ -1143,7 +1134,7 @@ Rectangle {
                                     Text {
                                         anchors.fill: parent
                                         text: "_ _ _ _ _ _ _ _ _ _ _ _ _ _"
-                                        color: "#666666"
+                                        color: Colors.textDisabled
                                         font.family: parent.font.family
                                         font.pixelSize: parent.font.pixelSize
                                         visible: !parent.text && !parent.activeFocus
@@ -1164,7 +1155,7 @@ Rectangle {
 
                         Text {
                             text: "Input Source"
-                            color: "#FFFFFF"
+                            color: Colors.textPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 14
                             font.weight: Font.DemiBold
@@ -1319,13 +1310,13 @@ Rectangle {
                                     source: scissorsIcon
                                     anchors.fill: scissorsIcon
                                     colorization: 1.0
-                                    colorizationColor: "#FFFFFF"
+                                    colorizationColor: Colors.textPrimary
                                 }
                             }
 
                             Text {
                                 text: "Trim Audio"
-                                color: "#FFFFFF"
+                                color: Colors.textPrimary
                                 font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
@@ -1358,13 +1349,15 @@ Rectangle {
                         Rectangle {
                             Layout.preferredWidth: 80
                             Layout.preferredHeight: 36
-                            color: cancelBtnArea.containsMouse ? "#4A4A4A" : "#3A3A3A"
+                            color: cancelBtnArea.containsMouse ? Colors.surfaceLight : Colors.surface
                             radius: 8
+                            border.width: 1
+                            border.color: Colors.border
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "Cancel"
-                                color: "#FFFFFF"
+                                color: Colors.textPrimary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
@@ -1398,7 +1391,7 @@ Rectangle {
                             Text {
                                 anchors.centerIn: parent
                                 text: "Save"
-                                color: "#FFFFFF"
+                                color: Colors.textOnPrimary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
@@ -1517,7 +1510,7 @@ Rectangle {
 
                             Text {
                                 text: "No Clip Selected"
-                                color: "#888888"
+                                color: Colors.textPrimary
                                 font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                 font.pixelSize: 14
                                 font.weight: Font.DemiBold
@@ -1526,7 +1519,7 @@ Rectangle {
 
                             Text {
                                 text: "Select a clip to edit its\nsettings and properties"
-                                color: "#666666"
+                                color: Colors.textSecondary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
                                 Layout.alignment: Qt.AlignHCenter
@@ -2006,11 +1999,11 @@ Rectangle {
                                                 orientation: Gradient.Horizontal
                                                 GradientStop {
                                                     position: 0.0
-                                                    color: "#3B82F6"
+                                                    color: Colors.gradientPrimaryStart
                                                 }
                                                 GradientStop {
                                                     position: 1.0
-                                                    color: "#8B5CF6"
+                                                    color: Colors.gradientPrimaryEnd
                                                 }
                                             }
                                         }
@@ -2022,7 +2015,7 @@ Rectangle {
                                         width: 14
                                         height: 14
                                         radius: 7
-                                        color: "#FFFFFF"
+                                        color: Colors.textOnPrimary
                                     }
                                 }
                             }
@@ -2087,11 +2080,11 @@ Rectangle {
                                                 orientation: Gradient.Horizontal
                                                 GradientStop {
                                                     position: 0.0
-                                                    color: "#3B82F6"
+                                                    color: Colors.gradientPrimaryStart
                                                 }
                                                 GradientStop {
                                                     position: 1.0
-                                                    color: "#8B5CF6"
+                                                    color: Colors.gradientPrimaryEnd
                                                 }
                                             }
                                         }
@@ -2103,7 +2096,7 @@ Rectangle {
                                         width: 14
                                         height: 14
                                         radius: 7
-                                        color: "#FFFFFF"
+                                        color: Colors.textOnPrimary
                                     }
                                 }
                             }
@@ -2213,7 +2206,7 @@ Rectangle {
                                     spacing: 8
 
                                     // change this to your real theme flag
-                                    property bool isLightTheme: false
+                                    property bool isLightTheme: Colors.currentTheme === Colors.LightTheme
 
                                     // helper: pick correct svg for mode + theme
                                     function modeIconSource(mode) {
@@ -2237,7 +2230,7 @@ Rectangle {
                                         width: 36
                                         height: 36
                                         radius: 8
-                                        color: ma.containsMouse ? "#2A2A2A" : "#1A1A1A"
+                                        color: ma.containsMouse ? Colors.surfaceDark : Colors.surface
                                         border.width: 1
 
                                         Rectangle {
@@ -2304,7 +2297,7 @@ Rectangle {
                                             return "";
                                         }
                                     }
-                                    color: "#888888"
+                                    color: Colors.textSecondary // was #AAAAAA
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 10
                                     wrapMode: Text.WordWrap
@@ -2318,7 +2311,7 @@ Rectangle {
 
                                 Text {
                                     text: "Playback Behavior"
-                                    color: "#FFFFFF"
+                                    color: Colors.textOnPrimary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 12
                                     font.weight: Font.DemiBold
@@ -2342,14 +2335,14 @@ Rectangle {
                                             radius: 4
                                             // Force checked when mode is Play/Stop (mode 2), force unchecked when Play/Pause (mode 1)
                                             property bool effectiveValue: clipEditorTab.reproductionMode === 2 ? true : (clipEditorTab.reproductionMode === 1 ? false : clipEditorTab.stopOtherSounds)
-                                            color: effectiveValue ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: effectiveValue ? "#8B5CF6" : "#4A4A4A"
+                                            color: effectiveValue ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: effectiveValue ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: parent.effectiveValue ? "✓" : ""
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
                                             }
@@ -2369,7 +2362,7 @@ Rectangle {
 
                                         Text {
                                             text: clipEditorTab.reproductionMode === 2 ? "Stop other sounds on play (auto)" : clipEditorTab.reproductionMode === 1 ? "Stop other sounds on play (disabled)" : "Stop other sounds on play"
-                                            color: parent.isReadOnly ? "#888888" : "#CCCCCC"
+                                            color: parent.isReadOnly ? Colors.textDisabled : Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2383,14 +2376,14 @@ Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            color: clipEditorTab.muteOtherSounds ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: clipEditorTab.muteOtherSounds ? "#8B5CF6" : "#4A4A4A"
+                                            color: clipEditorTab.muteOtherSounds ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: clipEditorTab.muteOtherSounds ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: clipEditorTab.muteOtherSounds ? "✓" : ""
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
                                             }
@@ -2413,7 +2406,7 @@ Rectangle {
 
                                         Text {
                                             text: "Mute other sounds"
-                                            color: "#CCCCCC"
+                                            color: Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2431,14 +2424,14 @@ Rectangle {
                                             radius: 4
                                             // Force checked when muteOtherSounds is enabled
                                             property bool effectiveValue: clipEditorTab.muteOtherSounds || clipEditorTab.muteMicDuringPlayback
-                                            color: effectiveValue ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: effectiveValue ? "#8B5CF6" : "#4A4A4A"
+                                            color: effectiveValue ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: effectiveValue ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: parent.effectiveValue ? "✓" : ""
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
                                             }
@@ -2458,7 +2451,7 @@ Rectangle {
 
                                         Text {
                                             text: clipEditorTab.muteOtherSounds ? "Mute mic during playback (auto)" : "Mute mic during playback"
-                                            color: clipEditorTab.muteOtherSounds ? "#888888" : "#CCCCCC"
+                                            color: clipEditorTab.muteOtherSounds ? Colors.textDisabled : Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2472,14 +2465,14 @@ Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            color: clipEditorTab.persistentSettings ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: clipEditorTab.persistentSettings ? "#8B5CF6" : "#4A4A4A"
+                                            color: clipEditorTab.persistentSettings ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: clipEditorTab.persistentSettings ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: clipEditorTab.persistentSettings ? "✓" : ""
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
                                             }
@@ -2496,7 +2489,7 @@ Rectangle {
 
                                         Text {
                                             text: "Persistent settings"
-                                            color: "#CCCCCC"
+                                            color: Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2510,14 +2503,14 @@ Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            color: clipEditorTab.clipIsRepeat ? "#8B5CF6" : "#3A3A3A"
-                                            border.color: clipEditorTab.clipIsRepeat ? "#8B5CF6" : "#4A4A4A"
+                                            color: clipEditorTab.clipIsRepeat ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: clipEditorTab.clipIsRepeat ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: clipEditorTab.clipIsRepeat ? "✓" : ""
-                                                color: "#FFFFFF"
+                                                color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
                                             }
@@ -2537,7 +2530,7 @@ Rectangle {
 
                                         Text {
                                             text: "Loop playback"
-                                            color: "#CCCCCC"
+                                            color: Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2552,7 +2545,7 @@ Rectangle {
 
                                 Text {
                                     text: "Add Tag"
-                                    color: "#FFFFFF"
+                                    color: Colors.textOnPrimary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 12
                                     font.weight: Font.DemiBold
@@ -2561,7 +2554,7 @@ Rectangle {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 36
-                                    color: "#1A1A1A"
+                                    color: Colors.surfaceDark
                                     radius: 18
                                     border.color: addTagInput.activeFocus ? "#8B5CF6" : "#3A3A3A"
                                     border.width: 1
@@ -2572,7 +2565,7 @@ Rectangle {
                                         anchors.leftMargin: 16
                                         anchors.rightMargin: 16
                                         verticalAlignment: TextInput.AlignVCenter
-                                        color: "#FFFFFF"
+                                        color: Colors.textPrimary
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 12
                                         clip: true
@@ -2595,7 +2588,7 @@ Rectangle {
                                             anchors.leftMargin: 0
                                             verticalAlignment: Text.AlignVCenter
                                             text: "Add tag and press enter"
-                                            color: "#666666"
+                                            color: Colors.textSecondary
                                             font: parent.font
                                             visible: !parent.text && !parent.activeFocus
                                         }
@@ -2618,13 +2611,13 @@ Rectangle {
                                             width: tagText.implicitWidth + 24
                                             height: 24
                                             radius: 12
-                                            color: "#3A3A3A"
+                                            color: Colors.surfaceDark
 
                                             Text {
                                                 id: tagText
                                                 anchors.centerIn: parent
                                                 text: modelData
-                                                color: "#CCCCCC"
+                                                color: Colors.textPrimary
                                                 font.pixelSize: 10
                                             }
 
@@ -2702,7 +2695,7 @@ Rectangle {
 
                         Text {
                             text: "Name Audio File"
-                            color: "#FFFFFF"
+                            color: Colors.textOnPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 14
                             font.weight: Font.DemiBold
@@ -2712,9 +2705,9 @@ Rectangle {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 44
-                            color: "#1A1A1A"
+                            color: Colors.surfaceDark
                             radius: 8
-                            border.color: "#3A3A3A"
+                            border.color: Colors.border
                             border.width: 1
 
                             RowLayout {
@@ -2725,7 +2718,7 @@ Rectangle {
 
                                 Text {
                                     text: "Enter Name Here:"
-                                    color: "#808080"
+                                    color: Colors.textSecondary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
                                     visible: uploadAudioNameInput.text === ""
@@ -2734,7 +2727,7 @@ Rectangle {
                                 TextInput {
                                     id: uploadAudioNameInput
                                     Layout.fillWidth: true
-                                    color: "#FFFFFF"
+                                    color: Colors.textPrimary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
                                     clip: true
@@ -2742,7 +2735,7 @@ Rectangle {
                                     Text {
                                         anchors.fill: parent
                                         text: "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _"
-                                        color: "#666666"
+                                        color: Colors.textSecondary
                                         font.family: parent.font.family
                                         font.pixelSize: parent.font.pixelSize
                                         visible: !parent.text && !parent.activeFocus
@@ -2761,7 +2754,7 @@ Rectangle {
 
                         Text {
                             text: "Assign to Slot"
-                            color: "#FFFFFF"
+                            color: Colors.textOnPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 14
                             font.weight: Font.DemiBold
@@ -2771,9 +2764,9 @@ Rectangle {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 44
-                            color: "#1A1A1A"
+                            color: Colors.surfaceDark
                             radius: 8
-                            border.color: "#3A3A3A"
+                            border.color: Colors.border
                             border.width: 1
 
                             RowLayout {
@@ -2783,7 +2776,7 @@ Rectangle {
 
                                 Text {
                                     text: "Select Available Slot"
-                                    color: "#AAAAAA"
+                                    color: Colors.textSecondary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
                                     Layout.fillWidth: true
@@ -2792,7 +2785,7 @@ Rectangle {
                                 // Dropdown arrow
                                 Text {
                                     text: "▼"
-                                    color: "#808080"
+                                    color: Colors.textSecondary
                                     font.pixelSize: 10
                                 }
                             }
@@ -2854,7 +2847,7 @@ Rectangle {
 
                         Text {
                             text: "Trim Audio"
-                            color: "#FFFFFF"
+                            color: Colors.textOnPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 14
                             font.weight: Font.DemiBold
@@ -2904,7 +2897,7 @@ Rectangle {
                             Text {
                                 anchors.centerIn: parent
                                 text: "Cancel"
-                                color: "#FFFFFF"
+                                color: Colors.textOnPrimary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 13
                                 font.weight: Font.Medium
@@ -2945,7 +2938,7 @@ Rectangle {
                             Text {
                                 anchors.centerIn: parent
                                 text: "Save"
-                                color: "#FFFFFF"
+                                color: Colors.textOnPrimary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 13
                                 font.weight: Font.Medium
@@ -3013,7 +3006,7 @@ Rectangle {
 
                     Text {
                         text: "Teleprompter"
-                        color: "#FFFFFF"
+                        color: Colors.textOnPrimary
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
@@ -3021,7 +3014,7 @@ Rectangle {
 
                     Text {
                         text: "Teleprompter content will appear here"
-                        color: "#666666"
+                        color: Colors.textSecondary
                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                         font.pixelSize: 12
                     }
@@ -3040,7 +3033,7 @@ Rectangle {
 
                     Text {
                         text: "Audio Output"
-                        color: "#FFFFFF"
+                        color: Colors.textOnPrimary
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
@@ -3048,7 +3041,7 @@ Rectangle {
 
                     Text {
                         text: "Speaker and output settings here"
-                        color: "#666666"
+                        color: Colors.textSecondary
                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                         font.pixelSize: 12
                     }
