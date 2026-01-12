@@ -1855,7 +1855,7 @@ void SoundboardService::playClip(int clipId)
 
     // 1) Apply Clip_B reproduction to OTHER currently playing clips
     QVariantList others = playingClipIDs();
-    qDebug() << "playClip: clipId=" << clipId << "mode=" << mode << "others playing=" << others;
+    qDebug() << "playClip: clipId=" << clipId << "mode=" << mode << "others playing=" << others << "others count=" << others.size();
 
     // Remove this clip if it appears in the "playing" list
     for (int i = others.size() - 1; i >= 0; --i) {
@@ -1866,19 +1866,20 @@ void SoundboardService::playClip(int clipId)
         }
     }
 
-    qDebug() << "playClip: after removing self, others=" << others;
+    qDebug() << "playClip: after removing self, others=" << others << "others count=" << others.size();
 
     // Track which clips we're pausing for this clip (for resuming later)
     QList<int> pausedClipIds;
 
-    if (mode == 1) {
+    if (mode == 1 && !others.isEmpty()) {
         // Pause Clip_A, play Clip_B - track paused clips for resuming later
-        qDebug() << "playClip: mode=1, calling reproductionPlayingClip to pause others";
+        qDebug() << "playClip: mode=1 (Play/Pause), pausing" << others.size() << "other clips";
         for (const QVariant& v : others) {
             bool ok = false;
             int otherId = v.toInt(&ok);
             if (ok) {
                 pausedClipIds.append(otherId);
+                qDebug() << "playClip: will pause clip" << otherId;
             }
         }
         reproductionPlayingClip(others, 1);
@@ -1886,6 +1887,7 @@ void SoundboardService::playClip(int clipId)
         // Store which clips were paused by this clip
         if (!pausedClipIds.isEmpty()) {
             m_pausedByClip[clipId] = pausedClipIds;
+            qDebug() << "playClip: stored paused clips for" << clipId << ":" << pausedClipIds;
         }
     } else if (mode == 2) {
         // Stop Clip_A, play Clip_B
@@ -2288,14 +2290,30 @@ QVariantList SoundboardService::playingClipIDs() const
 {
     QVariantList playingIds;
 
-    // Check all active boards for playing clips
+    // Check all active boards for playing clips (excluding paused clips)
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& clip : it.value().clips) {
-            if (isClipPlaying(clip.id)) {
+            // Check our internal state first (more reliable for short clips)
+            // Also verify with audio engine if clip has a slot
+            bool isPlayingInternal = clip.isPlaying;
+            bool isPlayingEngine = false;
+            bool isPausedEngine = false;
+            
+            if (m_clipIdToSlot.contains(clip.id)) {
+                int slotId = m_clipIdToSlot[clip.id];
+                isPlayingEngine = m_audioEngine && m_audioEngine->isClipPlaying(slotId);
+                isPausedEngine = m_audioEngine && m_audioEngine->isClipPaused(slotId);
+            }
+            
+            // Clip is playing if either our internal state says so OR the audio engine says so
+            // Exclude paused clips
+            if ((isPlayingInternal || isPlayingEngine) && !isPausedEngine) {
                 playingIds.append(clip.id);
+                qDebug() << "playingClipIDs: clip" << clip.id << "is playing (internal=" << isPlayingInternal << ", engine=" << isPlayingEngine << ")";
             }
         }
     }
+    qDebug() << "playingClipIDs: returning" << playingIds;
     return playingIds;
 }
 
@@ -2306,8 +2324,41 @@ int SoundboardService::getOrAssignSlot(int clipId)
         return m_clipIdToSlot[clipId];
     }
 
-    // Assign a new slot (wrap around if we exceed MAX_CLIPS)
-    int slotId = m_nextSlot % 16; // MAX_CLIPS is 16
+    // Find a free slot (one not currently in use by another clip)
+    // First, try to find a slot that's not in the map at all
+    QSet<int> usedSlots;
+    for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it) {
+        usedSlots.insert(it.value());
+    }
+    
+    // Try to find an unused slot
+    for (int i = 0; i < 16; ++i) { // MAX_CLIPS is 16
+        int candidateSlot = (m_nextSlot + i) % 16;
+        if (!usedSlots.contains(candidateSlot)) {
+            m_clipIdToSlot[clipId] = candidateSlot;
+            m_nextSlot = candidateSlot + 1;
+            return candidateSlot;
+        }
+    }
+    
+    // All slots are in use - find the slot with the oldest/least recently used clip
+    // For now, just use round-robin but remove the old mapping
+    int slotId = m_nextSlot % 16;
+    
+    // Remove any existing clip that has this slot
+    for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ) {
+        if (it.value() == slotId && it.key() != clipId) {
+            qDebug() << "Evicting clip" << it.key() << "from slot" << slotId << "for new clip" << clipId;
+            // Stop the old clip if playing
+            if (m_audioEngine && m_audioEngine->isClipPlaying(slotId)) {
+                m_audioEngine->stopClip(slotId);
+            }
+            it = m_clipIdToSlot.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    
     m_clipIdToSlot[clipId] = slotId;
     m_nextSlot++;
 
