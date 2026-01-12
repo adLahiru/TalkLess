@@ -8,9 +8,9 @@
 #include <QHash>
 #include <QObject>
 #include <QSet>
+#include <QStringList>
 #include <QVariant>
 #include <QVector>
-#include <QStringList>
 
 #include <memory>
 #include <optional>
@@ -43,8 +43,10 @@ public:
     Q_PROPERTY(QString selectedPlaybackDeviceId READ selectedPlaybackDeviceId NOTIFY settingsChanged)
     Q_PROPERTY(QString selectedMonitorDeviceId READ selectedMonitorDeviceId NOTIFY settingsChanged)
     Q_PROPERTY(bool micEnabled READ isMicEnabled WRITE setMicEnabled NOTIFY settingsChanged)
-    Q_PROPERTY(bool micPassthroughEnabled READ isMicPassthroughEnabled WRITE setMicPassthroughEnabled NOTIFY settingsChanged)
-    Q_PROPERTY(float micSoundboardBalance READ getMicSoundboardBalance WRITE setMicSoundboardBalance NOTIFY settingsChanged)
+    Q_PROPERTY(
+        bool micPassthroughEnabled READ isMicPassthroughEnabled WRITE setMicPassthroughEnabled NOTIFY settingsChanged)
+    Q_PROPERTY(
+        float micSoundboardBalance READ getMicSoundboardBalance WRITE setMicSoundboardBalance NOTIFY settingsChanged)
     Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
 
     // Audio buffer settings
@@ -121,16 +123,16 @@ public:
     Q_INVOKABLE bool isBoardActive(int boardId) const; // Check if a specific board is active
     Q_INVOKABLE bool toggleBoardActive(int boardId);   // Toggle active state of a board
 
-    bool activate(int boardId);    // Activate a board (adds to active set)
-    bool deactivate(int boardId);  // Deactivate a board (removes from active set)
-    bool saveActive();             // Save all active boards
+    bool activate(int boardId);   // Activate a board (adds to active set)
+    bool deactivate(int boardId); // Deactivate a board (removes from active set)
+    bool saveActive();            // Save all active boards
 
     // ---- Clip operations (board-wise) ----
     Q_INVOKABLE bool addClip(int boardId, const QString& filePath);
     Q_INVOKABLE bool addClips(int boardId, const QStringList& filePaths);
     Q_INVOKABLE bool addClipWithTitle(int boardId, const QString& filePath, const QString& title);
-    Q_INVOKABLE bool addClipWithSettings(int boardId, const QString& filePath, const QString& title,
-                                         double trimStartMs, double trimEndMs);
+    Q_INVOKABLE bool addClipWithSettings(int boardId, const QString& filePath, const QString& title, double trimStartMs,
+                                         double trimEndMs);
     Q_INVOKABLE bool deleteClip(int boardId, int clipId);
     bool addClipToBoard(int boardId, const Clip& draft);
     bool updateClipInBoard(int boardId, int clipId, const Clip& updatedClip);
@@ -162,6 +164,8 @@ public:
     Q_INVOKABLE void stopAllClips();
     Q_INVOKABLE bool isClipPlaying(int clipId) const;
     Q_INVOKABLE double getClipPlaybackPositionMs(int clipId) const;
+    Q_INVOKABLE double getClipPlaybackProgress(int clipId) const; // Returns 0.0 to 1.0
+    Q_INVOKABLE double getClipDurationMs(int clipId) const;
     Q_INVOKABLE QVariantList playingClipIDs() const;
 
     // ---- Audio Device Selection ----
@@ -235,8 +239,8 @@ private:
 private:
     // Reserve last engine slot for recording preview so it never collides with normal clip slots.
     static constexpr int kEngineSlotsTotal = 16;
-    static constexpr int kPreviewSlot      = 15; // MUST match AudioEngine::MAX_CLIPS-1
-    static constexpr int kClipSlotsUsable  = 15; // 0..14 used by normal clips
+    static constexpr int kPreviewSlot = 15;     // MUST match AudioEngine::MAX_CLIPS-1
+    static constexpr int kClipSlotsUsable = 15; // 0..14 used by normal clips
 
     StorageRepository m_repo;
 

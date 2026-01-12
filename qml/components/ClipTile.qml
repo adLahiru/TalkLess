@@ -24,6 +24,8 @@ Item {
     property bool selected: false
     property bool showActions: false
     property bool isPlaying: false
+    property int clipId: -1  // The clip ID for fetching progress
+    property real playbackProgress: 0.0  // 0.0 to 1.0 for progress display
 
     // hover state
     property bool tileHover: false
@@ -178,6 +180,78 @@ Item {
                 maskEnabled: true
                 maskSource: ShaderEffectSource { sourceItem: imageMask; live: false }
                 visible: backgroundImage.status === Image.Ready
+            }
+        }
+
+        // =========================
+        // PLAYBACK PROGRESS OVERLAY
+        // =========================
+        // This overlay fills from left to right based on playback progress
+        // Uses clip with rounded corners so the progress bar edges match the tile
+        Item {
+            id: progressOverlayContainer
+            anchors.fill: parent
+            anchors.margins: 2 * root.scaleFactor
+            visible: root.isPlaying && root.playbackProgress > 0
+            z: 5  // Above background, below UI elements
+            clip: true
+
+            // Rounded clip mask - applied to the entire container
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                maskEnabled: true
+                maskSource: ShaderEffectSource {
+                    sourceItem: Rectangle {
+                        width: progressOverlayContainer.width
+                        height: progressOverlayContainer.height
+                        radius: 14 * root.scaleFactor
+                    }
+                    live: true
+                }
+            }
+
+            // Progress fill - simple rectangle that gets clipped by container
+            Rectangle {
+                id: progressFill
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: parent.width * root.playbackProgress
+                
+                // Gradient effect for the progress overlay
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+                    GradientStop { position: 0.0; color: Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.45) }
+                    GradientStop { position: 0.85; color: Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.3) }
+                    GradientStop { position: 1.0; color: Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.15) }
+                }
+
+                // Smooth width animation
+                Behavior on width {
+                    NumberAnimation {
+                        duration: 50
+                        easing.type: Easing.Linear
+                    }
+                }
+            }
+
+            // Leading edge glow effect
+            Rectangle {
+                visible: root.playbackProgress > 0.05 && root.playbackProgress < 0.95
+                x: progressFill.width - 2
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: 4
+                color: Colors.accent
+                opacity: 0.8
+
+                // Glow animation
+                SequentialAnimation on opacity {
+                    running: root.isPlaying
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 0.8; to: 1.0; duration: 400; easing.type: Easing.InOutQuad }
+                    NumberAnimation { from: 1.0; to: 0.8; duration: 400; easing.type: Easing.InOutQuad }
+                }
             }
         }
 

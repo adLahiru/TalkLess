@@ -2,16 +2,15 @@
 
 #include "audioEngine.h"
 
+#include <QDateTime>
 #include <QDebug>
+#include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
-#include <QUrl>
-#include <QDateTime>
 #include <QStandardPaths>
-#include <QDir>
-
+#include <QUrl>
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
@@ -241,7 +240,7 @@ bool SoundboardService::saveActive()
             allOk = false;
         }
     }
-    
+
     if (allOk) {
         // reload index because clipCount/name might update
         m_state = m_repo.loadIndex();
@@ -258,7 +257,7 @@ QString SoundboardService::normalizeHotkey(const QString& hotkey)
 void SoundboardService::rebuildHotkeyIndex()
 {
     m_hotkeyToClipId.clear();
-    
+
     // Build hotkey index from all active boards
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& c : it.value().clips) {
@@ -339,7 +338,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
                     map["hotkey"] = c.hotkey;
                     map["volume"] = c.volume;
                     map["speed"] = c.speed;
-                    map["isPlaying"] = c.isPlaying;  // Use stored state, not audio engine state
+                    map["isPlaying"] = c.isPlaying; // Use stored state, not audio engine state
                     map["isRepeat"] = c.isRepeat;
                     map["tags"] = c.tags;
                     map["reproductionMode"] = c.reproductionMode;
@@ -353,7 +352,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
                     map["durationSec"] = duration;
                     map["trimStartMs"] = c.trimStartMs;
                     map["trimEndMs"] = c.trimEndMs;
-                    map["lastPlayedPosMs"] = c.lastPlayedPosMs;  // For resuming playback
+                    map["lastPlayedPosMs"] = c.lastPlayedPosMs; // For resuming playback
                     return map;
                 }
             }
@@ -369,7 +368,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
         map["hotkey"] = clip->hotkey;
         map["volume"] = clip->volume;
         map["speed"] = clip->speed;
-        map["isPlaying"] = clip->isPlaying;  // Use stored state, not audio engine state
+        map["isPlaying"] = clip->isPlaying; // Use stored state, not audio engine state
         map["isRepeat"] = clip->isRepeat;
         map["tags"] = clip->tags;
         map["reproductionMode"] = clip->reproductionMode;
@@ -383,7 +382,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
         map["durationSec"] = duration;
         map["trimStartMs"] = clip->trimStartMs;
         map["trimEndMs"] = clip->trimEndMs;
-        map["lastPlayedPosMs"] = clip->lastPlayedPosMs;  // For resuming playback
+        map["lastPlayedPosMs"] = clip->lastPlayedPosMs; // For resuming playback
         return map;
     }
 
@@ -1423,7 +1422,7 @@ void SoundboardService::playClip(int clipId)
     // 1) Apply Clip_B reproduction to OTHER currently playing clips
     QVariantList others = playingClipIDs();
     qDebug() << "playClip: clipId=" << clipId << "mode=" << mode << "others playing=" << others;
-    
+
     // Remove this clip if it appears in the "playing" list
     for (int i = others.size() - 1; i >= 0; --i) {
         bool ok = false;
@@ -1432,7 +1431,7 @@ void SoundboardService::playClip(int clipId)
             others.removeAt(i);
         }
     }
-    
+
     qDebug() << "playClip: after removing self, others=" << others;
 
     if (mode == 1) {
@@ -1595,7 +1594,6 @@ float SoundboardService::recordingDuration() const
     return m_audioEngine->getRecordingDuration();
 }
 
-
 QString SoundboardService::getRecordingOutputPath() const
 {
     // Recordings folder in AppData
@@ -1738,6 +1736,43 @@ double SoundboardService::getClipPlaybackPositionMs(int clipId) const
     return m_audioEngine->getClipPlaybackPositionMs(m_clipIdToSlot[clipId]);
 }
 
+double SoundboardService::getClipPlaybackProgress(int clipId) const
+{
+    if (!m_audioEngine)
+        return 0.0;
+    if (!m_clipIdToSlot.contains(clipId))
+        return 0.0;
+
+    // Find the clip to get its duration
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        for (const auto& clip : it.value().clips) {
+            if (clip.id == clipId) {
+                double durationMs = clip.durationSec * 1000.0;
+                if (durationMs <= 0.0)
+                    return 0.0;
+
+                double positionMs = m_audioEngine->getClipPlaybackPositionMs(m_clipIdToSlot[clipId]);
+                double progress = positionMs / durationMs;
+                return std::clamp(progress, 0.0, 1.0);
+            }
+        }
+    }
+    return 0.0;
+}
+
+double SoundboardService::getClipDurationMs(int clipId) const
+{
+    // Find the clip to get its duration
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        for (const auto& clip : it.value().clips) {
+            if (clip.id == clipId) {
+                return clip.durationSec * 1000.0;
+            }
+        }
+    }
+    return 0.0;
+}
+
 double SoundboardService::getFileDuration(const QString& filePath) const
 {
     if (!m_audioEngine)
@@ -1754,7 +1789,7 @@ double SoundboardService::getFileDuration(const QString& filePath) const
 QVariantList SoundboardService::playingClipIDs() const
 {
     QVariantList playingIds;
-    
+
     // Check all active boards for playing clips
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& clip : it.value().clips) {

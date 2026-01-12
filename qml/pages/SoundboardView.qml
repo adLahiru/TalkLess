@@ -32,6 +32,37 @@ Rectangle {
     signal requestDetach
     signal requestDock
 
+    // =========================
+    // PLAYBACK PROGRESS TIMER
+    // =========================
+    // Timer that updates playback progress for all playing clips every 50ms
+    Timer {
+        id: progressUpdateTimer
+        interval: 50  // Update every 50ms for smooth progress
+        repeat: true
+        running: true  // Always run to check for playing clips
+        
+        // Map of clipId -> progress (0.0 to 1.0)
+        property var clipProgressMap: ({})
+        
+        onTriggered: {
+            // Get all currently playing clip IDs
+            var playingIds = soundboardService.playingClipIDs();
+            var newMap = {};
+            
+            for (var i = 0; i < playingIds.length; i++) {
+                var clipId = playingIds[i];
+                var progress = soundboardService.getClipPlaybackProgress(clipId);
+                newMap[clipId] = progress;
+            }
+            
+            // Only update if there are changes (avoid unnecessary re-renders)
+            if (JSON.stringify(clipProgressMap) !== JSON.stringify(newMap)) {
+                clipProgressMap = newMap;
+            }
+        }
+    }
+
     // Helper function to find clip data by ID in the model
     function getClipDataById(clipId) {
         if (clipId === -1)
@@ -860,6 +891,8 @@ Rectangle {
                                         }
                                     }
                                     isPlaying: clipWrapper.clipIsPlaying
+                                    clipId: clipWrapper.clipId
+                                    playbackProgress: clipWrapper.clipIsPlaying ? progressUpdateTimer.clipProgressMap[clipWrapper.clipId] || 0.0 : 0.0
 
                                     onClicked: {
                                         // Selecting the clip updates the sidebar
