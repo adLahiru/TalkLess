@@ -15,11 +15,15 @@ set(CMAKE_AUTORCC ON)
 
 set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "" FORCE)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg)
+# Require Qt 6.5+ (matches qt_standard_project_setup below)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg)
 qt_standard_project_setup(REQUIRES 6.5)
 
-# Silence QTP0004 warning (no qmldir required). Switch to NEW later if you want stricter QML structure.
-qt_policy(SET QTP0004 OLD)
+# ---- FIX: QTP0004 only exists in newer Qt versions (not in 6.5.x) ----
+# Silence QTP0004 warning (no qmldir required) when available.
+if (QT_KNOWN_POLICY_QTP0004)
+    qt_policy(SET QTP0004 OLD)
+endif()
 
 add_compile_definitions(NOMINMAX)
 
@@ -126,7 +130,6 @@ set(TALKLESS_RESOURCES
 )
 
 # Force every resource to be accessible with a RELATIVE alias.
-# This prevents Qt 6.10+ from erroring if any resource path accidentally becomes "/resources/..."
 foreach(_res IN LISTS TALKLESS_RESOURCES)
     set(_alias "${_res}")
     string(REGEX REPLACE "^/+" "" _alias "${_alias}")
