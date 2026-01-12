@@ -45,7 +45,6 @@ ApplicationWindow {
             var outputChanged = JSON.stringify(currentOutputDevices) !== JSON.stringify(mainWindow.lastKnownOutputDevices);
             
             if (inputChanged || outputChanged) {
-                console.log("[Hotplug] Audio devices changed, refreshing audio engine...");
                 mainWindow.lastKnownInputDevices = currentInputDevices;
                 mainWindow.lastKnownOutputDevices = currentOutputDevices;
                 // This will rebuild context and refresh device ID structs
@@ -67,7 +66,6 @@ ApplicationWindow {
         if (firstBoardId >= 0) {
             clipsModel.boardId = firstBoardId;
             clipsModel.reload();
-            console.log("Initial board loaded:", firstBoardId);
         }
     }
 
@@ -162,7 +160,6 @@ ApplicationWindow {
                 Layout.fillHeight: true
 
                 onSelected: route => {
-                    console.log("Selected route:", route);
                     switch (route) {
                     case "soundboard":
                         contentStack.currentIndex = 0;
@@ -184,7 +181,6 @@ ApplicationWindow {
 
                 // When a soundboard is selected, load its clips
                 onSoundboardSelected: boardId => {
-                    console.log("Soundboard selected:", boardId);
                     // Switch to soundboard view
                     contentStack.currentIndex = 0;
                     // Don't activate the board - just view it

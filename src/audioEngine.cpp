@@ -503,7 +503,7 @@ std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumeratePlaybackDevices(
     devices.reserve(playbackCount);
     for (ma_uint32 i = 0; i < playbackCount; ++i) {
         AudioDeviceInfo info;
-        info.name = pPlaybackInfos[i].name ? std::string(pPlaybackInfos[i].name) : std::string();
+        info.name = (pPlaybackInfos[i].name[0] != '\0') ? std::string(pPlaybackInfos[i].name) : std::string();
         info.id = info.name; // your UI uses name as ID
         info.isDefault = pPlaybackInfos[i].isDefault;
         info.deviceId = pPlaybackInfos[i].id;
@@ -529,7 +529,7 @@ std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumerateCaptureDevices()
     devices.reserve(captureCount);
     for (ma_uint32 i = 0; i < captureCount; ++i) {
         AudioDeviceInfo info;
-        info.name = pCaptureInfos[i].name ? std::string(pCaptureInfos[i].name) : std::string();
+        info.name = (pCaptureInfos[i].name[0] != '\0') ? std::string(pCaptureInfos[i].name) : std::string();
         info.id = info.name;
         info.isDefault = pCaptureInfos[i].isDefault;
         info.deviceId = pCaptureInfos[i].id;
