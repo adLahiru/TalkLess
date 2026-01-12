@@ -2604,7 +2604,7 @@ Rectangle {
                                             height: 28
                                             radius: 14
                                             visible: parent.selected
-                                            color: "#00D9FF"
+                                            color: Colors.gradientPrimaryStart
                                         }
 
                                         Image {
