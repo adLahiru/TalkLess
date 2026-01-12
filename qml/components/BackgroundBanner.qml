@@ -2,13 +2,15 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../styles"
+
 
 Rectangle {
     id: root
-
+    
     // Pass comma-separated text like "Line 1,Line 2" or empty string for no text
     property string displayText: ""
-
+    
     // Computed properties for the two lines
     readonly property var textLines: displayText.length > 0 ? displayText.split(",") : []
     readonly property string line1: textLines.length > 0 ? textLines[0].trim() : ""
@@ -55,13 +57,11 @@ Rectangle {
         anchors.fill: parent
         radius: root.radius
         color: Colors.black
-        opacity: root.hasText ? 0.4 : 0
+        opacity: root.hasText ? 0.3 : 0
         visible: root.hasText
-
+        
         Behavior on opacity {
-            NumberAnimation {
-                duration: 200
-            }
+            NumberAnimation { duration: 200 }
         }
     }
 
@@ -75,15 +75,13 @@ Rectangle {
         opacity: root.hasText ? 1 : 0
 
         Behavior on opacity {
-            NumberAnimation {
-                duration: 200
-            }
+            NumberAnimation { duration: 200 }
         }
 
         // Line 1 - Main text (Poppins SemiBold 27.51px)
         Text {
             text: root.line1
-            color: Colors.textPrimary
+            color: Colors.white
             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
             font.pixelSize: 28
             font.weight: Font.DemiBold
@@ -94,7 +92,7 @@ Rectangle {
         // Line 2 - Secondary text (Inter Regular 15.29px)
         Text {
             text: root.line2
-            color: "#FFFFFF"
+            color: Colors.white
             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
             font.pixelSize: 15
             font.weight: Font.Normal

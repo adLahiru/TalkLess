@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../styles"
 
 Item {
     id: root
@@ -54,7 +55,7 @@ Item {
 
             Text {
                 text: root.formatTime(root.currentTime)
-                color: "#FFFFFF"
+                color: Colors.textPrimary
                 font.pixelSize: 11
                 font.weight: Font.Bold
                 font.family: "Arial"
@@ -62,7 +63,7 @@ Item {
             }
             Text {
                 text: root.formatTime(root.trimStart * root.totalDuration)
-                color: "#3B82F6"
+                color: Colors.accent
                 font.pixelSize: 10
                 font.family: "Arial"
                 Layout.alignment: Qt.AlignRight
@@ -74,7 +75,7 @@ Item {
             id: waveformView
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: "#1A1A1A"
+            color: Colors.surface
             radius: 8
             clip: true
 
@@ -92,7 +93,7 @@ Item {
                 x: parent.width * root.trimStart
                 width: parent.width * (root.trimEnd - root.trimStart)
                 height: parent.height
-                color: "#1E3A8A" // Dark blue
+                color: Qt.darker(Colors.accent, 1.5) // Dark blue
                 opacity: 0.3
             }
 
@@ -119,10 +120,10 @@ Item {
                         radius: 1
                         color: {
                             if (isPlayed)
-                                return "#FFFFFF";
+                                return Colors.textPrimary;
                             if (isInTrimRegion)
-                                return "#3B82F6";
-                            return "#4B5563";
+                                return Colors.accent;
+                            return Colors.textSecondary;
                         }
                     }
                 }
@@ -134,7 +135,7 @@ Item {
                 x: parent.width * (root.totalDuration > 0 ? root.currentTime / root.totalDuration : 0) - 1
                 width: 2
                 height: parent.height
-                color: "#FFFFFF"
+                color: Colors.textPrimary
                 visible: root.totalDuration > 0
                 z: 5
             }
@@ -145,7 +146,7 @@ Item {
                 x: parent.width * root.trimStart - 2
                 width: 4
                 height: parent.height
-                color: "#3B82F6"
+                color: Colors.accent
                 radius: 2
                 z: 10
 
@@ -156,7 +157,7 @@ Item {
                     width: 8
                     height: 8
                     radius: 4
-                    color: "#3B82F6"
+                    color: Colors.accent
                 }
 
                 MouseArea {
@@ -183,7 +184,7 @@ Item {
                 x: parent.width * root.trimEnd - 2
                 width: 4
                 height: parent.height
-                color: "#3B82F6"
+                color: Colors.accent
                 radius: 2
                 z: 10
 
@@ -194,7 +195,7 @@ Item {
                     width: 8
                     height: 8
                     radius: 4
-                    color: "#3B82F6"
+                    color: Colors.accent
                 }
 
                 MouseArea {
@@ -223,14 +224,14 @@ Item {
 
             Text {
                 text: root.formatTime(root.totalDuration)
-                color: "#888888"
+                color: Colors.textSecondary
                 font.pixelSize: 11
                 font.family: "Arial"
                 Layout.alignment: Qt.AlignLeft
             }
             Text {
                 text: root.formatTime(root.trimEnd * root.totalDuration)
-                color: "#3B82F6"
+                color: Colors.accent
                 font.pixelSize: 10
                 font.family: "Arial"
                 Layout.alignment: Qt.AlignLeft

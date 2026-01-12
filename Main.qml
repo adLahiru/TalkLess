@@ -4,7 +4,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "qml/components"
 import "qml/pages"
-import TalkLess
+import "qml/styles"
 
 ApplicationWindow {
     id: mainWindow
@@ -49,13 +49,6 @@ ApplicationWindow {
         }
     }
 
-    // Connections for global state are now handled in the singletons themselves
-
-    Component.onCompleted: {
-        Colors.setTheme(soundboardService.theme.toLowerCase());
-        Colors.setAccentColor(soundboardService.accentColor);
-    }
-
     // ---- Toast Notification ----
     Rectangle {
         id: toastMessage
@@ -75,7 +68,6 @@ ApplicationWindow {
         color: Colors.cardBg
         border.width: 1
         border.color: Colors.border
-
         opacity: 0
         z: 999
 
@@ -91,7 +83,6 @@ ApplicationWindow {
             anchors.centerIn: parent
             text: toastMessage.text
             color: Colors.textPrimary
-
             font.pixelSize: 14
             font.weight: Font.Medium
         }

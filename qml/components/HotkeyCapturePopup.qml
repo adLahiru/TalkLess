@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../styles"
 
 // A sleek, modern popup for capturing keyboard hotkeys
 Popup {
@@ -21,10 +22,10 @@ Popup {
     focus: true  // Popup needs focus
 
     background: Rectangle {
-        color: "#1A1A1A"
+        color: Colors.panelBg
         radius: 16
         border.width: 1
-        border.color: "#2A2A2A"
+        border.color: Colors.border
 
         // Subtle glow effect
         Rectangle {
@@ -33,7 +34,7 @@ Popup {
             radius: 18
             color: "transparent"
             border.width: 2
-            border.color: "#3C7BFF"
+            border.color: Colors.accent
             opacity: 0.3
             z: -1
         }
@@ -41,7 +42,7 @@ Popup {
 
     // Dim overlay
     Overlay.modal: Rectangle {
-        color: "#80000000"
+        color: Qt.rgba(0,0,0,0.5)
     }
 
     // Focus handler

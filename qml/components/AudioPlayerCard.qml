@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
+import "../styles"
 
 Item {
     id: root
@@ -55,7 +56,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: 4
-            color: playButtonArea.containsMouse ? "#4A9AF7" : "#3B82F6"
+            color: playButtonArea.containsMouse ? Colors.primaryLight : Colors.accent
             
             // Play icon (triangle pointing right)
             Canvas {
@@ -69,7 +70,7 @@ Item {
                 onPaint: {
                     var ctx = getContext("2d")
                     ctx.reset()
-                    ctx.fillStyle = "#FFFFFF"
+                    ctx.fillStyle = Colors.textOnPrimary
                     ctx.beginPath()
                     ctx.moveTo(2, 0)
                     ctx.lineTo(16, 9)
@@ -89,13 +90,13 @@ Item {
                     width: 4
                     height: 14
                     radius: 1
-                    color: "#FFFFFF"
+                    color: Colors.textOnPrimary
                 }
                 Rectangle {
                     width: 4
                     height: 14
                     radius: 1
-                    color: "#FFFFFF"
+                    color: Colors.textOnPrimary
                 }
             }
             

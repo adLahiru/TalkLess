@@ -62,34 +62,6 @@ QtObject {
 
     // Logic: Self-Update from Service
     function setTheme(theme) {
-        if (!theme)
-            return;
-        let t = theme.toLowerCase();
-        if (t === "light" || t === "dark") {
-            currentTheme = t;
-        } else {
-            currentTheme = "dark";
-        }
-    }
-
-    function setAccentColor(color) {
-        if (color && color.length >= 4) {
-            accent = color;
-        }
-    }
-
-    readonly property Connections _serviceConnections: Connections {
-        target: typeof soundboardService !== "undefined" ? soundboardService : null
-        function onSettingsChanged() {
-            setTheme(soundboardService.theme);
-            setAccentColor(soundboardService.accentColor);
-        }
-    }
-
-    Component.onCompleted: {
-        if (typeof soundboardService !== "undefined") {
-            setTheme(soundboardService.theme);
-            setAccentColor(soundboardService.accentColor);
-        }
+        currentTheme = theme
     }
 }

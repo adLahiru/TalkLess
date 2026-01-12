@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../styles"
 
 Item {
     id: root
@@ -34,14 +35,14 @@ Item {
             anchors.topMargin: 10
             height: 17
             radius: 8.5
-            color: "#E8E0F0"  // Light purple/gray
+            color: Colors.surfaceDark  // Light purple/gray replaced with neutral
 
             // Left dot
             Rectangle {
                 width: 6
                 height: 6
                 radius: 3
-                color: "#9999AA"
+                color: Colors.textTertiary
                 anchors.left: parent.left
                 anchors.leftMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
@@ -52,7 +53,7 @@ Item {
                 width: 6
                 height: 6
                 radius: 3
-                color: "#9999AA"
+                color: Colors.textTertiary
                 anchors.right: parent.right
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
@@ -65,7 +66,7 @@ Item {
             width: 4
             height: 44
             radius: 2
-            color: "#6B4C9A"  // Purple color
+            color: Colors.accent  // Purple color replaced with accent
             x: track.x + 11 + (root.value * (track.width - 22))
             anchors.verticalCenter: track.verticalCenter
 
@@ -77,7 +78,7 @@ Item {
                 radius: 4
                 color: "transparent"
                 border.width: 2
-                border.color: "#AAAAAA"
+                border.color: Colors.border
                 z: -1
             }
         }

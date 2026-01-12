@@ -3,68 +3,66 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
-import TalkLess
 import QtQuick.Layouts
+import "../styles"
 
 Rectangle {
     id: root
-
+    
     property string placeholder: "Select..."
     property string selectedValue: ""
     property string selectedId: ""
     property string icon: ""
     property var model: []  // Array of objects with {id, name, isDefault}
-
+    
     signal itemSelected(string id, string name)
-
+    signal aboutToOpen()
     // Internal list model to properly manage items
     property var internalModel: []
-
+    
     onModelChanged: {
         // Copy model to internal list to avoid binding issues
-        var items = [];
+        var items = []
         if (model && model.length > 0) {
             for (var i = 0; i < model.length; i++) {
                 items.push({
                     id: model[i].id || "",
                     name: model[i].name || "",
                     isDefault: model[i].isDefault || false
-                });
+                })
             }
         }
-        internalModel = items;
-
+        internalModel = items
+        
         // Update selected name if models change
-        updateSelectedName();
+        updateSelectedName()
     }
 
     onSelectedIdChanged: updateSelectedName()
 
     function updateSelectedName() {
         if (!selectedId) {
-            selectedValue = "";
-            return;
+            selectedValue = ""
+            return
         }
         for (var i = 0; i < internalModel.length; i++) {
             if (internalModel[i].id === selectedId) {
-                selectedValue = internalModel[i].name;
-                return;
+                selectedValue = internalModel[i].name
+                return
             }
         }
         // If not found in model, it might still be loading or model not yet populated
         // We don't clear selectedValue here to avoid flickering if it was already set
     }
-
+    
     height: 50
     color: dropdownMouseArea.containsMouse || dropdownPopup.visible ? Colors.surfaceLight : Colors.surface
     radius: 12
     border.width: 1
-    border.color: dropdownPopup.visible ? Colors.accent : Colors.border
+    border.color: dropdownPopup.visible ? Colors.borderLight : Colors.border
 
     Behavior on color {
-        ColorAnimation {
-            duration: 150
-        }
+        ColorAnimation { duration: 150 }
     }
 
     FontLoader {
@@ -109,11 +107,13 @@ Rectangle {
         hoverEnabled: true
         onClicked: {
             if (dropdownPopup.visible) {
-                dropdownPopup.close();
+                dropdownPopup.close()
             } else {
-                dropdownPopup.open();
+                root.aboutToOpen()
+                dropdownPopup.open()
             }
         }
+
     }
 
     // Dropdown popup menu
@@ -127,13 +127,13 @@ Rectangle {
         modal: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         z: 1000
-
+        
         background: Rectangle {
-            color: Colors.panelBg
+            color: "#1A1A1A"
             radius: 10
-            border.color: Colors.border
+            border.color: "#444444"
             border.width: 1
-
+            
             // Shadow effect
             Rectangle {
                 anchors.fill: parent
@@ -153,20 +153,20 @@ Rectangle {
             contentHeight: itemColumn.implicitHeight
             contentWidth: width
             boundsBehavior: Flickable.StopAtBounds
-
+            
             Column {
                 id: itemColumn
                 width: parent.width
                 spacing: 4
-
+                
                 Repeater {
                     model: root.internalModel
-
+                    
                     delegate: Rectangle {
                         id: itemDelegate
                         required property var modelData
                         required property int index
-
+                        
                         width: itemColumn.width
                         height: 42
                         radius: 8
@@ -222,21 +222,19 @@ Rectangle {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                root.selectedId = itemDelegate.modelData.id;
-                                root.selectedValue = itemDelegate.modelData.name;
-                                root.itemSelected(itemDelegate.modelData.id, itemDelegate.modelData.name);
-                                dropdownPopup.close();
+                                root.selectedId = itemDelegate.modelData.id
+                                root.selectedValue = itemDelegate.modelData.name
+                                root.itemSelected(itemDelegate.modelData.id, itemDelegate.modelData.name)
+                                dropdownPopup.close()
                             }
                         }
 
                         Behavior on color {
-                            ColorAnimation {
-                                duration: 100
-                            }
+                            ColorAnimation { duration: 100 }
                         }
                     }
                 }
-
+                
                 // Empty state when no devices
                 Rectangle {
                     visible: root.internalModel.length === 0
@@ -253,7 +251,7 @@ Rectangle {
                     }
                 }
             }
-
+            
             ScrollBar.vertical: ScrollBar {
                 active: flickable.contentHeight > flickable.height
                 policy: flickable.contentHeight > flickable.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
@@ -261,27 +259,12 @@ Rectangle {
         }
 
         enter: Transition {
-            NumberAnimation {
-                property: "opacity"
-                from: 0.0
-                to: 1.0
-                duration: 120
-            }
-            NumberAnimation {
-                property: "scale"
-                from: 0.95
-                to: 1.0
-                duration: 120
-            }
+            NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 120 }
+            NumberAnimation { property: "scale"; from: 0.95; to: 1.0; duration: 120 }
         }
 
         exit: Transition {
-            NumberAnimation {
-                property: "opacity"
-                from: 1.0
-                to: 0.0
-                duration: 80
-            }
+            NumberAnimation { property: "opacity"; from: 1.0; to: 0.0; duration: 80 }
         }
     }
 }

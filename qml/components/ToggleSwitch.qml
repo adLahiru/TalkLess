@@ -3,13 +3,14 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import "../styles"
 
 Rectangle {
     id: root
     
     property bool isOn: false
-    property color onColor: "#22C55E"
-    property color offColor: "#3A3A3A"
+    property color onColor: Colors.success
+    property color offColor: Colors.surfaceLight
     
     signal toggled(bool value)
     
@@ -23,7 +24,7 @@ Rectangle {
         width: 22
         height: 22
         radius: 11
-        color: "#FFFFFF"
+        color: Colors.white
         x: root.isOn ? parent.width - width - 3 : 3
         anchors.verticalCenter: parent.verticalCenter
 

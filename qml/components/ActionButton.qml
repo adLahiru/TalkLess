@@ -3,20 +3,20 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
-import TalkLess
 import QtQuick.Layouts
+import "../styles"
 
 Rectangle {
     id: root
-
+    
     property string text: "Button"
     property string icon: ""
     property color backgroundColor: Colors.surface
     property color hoverColor: Colors.surfaceLight
     property color textColor: Colors.textPrimary
-
-    signal clicked
-
+    
+    signal clicked()
+    
     height: 50
     color: mouseArea.containsMouse ? root.hoverColor : root.backgroundColor
     radius: 12
@@ -56,8 +56,6 @@ Rectangle {
     }
 
     Behavior on color {
-        ColorAnimation {
-            duration: 150
-        }
+        ColorAnimation { duration: 150 }
     }
 }

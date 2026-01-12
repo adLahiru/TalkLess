@@ -8,12 +8,12 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import QtQuick.Dialogs
 import "../components"
-import TalkLess
+import "../styles"
 
 Rectangle {
     id: root
     color: Colors.background
-    radius: Theme.radiusLarge
+    radius: 10
 
     property int selectedClipId: -1  // Keep track of which clip is selected
     property int playingClipId: -1   // Last started clip that is still playing
@@ -210,6 +210,7 @@ Rectangle {
             root.updateDisplayedClipData();
         }
 
+
         function onClipPlaybackPaused(clipId) {
             // Update the UI when a clip is paused (but keep it as the displayed clip)
             root.updateDisplayedClipData();
@@ -276,9 +277,8 @@ Rectangle {
                 // Dark overlay for text readability
                 Rectangle {
                     anchors.fill: parent
-                    radius: 16
-                    color: Colors.backgroundDark
-                    opacity: root.enabled ? 1.0 : 0.6
+                    color: "#000000"
+                    opacity: 0.3
                 }
 
                 // Three dots menu button - top right corner
@@ -291,7 +291,7 @@ Rectangle {
                     width: 28
                     height: 28
                     radius: 6
-                    color: moreMouseArea.containsMouse || moreOptionsMenu.visible ? Qt.alpha(Colors.white, 0.2) : Qt.alpha(Colors.white, 0.15)
+                    color: moreMouseArea.containsMouse || moreOptionsMenu.visible ? "#33FFFFFF" : "#22FFFFFF"
 
                     // Three vertical dots
                     Column {
@@ -304,7 +304,7 @@ Rectangle {
                                 width: 3
                                 height: 3
                                 radius: 1.5
-                                color: Colors.white
+                                color: "#FFFFFF"
                             }
                         }
                     }
@@ -334,9 +334,9 @@ Rectangle {
                         padding: 8
 
                         background: Rectangle {
-                            color: Colors.surfaceDark
+                            color: "#1F1F1F"
                             radius: 8
-                            border.color: Colors.border
+                            border.color: "#333333"
                             border.width: 1
                         }
 
@@ -351,7 +351,7 @@ Rectangle {
                                     width: 144
                                     height: 36
                                     radius: 6
-                                    color: menuItemMouse.containsMouse ? Colors.surfaceLight : "transparent"
+                                    color: menuItemMouse.containsMouse ? "#333333" : "transparent"
 
                                     required property string modelData
 
@@ -360,7 +360,7 @@ Rectangle {
                                         anchors.leftMargin: 12
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: menuItem.modelData
-                                        color: menuItem.modelData === "Delete" ? Colors.error : Colors.textPrimary
+                                        color: menuItem.modelData === "Delete" ? "#FF6B6B" : "#FFFFFF"
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 14
                                         font.weight: Font.Normal
@@ -441,7 +441,7 @@ Rectangle {
                             }
                             GradientStop {
                                 position: 1.0
-                                color: addMouseArea.containsMouse ? Colors.primaryLight : Colors.accent
+                                color: addMouseArea.containsMouse ? Colors.secondary : "#D214FD"
                             }
                         }
 
@@ -528,8 +528,8 @@ Rectangle {
                 id: contentArea
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: Colors.surfaceDark
-                radius: Theme.radiusLarge
+                color: "#0d0d0d"
+                radius: 12
 
                 // Tile sizing properties - responsive layout with scale factor
                 readonly property real tileSpacing: 15
@@ -679,6 +679,7 @@ Rectangle {
                             onClicked: {
                                 console.log("Add Audio clicked - opening add audio panel");
                                 rightSidebar.currentTabIndex = 1;
+                                audioFileDialog.open()
                             }
                         }
 
@@ -733,7 +734,9 @@ Rectangle {
                                         // Selecting the clip updates the sidebar
                                         console.log("ClipTile clicked - index:", clipWrapper.index, "clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle);
                                         soundboardService.setCurrentlySelectedClip(clipWrapper.clipId);
+                                        soundboardService.playClip(clipWrapper.clipId);
                                     }
+
                                     onPlayClicked: {
                                         console.log("ClipTile playClicked - clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle, "filePath:", clipWrapper.filePath);
                                         soundboardService.playClip(clipWrapper.clipId);
@@ -815,7 +818,7 @@ Rectangle {
                                             // If dropped on a valid position, reorder
                                             if (dropIndex >= 0 && dropIndex !== clipWrapper.index) {
                                                 console.log("Moving clip from", clipWrapper.index, "to", dropIndex);
-                                                soundboardService.moveClip(clipsModel.boardId, clipWrapper.index, dropIndex);
+                                                soundboardService.moveClip(soundboardService.activeBoardId, clipWrapper.index, dropIndex);
                                                 clipsModel.reload();
                                             }
                                         }
@@ -882,16 +885,15 @@ Rectangle {
                 // Bind isPlaying state
                 isPlaying: root.displayedClipData ? root.displayedClipData.isPlaying : false
 
-                // Toggle playback - backend handles reproduction mode behavior
+                // Play/Pause the displayed clip
                 onPlayClicked: {
                     if (root.displayedClipData) {
                         soundboardService.playClip(root.displayedClipData.clipId);
                     }
                 }
                 onPauseClicked: {
-                    // Also call playClip - backend toggles based on reproduction mode
                     if (root.displayedClipData) {
-                        soundboardService.playClip(root.displayedClipData.clipId);
+                        soundboardService.stopClip(root.displayedClipData.clipId);
                     }
                 }
 
@@ -964,16 +966,16 @@ Rectangle {
             Layout.rightMargin: 0
 
             // Glassmorphism effect
-            color: Colors.panelBg
+            color: Colors.cardBg
             border.color: Colors.border
             border.width: 1
 
             // Rounded only on left side if desired, but let's keep it simple and clean
             radius: 0 // Flush to the right side edge looks better for fixed sidebar
 
-            // Tab state: 0=Settings, 1=Plus, 2=Record, 3=Teleprompter, 4=Speaker
+            // Tab state: 0=Editor, 1=Plus, 2=Record, 3=Teleprompter, 4=Speaker
             property int currentTabIndex: 0  // Default to Record tab
-            property var tabState: ["Settings", "Add Audio", "Record", "Teleprompter", "Outputs"]
+            property var tabState: ["Clip Editor", "Add Audio", "Recording", "Teleprompter", "Speaker"]
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 12
@@ -1047,37 +1049,36 @@ Rectangle {
 
                 // Recording Tab Content (Tab 2)
                 ColumnLayout {
+                    id: recordingTab
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: 6
                     visible: rightSidebar.currentTabIndex === 2
 
-                    // Name Audio File Section
+                    // ============================================================
+                    // Name Audio File (SINGLE INPUT - fixed duplicate name issue)
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
 
-                        // Header with title and icon
+                        // Header with title and clipboard icon
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
 
                             Text {
                                 text: "Name Audio File"
-                                color: Colors.textPrimary
-
+                                color: "#FFFFFF"
                                 font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                 font.pixelSize: 14
                                 font.weight: Font.DemiBold
                             }
 
-                            Item {
-                                Layout.fillWidth: true
-                            }
+                            Item { Layout.fillWidth: true }
 
-                            // Clipboard/paste icon
                             Rectangle {
                                 width: 24
                                 height: 24
@@ -1097,7 +1098,7 @@ Rectangle {
                                     source: clipboardIcon
                                     anchors.fill: clipboardIcon
                                     colorization: 1.0
-                                    colorizationColor: Colors.textPrimary
+                                    colorizationColor: "#FFFFFF"
                                 }
 
                                 MouseArea {
@@ -1108,7 +1109,7 @@ Rectangle {
                             }
                         }
 
-                        // Text Input Field
+                        // Text Input Field (single input used for saving)
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 44
@@ -1128,11 +1129,11 @@ Rectangle {
                                     color: "#808080"
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
-                                    visible: audioNameInput.text === ""
+                                    visible: recordingNameInput.text === ""
                                 }
 
                                 TextInput {
-                                    id: audioNameInput
+                                    id: recordingNameInput
                                     Layout.fillWidth: true
                                     color: "#FFFFFF"
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
@@ -1152,7 +1153,9 @@ Rectangle {
                         }
                     }
 
+                    // ============================================================
                     // Input Source Section
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
@@ -1167,68 +1170,72 @@ Rectangle {
                             font.weight: Font.DemiBold
                         }
 
-                        // Dropdown selector
-                        Rectangle {
+                        DropdownSelector {
+                            id: inputDeviceDropdown
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 44
-                            color: "#1A1A1A"
-                            radius: 8
-                            border.color: "#3A3A3A"
-                            border.width: 1
+                            icon: "🔴"
+                            placeholder: "Select Mic Device"
+                            selectedId: "-1"
+                            model: []
 
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 15
-                                anchors.rightMargin: 15
-
-                                Text {
-                                    text: "Select Mic Device"
-                                    color: "#666666"
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 13
-                                    Layout.fillWidth: true
-                                }
-
-                                // Dropdown arrow
-                                Text {
-                                    text: "▼"
-                                    color: "#808080"
-                                    font.pixelSize: 10
-                                }
+                            onAboutToOpen: {
+                                const list = soundboardService.getInputDevices()
+                                list.unshift({ id: "-1", name: "None", isDefault: false })
+                                model = list
                             }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Mic dropdown clicked")
+                            onItemSelected: function (id, name) {
+                                console.log("Recording input device selected:", name, "(id:", id, ")");
+                                soundboardService.setRecordingInputDevice(id);
                             }
                         }
                     }
 
                     // Spacer
-                    Item {
-                        Layout.preferredHeight: 4
-                    }
+                    Item { Layout.preferredHeight: 4 }
 
-                    // Start Recording Button Section
+                    // ============================================================
+                    // Start/Stop Recording Button Section
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 8
 
-                        // Recording state
-                        readonly property bool isRecording: soundboardService.isRecording
-
-                        // Microphone button with gray background
                         Rectangle {
                             id: micButton
-                            Layout.preferredWidth: 30
-                            Layout.preferredHeight: 30
+                            Layout.preferredWidth: 36
+                            Layout.preferredHeight: 36
                             Layout.alignment: Qt.AlignHCenter
-                            radius: 15
-                            color: micButtonArea.containsMouse ? "#4A4A4A" : "#3A3A3A"
-                            border.color: "#4A4A4A"
+                            radius: 18
+
+                            // Button color changes based on hover + recording state
+                            color: micButtonArea.containsMouse
+                                   ? (soundboardService.isRecording ? "#7F1D1D" : "#4A4A4A")
+                                   : (soundboardService.isRecording ? "#991B1B" : "#3A3A3A")
+
+                            border.color: soundboardService.isRecording ? "#EF4444" : "#4A4A4A"
                             border.width: 1
+
+                            // subtle pulse ring while recording
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: parent.width + 10
+                                height: parent.height + 10
+                                radius: (parent.width + 10) / 2
+                                color: "transparent"
+                                border.width: 2
+                                border.color: "#EF4444"
+                                opacity: 0.0
+                                visible: soundboardService.isRecording
+
+                                SequentialAnimation on opacity {
+                                    running: soundboardService.isRecording
+                                    loops: Animation.Infinite
+                                    NumberAnimation { to: 0.35; duration: 450 }
+                                    NumberAnimation { to: 0.05; duration: 450 }
+                                }
+                            }
 
                             Image {
                                 id: micIcon
@@ -1244,7 +1251,8 @@ Rectangle {
                                 source: micIcon
                                 anchors.fill: micIcon
                                 colorization: 1.0
-                                colorizationColor: parent.parent.isRecording ? Colors.accent : Colors.textPrimary
+                                // blue when recording (or red if you prefer)
+                                colorizationColor: soundboardService.isRecording ? "#EF4444" : "#FFFFFF"
                             }
 
                             MouseArea {
@@ -1254,49 +1262,44 @@ Rectangle {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     if (soundboardService.isRecording) {
-                                        soundboardService.stopRecording();
+                                        soundboardService.stopRecording()
                                     } else {
-                                        soundboardService.startRecording();
+                                        // If your C++ startRecording needs a name/path, change this call accordingly.
+                                        // Example: soundboardService.startRecording(recordingNameInput.text)
+                                        soundboardService.startRecording()
                                     }
                                 }
                             }
 
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
+                            Behavior on color { ColorAnimation { duration: 150 } }
                         }
 
-                        // Start Recording text
                         Text {
-                            text: parent.isRecording ? "Stop Recording" : "Start Recording"
-                            color: Colors.textSecondary // Changed for light mode visibility
+                            text: soundboardService.isRecording ? "Stop Recording" : "Start Recording"
+                            color: "#888888"
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                            font.pixelSize: 9
+                            font.pixelSize: 10
                             font.weight: Font.Normal
                             Layout.alignment: Qt.AlignHCenter
                         }
                     }
 
                     // Spacer
-                    Item {
-                        Layout.preferredHeight: 8
-                    }
+                    Item { Layout.preferredHeight: 8 }
 
+                    // ============================================================
                     // Trim Audio Section
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
 
-                        // Header with scissors icon and title
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
 
-                            // Scissors icon
                             Rectangle {
                                 width: 16
                                 height: 16
@@ -1316,20 +1319,19 @@ Rectangle {
                                     source: scissorsIcon
                                     anchors.fill: scissorsIcon
                                     colorization: 1.0
-                                    colorizationColor: Colors.textPrimary // Changed for light mode visibility
+                                    colorizationColor: "#FFFFFF"
                                 }
                             }
 
                             Text {
                                 text: "Trim Audio"
-                                color: Colors.textPrimary // Changed for light mode visibility
+                                color: "#FFFFFF"
                                 font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.DemiBold
                             }
                         }
 
-                        // Waveform Display
                         WaveformDisplay {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 90
@@ -1339,100 +1341,30 @@ Rectangle {
                     }
 
                     // Spacer
-                    Item {
-                        Layout.preferredHeight: 4
-                    }
+                    Item { Layout.preferredHeight: 6 }
 
-                    // Name Audio File Section (for saving)
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 5
-                        Layout.rightMargin: 5
-                        spacing: 4
-
-                        Text {
-                            text: "Name Audio File"
-                            color: Colors.textPrimary // Changed for light mode visibility
-                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                        }
-
-                        // Text Input Field
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 36
-                            color: Colors.background // Changed for theme
-                            radius: 6
-                            border.color: Colors.border // Changed for theme
-                            border.width: 1
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 4
-
-                                Text {
-                                    text: "Enter Name Here:"
-                                    color: Colors.textSecondary // Changed for theme
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 11
-                                    visible: saveNameInput.text === ""
-                                }
-
-                                TextInput {
-                                    id: saveNameInput
-                                    Layout.fillWidth: true
-                                    color: Colors.textPrimary // Changed for theme
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 11
-                                    clip: true
-
-                                    Text {
-                                        anchors.fill: parent
-                                        text: "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _"
-                                        color: Colors.textSecondary // Changed for theme
-                                        font.family: parent.font.family
-                                        font.pixelSize: parent.font.pixelSize
-                                        visible: !parent.text && !parent.activeFocus
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Spacer
-                    Item {
-                        Layout.preferredHeight: 6
-                    }
-
+                    // ============================================================
                     // Cancel and Save buttons
+                    // ============================================================
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
 
-                        // Spacer to push buttons to right
-                        Item {
-                            Layout.fillWidth: true
-                        }
+                        Item { Layout.fillWidth: true }
 
                         // Cancel button
                         Rectangle {
                             Layout.preferredWidth: 80
                             Layout.preferredHeight: 36
-                            color: cancelBtnArea.containsMouse ? Colors.surfaceLight : Colors.surface
+                            color: cancelBtnArea.containsMouse ? "#4A4A4A" : "#3A3A3A"
                             radius: 8
-                            border.color: Colors.border
-                            border.width: 1
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "Cancel"
-                                color: Colors.textPrimary
-
+                                color: "#FFFFFF"
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
@@ -1444,41 +1376,29 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    saveNameInput.text = "";
-                                    audioNameInput.text = "";
+                                    recordingNameInput.text = "";
                                     rightSidebar.currentTabIndex = 0;
                                 }
                             }
 
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
+                            Behavior on color { ColorAnimation { duration: 150 } }
                         }
 
-                        // Save button (gradient)
+                        // Save button
                         Rectangle {
                             Layout.preferredWidth: 80
                             Layout.preferredHeight: 36
                             radius: 8
                             gradient: Gradient {
                                 orientation: Gradient.Horizontal
-                                GradientStop {
-                                    position: 0.0
-                                    color: saveBtnArea.containsMouse ? Colors.primaryLight : Colors.primary
-                                }
-                                GradientStop {
-                                    position: 1.0
-                                    color: saveBtnArea.containsMouse ? Colors.secondary : Colors.accent
-                                }
+                                GradientStop { position: 0.0; color: saveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6" }
+                                GradientStop { position: 1.0; color: saveBtnArea.containsMouse ? "#E040FB" : "#D214FD" }
                             }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "Save"
-                                color: Colors.textOnPrimary
-
+                                color: "#FFFFFF"
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
@@ -1492,15 +1412,18 @@ Rectangle {
                                 onClicked: {
                                     console.log("Save clicked");
                                     const boardId = clipsModel.boardId;
+
                                     if (boardId >= 0 && soundboardService.lastRecordingPath !== "") {
-                                        const title = saveNameInput.text.trim() || audioNameInput.text.trim() || "New Recording";
-                                        const success = soundboardService.addClipWithTitle(boardId, "file:///" + soundboardService.lastRecordingPath, title);
+                                        const title = recordingNameInput.text.trim() || "New Recording";
+                                        const success = soundboardService.addClipWithTitle(
+                                            boardId,
+                                            "file:///" + soundboardService.lastRecordingPath,
+                                            title
+                                        );
+
                                         if (success) {
                                             clipsModel.reload();
-                                            // Clear inputs
-                                            saveNameInput.text = "";
-                                            audioNameInput.text = "";
-                                            // Switch back to editor tab
+                                            recordingNameInput.text = "";
                                             rightSidebar.currentTabIndex = 0;
                                         }
                                     } else {
@@ -1512,9 +1435,7 @@ Rectangle {
                     }
 
                     // Fill remaining space
-                    Item {
-                        Layout.fillHeight: true
-                    }
+                    Item { Layout.fillHeight: true }
                 }
 
                 // Settings Tab Content (Tab 0) - New Modern Clip Editor
@@ -1550,7 +1471,7 @@ Rectangle {
                         property bool muteMicDuringPlayback: true
                         property bool persistentSettings: true
                         property bool clipIsRepeat: false
-                        property int reproductionMode: 0  // 0=Overlay(default), 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop
+                        property int reproductionMode: 0  // 0=Overlay(default), 1=Play/Pause, 2=Play/Stop, 3=Exclusive, 4=Loop
                         property real durationSec: 0.0
                         property real trimStartMs: 0.0
                         property real trimEndMs: 0.0
@@ -1639,8 +1560,8 @@ Rectangle {
                                     Image {
                                         id: clipPreviewImage
                                         anchors.centerIn: parent
-                                        width: 80
-                                        height: 80
+                                        width: 100
+                                        height: 100
                                         fillMode: Image.PreserveAspectFit
                                         source: {
                                             const imgPath = clipEditorTab.editingClipImgPath;
@@ -1876,153 +1797,155 @@ Rectangle {
                                 }
                             }
 
-                            // ===== PLAYBACK CONTROLS =====
-                            RowLayout {
-                                Layout.alignment: Qt.AlignHCenter
-                                spacing: 6
+        //                     // ===== PLAYBACK CONTROLS =====
+        //                     RowLayout {
+        //                         Layout.alignment: Qt.AlignHCenter
+        //                         spacing: 6
 
-                                // Previous button
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: prevBtnArea.containsMouse ? Colors.surfaceLight : "transparent" // was #3A3A3A
+        //                         // Previous button
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: prevBtnArea.containsMouse ? "#3A3A3A" : "transparent"
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "◀"
-                                        color: Colors.textPrimary // was #FFFFFF
-                                        font.pixelSize: 10
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "◀"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 10
+        //                             }
 
-                                    MouseArea {
-                                        id: prevBtnArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Previous clicked")
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 id: prevBtnArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: console.log("Previous clicked")
+        //                             }
+        //                         }
 
-                                // Skip backward button
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: skipBackArea.containsMouse ? Colors.surfaceLight : "transparent"
+        //                         // Skip backward button
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: skipBackArea.containsMouse ? "#3A3A3A" : "transparent"
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "⏮"
-                                        color: Colors.textPrimary
-                                        font.pixelSize: 12
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "⏮"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 12
+        //                             }
 
-                                    MouseArea {
-                                        id: skipBackArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Skip backward clicked")
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 id: skipBackArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: console.log("Skip backward clicked")
+        //                             }
+        //                         }
 
-                                // Main Play Button (larger, gradient)
-                                Rectangle {
-                                    width: 36
-                                    height: 36
-                                    radius: 18
+        //                         // Main Play Button (larger, gradient)
+        //                         Rectangle {
+        //                             width: 36
+        //                             height: 36
+        //                             radius: 18
 
-                                    gradient: Gradient {
-                                        orientation: Gradient.Horizontal
-                                        GradientStop {
-                                            position: 0.0
-                                            color: Colors.accent
-                                        }
-                                        GradientStop {
-                                            position: 1.0
-                                            color: "#8B5CF6"
-                                        }
-                                    }
+        //                             gradient: Gradient {
+        //                                 orientation: Gradient.Horizontal
+        //                                 GradientStop {
+        //                                     position: 0.0
+        //                                     color: "#3B82F6"
+        //                                 }
+        //                                 GradientStop {
+        //                                     position: 1.0
+        //                                     color: "#8B5CF6"
+        //                                 }
+        //                             }
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: root.displayedClipData && root.displayedClipData.isPlaying ? "⏸" : "▶"
-                                        color: "#FFFFFF"
-                                        font.pixelSize: 14
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: root.displayedClipData && root.displayedClipData.isPlaying ? "⏸" : "▶"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 14
+        //                             }
 
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            // Let the backend handle reproduction mode behavior
-                                            // (playClip toggles based on clip's reproductionMode)
-                                            if (root.selectedClipId !== -1) {
-                                                soundboardService.playClip(root.selectedClipId);
-                                            }
-                                        }
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 anchors.fill: parent
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: {
+        //                                     if (root.selectedClipId !== -1) {
+        //                                         if (soundboardService.isClipPlaying(root.selectedClipId)) {
+        //                                             soundboardService.stopClip(root.selectedClipId);
+        //                                         } else {
+        //                                             soundboardService.playClip(root.selectedClipId);
+        //                                         }
+        //                                     }
+        //                                 }
+        //                             }
+        //                         }
 
-                                // Skip forward button
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: skipFwdArea.containsMouse ? Colors.surfaceLight : "transparent"
+        //                         // Skip forward button
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: skipFwdArea.containsMouse ? "#3A3A3A" : "transparent"
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "⏭"
-                                        color: Colors.textPrimary
-                                        font.pixelSize: 12
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "⏭"
+        //                                 color: "#FFFFFF"
+        //                                 font.pixelSize: 12
+        //                             }
 
-                                    MouseArea {
-                                        id: skipFwdArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Skip forward clicked")
-                                    }
-                                }
+        //                             MouseArea {
+        //                                 id: skipFwdArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: console.log("Skip forward clicked")
+        //                             }
+        //                         }
 
-                                // Loop button - toggles repeat for selected clip
-                                Rectangle {
-                                    width: 28
-                                    height: 28
-                                    radius: 6
-                                    color: {
-                                        // Active when repeat is on
-                                        if (clipEditorTab.clipIsRepeat) {
-                                            return loopBtnArea.containsMouse ? Colors.accent : Colors.accentLight; // was #7C3AED / #8B5CF6
-                                        }
-                                        return loopBtnArea.containsMouse ? Colors.surfaceLight : "transparent"; // was #3A3A3A
-                                    }
+        //                         // Loop button - toggles repeat for selected clip
+        //                         Rectangle {
+        //                             width: 28
+        //                             height: 28
+        //                             radius: 6
+        //                             color: {
+        //                                 // Active when repeat is on
+        //                                 if (clipEditorTab.clipIsRepeat) {
+        //                                     return loopBtnArea.containsMouse ? "#7C3AED" : "#8B5CF6";
+        //                                 }
+        //                                 return loopBtnArea.containsMouse ? "#3A3A3A" : "transparent";
+        //                             }
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "🔁"
-                                        color: clipEditorTab.clipIsRepeat ? Colors.textOnPrimary : Colors.textPrimary // was #FFFFFF / #888888
-                                        font.pixelSize: 12
-                                    }
+        //                             Text {
+        //                                 anchors.centerIn: parent
+        //                                 text: "🔁"
+        //                                 color: clipEditorTab.clipIsRepeat ? "#FFFFFF" : "#888888"
+        //                                 font.pixelSize: 12
+        //                             }
 
-                                    MouseArea {
-                                        id: loopBtnArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            // Toggle repeat for selected clip
-                                            if (root.selectedClipId !== -1) {
-                                                clipEditorTab.clipIsRepeat = !clipEditorTab.clipIsRepeat;
-                                                clipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+        //                             MouseArea {
+        //                                 id: loopBtnArea
+        //                                 anchors.fill: parent
+        //                                 hoverEnabled: true
+        //                                 cursorShape: Qt.PointingHandCursor
+        //                                 onClicked: {
+        //                                     // Toggle repeat for selected clip
+        //                                     if (root.selectedClipId !== -1) {
+        //                                         clipEditorTab.clipIsRepeat = !clipEditorTab.clipIsRepeat;
+        //                                         clipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
+        //                                     }
+        //                                 }
+        //                             }
+        //                         }
+        //                     }
 
                             // ===== VOICE VOLUME SLIDER =====
                             ColumnLayout {
@@ -2083,7 +2006,7 @@ Rectangle {
                                                 orientation: Gradient.Horizontal
                                                 GradientStop {
                                                     position: 0.0
-                                                    color: Colors.accent
+                                                    color: "#3B82F6"
                                                 }
                                                 GradientStop {
                                                     position: 1.0
@@ -2164,7 +2087,7 @@ Rectangle {
                                                 orientation: Gradient.Horizontal
                                                 GradientStop {
                                                     position: 0.0
-                                                    color: Colors.accent
+                                                    color: "#3B82F6"
                                                 }
                                                 GradientStop {
                                                     position: 1.0
@@ -2283,165 +2206,89 @@ Rectangle {
                                     }
                                 }
 
-                                // Mode icons row
+                                // Mode icons row (SVG + blue circle when selected)
                                 RowLayout {
                                     id: modeSelectorRow
-                                    Layout.fillWidth: true
-                                    spacing: 10
+                                    Layout.alignment: Qt.AlignHCenter
+                                    spacing: 8
 
-                                    property int selectedMode: clipEditorTab.reproductionMode  // Bind to clip's mode
-                                    property bool ignoreNextChange: false  // Flag to prevent saving during load
+                                    // change this to your real theme flag
+                                    property bool isLightTheme: false
 
-                                    // Update backend ONLY when user clicks, not during load
-                                    onSelectedModeChanged: {
-                                        if (ignoreNextChange) {
-                                            ignoreNextChange = false;  // Reset flag
-                                            return;  // Don't save during load
-                                        }
-                                        if (root.selectedClipId !== -1) {
-                                            soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, selectedMode);
-                                            console.log("Reproduction mode changed to:", selectedMode, "- SAVED!");
+                                    // helper: pick correct svg for mode + theme
+                                    function modeIconSource(mode) {
+                                        const base = "qrc:/qt/qml/TalkLess/resources/icons/reproduction/"
+                                        const suffix = isLightTheme ? "_light.svg" : "_dark.svg"
+                                        switch (mode) {
+                                        case 0: return base + "overlay" + suffix
+                                        case 1: return base + "play-pause" + suffix
+                                        case 2: return base + "play-stop" + suffix
+                                        case 3: return base + "restart" + suffix
+                                        case 4: return base + "loop" + suffix
+                                        default: return ""
                                         }
                                     }
 
-                                    // Overlay Mode
-                                    Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
-                                        color: parent.selectedMode === 0 ? Colors.accent : (overlayModeArea.containsMouse ? Colors.surfaceLight : Colors.surface)
-                                        border.color: parent.selectedMode === 0 ? Colors.accent : Colors.border
-                                        border.width: parent.selectedMode === 0 ? 2 : 1
+                                    // reusable button
+                                    component ModeButton: Rectangle {
+                                        required property int mode
+                                        property bool selected: clipEditorTab.reproductionMode === mode
 
-                                        Text {
+                                        width: 36
+                                        height: 36
+                                        radius: 8
+                                        color: ma.containsMouse ? "#2A2A2A" : "#1A1A1A"
+                                        border.width: 1
+
+                                        Rectangle {
                                             anchors.centerIn: parent
-                                            text: "▶"
-                                            color: parent.parent.selectedMode === 0 ? Colors.textOnPrimary : Colors.textPrimary
-                                            font.pixelSize: 18
-                                            font.weight: Font.Bold
+                                            width: 28
+                                            height: 28
+                                            radius: 14
+                                            visible: parent.selected
+                                            color: "#00D9FF"
+                                        }
+
+                                        Image {
+                                            anchors.centerIn: parent
+                                            source: modeSelectorRow.modeIconSource(parent.mode)
+                                            width: 18
+                                            height: 18
+                                            sourceSize.width: width
+                                            sourceSize.height: height
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            mipmap: true
                                         }
 
                                         MouseArea {
-                                            id: overlayModeArea
+                                            id: ma
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                modeSelectorRow.selectedMode = 0;
-                                                clipEditorTab.reproductionMode = 0;
                                                 if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 0);
-                                                    console.log("Mode set to Overlay (0)");
+                                                    clipEditorTab.reproductionMode = parent.mode
+                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, parent.mode)
+                                                    console.log("Reproduction mode changed to:", parent.mode, "- SAVED!")
                                                 }
                                             }
                                         }
                                     }
 
-                                    // Play/Pause Mode
-                                    Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
-                                        color: parent.selectedMode === 1 ? Colors.accent : (playPauseModeArea.containsMouse ? Colors.surfaceLight : Colors.surface)
-                                        border.color: parent.selectedMode === 1 ? Colors.accent : Colors.border
-                                        border.width: parent.selectedMode === 1 ? 2 : 1
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "▶⏸"
-                                            color: parent.parent.selectedMode === 1 ? Colors.textOnPrimary : Colors.textPrimary
-                                            font.pixelSize: 14
-                                            font.weight: Font.Bold
-                                        }
-
-                                        MouseArea {
-                                            id: playPauseModeArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                modeSelectorRow.selectedMode = 1;
-                                                clipEditorTab.reproductionMode = 1;
-                                                if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 1);
-                                                    console.log("Mode set to Play/Pause (1)");
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Play/Stop Mode
-                                    Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
-                                        color: parent.selectedMode === 2 ? Colors.accent : (playStopModeArea.containsMouse ? Colors.surfaceLight : Colors.surface)
-                                        border.color: parent.selectedMode === 2 ? Colors.accent : Colors.border
-                                        border.width: parent.selectedMode === 2 ? 2 : 1
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "▶⏹"
-                                            color: parent.parent.selectedMode === 2 ? Colors.textOnPrimary : Colors.textPrimary
-                                            font.pixelSize: 14
-                                            font.weight: Font.Bold
-                                        }
-
-                                        MouseArea {
-                                            id: playStopModeArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                modeSelectorRow.selectedMode = 2;
-                                                clipEditorTab.reproductionMode = 2;
-                                                if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 2);
-                                                    console.log("Mode set to Play/Stop (2)");
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Restart Mode
-                                    Rectangle {
-                                        width: 44
-                                        height: 44
-                                        radius: 10
-                                        color: parent.selectedMode === 3 ? "#00D9FF" : (restartModeArea.containsMouse ? "#2A2A2A" : "#1A1A1A")
-                                        border.color: parent.selectedMode === 3 ? "#00D9FF" : "#3A3A3A"
-                                        border.width: parent.selectedMode === 3 ? 2 : 1
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "⟲"
-                                            color: parent.parent.selectedMode === 3 ? "#000000" : "#FFFFFF"
-                                            font.pixelSize: 20
-                                            font.weight: Font.Bold
-                                        }
-
-                                        MouseArea {
-                                            id: restartModeArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                modeSelectorRow.selectedMode = 3;
-                                                clipEditorTab.reproductionMode = 3;
-                                                if (root.selectedClipId !== -1) {
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, 3);
-                                                    console.log("Mode set to Loop (3)");
-                                                }
-                                            }
-                                        }
-                                    }
+                                    ModeButton { mode: 0 }
+                                    ModeButton { mode: 1 }
+                                    ModeButton { mode: 2 }
+                                    ModeButton { mode: 3 }
+                                    ModeButton { mode: 4 }
                                 }
+
 
                                 // Mode description text
                                 Text {
                                     Layout.fillWidth: true
                                     text: {
-                                        const mode = modeSelectorRow.selectedMode; // Use modeSelectorRow directly
+                                        const mode = parent.children[1].selectedMode;
                                         switch (mode) {
                                         case 0:
                                             return "Sound plays with other sounds";
@@ -2450,9 +2297,9 @@ Rectangle {
                                         case 2:
                                             return "Second click stops and resets";
                                         case 3:
-                                            return "Always plays from beginning";
+                                            return "Plays from start, pauses others";
                                         case 4:
-                                            return "Endless loop until changed";
+                                            return "Loops from beginning, stops others";
                                         default:
                                             return "";
                                         }
@@ -2777,7 +2624,7 @@ Rectangle {
                                                 id: tagText
                                                 anchors.centerIn: parent
                                                 text: modelData
-                                                color: Colors.textSecondary
+                                                color: "#CCCCCC"
                                                 font.pixelSize: 10
                                             }
 
@@ -3087,11 +2934,11 @@ Rectangle {
                                 orientation: Gradient.Horizontal
                                 GradientStop {
                                     position: 0.0
-                                    color: uploadSaveBtnArea.containsMouse ? Colors.primaryLight : Colors.accent
+                                    color: uploadSaveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6"
                                 }
                                 GradientStop {
                                     position: 1.0
-                                    color: uploadSaveBtnArea.containsMouse ? Colors.primaryLight : Colors.accent
+                                    color: uploadSaveBtnArea.containsMouse ? "#E040FB" : "#D214FD"
                                 }
                             }
 
@@ -3166,7 +3013,7 @@ Rectangle {
 
                     Text {
                         text: "Teleprompter"
-                        color: Colors.textPrimary
+                        color: "#FFFFFF"
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
@@ -3174,7 +3021,7 @@ Rectangle {
 
                     Text {
                         text: "Teleprompter content will appear here"
-                        color: Colors.textSecondary
+                        color: "#666666"
                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                         font.pixelSize: 12
                     }
@@ -3193,7 +3040,7 @@ Rectangle {
 
                     Text {
                         text: "Audio Output"
-                        color: Colors.textPrimary
+                        color: "#FFFFFF"
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
@@ -3201,7 +3048,7 @@ Rectangle {
 
                     Text {
                         text: "Speaker and output settings here"
-                        color: Colors.textSecondary
+                        color: "#666666"
                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                         font.pixelSize: 12
                     }
@@ -3224,7 +3071,7 @@ Rectangle {
         width: 32
         height: 32
         radius: 8
-        color: isActive ? Qt.alpha(Colors.accent, 0.15) : (mouse.containsMouse ? Colors.surfaceLight : "transparent")
+        color: isActive ? Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.2) : (mouse.containsMouse ? Colors.surfaceLight : "transparent")
         border.color: isActive ? Colors.accent : "transparent"
         border.width: 1
 

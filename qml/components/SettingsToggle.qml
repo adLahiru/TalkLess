@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import "../styles"
 
 Item {
     id: root
@@ -35,13 +36,13 @@ Item {
             width: 52
             height: 28
             radius: 14
-            color: root.isOn ? "#22C55E" : "#3A3A3A"
+            color: root.isOn ? Colors.success : Colors.surfaceLight
 
             Rectangle {
                 width: 22
                 height: 22
                 radius: 11
-                color: "#FFFFFF"
+                color: Colors.surface
                 x: root.isOn ? parent.width - width - 3 : 3
                 anchors.verticalCenter: parent.verticalCenter
 
@@ -68,7 +69,7 @@ Item {
         Text {
             visible: root.label !== ""
             text: root.label
-            color: "#FFFFFF"
+            color: Colors.textPrimary
             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
             font.pixelSize: 15
         }
@@ -77,7 +78,7 @@ Item {
         Text {
             visible: root.showStatusText
             text: root.isOn ? root.onText : root.offText
-            color: "#666666"
+            color: Colors.textTertiary
             font.pixelSize: 12
         }
     }
