@@ -2303,10 +2303,50 @@ void SoundboardService::refreshAudioDevices()
         return;
     }
 
-    // Refresh both playback and input devices
+    // Refresh the audio context and devices
     m_audioEngine->refreshPlaybackDevices();
+
+    // Try to reconnect to previously selected devices if they're available again
+    // Check and reconnect capture device
+    if (!m_state.settings.selectedCaptureDeviceId.isEmpty()) {
+        auto inputDevices = m_audioEngine->enumerateCaptureDevices();
+        for (const auto& device : inputDevices) {
+            if (QString::fromStdString(device.id) == m_state.settings.selectedCaptureDeviceId ||
+                QString::fromStdString(device.name) == m_state.settings.selectedCaptureDeviceId) {
+                qDebug() << "Reconnecting to capture device:" << m_state.settings.selectedCaptureDeviceId;
+                m_audioEngine->setCaptureDevice(m_state.settings.selectedCaptureDeviceId.toStdString());
+                break;
+            }
+        }
+    }
+
+    // Check and reconnect playback device
+    if (!m_state.settings.selectedPlaybackDeviceId.isEmpty()) {
+        auto outputDevices = m_audioEngine->enumeratePlaybackDevices();
+        for (const auto& device : outputDevices) {
+            if (QString::fromStdString(device.id) == m_state.settings.selectedPlaybackDeviceId ||
+                QString::fromStdString(device.name) == m_state.settings.selectedPlaybackDeviceId) {
+                qDebug() << "Reconnecting to playback device:" << m_state.settings.selectedPlaybackDeviceId;
+                m_audioEngine->setPlaybackDevice(m_state.settings.selectedPlaybackDeviceId.toStdString());
+                break;
+            }
+        }
+    }
+
+    // Check and reconnect monitor device
+    if (!m_state.settings.selectedMonitorDeviceId.isEmpty()) {
+        auto outputDevices = m_audioEngine->enumeratePlaybackDevices();
+        for (const auto& device : outputDevices) {
+            if (QString::fromStdString(device.id) == m_state.settings.selectedMonitorDeviceId ||
+                QString::fromStdString(device.name) == m_state.settings.selectedMonitorDeviceId) {
+                qDebug() << "Reconnecting to monitor device:" << m_state.settings.selectedMonitorDeviceId;
+                m_audioEngine->setMonitorPlaybackDevice(m_state.settings.selectedMonitorDeviceId.toStdString());
+                break;
+            }
+        }
+    }
     
-    qDebug() << "Audio devices refreshed";
+    qDebug() << "Audio devices refreshed and reconnected";
     emit audioDevicesChanged();
 }
 
