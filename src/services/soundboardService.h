@@ -40,17 +40,13 @@ public:
     Q_PROPERTY(QString selectedPlaybackDeviceId READ selectedPlaybackDeviceId NOTIFY settingsChanged)
     Q_PROPERTY(QString selectedMonitorDeviceId READ selectedMonitorDeviceId NOTIFY settingsChanged)
     Q_PROPERTY(bool micEnabled READ isMicEnabled WRITE setMicEnabled NOTIFY settingsChanged)
-    Q_PROPERTY(
-        bool micPassthroughEnabled READ isMicPassthroughEnabled WRITE setMicPassthroughEnabled NOTIFY settingsChanged)
-    Q_PROPERTY(
-        float micSoundboardBalance READ getMicSoundboardBalance WRITE setMicSoundboardBalance NOTIFY settingsChanged)
+    Q_PROPERTY(bool micPassthroughEnabled READ isMicPassthroughEnabled WRITE setMicPassthroughEnabled NOTIFY settingsChanged)
+    Q_PROPERTY(float micSoundboardBalance READ getMicSoundboardBalance WRITE setMicSoundboardBalance NOTIFY settingsChanged)
     Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
+
     Q_PROPERTY(bool isRecording READ isRecording NOTIFY recordingStateChanged)
     Q_PROPERTY(QString lastRecordingPath READ lastRecordingPath NOTIFY recordingStateChanged)
     Q_PROPERTY(float recordingDuration READ recordingDuration NOTIFY recordingStateChanged)
-
-
-
 
     // ---- Index / Settings ----
     double masterGainDb() const { return m_state.settings.masterGainDb; }
@@ -97,22 +93,22 @@ public:
     Q_INVOKABLE void reloadIndex(); // re-read index.json
 
     // ---- Active boards (multiple can be active) ----
-    int activeBoardId() const;                        // Returns first active board ID or -1
-    QString activeBoardName() const;                  // Returns first active board name
-    QVariantList activeBoardIdsList() const;          // Returns all active board IDs
+    int activeBoardId() const;                         // Returns first active board ID or -1
+    QString activeBoardName() const;                   // Returns first active board name
+    QVariantList activeBoardIdsList() const;           // Returns all active board IDs
     Q_INVOKABLE bool isBoardActive(int boardId) const; // Check if a specific board is active
-    Q_INVOKABLE bool toggleBoardActive(int boardId);  // Toggle active state of a board
+    Q_INVOKABLE bool toggleBoardActive(int boardId);   // Toggle active state of a board
 
-    bool activate(int boardId);                       // Activate a board (adds to active set)
-    bool deactivate(int boardId);                     // Deactivate a board (removes from active set)
-    bool saveActive();                                // Save all active boards
+    bool activate(int boardId);    // Activate a board (adds to active set)
+    bool deactivate(int boardId);  // Deactivate a board (removes from active set)
+    bool saveActive();             // Save all active boards
 
     // ---- Clip operations (board-wise) ----
     Q_INVOKABLE bool addClip(int boardId, const QString& filePath);
     Q_INVOKABLE bool addClips(int boardId, const QStringList& filePaths);
     Q_INVOKABLE bool addClipWithTitle(int boardId, const QString& filePath, const QString& title);
-    Q_INVOKABLE bool addClipWithSettings(int boardId, const QString& filePath, const QString& title, double trimStartMs,
-                                         double trimEndMs);
+    Q_INVOKABLE bool addClipWithSettings(int boardId, const QString& filePath, const QString& title,
+                                         double trimStartMs, double trimEndMs);
     Q_INVOKABLE bool deleteClip(int boardId, int clipId);
     bool addClipToBoard(int boardId, const Clip& draft);
     bool updateClipInBoard(int boardId, int clipId, const Clip& updatedClip);
@@ -120,28 +116,28 @@ public:
                                        const QStringList& tags);
     Q_INVOKABLE bool updateClipImage(int boardId, int clipId, const QString& imagePath);
     Q_INVOKABLE bool updateClipAudioSettings(int boardId, int clipId, int volume, double speed);
-    Q_INVOKABLE void setClipVolume(int boardId, int clipId, int volume);         // Real-time volume (no save)
-    Q_INVOKABLE void setClipRepeat(int boardId, int clipId, bool repeat);        // Toggle repeat mode
-    Q_INVOKABLE void setClipReproductionMode(int boardId, int clipId, int mode); // Set reproduction mode (0-3)
+    Q_INVOKABLE void setClipVolume(int boardId, int clipId, int volume);
+    Q_INVOKABLE void setClipRepeat(int boardId, int clipId, bool repeat);
+    Q_INVOKABLE void setClipReproductionMode(int boardId, int clipId, int mode);
     Q_INVOKABLE void setClipStopOtherSounds(int boardId, int clipId, bool stop);
     Q_INVOKABLE void setClipMuteOtherSounds(int boardId, int clipId, bool mute);
     Q_INVOKABLE void setClipMuteMicDuringPlayback(int boardId, int clipId, bool mute);
     Q_INVOKABLE void setClipTrim(int boardId, int clipId, double startMs, double endMs);
     Q_INVOKABLE void seekClip(int boardId, int clipId, double positionMs);
-    Q_INVOKABLE bool moveClip(int boardId, int fromIndex, int toIndex); // Reorder clips with drag-drop
-    Q_INVOKABLE void copyClip(int clipId);                              // Copy clip to internal clipboard
-    Q_INVOKABLE bool pasteClip(int boardId);                            // Paste clip from clipboard to target board
-    Q_INVOKABLE bool canPaste() const;                                  // Check if clipboard has a clip
-    QVector<Clip> getClipsForBoard(int boardId) const;                  // Get all clips for a board
-    QVector<Clip> getActiveClips() const;                               // Get clips from active board
-    Q_INVOKABLE QVariantMap getClipData(int boardId, int clipId) const; // Get full clip data as map
+    Q_INVOKABLE bool moveClip(int boardId, int fromIndex, int toIndex);
+    Q_INVOKABLE void copyClip(int clipId);
+    Q_INVOKABLE bool pasteClip(int boardId);
+    Q_INVOKABLE bool canPaste() const;
+    QVector<Clip> getClipsForBoard(int boardId) const;
+    QVector<Clip> getActiveClips() const;
+    Q_INVOKABLE QVariantMap getClipData(int boardId, int clipId) const;
 
     // ---- Playback controls ----
-    Q_INVOKABLE void clipClicked(int clipId);              // Handle clip tile click: select + play with mode logic
-    Q_INVOKABLE void setCurrentlySelectedClip(int clipId); // Just select the clip (for UI)
-    Q_INVOKABLE void playClip(int clipId);                 // Start playback of the given clip
-    Q_INVOKABLE void stopClip(int clipId);                 // Stop playback of the given clip
-    Q_INVOKABLE void stopAllClips();                       // Stop all currently playing clips
+    Q_INVOKABLE void clipClicked(int clipId);
+    Q_INVOKABLE void setCurrentlySelectedClip(int clipId);
+    Q_INVOKABLE void playClip(int clipId);
+    Q_INVOKABLE void stopClip(int clipId);
+    Q_INVOKABLE void stopAllClips();
     Q_INVOKABLE bool isClipPlaying(int clipId) const;
     Q_INVOKABLE double getClipPlaybackPositionMs(int clipId) const;
     Q_INVOKABLE QVariantList playingClipIDs() const;
@@ -152,7 +148,7 @@ public:
     Q_INVOKABLE bool setInputDevice(const QString& deviceId);
     Q_INVOKABLE bool setOutputDevice(const QString& deviceId);
     Q_INVOKABLE bool setMonitorOutputDevice(const QString& deviceId);
-    Q_INVOKABLE bool setRecodingInputDevice(const QString& deviceId);
+    Q_INVOKABLE bool setRecordingInputDevice(const QString& deviceId);
 
     // ---- Audio Level Monitoring ----
     Q_INVOKABLE float getMicPeakLevel() const;
@@ -161,11 +157,11 @@ public:
     Q_INVOKABLE void resetPeakLevels();
 
     // ---- Mixer Controls ----
-    Q_INVOKABLE void setMicSoundboardBalance(float balance); // 0.0 = full mic, 1.0 = full soundboard
+    Q_INVOKABLE void setMicSoundboardBalance(float balance);
     Q_INVOKABLE float getMicSoundboardBalance() const;
-    Q_INVOKABLE void setMicPassthroughEnabled(bool enabled); // Enable/disable mic in output
+    Q_INVOKABLE void setMicPassthroughEnabled(bool enabled);
     Q_INVOKABLE bool isMicPassthroughEnabled() const;
-    Q_INVOKABLE void setMicEnabled(bool enabled); // Enable/disable capture
+    Q_INVOKABLE void setMicEnabled(bool enabled);
     Q_INVOKABLE bool isMicEnabled() const;
     Q_INVOKABLE double getFileDuration(const QString& filePath) const;
 
@@ -177,8 +173,10 @@ public:
     float recordingDuration() const;
     Q_INVOKABLE QString getRecordingOutputPath() const;
 
-
-
+    // ---- Recording preview (NO soundboard add) ----
+    Q_INVOKABLE bool playLastRecordingPreview();
+    Q_INVOKABLE void stopLastRecordingPreview();
+    Q_INVOKABLE bool isRecordingPreviewPlaying() const;
 
     // ---- Hotkey (active only) ----
     int findActiveClipIdByHotkey(const QString& hotkey) const;
@@ -187,7 +185,6 @@ public:
     bool setClipPlaying(int clipId, bool playing);
 
     // ---- Hotkey Action Handler ----
-    // Connect this to HotkeyManager::actionTriggered for modular action handling
     Q_INVOKABLE void handleHotkeyAction(const QString& actionId);
 
 signals:
@@ -197,38 +194,42 @@ signals:
     void settingsChanged();
     void clipPlaybackStarted(int clipId);
     void clipPlaybackStopped(int clipId);
-    void clipPlaybackPaused(int clipId); // Notify UI when clip is paused by another clip
+    void clipPlaybackPaused(int clipId);
     void clipUpdated(int boardId, int clipId);
 
-    // Emitted when play-selected hotkey is pressed - QML handles this since it knows selected clip
     void playSelectedRequested();
-    void clipSelectionRequested(int clipId); // Emitted when a clip should be selected in UI
+    void clipSelectionRequested(int clipId);
     void clipboardChanged();
     void recordingStateChanged();
-
 
 private:
     void rebuildHotkeyIndex();
     Clip* findActiveClipById(int clipId);
-    int getOrAssignSlot(int clipId); // Get audio engine slot for clip
+    int getOrAssignSlot(int clipId);
     void reproductionPlayingClip(const QVariantList& playingClipIds, int mode);
     static QString normalizeHotkey(const QString& hotkey);
-    void finalizeClipPlayback(int clipId); // Shared cleanup for manual stop and natural end
+    void finalizeClipPlayback(int clipId);
 
 private:
+    // Reserve last engine slot for recording preview so it never collides with normal clip slots.
+    static constexpr int kEngineSlotsTotal = 16;
+    static constexpr int kPreviewSlot      = 15; // MUST match AudioEngine::MAX_CLIPS-1
+    static constexpr int kClipSlotsUsable  = 15; // 0..14 used by normal clips
+
     StorageRepository m_repo;
 
-    AppState m_state;                             // index.json data in memory
-    QHash<int, Soundboard> m_activeBoards;        // Multiple active boards in memory (boardId -> Soundboard)
-    QHash<QString, int> m_hotkeyToClipId;         // hotkey -> clipId (from all active boards)
+    AppState m_state;
+    QHash<int, Soundboard> m_activeBoards;
+    QHash<QString, int> m_hotkeyToClipId;
 
-    // Audio playback
     std::unique_ptr<AudioEngine> m_audioEngine;
-    QHash<int, int> m_clipIdToSlot; // clipId -> audio engine slot
-    int m_nextSlot = 0;             // next available slot
-    QSet<int> m_clipsThatMutedMic;  // Track clips that muted the mic (to restore on stop)
+    QHash<int, int> m_clipIdToSlot;
+    int m_nextSlot = 0;
+    QSet<int> m_clipsThatMutedMic;
 
-    std::optional<Clip> m_clipboardClip; // Internal clipboard for copy/paste
+    std::optional<Clip> m_clipboardClip;
     QString m_lastRecordingPath;
-};
 
+    // Preview state
+    bool m_recordingPreviewPlaying = false;
+};

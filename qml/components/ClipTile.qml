@@ -204,10 +204,10 @@ Item {
             id: actionPopupBar
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.topMargin: 8 * root.scaleFactor
-            width: Math.min(240 * root.scaleFactor, parent.width - 16 * root.scaleFactor) // Widened for Copy and Paste buttons
-            height: 40 * root.scaleFactor
-            radius: 20 * root.scaleFactor
+            anchors.topMargin: 8
+            width: 240 // Widened for Copy and Paste buttons
+            height: 40
+            radius: 20
             color: "#E61A1A1A" // More solid than hover version
             border.color: "#3B82F6" // Blue border when open
             border.width: 1

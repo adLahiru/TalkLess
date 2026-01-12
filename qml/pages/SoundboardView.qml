@@ -1048,19 +1048,22 @@ Rectangle {
 
                 // Recording Tab Content (Tab 2)
                 ColumnLayout {
+                    id: recordingTab
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: 6
                     visible: rightSidebar.currentTabIndex === 2
 
-                    // Name Audio File Section
+                    // ============================================================
+                    // Name Audio File (SINGLE INPUT - fixed duplicate name issue)
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
 
-                        // Header with title and icon
+                        // Header with title and clipboard icon
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
@@ -1073,11 +1076,8 @@ Rectangle {
                                 font.weight: Font.DemiBold
                             }
 
-                            Item {
-                                Layout.fillWidth: true
-                            }
+                            Item { Layout.fillWidth: true }
 
-                            // Clipboard/paste icon
                             Rectangle {
                                 width: 24
                                 height: 24
@@ -1108,7 +1108,7 @@ Rectangle {
                             }
                         }
 
-                        // Text Input Field
+                        // Text Input Field (single input used for saving)
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 44
@@ -1128,11 +1128,11 @@ Rectangle {
                                     color: "#808080"
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
-                                    visible: audioNameInput.text === ""
+                                    visible: recordingNameInput.text === ""
                                 }
 
                                 TextInput {
-                                    id: audioNameInput
+                                    id: recordingNameInput
                                     Layout.fillWidth: true
                                     color: "#FFFFFF"
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
@@ -1152,7 +1152,9 @@ Rectangle {
                         }
                     }
 
+                    // ============================================================
                     // Input Source Section
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
@@ -1167,16 +1169,12 @@ Rectangle {
                             font.weight: Font.DemiBold
                         }
 
-                        // Dropdown selector
                         DropdownSelector {
                             id: inputDeviceDropdown
                             Layout.fillWidth: true
                             icon: "🔴"
                             placeholder: "Select Mic Device"
-
                             selectedId: "-1"
-
-                            // initial can be empty; we’ll fill on open
                             model: []
 
                             onAboutToOpen: {
@@ -1186,38 +1184,57 @@ Rectangle {
                             }
 
                             onItemSelected: function (id, name) {
-                                console.log("Recoding input device selected:", name, "(id:", id, ")");
-                                soundboardService.setRecodingInputDevice(id);
+                                console.log("Recording input device selected:", name, "(id:", id, ")");
+                                soundboardService.setRecordingInputDevice(id);
                             }
-
                         }
-
                     }
 
                     // Spacer
-                    Item {
-                        Layout.preferredHeight: 4
-                    }
+                    Item { Layout.preferredHeight: 4 }
 
-                    // Start Recording Button Section
+                    // ============================================================
+                    // Start/Stop Recording Button Section
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 8
 
-                        // Recording state
-                        readonly property bool isRecording: soundboardService.isRecording
-
-                        // Microphone button with gray background
                         Rectangle {
                             id: micButton
-                            Layout.preferredWidth: 30
-                            Layout.preferredHeight: 30
+                            Layout.preferredWidth: 36
+                            Layout.preferredHeight: 36
                             Layout.alignment: Qt.AlignHCenter
-                            radius: 15
-                            color: micButtonArea.containsMouse ? "#4A4A4A" : "#3A3A3A"
-                            border.color: "#4A4A4A"
+                            radius: 18
+
+                            // Button color changes based on hover + recording state
+                            color: micButtonArea.containsMouse
+                                   ? (soundboardService.isRecording ? "#7F1D1D" : "#4A4A4A")
+                                   : (soundboardService.isRecording ? "#991B1B" : "#3A3A3A")
+
+                            border.color: soundboardService.isRecording ? "#EF4444" : "#4A4A4A"
                             border.width: 1
+
+                            // subtle pulse ring while recording
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: parent.width + 10
+                                height: parent.height + 10
+                                radius: (parent.width + 10) / 2
+                                color: "transparent"
+                                border.width: 2
+                                border.color: "#EF4444"
+                                opacity: 0.0
+                                visible: soundboardService.isRecording
+
+                                SequentialAnimation on opacity {
+                                    running: soundboardService.isRecording
+                                    loops: Animation.Infinite
+                                    NumberAnimation { to: 0.35; duration: 450 }
+                                    NumberAnimation { to: 0.05; duration: 450 }
+                                }
+                            }
 
                             Image {
                                 id: micIcon
@@ -1233,7 +1250,8 @@ Rectangle {
                                 source: micIcon
                                 anchors.fill: micIcon
                                 colorization: 1.0
-                                colorizationColor: parent.parent.isRecording ? "#3B82F6" : "#FFFFFF"
+                                // blue when recording (or red if you prefer)
+                                colorizationColor: soundboardService.isRecording ? "#EF4444" : "#FFFFFF"
                             }
 
                             MouseArea {
@@ -1243,49 +1261,44 @@ Rectangle {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     if (soundboardService.isRecording) {
-                                        soundboardService.stopRecording();
+                                        soundboardService.stopRecording()
                                     } else {
-                                        soundboardService.startRecording();
+                                        // If your C++ startRecording needs a name/path, change this call accordingly.
+                                        // Example: soundboardService.startRecording(recordingNameInput.text)
+                                        soundboardService.startRecording()
                                     }
                                 }
                             }
 
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
+                            Behavior on color { ColorAnimation { duration: 150 } }
                         }
 
-                        // Start Recording text
                         Text {
-                            text: parent.isRecording ? "Stop Recording" : "Start Recording"
+                            text: soundboardService.isRecording ? "Stop Recording" : "Start Recording"
                             color: "#888888"
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                            font.pixelSize: 9
+                            font.pixelSize: 10
                             font.weight: Font.Normal
                             Layout.alignment: Qt.AlignHCenter
                         }
                     }
 
                     // Spacer
-                    Item {
-                        Layout.preferredHeight: 8
-                    }
+                    Item { Layout.preferredHeight: 8 }
 
+                    // ============================================================
                     // Trim Audio Section
+                    // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
 
-                        // Header with scissors icon and title
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
 
-                            // Scissors icon
                             Rectangle {
                                 width: 16
                                 height: 16
@@ -1318,7 +1331,6 @@ Rectangle {
                             }
                         }
 
-                        // Waveform Display
                         WaveformDisplay {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 90
@@ -1328,85 +1340,18 @@ Rectangle {
                     }
 
                     // Spacer
-                    Item {
-                        Layout.preferredHeight: 4
-                    }
+                    Item { Layout.preferredHeight: 6 }
 
-                    // Name Audio File Section (for saving)
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 5
-                        Layout.rightMargin: 5
-                        spacing: 4
-
-                        Text {
-                            text: "Name Audio File"
-                            color: "#FFFFFF"
-                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                        }
-
-                        // Text Input Field
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 36
-                            color: "#1A1A1A"
-                            radius: 6
-                            border.color: "#3A3A3A"
-                            border.width: 1
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 4
-
-                                Text {
-                                    text: "Enter Name Here:"
-                                    color: "#808080"
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 11
-                                    visible: saveNameInput.text === ""
-                                }
-
-                                TextInput {
-                                    id: saveNameInput
-                                    Layout.fillWidth: true
-                                    color: "#FFFFFF"
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 11
-                                    clip: true
-
-                                    Text {
-                                        anchors.fill: parent
-                                        text: "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _"
-                                        color: "#666666"
-                                        font.family: parent.font.family
-                                        font.pixelSize: parent.font.pixelSize
-                                        visible: !parent.text && !parent.activeFocus
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Spacer
-                    Item {
-                        Layout.preferredHeight: 6
-                    }
-
+                    // ============================================================
                     // Cancel and Save buttons
+                    // ============================================================
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
 
-                        // Spacer to push buttons to right
-                        Item {
-                            Layout.fillWidth: true
-                        }
+                        Item { Layout.fillWidth: true }
 
                         // Cancel button
                         Rectangle {
@@ -1430,34 +1375,23 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    saveNameInput.text = "";
-                                    audioNameInput.text = "";
+                                    recordingNameInput.text = "";
                                     rightSidebar.currentTabIndex = 0;
                                 }
                             }
 
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 150
-                                }
-                            }
+                            Behavior on color { ColorAnimation { duration: 150 } }
                         }
 
-                        // Save button (gradient)
+                        // Save button
                         Rectangle {
                             Layout.preferredWidth: 80
                             Layout.preferredHeight: 36
                             radius: 8
                             gradient: Gradient {
                                 orientation: Gradient.Horizontal
-                                GradientStop {
-                                    position: 0.0
-                                    color: saveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6"
-                                }
-                                GradientStop {
-                                    position: 1.0
-                                    color: saveBtnArea.containsMouse ? "#E040FB" : "#D214FD"
-                                }
+                                GradientStop { position: 0.0; color: saveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6" }
+                                GradientStop { position: 1.0; color: saveBtnArea.containsMouse ? "#E040FB" : "#D214FD" }
                             }
 
                             Text {
@@ -1477,15 +1411,18 @@ Rectangle {
                                 onClicked: {
                                     console.log("Save clicked");
                                     const boardId = clipsModel.boardId;
+
                                     if (boardId >= 0 && soundboardService.lastRecordingPath !== "") {
-                                        const title = saveNameInput.text.trim() || audioNameInput.text.trim() || "New Recording";
-                                        const success = soundboardService.addClipWithTitle(boardId, "file:///" + soundboardService.lastRecordingPath, title);
+                                        const title = recordingNameInput.text.trim() || "New Recording";
+                                        const success = soundboardService.addClipWithTitle(
+                                            boardId,
+                                            "file:///" + soundboardService.lastRecordingPath,
+                                            title
+                                        );
+
                                         if (success) {
                                             clipsModel.reload();
-                                            // Clear inputs
-                                            saveNameInput.text = "";
-                                            audioNameInput.text = "";
-                                            // Switch back to editor tab
+                                            recordingNameInput.text = "";
                                             rightSidebar.currentTabIndex = 0;
                                         }
                                     } else {
@@ -1497,9 +1434,7 @@ Rectangle {
                     }
 
                     // Fill remaining space
-                    Item {
-                        Layout.fillHeight: true
-                    }
+                    Item { Layout.fillHeight: true }
                 }
 
                 // Settings Tab Content (Tab 0) - New Modern Clip Editor

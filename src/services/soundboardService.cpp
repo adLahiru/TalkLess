@@ -11,6 +11,9 @@
 #include <QJsonValue>
 #include <QStandardPaths>
 #include <QUrl>
+#include <QFile>
+#include <cmath>
+#include <QTimer>
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
@@ -92,8 +95,9 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
 
 SoundboardService::~SoundboardService()
 {
-    // Stop all clips before shutting down
     if (m_audioEngine) {
+        stopLastRecordingPreview();
+
         for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it) {
             m_audioEngine->stopClip(it.value());
         }
@@ -1614,28 +1618,104 @@ void SoundboardService::stopClip(int clipId)
 
 bool SoundboardService::startRecording()
 {
-    if (!m_audioEngine)
+    if (!m_audioEngine) {
+        qWarning() << "AudioEngine not initialized";
         return false;
+    }
 
-    m_lastRecordingPath = getRecordingOutputPath();
-    // Ensure directory exists
-    QDir().mkpath(QFileInfo(m_lastRecordingPath).absolutePath());
-
-    bool success = m_audioEngine->startRecording(m_lastRecordingPath.toStdString());
-    if (success) {
+    // Generate output path
+    const QString path = getRecordingOutputPath();
+    const bool ok = m_audioEngine->startRecording(path.toStdString());
+    if (ok) {
+        m_lastRecordingPath = path;
         emit recordingStateChanged();
     }
-    return success;
+    return ok;
+}
+
+bool SoundboardService::playLastRecordingPreview()
+{
+    if (!m_audioEngine) {
+        qWarning() << "AudioEngine not initialized";
+        return false;
+    }
+
+    if (m_lastRecordingPath.isEmpty()) {
+        qWarning() << "No last recording path";
+        return false;
+    }
+
+    if (!QFile::exists(m_lastRecordingPath)) {
+        qWarning() << "Recording file does not exist:" << m_lastRecordingPath;
+        return false;
+    }
+
+    // Ensure the main device is running so we can hear it
+    m_audioEngine->startAudioDevice();
+
+    // Stop any existing preview first
+    stopLastRecordingPreview();
+
+    // Load the WAV into the reserved preview slot
+    m_audioEngine->stopClip(kPreviewSlot);
+
+    const std::string fp = m_lastRecordingPath.toStdString();
+    auto [startSec, endSec] = m_audioEngine->loadClip(kPreviewSlot, fp);
+    if (startSec == endSec) {
+        qWarning() << "Failed to load preview recording:" << m_lastRecordingPath;
+        return false;
+    }
+
+    // Play at unity (0 dB)
+    m_audioEngine->setClipGain(kPreviewSlot, 0.0f);
+    m_audioEngine->setClipLoop(kPreviewSlot, false);
+    m_audioEngine->setClipTrim(kPreviewSlot, 0.0, 0.0);
+    m_audioEngine->seekClip(kPreviewSlot, 0.0);
+
+    m_audioEngine->playClip(kPreviewSlot);
+
+    m_recordingPreviewPlaying = true;
+    emit recordingStateChanged();
+    return true;
+}
+
+void SoundboardService::stopLastRecordingPreview()
+{
+    if (!m_audioEngine) {
+        m_recordingPreviewPlaying = false;
+        return;
+    }
+
+    // Stop preview slot only
+    m_audioEngine->stopClip(kPreviewSlot);
+
+    if (m_recordingPreviewPlaying) {
+        m_recordingPreviewPlaying = false;
+        emit recordingStateChanged();
+    }
+}
+
+bool SoundboardService::isRecordingPreviewPlaying() const
+{
+    if (!m_audioEngine) return false;
+
+    // Trust engine state rather than only local bool
+    // (works even if preview naturally ends)
+    return m_audioEngine->isClipPlaying(kPreviewSlot);
 }
 
 bool SoundboardService::stopRecording()
 {
-    if (!m_audioEngine)
+    if (!m_audioEngine) {
+        qWarning() << "AudioEngine not initialized";
         return false;
+    }
 
-    bool success = m_audioEngine->stopRecording();
-    emit recordingStateChanged();
-    return success;
+    const bool ok = m_audioEngine->stopRecording();
+    if (ok) {
+        emit recordingStateChanged();
+    }
+    return ok;
 }
 
 bool SoundboardService::isRecording() const
@@ -1779,18 +1859,24 @@ QVariantList SoundboardService::playingClipIDs() const
 
 int SoundboardService::getOrAssignSlot(int clipId)
 {
-    // Check if clip already has a slot
     if (m_clipIdToSlot.contains(clipId)) {
-        return m_clipIdToSlot[clipId];
+        int s = m_clipIdToSlot[clipId];
+        // If some old mapping accidentally used preview slot, remap it.
+        if (s == kPreviewSlot) {
+            s = m_nextSlot % kClipSlotsUsable; // 0..14
+            m_clipIdToSlot[clipId] = s;
+            m_nextSlot++;
+        }
+        return s;
     }
 
-    // Assign a new slot (wrap around if we exceed MAX_CLIPS)
-    int slotId = m_nextSlot % 16; // MAX_CLIPS is 16
+    int slotId = m_nextSlot % kClipSlotsUsable; // 0..14 only
     m_clipIdToSlot[clipId] = slotId;
     m_nextSlot++;
 
     return slotId;
 }
+
 
 // ============================================================================
 // AUDIO DEVICE SELECTION
@@ -1853,14 +1939,14 @@ bool SoundboardService::setInputDevice(const QString& deviceId)
     return success;
 }
 
-bool SoundboardService::setRecodingInputDevice(const QString& deviceId)
+bool SoundboardService::setRecordingInputDevice(const QString& deviceId)
 {
     if (!m_audioEngine) {
         qWarning() << "AudioEngine not initialized";
         return false;
     }
 
-    bool success = m_audioEngine->setRecodingDevice(deviceId.toStdString());
+    bool success = m_audioEngine->setRecordingDevice(deviceId.toStdString());
     if (success) {
         qDebug() << "Input device set to:" << deviceId;
     } else {
@@ -1868,7 +1954,6 @@ bool SoundboardService::setRecodingInputDevice(const QString& deviceId)
     }
     return success;
 }
-
 
 bool SoundboardService::setOutputDevice(const QString& deviceId)
 {
