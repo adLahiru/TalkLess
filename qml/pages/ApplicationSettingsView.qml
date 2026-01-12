@@ -739,19 +739,23 @@ Rectangle {
                         RowLayout {
                             spacing: 24
                             Layout.fillWidth: true
+                            Layout.fillHeight: true
                             Layout.alignment: Qt.AlignTop
 
                             // Left Pane: Theme & Language
                             Rectangle {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: leftPaneColumn.implicitHeight + 40
+                                Layout.fillHeight: true
+                                Layout.alignment: Qt.AlignTop
                                 color: Colors.surface
                                 radius: 16
                                 border.color: Colors.surfaceHighlight
 
                                 ColumnLayout {
                                     id: leftPaneColumn
-                                    anchors.fill: parent
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
                                     anchors.margins: 20
                                     spacing: 20
 
@@ -923,14 +927,17 @@ Rectangle {
                             // Right Pane: Slot Size & Preview
                             Rectangle {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: rightPaneColumn.implicitHeight + 40
+                                Layout.fillHeight: true
+                                Layout.alignment: Qt.AlignTop
                                 color: Colors.surface
                                 radius: 16
                                 border.color: Colors.surfaceHighlight
 
                                 ColumnLayout {
                                     id: rightPaneColumn
-                                    anchors.fill: parent
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
                                     anchors.margins: 20
                                     spacing: 24
 
