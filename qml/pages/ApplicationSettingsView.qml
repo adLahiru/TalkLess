@@ -25,6 +25,29 @@ Rectangle {
         mainLoader.active = true;
     }
 
+    // Function to refresh device selections from backend
+    function refreshDeviceSelections() {
+        // Update input device dropdown
+        if (inputDeviceDropdown) {
+            inputDeviceDropdown.selectedId = soundboardService.selectedCaptureDeviceId;
+        }
+        // Update output device dropdown
+        if (speakerOutputDropdown) {
+            speakerOutputDropdown.selectedId = soundboardService.selectedPlaybackDeviceId;
+        }
+        // Update monitor device dropdown
+        if (secondOutputDropdown) {
+            secondOutputDropdown.selectedId = soundboardService.selectedMonitorDeviceId;
+        }
+    }
+
+    // Refresh device selections when view becomes visible
+    onVisibleChanged: {
+        if (visible) {
+            refreshDeviceSelections();
+        }
+    }
+
     // Timer to update audio levels
     Timer {
         id: levelUpdateTimer
@@ -123,6 +146,13 @@ Rectangle {
                     contentHeight: advancedAudioSection.y + advancedAudioSection.height + 40
                     clip: true
 
+                    // Refresh device selections when this tab becomes active
+                    onVisibleChanged: {
+                        if (visible && StackLayout.isCurrentItem) {
+                            root.refreshDeviceSelections();
+                        }
+                    }
+
                     // Load fonts
                     FontLoader {
                         id: poppinsFont
@@ -174,6 +204,10 @@ Rectangle {
 
                                     // initial can be empty; we’ll fill on open
                                     model: []
+
+                                    Component.onCompleted: {
+                                        model = soundboardService.getInputDevices();
+                                    }
 
                                     onAboutToOpen: {
                                         model = soundboardService.getInputDevices();
@@ -1065,6 +1099,13 @@ Rectangle {
                     contentHeight: audioContent.height
                     clip: true
 
+                    // Refresh device selections when this tab becomes active
+                    onVisibleChanged: {
+                        if (visible && StackLayout.isCurrentItem) {
+                            root.refreshDeviceSelections();
+                        }
+                    }
+
                     Rectangle {
                         id: audioContent
                         width: parent.width
@@ -1160,6 +1201,10 @@ Rectangle {
                                         // initial can be empty; we’ll fill on open
                                         model: []
 
+                                        Component.onCompleted: {
+                                            model = soundboardService.getOutputDevices();
+                                        }
+
                                         onAboutToOpen: {
                                             model = soundboardService.getOutputDevices();
                                         }
@@ -1200,6 +1245,10 @@ Rectangle {
                                         selectedId: soundboardService.selectedMonitorDeviceId
 
                                         model: []
+
+                                        Component.onCompleted: {
+                                            model = soundboardService.getOutputDevices();
+                                        }
 
                                         onAboutToOpen: {
                                             model = soundboardService.getOutputDevices();
