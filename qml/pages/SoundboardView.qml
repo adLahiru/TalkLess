@@ -20,6 +20,14 @@ Rectangle {
     property var displayedClipData: null // Data currently shown in the player card
     property int hotkeyEditingClipId: -1 // Track which clip's hotkey is being edited from a tile
 
+    // Drag and drop state for clip reordering
+    property bool isDragging: false
+    property int dragSourceIndex: -1
+    property int dragTargetIndex: -1
+    property string dragClipTitle: ""
+    property string dragClipImage: ""
+    property point dragPosition: Qt.point(0, 0)
+
     property bool isDetached: false
     signal requestDetach
     signal requestDock
@@ -667,6 +675,30 @@ Rectangle {
                         width: parent.width
                         spacing: contentArea.tileSpacing
 
+                        // Helper function to calculate drop index from position
+                        function getDropIndexFromPosition(globalX, globalY) {
+                            // Map position to grid coordinates
+                            var localPos = clipsGrid.mapFromItem(clipsFlickable, globalX, globalY);
+                            var x = localPos.x;
+                            var y = localPos.y;
+                            
+                            // Calculate column and row
+                            var tileWidthWithSpacing = contentArea.tileWidth + contentArea.tileSpacing;
+                            var tileHeightWithSpacing = contentArea.tileHeight + contentArea.tileSpacing;
+                            
+                            var col = Math.floor(x / tileWidthWithSpacing);
+                            var row = Math.floor(y / tileHeightWithSpacing);
+                            
+                            // Clamp to valid range
+                            col = Math.max(0, Math.min(col, contentArea.columnsCount - 1));
+                            
+                            // Calculate index (accounting for AddAudioTile at position 0)
+                            var index = row * contentArea.columnsCount + col - 1; // -1 for AddAudioTile
+                            
+                            // Clamp to valid clip range
+                            return Math.max(0, Math.min(index, clipsModel.count - 1));
+                        }
+
                         // Add Audio Tile (first item)
                         AddAudioTile {
                             id: addAudioTile
@@ -701,11 +733,116 @@ Rectangle {
                                 // Store original position for drag reset
                                 property real startX: 0
                                 property real startY: 0
+                                property bool isBeingDragged: false
+
+                                // Check if this is the drop target position
+                                property bool isDropTarget: root.isDragging && root.dragTargetIndex === clipWrapper.index && root.dragSourceIndex !== clipWrapper.index
+                                property bool isDropTargetLeft: isDropTarget && root.dragSourceIndex > clipWrapper.index
+                                property bool isDropTargetRight: isDropTarget && root.dragSourceIndex < clipWrapper.index
+
+                                // Visual offset when item is dragged over
+                                property real visualOffsetX: {
+                                    if (!root.isDragging) return 0;
+                                    if (clipWrapper.index === root.dragSourceIndex) return 0;
+                                    
+                                    // Items between source and target shift to make room
+                                    if (root.dragSourceIndex < root.dragTargetIndex) {
+                                        // Dragging right - items in between shift left
+                                        if (clipWrapper.index > root.dragSourceIndex && clipWrapper.index <= root.dragTargetIndex) {
+                                            return -(contentArea.tileWidth + contentArea.tileSpacing) * 0.15;
+                                        }
+                                    } else if (root.dragSourceIndex > root.dragTargetIndex) {
+                                        // Dragging left - items in between shift right
+                                        if (clipWrapper.index >= root.dragTargetIndex && clipWrapper.index < root.dragSourceIndex) {
+                                            return (contentArea.tileWidth + contentArea.tileSpacing) * 0.15;
+                                        }
+                                    }
+                                    return 0;
+                                }
+
+                                // Animate the offset
+                                Behavior on visualOffsetX {
+                                    NumberAnimation {
+                                        duration: 200
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
+
+                                // Apply the transform
+                                transform: Translate {
+                                    x: clipWrapper.isBeingDragged ? 0 : clipWrapper.visualOffsetX
+                                }
+
+                                // Fade out the source position when dragging
+                                opacity: clipWrapper.isBeingDragged ? 0.3 : 1.0
+                                Behavior on opacity {
+                                    NumberAnimation { duration: 150 }
+                                }
 
                                 // For drag-drop visual feedback
                                 Drag.active: dragHandler.active
                                 Drag.hotSpot.x: width / 2
                                 Drag.hotSpot.y: height / 2
+
+                                // Drop indicator - left edge
+                                Rectangle {
+                                    id: dropIndicatorLeft
+                                    visible: clipWrapper.isDropTargetLeft
+                                    width: 4
+                                    height: parent.height
+                                    x: -contentArea.tileSpacing / 2 - 2
+                                    y: 0
+                                    radius: 2
+                                    color: "#3B82F6"
+                                    
+                                    // Glow effect
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: 12
+                                        height: parent.height
+                                        radius: 6
+                                        color: "#3B82F6"
+                                        opacity: 0.3
+                                    }
+
+                                    // Pulsing animation
+                                    SequentialAnimation on opacity {
+                                        running: clipWrapper.isDropTargetLeft
+                                        loops: Animation.Infinite
+                                        NumberAnimation { from: 1.0; to: 0.6; duration: 500; easing.type: Easing.InOutQuad }
+                                        NumberAnimation { from: 0.6; to: 1.0; duration: 500; easing.type: Easing.InOutQuad }
+                                    }
+                                }
+
+                                // Drop indicator - right edge
+                                Rectangle {
+                                    id: dropIndicatorRight
+                                    visible: clipWrapper.isDropTargetRight
+                                    width: 4
+                                    height: parent.height
+                                    x: parent.width + contentArea.tileSpacing / 2 - 2
+                                    y: 0
+                                    radius: 2
+                                    color: "#3B82F6"
+                                    
+                                    // Glow effect
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: 12
+                                        height: parent.height
+                                        radius: 6
+                                        color: "#3B82F6"
+                                        opacity: 0.3
+                                    }
+
+                                    // Pulsing animation
+                                    SequentialAnimation on opacity {
+                                        running: clipWrapper.isDropTargetRight
+                                        loops: Animation.Infinite
+                                        NumberAnimation { from: 1.0; to: 0.6; duration: 500; easing.type: Easing.InOutQuad }
+                                        NumberAnimation { from: 0.6; to: 1.0; duration: 500; easing.type: Easing.InOutQuad }
+                                    }
+                                }
 
                                 ClipTile {
                                     id: clipTile
@@ -723,9 +860,6 @@ Rectangle {
                                         }
                                     }
                                     isPlaying: clipWrapper.clipIsPlaying
-
-                                    // Make tile semi-transparent when dragging
-                                    opacity: dragHandler.active ? 0.7 : 1.0
 
                                     onClicked: {
                                         // Selecting the clip updates the sidebar
@@ -783,6 +917,14 @@ Rectangle {
 
                                     onActiveChanged: {
                                         if (active) {
+                                            // Set dragging state
+                                            clipWrapper.isBeingDragged = true;
+                                            root.isDragging = true;
+                                            root.dragSourceIndex = clipWrapper.index;
+                                            root.dragTargetIndex = clipWrapper.index;
+                                            root.dragClipTitle = clipWrapper.clipTitle;
+                                            root.dragClipImage = clipWrapper.imgPath;
+
                                             // Store the starting position
                                             clipWrapper.startX = clipWrapper.x;
                                             clipWrapper.startY = clipWrapper.y;
@@ -790,48 +932,174 @@ Rectangle {
                                             clipWrapper.parent = clipsFlickable;
                                             clipWrapper.z = 100;
                                         } else {
-                                            // Find drop target based on position
-                                            var dropIndex = -1;
-                                            var centerX = clipWrapper.x + clipWrapper.width / 2;
-                                            var centerY = clipWrapper.y + clipWrapper.height / 2;
-
-                                            for (var i = 0; i < clipsRepeater.count; i++) {
-                                                if (i === clipWrapper.index)
-                                                    continue;
-                                                var item = clipsRepeater.itemAt(i);
-                                                if (item) {
-                                                    var itemPos = item.mapToItem(clipsFlickable, 0, 0);
-                                                    if (centerX >= itemPos.x && centerX <= itemPos.x + item.width && centerY >= itemPos.y && centerY <= itemPos.y + item.height) {
-                                                        dropIndex = i;
-                                                        break;
-                                                    }
-                                                }
-                                            }
+                                            // Clear dragging state first
+                                            clipWrapper.isBeingDragged = false;
+                                            var finalDropIndex = root.dragTargetIndex;
+                                            var sourceIndex = root.dragSourceIndex;
+                                            
+                                            // Reset global drag state
+                                            root.isDragging = false;
+                                            root.dragSourceIndex = -1;
+                                            root.dragTargetIndex = -1;
+                                            root.dragClipTitle = "";
+                                            root.dragClipImage = "";
 
                                             // Reparent back to grid
                                             clipWrapper.parent = clipsGrid;
                                             clipWrapper.z = 0;
 
                                             // If dropped on a valid position, reorder
-                                            if (dropIndex >= 0 && dropIndex !== clipWrapper.index) {
-                                                console.log("Moving clip from", clipWrapper.index, "to", dropIndex);
-                                                soundboardService.moveClip(soundboardService.activeBoardId, clipWrapper.index, dropIndex);
+                                            if (finalDropIndex >= 0 && finalDropIndex !== sourceIndex) {
+                                                console.log("Moving clip from", sourceIndex, "to", finalDropIndex);
+                                                soundboardService.moveClip(soundboardService.activeBoardId, sourceIndex, finalDropIndex);
                                                 clipsModel.reload();
+                                            }
+                                        }
+                                    }
+
+                                    // Update target position while dragging
+                                    onCentroidChanged: {
+                                        if (active) {
+                                            var pos = centroid.position;
+                                            var globalPos = clipWrapper.mapToItem(clipsFlickable, pos.x, pos.y);
+                                            root.dragPosition = Qt.point(globalPos.x, globalPos.y);
+                                            
+                                            // Calculate drop target
+                                            var newTargetIndex = clipsGrid.getDropIndexFromPosition(globalPos.x, globalPos.y);
+                                            if (newTargetIndex !== root.dragTargetIndex) {
+                                                root.dragTargetIndex = newTargetIndex;
                                             }
                                         }
                                     }
                                 }
 
-                                // Drop area for receiving dragged items
+                                // Drop area for receiving dragged items - now with improved feedback
                                 DropArea {
+                                    id: dropArea
                                     anchors.fill: parent
+                                    enabled: root.isDragging && clipWrapper.index !== root.dragSourceIndex
 
+                                    onEntered: function(drag) {
+                                        if (clipWrapper.index !== root.dragSourceIndex) {
+                                            root.dragTargetIndex = clipWrapper.index;
+                                        }
+                                    }
+
+                                    // Highlight overlay when this is a drop target
                                     Rectangle {
                                         anchors.fill: parent
                                         color: parent.containsDrag ? Qt.rgba(Colors.success.r, Colors.success.g, Colors.success.b, 0.25) : "transparent"
                                         radius: 16
                                         border.width: parent.containsDrag ? 2 : 0
                                         border.color: Colors.success
+                                    }
+                                }
+                            }
+                        }
+
+                        // Drag preview overlay - shows a ghost of the dragged clip
+                        Item {
+                            id: dragPreviewContainer
+                            parent: clipsFlickable
+                            visible: root.isDragging
+                            z: 1000
+                            
+                            // Position at drag location
+                            x: root.dragPosition.x - contentArea.tileWidth / 2
+                            y: root.dragPosition.y - contentArea.tileHeight / 2
+
+                            Rectangle {
+                                id: dragPreview
+                                width: contentArea.tileWidth
+                                height: contentArea.tileHeight
+                                radius: 16
+                                color: "#1F1F1F"
+                                border.width: 3
+                                border.color: "#3B82F6"
+                                opacity: 0.9
+                                visible: root.isDragging
+
+                                // Scale up slightly for emphasis
+                                scale: 1.05
+
+                                // Clip image
+                                Image {
+                                    id: previewImage
+                                    anchors.fill: parent
+                                    anchors.margins: 3
+                                    source: {
+                                        if (root.dragClipImage.length === 0) {
+                                            return "qrc:/qt/qml/TalkLess/resources/images/audioClipDefaultBackground.png";
+                                        } else if (root.dragClipImage.startsWith("qrc:") || root.dragClipImage.startsWith("file:") || root.dragClipImage.startsWith("http")) {
+                                            return root.dragClipImage;
+                                        } else {
+                                            return "file:///" + root.dragClipImage;
+                                        }
+                                    }
+                                    fillMode: Image.PreserveAspectCrop
+                                    
+                                    // Rounded corners
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        maskEnabled: true
+                                        maskThresholdMin: 0.5
+                                        maskSpreadAtMin: 1.0
+                                        maskSource: ShaderEffectSource {
+                                            sourceItem: Rectangle {
+                                                width: previewImage.width
+                                                height: previewImage.height
+                                                radius: 14
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Title overlay
+                                Rectangle {
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.bottom: parent.bottom
+                                    height: 30
+                                    color: "#CC000000"
+                                    radius: 12
+                                    
+                                    // Only bottom corners rounded
+                                    Rectangle {
+                                        anchors.top: parent.top
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        height: parent.radius
+                                        color: parent.color
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: root.dragClipTitle || "Moving..."
+                                        color: "#FFFFFF"
+                                        font.pixelSize: 12
+                                        font.weight: Font.Medium
+                                        elide: Text.ElideRight
+                                        width: parent.width - 16
+                                        horizontalAlignment: Text.AlignHCenter
+                                    }
+                                }
+
+                                // Move icon overlay
+                                Rectangle {
+                                    anchors.top: parent.top
+                                    anchors.right: parent.right
+                                    anchors.margins: 8
+                                    width: 24
+                                    height: 24
+                                    radius: 12
+                                    color: "#3B82F6"
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "⋮⋮"
+                                        color: "#FFFFFF"
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
                                     }
                                 }
                             }
@@ -856,7 +1124,7 @@ Rectangle {
             AudioPlayerCard {
                 id: audioPlayerCard
                 Layout.preferredWidth: 228
-                Layout.preferredHeight: 140
+                Layout.preferredHeight: 175
                 Layout.alignment: Qt.AlignHCenter
                 Layout.bottomMargin: 10
 
@@ -881,6 +1149,55 @@ Rectangle {
 
                 // Bind isPlaying state
                 isPlaying: root.displayedClipData ? root.displayedClipData.isPlaying : false
+
+                // Waveform progress - bind totalTime from clip duration (in seconds)
+                totalTime: (root.displayedClipData && root.displayedClipData.durationSec > 0) 
+                           ? root.displayedClipData.durationSec : 210
+
+                // currentTime is updated by the timer below
+                property real playbackPositionMs: 0
+                property int lastClipId: -1  // Track which clip we're displaying
+
+                // Timer to poll playback position - runs when playing
+                Timer {
+                    id: audioPlayerTimer
+                    interval: 50  // Update every 50ms for smoother sync
+                    repeat: true
+                    running: audioPlayerCard.isPlaying && root.displayedClipData !== null
+                    onTriggered: {
+                        if (root.displayedClipData) {
+                            audioPlayerCard.playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
+                        }
+                    }
+                }
+
+                // Convert ms to seconds for currentTime
+                currentTime: playbackPositionMs / 1000.0
+
+                // Sync position immediately when playback state changes
+                onIsPlayingChanged: {
+                    if (root.displayedClipData) {
+                        // Always sync position when state changes
+                        playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
+                    }
+                }
+
+                // Reset position when switching to a different clip
+                onDisplayedClipDataChanged: {
+                    if (root.displayedClipData) {
+                        if (lastClipId !== root.displayedClipData.clipId) {
+                            // New clip - get current position from backend
+                            playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
+                            lastClipId = root.displayedClipData.clipId
+                        }
+                    } else {
+                        playbackPositionMs = 0
+                        lastClipId = -1
+                    }
+                }
+
+                // Helper to access displayed clip data from handlers
+                property var displayedClipData: root.displayedClipData
 
                 // Play/Pause the displayed clip
                 onPlayClicked: {

@@ -1,4 +1,4 @@
-// AudioPlayerCard.qml - Custom audio player card with SVG background
+// AudioPlayerCard.qml - Custom audio player card with waveform progress strip
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -10,9 +10,9 @@ import "../styles"
 Item {
     id: root
     
-    // Dimensions scaled to 85% of original SVG size (268x149 -> 228x127)
+    // Dimensions adjusted for waveform strip above the card
     implicitWidth: 228
-    implicitHeight: 140  // Extra height for play button extending above
+    implicitHeight: 175  // Height for waveform strip + gap + player card
     
     // Properties
     property string songName: "Greetings"
@@ -20,6 +20,17 @@ Item {
     property url imageSource: "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
     property bool isPlaying: false
     property bool isMuted: false
+    
+    // Time properties for waveform progress
+    property real currentTime: 90   // Current position in seconds (1:30)
+    property real totalTime: 210    // Total duration in seconds (3:30)
+    
+    // Helper function to format time as m:ss
+    function formatTime(seconds: real): string {
+        var mins = Math.floor(seconds / 60)
+        var secs = Math.floor(seconds % 60)
+        return mins + ":" + (secs < 10 ? "0" : "") + secs
+    }
     
     // Signals
     signal playClicked()
@@ -35,10 +46,78 @@ Item {
     Item {
         anchors.fill: parent
         
-        // Background shape - positioned at bottom to leave room for play button
+        // Waveform progress strip - positioned at the top
+        Rectangle {
+            id: waveformStrip
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: 191  // Narrower strip to reduce gap between timestamps and waveform
+            height: 28
+            radius: 14  // Pill shape
+            color: "#3D3D3D"
+            
+            // Left timestamp
+            Text {
+                id: currentTimeText
+                anchors.left: parent.left
+                anchors.leftMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.formatTime(root.currentTime)
+                color: "#9CA3AF"
+                font.pixelSize: 11
+                font.weight: Font.Medium
+            }
+            
+            // Right timestamp
+            Text {
+                id: totalTimeText
+                anchors.right: parent.right
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.formatTime(root.totalTime)
+                color: "#9CA3AF"
+                font.pixelSize: 11
+                font.weight: Font.Medium
+            }
+            
+            // Waveform visualization (centered)
+            Row {
+                id: waveformBars
+                anchors.centerIn: parent
+                spacing: 2
+                
+                // Generate waveform bars with varying heights
+                Repeater {
+                    model: 32
+                    
+                    Rectangle {
+                        required property int index
+                        width: 2
+                        // Create varied heights for waveform effect
+                        height: {
+                            var heights = [6, 10, 14, 8, 16, 12, 10, 18, 14, 8, 12, 16, 
+                                          14, 10, 18, 12, 8, 14, 16, 10, 12, 8, 14, 10,
+                                          8, 12, 16, 10, 14, 8, 12, 10]
+                            return heights[index] || 10
+                        }
+                        radius: 1
+                        // Live progress: white for played portion, gray for remaining
+                        color: {
+                            var progress = root.totalTime > 0 ? root.currentTime / root.totalTime : 0
+                            var barProgress = (index + 1) / 32
+                            return barProgress <= progress ? "#FFFFFF" : "#6B7280"
+                        }
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+            }
+        }
+        
+        // SVG Background shape - positioned at bottom to leave room for play button and waveform
         Rectangle {
             id: backgroundSvg
-            anchors.bottom: parent.bottom
+            anchors.top: waveformStrip.bottom
+            anchors.topMargin: 12
             anchors.horizontalCenter: parent.horizontalCenter
             width: 268 * root.scaleFactor  // 228
             height: 141 * root.scaleFactor  // ~120
@@ -58,16 +137,16 @@ Item {
             }
         }
         
-        // Play button - smaller, positioned in the center notch
+        // Play button - positioned in the center notch of the player card
         Rectangle {
             id: playButton
             width: 48
             height: 48
             radius: 24
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: 4
-            color: playButtonArea.containsMouse ? Colors.primaryLight : Colors.accent
+            anchors.horizontalCenter: backgroundSvg.horizontalCenter
+            anchors.top: backgroundSvg.top
+            anchors.topMargin: -20  // Overlap into the notch
+            color: playButtonArea.containsMouse ? "#4A9AF7" : "#3B82F6"
             
             // Play icon (triangle pointing right)
             Canvas {
