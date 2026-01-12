@@ -115,8 +115,6 @@ Rectangle {
         if (!data)
             return;
 
-        console.log("pushToEditor: Updating editor with clip", data.clipId, "mode:", data.reproductionMode, "volume:", data.clipVolume);
-
         clipEditorTab.editingClipName = data.title || "";
         clipEditorTab.editingClipHotkey = data.hotkey || "";
         clipEditorTab.editingClipTags = data.tags || [];
@@ -168,7 +166,6 @@ Rectangle {
         title: "Select Audio File"
         nameFilters: ["Audio files (*.mp3 *.wav *.ogg *.m4a)", "All files (*)"]
         onAccepted: {
-            console.log("File selected:", selectedFile);
             const boardId = clipsModel.boardId;
             if (boardId >= 0) {
                 const success = soundboardService.addClip(boardId, selectedFile.toString());
@@ -188,14 +185,10 @@ Rectangle {
         title: "Select Background Image"
         nameFilters: ["Image files (*.png *.jpg *.jpeg *.gif *.webp *.bmp)", "All files (*)"]
         onAccepted: {
-            console.log("Image selected:", selectedFile, "for clip:", root.clipToEditImageId);
             if (root.clipToEditImageId >= 0) {
                 const success = clipsModel.updateClipImage(root.clipToEditImageId, selectedFile.toString());
                 if (success) {
-                    console.log("Background image updated successfully");
                     clipsModel.reload();  // Reload to show new image
-                } else {
-                    console.log("Failed to update background image");
                 }
                 root.clipToEditImageId = -1;
             }
@@ -496,7 +489,6 @@ Rectangle {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                console.log("Add Soundboard clicked");
                                 soundboardService.createBoard("New Soundboard");
                                 soundboardsModel.reload();
                             }
@@ -521,10 +513,8 @@ Rectangle {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 if (root.isDetached) {
-                                    console.log("Docking Soundboard...");
                                     root.requestDock();
                                 } else {
-                                    console.log("Detaching Soundboard...");
                                     root.requestDetach();
                                 }
                             }
@@ -623,7 +613,6 @@ Rectangle {
 
                                 const boardId = clipsModel.boardId;
                                 if (boardId !== -1) {
-                                    console.log("Adding clips from drop:", urls);
                                     const success = soundboardService.addClips(boardId, urls);
                                     if (success) {
                                         clipsModel.reload();
@@ -737,7 +726,6 @@ Rectangle {
                             height: contentArea.tileHeight
                             enabled: true
                             onClicked: {
-                                console.log("Add Audio clicked - opening add audio panel");
                                 rightSidebar.currentTabIndex = 1;
                                 audioFileDialog.open()
                             }
@@ -898,13 +886,11 @@ Rectangle {
 
                                     onClicked: {
                                         // Selecting the clip updates the sidebar
-                                        console.log("ClipTile clicked - index:", clipWrapper.index, "clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle);
                                         soundboardService.setCurrentlySelectedClip(clipWrapper.clipId);
                                         soundboardService.playClip(clipWrapper.clipId);
                                     }
 
                                     onPlayClicked: {
-                                        console.log("ClipTile playClicked - clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle, "filePath:", clipWrapper.filePath);
                                         soundboardService.playClip(clipWrapper.clipId);
                                     }
                                     onStopClicked: {
@@ -922,11 +908,9 @@ Rectangle {
                                         rightSidebar.currentTabIndex = 0; // Focus the editor tab
                                     }
                                     onWebClicked: {
-                                        console.log("Web clicked for clip:", clipWrapper.clipId);
                                         // Open sharing URL?
                                     }
                                     onSendToClicked: {
-                                        console.log("Send to clicked for clip:", clipWrapper.clipId, "filePath:", clipWrapper.filePath);
                                         // Popup opens automatically from ClipTile
                                     }
                                     onPasteClicked: {
@@ -935,12 +919,10 @@ Rectangle {
                                         }
                                     }
                                     onEditBackgroundClicked: {
-                                        console.log("Edit background clicked:", clipWrapper.clipId, clipWrapper.clipTitle);
                                         root.clipToEditImageId = clipWrapper.clipId;
                                         imageFileDialog.open();
                                     }
                                     onHotkeyClicked: {
-                                        console.log("Hotkey clicked for clip:", clipWrapper.clipId);
                                         root.hotkeyEditingClipId = clipWrapper.clipId;
                                         clipHotkeyPopup.open();
                                     }
@@ -986,7 +968,6 @@ Rectangle {
 
                                             // If dropped on a valid position, reorder
                                             if (finalDropIndex >= 0 && finalDropIndex !== sourceIndex) {
-                                                console.log("Moving clip from", sourceIndex, "to", finalDropIndex);
                                                 soundboardService.moveClip(clipsModel.boardId, sourceIndex, finalDropIndex);
                                                 clipsModel.reload();
                                             }
@@ -1255,7 +1236,6 @@ Rectangle {
 
                 // Navigate to previous/next clip in the list
                 onPreviousClicked: {
-                    console.log("Audio Player: Previous clicked");
                     if (clipsModel.count === 0)
                         return;
 
@@ -1280,7 +1260,6 @@ Rectangle {
                     }
                 }
                 onNextClicked: {
-                    console.log("Audio Player: Next clicked");
                     if (clipsModel.count === 0)
                         return;
 
@@ -1306,7 +1285,6 @@ Rectangle {
                 }
                 isMuted: !soundboardService.isMicEnabled()
                 onMuteClicked: {
-                    console.log("Audio Player: Mute toggled, muted:", isMuted);
                     soundboardService.setMicEnabled(!isMuted);
                 }
             }
