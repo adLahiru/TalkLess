@@ -49,10 +49,10 @@ Item {
     // =========================
     Timer {
         id: autoCloseTimer
-        interval: 1000
+        interval: 500
         repeat: false
         onTriggered: {
-            if (!root.actionHover) {
+            if (!root.actionHover && !root.tileHover) {
                 root.showActions = false
             }
         }
@@ -400,21 +400,25 @@ Item {
             id: cardMouseArea
             anchors.fill: parent
             hoverEnabled: true
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            acceptedButtons: Qt.LeftButton
             cursorShape: Qt.PointingHandCursor
 
-            onEntered: { root.tileHover = true }
-            onExited:  { root.tileHover = false }
+            onEntered: {
+                root.tileHover = true
+                root.openActionsAboveTile()
+            }
+            onExited: {
+                root.tileHover = false
+                // Don't close immediately - let autoCloseTimer handle it
+                if (!root.actionHover) {
+                    autoCloseTimer.restart()
+                }
+            }
 
             onClicked: function(mouse) {
-                if (mouse.button === Qt.RightButton) {
-                    root.openActionsAboveTile()
-                    mouse.accepted = true
-                } else if (mouse.button === Qt.LeftButton) {
-                    root.clicked()
-                    root.playClicked()
-                    root.showActions = false
-                }
+                root.clicked()
+                root.playClicked()
+                root.showActions = false
             }
         }
     }

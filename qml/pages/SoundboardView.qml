@@ -913,7 +913,7 @@ Rectangle {
                                 // Drag handler for reordering
                                 DragHandler {
                                     id: dragHandler
-                                    target: clipWrapper.parent === clipsGrid ? null : clipWrapper
+                                    target: null  // We handle position manually
 
                                     onActiveChanged: {
                                         if (active) {
@@ -951,7 +951,7 @@ Rectangle {
                                             // If dropped on a valid position, reorder
                                             if (finalDropIndex >= 0 && finalDropIndex !== sourceIndex) {
                                                 console.log("Moving clip from", sourceIndex, "to", finalDropIndex);
-                                                soundboardService.moveClip(soundboardService.activeBoardId, sourceIndex, finalDropIndex);
+                                                soundboardService.moveClip(clipsModel.boardId, sourceIndex, finalDropIndex);
                                                 clipsModel.reload();
                                             }
                                         }
@@ -963,6 +963,12 @@ Rectangle {
                                             var pos = centroid.position;
                                             var globalPos = clipWrapper.mapToItem(clipsFlickable, pos.x, pos.y);
                                             root.dragPosition = Qt.point(globalPos.x, globalPos.y);
+                                            
+                                            // Move the clipWrapper to follow the drag
+                                            if (clipWrapper.parent === clipsFlickable) {
+                                                clipWrapper.x = globalPos.x - clipWrapper.width / 2;
+                                                clipWrapper.y = globalPos.y - clipWrapper.height / 2;
+                                            }
                                             
                                             // Calculate drop target
                                             var newTargetIndex = clipsGrid.getDropIndexFromPosition(globalPos.x, globalPos.y);
