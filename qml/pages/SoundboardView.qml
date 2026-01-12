@@ -893,6 +893,8 @@ Rectangle {
                                     isPlaying: clipWrapper.clipIsPlaying
                                     clipId: clipWrapper.clipId
                                     playbackProgress: clipWrapper.clipIsPlaying ? progressUpdateTimer.clipProgressMap[clipWrapper.clipId] || 0.0 : 0.0
+                                    filePath: clipWrapper.filePath
+                                    currentBoardId: clipsModel.boardId
 
                                     onClicked: {
                                         // Selecting the clip updates the sidebar
@@ -923,8 +925,9 @@ Rectangle {
                                         console.log("Web clicked for clip:", clipWrapper.clipId);
                                         // Open sharing URL?
                                     }
-                                    onCopyClicked: {
-                                        soundboardService.copyClip(clipWrapper.clipId);
+                                    onSendToClicked: {
+                                        console.log("Send to clicked for clip:", clipWrapper.clipId, "filePath:", clipWrapper.filePath);
+                                        // Popup opens automatically from ClipTile
                                     }
                                     onPasteClicked: {
                                         if (soundboardService.pasteClip(clipsModel.boardId)) {

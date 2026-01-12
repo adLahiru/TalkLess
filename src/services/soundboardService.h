@@ -126,8 +126,8 @@ public:
     Q_INVOKABLE bool isBoardActive(int boardId) const; // Check if a specific board is active
     Q_INVOKABLE bool toggleBoardActive(int boardId);   // Toggle active state of a board
 
-    bool activate(int boardId);   // Activate a board (adds to active set)
-    bool deactivate(int boardId); // Deactivate a board (removes from active set)
+    Q_INVOKABLE bool activate(int boardId);   // Activate a board (adds to active set)
+    Q_INVOKABLE bool deactivate(int boardId); // Deactivate a board (removes from active set)
     bool saveActive();            // Save all active boards
 
     // ---- Clip operations (board-wise) ----
@@ -158,6 +158,11 @@ public:
     QVector<Clip> getClipsForBoard(int boardId) const;
     QVector<Clip> getActiveClips() const;
     Q_INVOKABLE QVariantMap getClipData(int boardId, int clipId) const;
+
+    // Cross-soundboard clip operations
+    Q_INVOKABLE QVariantList getBoardsWithClipStatus(int clipId) const;
+    Q_INVOKABLE bool copyClipToBoard(int sourceClipId, int targetBoardId);
+    Q_INVOKABLE bool removeClipByFilePath(int boardId, const QString& filePath);
 
     // ---- Playback controls ----
     Q_INVOKABLE void clipClicked(int clipId);
@@ -234,10 +239,13 @@ signals:
 private:
     void rebuildHotkeyIndex();
     Clip* findActiveClipById(int clipId);
+    std::optional<Clip> findClipByIdAnyBoard(int clipId, int* outBoardId = nullptr) const;
     int getOrAssignSlot(int clipId);
     void reproductionPlayingClip(const QVariantList& playingClipIds, int mode);
     static QString normalizeHotkey(const QString& hotkey);
     void finalizeClipPlayback(int clipId);
+    void syncSharedBoardIds(const QString& filePath, const QList<int>& sharedBoardIds);
+    void removeFromSharedBoardIds(const QString& filePath, int boardId);
 
 private:
     // Reserve last engine slot for recording preview so it never collides with normal clip slots.

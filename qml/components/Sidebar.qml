@@ -34,7 +34,7 @@ Rectangle {
 
     property int currentIndex: 0
     property int editingBoardId: -1
-    property int selectedBoardId: -1  // Track which board is selected (for viewing)
+    property int selectedBoardId: soundboardService.activeBoardId()  // Track which board is selected (for viewing), initialize to first active board
     signal selected(string route)
     signal soundboardSelected(int boardId)  // Emitted when a soundboard is selected
 
@@ -327,16 +327,20 @@ Rectangle {
                         readonly property string boardImage: imagePath
                         readonly property bool active: isActive
 
-                        // Mouse area for the whole row (placed first = underneath)
+                        // Mouse area for the whole row - placed at the end to be on top
+                        // This catches all clicks and handles row selection
                         MouseArea {
                             id: mouse2
                             anchors.fill: parent
                             hoverEnabled: true
                             acceptedButtons: Qt.LeftButton
+                            // Lower z than interactive child elements
+                            z: 0
 
-                            onClicked: () => {
+                            onClicked: (mouse) => {
                                 if (root.editingBoardId === -1) {
                                     // Select this soundboard (for viewing)
+                                    console.log("Soundboard row clicked:", boardRow.boardId, boardRow.boardName);
                                     root.selectedBoardId = boardRow.boardId;
                                     root.soundboardSelected(boardRow.boardId);
                                 }
@@ -428,8 +432,10 @@ Rectangle {
                                     anchors.margins: -4
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
+                                    z: 20
 
-                                    onClicked: () => {
+                                    onClicked: (mouse) => {
+                                        mouse.accepted = true;  // Stop propagation
                                         console.log("Collapsed checkbox clicked - toggling board:", boardRow.boardId);
                                         soundboardsModel.toggleActiveById(boardRow.boardId);
                                     }
@@ -443,8 +449,10 @@ Rectangle {
                             anchors.leftMargin: 10
                             anchors.rightMargin: 10
                             spacing: 10
-                            z: 1  // Above the background
                             visible: !root.isCollapsed
+                            
+                            // Allow mouse events to pass through to mouse2 below, except for interactive children
+                            // This is handled by not setting z and letting child MouseAreas handle their own events
 
                             // checkbox indicator - clicking this toggles the soundboard active state
                             Rectangle {
@@ -474,8 +482,10 @@ Rectangle {
                                     anchors.margins: -4  // Make clickable area slightly larger
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
+                                    z: 20
 
-                                    onClicked: () => {
+                                    onClicked: (mouse) => {
+                                        mouse.accepted = true;  // Stop propagation
                                         console.log("Checkbox clicked - toggling board:", boardRow.boardId);
                                         soundboardsModel.toggleActiveById(boardRow.boardId);
                                     }

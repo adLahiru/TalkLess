@@ -31,6 +31,14 @@ ApplicationWindow {
         // Initialize Theme from Backend
         Colors.setTheme(soundboardService.theme)
         Colors.setAccent(soundboardService.accentColor)
+        
+        // Initialize first soundboard on startup
+        var firstBoardId = soundboardService.activeBoardId();
+        if (firstBoardId >= 0) {
+            clipsModel.boardId = firstBoardId;
+            clipsModel.reload();
+            console.log("Initial board loaded:", firstBoardId);
+        }
     }
 
     property bool isSoundboardDetached: false
@@ -147,6 +155,10 @@ ApplicationWindow {
                 // When a soundboard is selected, load its clips
                 onSoundboardSelected: boardId => {
                     console.log("Soundboard selected:", boardId);
+                    // Switch to soundboard view
+                    contentStack.currentIndex = 0;
+                    // Activate the board so clips can be played
+                    soundboardService.activate(boardId);
                     clipsModel.boardId = boardId;
                     clipsModel.reload();
                 }

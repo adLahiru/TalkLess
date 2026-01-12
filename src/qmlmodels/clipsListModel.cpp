@@ -168,8 +168,8 @@ void ClipsListModel::loadActiveBoard()
 
 void ClipsListModel::onActiveClipsChanged()
 {
-    // If we're showing the active board, reload
-    if (m_service && m_boardId == m_service->activeBoardId()) {
+    // Reload if we're showing any active board (since playback state may have changed)
+    if (m_service && m_boardId >= 0 && m_service->isBoardActive(m_boardId)) {
         reload();
     }
 }
