@@ -544,7 +544,17 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
         for (int i = 0; i < board.clips.size(); ++i) {
             if (board.clips[i].id == clipId) {
                 if (board.clips[i].locked)
-                    return false; // can't delete playing
+                    return false; // can't delete locked clip
+
+                // STOP the clip if it's playing before deleting
+                if (m_audioEngine && m_clipIdToSlot.contains(clipId)) {
+                    int slotId = m_clipIdToSlot[clipId];
+                    m_audioEngine->stopClip(slotId);
+                    m_audioEngine->unloadClip(slotId);
+                    m_clipIdToSlot.remove(clipId);
+                    qDebug() << "Stopped and unloaded clip" << clipId << "before deletion";
+                }
+
                 board.clips.removeAt(i);
                 found = true;
                 break;
@@ -555,6 +565,7 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
 
         rebuildHotkeyIndex();
         emit activeClipsChanged();
+        emit clipPlaybackStopped(clipId); // Notify UI that clip stopped
         return saveActive();
     }
 
@@ -1414,6 +1425,15 @@ void SoundboardService::playClip(int clipId)
         emit activeClipsChanged();
         emit clipPlaybackStopped(clipId);
         return;
+    }
+
+    // Mode 3 (Restart): Always restart from beginning when clicking same clip
+    // If the clip is playing or paused, stop it and let it fall through to restart
+    if (mode == 3 && isCurrentlyPlaying) {
+        m_audioEngine->stopClip(slotId);
+        clip->isPlaying = false;
+        qDebug() << "Mode 3 (Restart): Restarting clip" << clipId << "from beginning";
+        // Fall through to reload and play from beginning
     }
 
     // If user taps a paused clip in Play/Stop mode: restart from beginning
