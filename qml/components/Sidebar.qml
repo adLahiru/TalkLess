@@ -249,6 +249,30 @@ Rectangle {
                         root.selected(rowItem.route);
                     }
                 }
+
+                // Tooltip for collapsed sidebar
+                ToolTip {
+                    visible: root.isCollapsed && mouse.containsMouse
+                    text: rowItem.title
+                    delay: 300
+                    timeout: 5000
+                    x: parent.width + 10
+                    y: (parent.height - height) / 2
+
+                    background: Rectangle {
+                        color: Colors.surface
+                        border.color: Colors.border
+                        border.width: 1
+                        radius: 6
+                    }
+
+                    contentItem: Text {
+                        text: rowItem.title
+                        color: Colors.textPrimary
+                        font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
+                        font.pixelSize: 13
+                    }
+                }
             }
         }
 
@@ -629,6 +653,29 @@ Rectangle {
                                 }
                             }
                         }
+                        // Tooltip for collapsed sidebar - soundboard name
+                        ToolTip {
+                            visible: root.isCollapsed && mouse2.containsMouse
+                            text: boardRow.boardName
+                            delay: 300
+                            timeout: 5000
+                            x: boardRow.width + 10
+                            y: (boardRow.height - height) / 2
+
+                            background: Rectangle {
+                                color: Colors.surface
+                                border.color: Colors.border
+                                border.width: 1
+                                radius: 6
+                            }
+
+                            contentItem: Text {
+                                text: boardRow.boardName
+                                color: Colors.textPrimary
+                                font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
+                                font.pixelSize: 13
+                            }
+                        }
                     }
                 }
             }
@@ -716,6 +763,30 @@ Rectangle {
                     if (row >= 0) {
                         boardsList.positionViewAtIndex(row, ListView.End);
                         // Focus happens automatically when the TextField becomes visible
+                    }
+                }
+
+                // Tooltip for collapsed sidebar
+                ToolTip {
+                    visible: root.isCollapsed && parent.hovered
+                    text: "Add Soundboard"
+                    delay: 300
+                    timeout: 5000
+                    x: parent.width + 10
+                    y: (parent.height - height) / 2
+
+                    background: Rectangle {
+                        color: Colors.surface
+                        border.color: Colors.border
+                        border.width: 1
+                        radius: 6
+                    }
+
+                    contentItem: Text {
+                        text: "Add Soundboard"
+                        color: Colors.textPrimary
+                        font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Poppins"
+                        font.pixelSize: 13
                     }
                 }
             }
