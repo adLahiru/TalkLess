@@ -176,7 +176,7 @@ Rectangle {
                                     model: []
 
                                     onAboutToOpen: {
-                                        model = soundboardService.getInputDevices()
+                                        model = soundboardService.getInputDevices();
                                     }
 
                                     onItemSelected: function (id, name) {
@@ -558,101 +558,29 @@ Rectangle {
                                     font.pixelSize: 14
                                 }
 
-                                Rectangle {
+                                // Sample Rate Dropdown
+                                DropdownSelector {
                                     id: sampleRateDropdown
-                                    width: 200
+                                    Layout.preferredWidth: 200
                                     height: 40
-                                    color: sampleRateMouseArea.containsMouse ? Colors.surfaceLight : Colors.surface
-                                    radius: 8
-                                    property bool expanded: false
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 12
-                                        anchors.rightMargin: 12
-
-                                        Text {
-                                            text: {
-                                                switch(soundboardService.sampleRate) {
-                                                    case 44100: return "44.1 kHz";
-                                                    case 48000: return "48 kHz";
-                                                    case 96000: return "96 kHz";
-                                                    default: return "48 kHz";
-                                                }
-                                            }
-                                            color: Colors.textPrimary
-                                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                            font.pixelSize: 14
-                                            Layout.fillWidth: true
+                                    placeholder: "Select Sample Rate"
+                                    selectedId: soundboardService.sampleRate.toString()
+                                    model: [
+                                        {
+                                            id: "44100",
+                                            name: "44.1 kHz"
+                                        },
+                                        {
+                                            id: "48000",
+                                            name: "48 kHz"
+                                        },
+                                        {
+                                            id: "96000",
+                                            name: "96 kHz"
                                         }
-
-                                        Text {
-                                            text: sampleRateDropdown.expanded ? "▲" : "▼"
-                                            color: Colors.textTertiary
-                                            font.pixelSize: 12
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        id: sampleRateMouseArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: sampleRateDropdown.expanded = !sampleRateDropdown.expanded
-                                    }
-
-                                    // Dropdown menu
-                                    Rectangle {
-                                        visible: sampleRateDropdown.expanded
-                                        anchors.top: parent.bottom
-                                        anchors.topMargin: 4
-                                        width: parent.width
-                                        height: sampleRateColumn.implicitHeight + 8
-                                        color: Colors.surface
-                                        radius: 8
-                                        border.color: Colors.border
-                                        border.width: 1
-                                        z: 100
-
-                                        Column {
-                                            id: sampleRateColumn
-                                            anchors.fill: parent
-                                            anchors.margins: 4
-
-                                            Repeater {
-                                                model: [
-                                                    { value: 44100, label: "44.1 kHz" },
-                                                    { value: 48000, label: "48 kHz" },
-                                                    { value: 96000, label: "96 kHz" }
-                                                ]
-
-                                                Rectangle {
-                                                    width: parent.width
-                                                    height: 32
-                                                    color: srItemMouse.containsMouse ? Colors.surfaceLight : "transparent"
-                                                    radius: 4
-
-                                                    Text {
-                                                        anchors.centerIn: parent
-                                                        text: modelData.label
-                                                        color: soundboardService.sampleRate === modelData.value ? Colors.gradientPrimaryStart : Colors.textPrimary
-                                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                                        font.pixelSize: 13
-                                                    }
-
-                                                    MouseArea {
-                                                        id: srItemMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: {
-                                                            soundboardService.setSampleRate(modelData.value);
-                                                            sampleRateDropdown.expanded = false;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                    ]
+                                    onItemSelected: function (id, name) {
+                                        soundboardService.setSampleRate(parseInt(id));
                                     }
                                 }
                             }
@@ -668,93 +596,25 @@ Rectangle {
                                     font.pixelSize: 14
                                 }
 
-                                Rectangle {
+                                // Channels Dropdown
+                                DropdownSelector {
                                     id: channelsDropdown
-                                    width: 200
+                                    Layout.preferredWidth: 200
                                     height: 40
-                                    color: channelsMouseArea.containsMouse ? Colors.surfaceLight : Colors.surface
-                                    radius: 8
-                                    property bool expanded: false
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 12
-                                        anchors.rightMargin: 12
-
-                                        Text {
-                                            text: soundboardService.audioChannels === 1 ? "Mono" : "Stereo"
-                                            color: Colors.textPrimary
-                                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                            font.pixelSize: 14
-                                            Layout.fillWidth: true
+                                    placeholder: "Select Channels"
+                                    selectedId: soundboardService.audioChannels.toString()
+                                    model: [
+                                        {
+                                            id: "1",
+                                            name: "Mono"
+                                        },
+                                        {
+                                            id: "2",
+                                            name: "Stereo"
                                         }
-
-                                        Text {
-                                            text: channelsDropdown.expanded ? "▲" : "▼"
-                                            color: Colors.textTertiary
-                                            font.pixelSize: 12
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        id: channelsMouseArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: channelsDropdown.expanded = !channelsDropdown.expanded
-                                    }
-
-                                    // Dropdown menu
-                                    Rectangle {
-                                        visible: channelsDropdown.expanded
-                                        anchors.top: parent.bottom
-                                        anchors.topMargin: 4
-                                        width: parent.width
-                                        height: channelsColumn.implicitHeight + 8
-                                        color: Colors.surface
-                                        radius: 8
-                                        border.color: Colors.border
-                                        border.width: 1
-                                        z: 100
-
-                                        Column {
-                                            id: channelsColumn
-                                            anchors.fill: parent
-                                            anchors.margins: 4
-
-                                            Repeater {
-                                                model: [
-                                                    { value: 1, label: "Mono" },
-                                                    { value: 2, label: "Stereo" }
-                                                ]
-
-                                                Rectangle {
-                                                    width: parent.width
-                                                    height: 32
-                                                    color: chItemMouse.containsMouse ? Colors.surfaceLight : "transparent"
-                                                    radius: 4
-
-                                                    Text {
-                                                        anchors.centerIn: parent
-                                                        text: modelData.label
-                                                        color: soundboardService.audioChannels === modelData.value ? Colors.gradientPrimaryStart : Colors.textPrimary
-                                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                                        font.pixelSize: 13
-                                                    }
-
-                                                    MouseArea {
-                                                        id: chItemMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: {
-                                                            soundboardService.setAudioChannels(modelData.value);
-                                                            channelsDropdown.expanded = false;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                    ]
+                                    onItemSelected: function (id, name) {
+                                        soundboardService.setAudioChannels(parseInt(id));
                                     }
                                 }
                             }
@@ -775,100 +635,37 @@ Rectangle {
                                     font.pixelSize: 14
                                 }
 
-                                Rectangle {
+                                // Buffer Size Dropdown
+                                DropdownSelector {
                                     id: bufferSizeDropdown
-                                    width: 200
+                                    Layout.preferredWidth: 200
                                     height: 40
-                                    color: bufferSizeMouseArea.containsMouse ? Colors.surfaceLight : Colors.surface
-                                    radius: 8
-                                    property bool expanded: false
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 12
-                                        anchors.rightMargin: 12
-
-                                        Text {
-                                            text: {
-                                                var frames = soundboardService.bufferSizeFrames;
-                                                var latencyMs = (frames / soundboardService.sampleRate * 1000).toFixed(1);
-                                                return frames + " samples (~" + latencyMs + "ms)";
-                                            }
-                                            color: Colors.textPrimary
-                                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                            font.pixelSize: 14
-                                            Layout.fillWidth: true
+                                    placeholder: "Select Buffer Size"
+                                    selectedId: soundboardService.bufferSizeFrames.toString()
+                                    model: [
+                                        {
+                                            id: "256",
+                                            name: "256 samples (Low latency)"
+                                        },
+                                        {
+                                            id: "512",
+                                            name: "512 samples"
+                                        },
+                                        {
+                                            id: "1024",
+                                            name: "1024 samples (Recommended)"
+                                        },
+                                        {
+                                            id: "2048",
+                                            name: "2048 samples"
+                                        },
+                                        {
+                                            id: "4096",
+                                            name: "4096 samples (High stability)"
                                         }
-
-                                        Text {
-                                            text: bufferSizeDropdown.expanded ? "▲" : "▼"
-                                            color: Colors.textTertiary
-                                            font.pixelSize: 12
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        id: bufferSizeMouseArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: bufferSizeDropdown.expanded = !bufferSizeDropdown.expanded
-                                    }
-
-                                    // Dropdown menu
-                                    Rectangle {
-                                        visible: bufferSizeDropdown.expanded
-                                        anchors.top: parent.bottom
-                                        anchors.topMargin: 4
-                                        width: parent.width
-                                        height: bufferSizeColumn.implicitHeight + 8
-                                        color: Colors.surface
-                                        radius: 8
-                                        border.color: Colors.border
-                                        border.width: 1
-                                        z: 100
-
-                                        Column {
-                                            id: bufferSizeColumn
-                                            anchors.fill: parent
-                                            anchors.margins: 4
-
-                                            Repeater {
-                                                model: [
-                                                    { value: 256, label: "256 samples (Low latency)" },
-                                                    { value: 512, label: "512 samples" },
-                                                    { value: 1024, label: "1024 samples (Recommended)" },
-                                                    { value: 2048, label: "2048 samples" },
-                                                    { value: 4096, label: "4096 samples (High stability)" }
-                                                ]
-
-                                                Rectangle {
-                                                    width: parent.width
-                                                    height: 32
-                                                    color: bsItemMouse.containsMouse ? Colors.surfaceLight : "transparent"
-                                                    radius: 4
-
-                                                    Text {
-                                                        anchors.centerIn: parent
-                                                        text: modelData.label
-                                                        color: soundboardService.bufferSizeFrames === modelData.value ? Colors.gradientPrimaryStart : Colors.textPrimary
-                                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                                        font.pixelSize: 13
-                                                    }
-
-                                                    MouseArea {
-                                                        id: bsItemMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: {
-                                                            soundboardService.setBufferSizeFrames(modelData.value);
-                                                            bufferSizeDropdown.expanded = false;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                    ]
+                                    onItemSelected: function (id, name) {
+                                        soundboardService.setBufferSizeFrames(parseInt(id));
                                     }
                                 }
                             }
@@ -884,94 +681,29 @@ Rectangle {
                                     font.pixelSize: 14
                                 }
 
-                                Rectangle {
+                                // Buffer Periods Dropdown
+                                DropdownSelector {
                                     id: bufferPeriodsDropdown
-                                    width: 200
+                                    Layout.preferredWidth: 200
                                     height: 40
-                                    color: bufferPeriodsMouseArea.containsMouse ? Colors.surfaceLight : Colors.surface
-                                    radius: 8
-                                    property bool expanded: false
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 12
-                                        anchors.rightMargin: 12
-
-                                        Text {
-                                            text: soundboardService.bufferPeriods + " periods"
-                                            color: Colors.textPrimary
-                                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                            font.pixelSize: 14
-                                            Layout.fillWidth: true
+                                    placeholder: "Select Periods"
+                                    selectedId: soundboardService.bufferPeriods.toString()
+                                    model: [
+                                        {
+                                            id: "2",
+                                            name: "2 periods (Low latency)"
+                                        },
+                                        {
+                                            id: "3",
+                                            name: "3 periods (Recommended)"
+                                        },
+                                        {
+                                            id: "4",
+                                            name: "4 periods (High stability)"
                                         }
-
-                                        Text {
-                                            text: bufferPeriodsDropdown.expanded ? "▲" : "▼"
-                                            color: Colors.textTertiary
-                                            font.pixelSize: 12
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        id: bufferPeriodsMouseArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: bufferPeriodsDropdown.expanded = !bufferPeriodsDropdown.expanded
-                                    }
-
-                                    // Dropdown menu
-                                    Rectangle {
-                                        visible: bufferPeriodsDropdown.expanded
-                                        anchors.top: parent.bottom
-                                        anchors.topMargin: 4
-                                        width: parent.width
-                                        height: bufferPeriodsColumn.implicitHeight + 8
-                                        color: Colors.surface
-                                        radius: 8
-                                        border.color: Colors.border
-                                        border.width: 1
-                                        z: 100
-
-                                        Column {
-                                            id: bufferPeriodsColumn
-                                            anchors.fill: parent
-                                            anchors.margins: 4
-
-                                            Repeater {
-                                                model: [
-                                                    { value: 2, label: "2 periods (Low latency)" },
-                                                    { value: 3, label: "3 periods (Recommended)" },
-                                                    { value: 4, label: "4 periods (High stability)" }
-                                                ]
-
-                                                Rectangle {
-                                                    width: parent.width
-                                                    height: 32
-                                                    color: bpItemMouse.containsMouse ? Colors.surfaceLight : "transparent"
-                                                    radius: 4
-
-                                                    Text {
-                                                        anchors.centerIn: parent
-                                                        text: modelData.label
-                                                        color: soundboardService.bufferPeriods === modelData.value ? Colors.gradientPrimaryStart : Colors.textPrimary
-                                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                                        font.pixelSize: 13
-                                                    }
-
-                                                    MouseArea {
-                                                        id: bpItemMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: {
-                                                            soundboardService.setBufferPeriods(modelData.value);
-                                                            bufferPeriodsDropdown.expanded = false;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                    ]
+                                    onItemSelected: function (id, name) {
+                                        soundboardService.setBufferPeriods(parseInt(id));
                                     }
                                 }
                             }
@@ -1062,8 +794,14 @@ Rectangle {
                                             spacing: 20
                                             Repeater {
                                                 model: [
-                                                    { label: "Light", value: "light" },
-                                                    { label: "Dark", value: "dark" }
+                                                    {
+                                                        label: "Light",
+                                                        value: "light"
+                                                    },
+                                                    {
+                                                        label: "Dark",
+                                                        value: "dark"
+                                                    }
                                                 ]
                                                 delegate: RowLayout {
                                                     spacing: 8
@@ -1240,9 +978,18 @@ Rectangle {
                                         }
                                         Repeater {
                                             model: [
-                                                { name: "Compact", scale: 0.7 },
-                                                { name: "Standard", scale: 1.0 },
-                                                { name: "Comfortable", scale: 1.3 }
+                                                {
+                                                    name: "Compact",
+                                                    scale: 0.7
+                                                },
+                                                {
+                                                    name: "Standard",
+                                                    scale: 1.0
+                                                },
+                                                {
+                                                    name: "Comfortable",
+                                                    scale: 1.3
+                                                }
                                             ]
                                             delegate: RowLayout {
                                                 required property var modelData
@@ -1341,7 +1088,7 @@ Rectangle {
                                 anchors.fill: parent
                                 anchors.margins: 22
                                 spacing: 22
-    
+
                                 // // ---- Row 1: Mic Input ----
                                 // RowLayout {
                                 //     spacing: 18
@@ -1384,7 +1131,7 @@ Rectangle {
 
                                 //     Item { Layout.fillWidth: true } // pushes items left
                                 // }
-                            
+
                                 // ---- Row 2: Speaker Output ----
                                 RowLayout {
                                     spacing: 18
@@ -1407,15 +1154,14 @@ Rectangle {
                                         model: []
 
                                         onAboutToOpen: {
-                                            model = soundboardService.getOutputDevices()
+                                            model = soundboardService.getOutputDevices();
                                         }
 
                                         onItemSelected: function (id, name) {
-                                            console.log("Speaker output selected:", name)
-                                            soundboardService.setOutputDevice(id)
+                                            console.log("Speaker output selected:", name);
+                                            soundboardService.setOutputDevice(id);
                                         }
                                     }
-
 
                                     DotMeter {
                                         Layout.leftMargin: 10
@@ -1449,7 +1195,7 @@ Rectangle {
                                         model: []
 
                                         onAboutToOpen: {
-                                            model = soundboardService.getOutputDevices()
+                                            model = soundboardService.getOutputDevices();
                                         }
 
                                         onItemSelected: function (id, name) {
