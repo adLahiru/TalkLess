@@ -27,7 +27,7 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
         int id = m_repo.createBoard("Default"); // creates board_1.json and updates index
         m_state = m_repo.loadIndex();
         m_state.activeBoardIds.insert(id);
-        m_repo.saveIndex(m_state);
+        m_indexDirty = true; // Mark as dirty instead of immediate save
     }
 
     // 3) Activate all saved active boards
@@ -101,6 +101,38 @@ SoundboardService::~SoundboardService()
     }
 }
 
+void SoundboardService::saveAllChanges()
+{
+    qDebug() << "Saving all changes on application close...";
+    
+    // Save index if dirty
+    if (m_indexDirty) {
+        qDebug() << "Saving index...";
+        m_repo.saveIndex(m_state);
+        m_indexDirty = false;
+    }
+    
+    // Save all dirty boards
+    if (!m_dirtyBoards.isEmpty()) {
+        qDebug() << "Saving" << m_dirtyBoards.size() << "dirty boards...";
+        for (int boardId : m_dirtyBoards) {
+            if (m_activeBoards.contains(boardId)) {
+                // Save active board
+                m_repo.saveBoard(m_activeBoards[boardId]);
+            } else {
+                // Load and save inactive board
+                auto loaded = m_repo.loadBoard(boardId);
+                if (loaded) {
+                    m_repo.saveBoard(*loaded);
+                }
+            }
+        }
+        m_dirtyBoards.clear();
+    }
+    
+    qDebug() << "All changes saved successfully.";
+}
+
 void SoundboardService::reloadIndex()
 {
     m_state = m_repo.loadIndex();
@@ -152,7 +184,7 @@ bool SoundboardService::toggleBoardActive(int boardId)
 void SoundboardService::setMasterGainDb(double db)
 {
     m_state.settings.masterGainDb = db;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
 
     // Apply to audio engine
     if (m_audioEngine) {
@@ -165,7 +197,7 @@ void SoundboardService::setMasterGainDb(double db)
 void SoundboardService::setMicGainDb(double db)
 {
     m_state.settings.micGainDb = db;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
 
     // Apply to audio engine
     if (m_audioEngine) {
@@ -200,7 +232,7 @@ bool SoundboardService::activate(int boardId)
 
     // Update index activeBoardIds
     m_state.activeBoardIds.insert(boardId);
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
 
     emit activeBoardChanged();
     emit activeClipsChanged();
@@ -214,14 +246,14 @@ bool SoundboardService::deactivate(int boardId)
         return true; // Already not active
     }
 
-    // Save the board before removing
-    m_repo.saveBoard(m_activeBoards[boardId]);
+    // Mark the board as dirty before removing
+    m_dirtyBoards.insert(boardId);
     m_activeBoards.remove(boardId);
     rebuildHotkeyIndex();
 
     // Update index activeBoardIds
     m_state.activeBoardIds.remove(boardId);
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
 
     emit activeBoardChanged();
     emit activeClipsChanged();
@@ -234,19 +266,13 @@ bool SoundboardService::saveActive()
     if (m_activeBoards.isEmpty())
         return false;
 
-    bool allOk = true;
+    // Mark all active boards as dirty
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
-        if (!m_repo.saveBoard(it.value())) {
-            allOk = false;
-        }
+        m_dirtyBoards.insert(it.key());
     }
 
-    if (allOk) {
-        // reload index because clipCount/name might update
-        m_state = m_repo.loadIndex();
-        emit boardsChanged();
-    }
-    return allOk;
+    // Will be saved on application close
+    return true;
 }
 
 QString SoundboardService::normalizeHotkey(const QString& hotkey)
@@ -489,12 +515,9 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
         b.clips.push_back(c);
     }
 
-    const bool ok = m_repo.saveBoard(b);
-    if (ok) {
-        m_state = m_repo.loadIndex();
-        emit boardsChanged();
-    }
-    return ok;
+    m_dirtyBoards.insert(boardId); // Mark as dirty instead of immediate save
+    emit boardsChanged();
+    return true;
 }
 
 bool SoundboardService::addClipWithTitle(int boardId, const QString& filePath, const QString& title)
@@ -586,12 +609,9 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
     if (!found)
         return false;
 
-    const bool ok = m_repo.saveBoard(b);
-    if (ok) {
-        m_state = m_repo.loadIndex();
-        emit boardsChanged();
-    }
-    return ok;
+    m_dirtyBoards.insert(boardId); // Mark as dirty instead of immediate save
+    emit boardsChanged();
+    return true;
 }
 
 bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
@@ -658,12 +678,9 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
 
     b.clips.push_back(c);
 
-    const bool ok = m_repo.saveBoard(b);
-    if (ok) {
-        m_state = m_repo.loadIndex();
-        emit boardsChanged();
-    }
-    return ok;
+    m_dirtyBoards.insert(boardId); // Mark as dirty instead of immediate save
+    emit boardsChanged();
+    return true;
 }
 
 bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& updatedClip)
@@ -717,12 +734,9 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
             n.isRepeat = true;
         c = n;
 
-        const bool ok = m_repo.saveBoard(b);
-        if (ok) {
-            m_state = m_repo.loadIndex();
-            emit boardsChanged();
-        }
-        return ok;
+        m_dirtyBoards.insert(boardId); // Mark as dirty instead of immediate save
+        emit boardsChanged();
+        return true;
     }
     return false;
 }
@@ -767,12 +781,9 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const QString
         c.hotkey = hotkey;
         c.tags = tags;
 
-        const bool ok = m_repo.saveBoard(b);
-        if (ok) {
-            m_state = m_repo.loadIndex();
-            emit boardsChanged();
-        }
-        return ok;
+        m_dirtyBoards.insert(boardId); // Mark as dirty instead of immediate save
+        emit boardsChanged();
+        return true;
     }
     return false;
 }
@@ -817,12 +828,9 @@ bool SoundboardService::updateClipImage(int boardId, int clipId, const QString& 
         // Update image path
         c.imgPath = localPath;
 
-        const bool ok = m_repo.saveBoard(b);
-        if (ok) {
-            m_state = m_repo.loadIndex();
-            emit boardsChanged();
-        }
-        return ok;
+        m_dirtyBoards.insert(boardId); // Mark as dirty instead of immediate save
+        emit boardsChanged();
+        return true;
     }
     return false;
 }
@@ -876,12 +884,9 @@ bool SoundboardService::updateClipAudioSettings(int boardId, int clipId, int vol
         c.volume = volume;
         c.speed = speed;
 
-        const bool ok = m_repo.saveBoard(b);
-        if (ok) {
-            m_state = m_repo.loadIndex();
-            emit boardsChanged();
-        }
-        return ok;
+        m_dirtyBoards.insert(boardId); // Mark as dirty instead of immediate save
+        emit boardsChanged();
+        return true;
     }
     return false;
 }
@@ -990,7 +995,7 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
             // Only mode 4 (Loop) forces repeat on
             if (mode == 4)
                 c.isRepeat = true;
-            m_repo.saveBoard(b);
+            m_dirtyBoards.insert(boardId);
             return;
         }
     }
@@ -1020,7 +1025,7 @@ void SoundboardService::setClipStopOtherSounds(int boardId, int clipId, bool sto
     for (auto& c : b.clips) {
         if (c.id == clipId) {
             c.stopOtherSounds = stop;
-            m_repo.saveBoard(b);
+            m_dirtyBoards.insert(boardId);
             return;
         }
     }
@@ -1056,7 +1061,7 @@ void SoundboardService::setClipMuteOtherSounds(int boardId, int clipId, bool mut
             c.muteOtherSounds = mute;
             if (mute)
                 c.muteMicDuringPlayback = true;
-            m_repo.saveBoard(b);
+            m_dirtyBoards.insert(boardId);
             return;
         }
     }
@@ -1086,7 +1091,7 @@ void SoundboardService::setClipMuteMicDuringPlayback(int boardId, int clipId, bo
     for (auto& c : b.clips) {
         if (c.id == clipId) {
             c.muteMicDuringPlayback = mute;
-            m_repo.saveBoard(b);
+            m_dirtyBoards.insert(boardId);
             return;
         }
     }
@@ -1125,7 +1130,7 @@ void SoundboardService::setClipTrim(int boardId, int clipId, double startMs, dou
         if (c.id == clipId) {
             c.trimStartMs = startMs;
             c.trimEndMs = endMs;
-            m_repo.saveBoard(b);
+            m_dirtyBoards.insert(boardId);
             return;
         }
     }
@@ -1175,12 +1180,9 @@ bool SoundboardService::moveClip(int boardId, int fromIndex, int toIndex)
     Clip clip = b.clips.takeAt(fromIndex);
     b.clips.insert(toIndex, clip);
 
-    const bool ok = m_repo.saveBoard(b);
-    if (ok) {
-        m_state = m_repo.loadIndex();
-        emit boardsChanged();
-    }
-    return ok;
+    m_dirtyBoards.insert(boardId); // Mark as dirty instead of immediate save
+    emit boardsChanged();
+    return true;
 }
 
 void SoundboardService::copyClip(int clipId)
@@ -1249,12 +1251,9 @@ bool SoundboardService::renameBoard(int boardId, const QString& newName)
     Soundboard b = *loaded;
     b.name = name;
 
-    const bool ok = m_repo.saveBoard(b); // should update index name + clipCount
-    if (ok) {
-        m_state = m_repo.loadIndex(); // IMPORTANT: Reload index in memory!
-        emit boardsChanged();
-    }
-    return ok;
+    m_dirtyBoards.insert(boardId); // Mark as dirty instead of immediate save
+    emit boardsChanged();
+    return true;
 }
 
 bool SoundboardService::deleteBoard(int boardId)
@@ -1886,7 +1885,7 @@ bool SoundboardService::setInputDevice(const QString& deviceId)
     bool success = m_audioEngine->setCaptureDevice(deviceId.toStdString());
     if (success) {
         m_state.settings.selectedCaptureDeviceId = deviceId;
-        m_repo.saveIndex(m_state);
+        m_indexDirty = true; // Mark as dirty instead of immediate save
         qDebug() << "Input device set to:" << deviceId;
         emit settingsChanged();
     } else {
@@ -1905,7 +1904,7 @@ bool SoundboardService::setOutputDevice(const QString& deviceId)
     bool success = m_audioEngine->setPlaybackDevice(deviceId.toStdString());
     if (success) {
         m_state.settings.selectedPlaybackDeviceId = deviceId;
-        m_repo.saveIndex(m_state);
+        m_indexDirty = true; // Mark as dirty instead of immediate save
         qDebug() << "Output device set to:" << deviceId;
         emit settingsChanged();
     } else {
@@ -1924,7 +1923,7 @@ bool SoundboardService::setMonitorOutputDevice(const QString& deviceId)
     bool success = m_audioEngine->setMonitorPlaybackDevice(deviceId.toStdString());
     if (success) {
         m_state.settings.selectedMonitorDeviceId = deviceId;
-        m_repo.saveIndex(m_state);
+        m_indexDirty = true; // Mark as dirty instead of immediate save
         qDebug() << "Secondary output device set to:" << deviceId;
         emit settingsChanged();
     } else {
@@ -1994,7 +1993,7 @@ void SoundboardService::setMicSoundboardBalance(float balance)
     m_audioEngine->setMicSoundboardBalance(balance);
 
     m_state.settings.micSoundboardBalance = balance;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
 
     qDebug() << "Mic/Soundboard balance set to:" << balance;
     emit settingsChanged();
@@ -2015,7 +2014,7 @@ void SoundboardService::setMicPassthroughEnabled(bool enabled)
     }
     m_audioEngine->setMicPassthroughEnabled(enabled);
     m_state.settings.micPassthroughEnabled = enabled;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     qDebug() << "Mic passthrough" << (enabled ? "enabled" : "disabled");
     emit settingsChanged();
 }
@@ -2035,7 +2034,7 @@ void SoundboardService::setMicEnabled(bool enabled)
     }
     m_audioEngine->setMicEnabled(enabled);
     m_state.settings.micEnabled = enabled;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     qDebug() << "Mic capture" << (enabled ? "enabled" : "disabled");
     emit settingsChanged();
 }
@@ -2074,18 +2073,18 @@ bool SoundboardService::setBoardHotkey(int boardId, const QString& hotkey)
     // If it's an active board, update in memory too
     if (m_activeBoards.contains(boardId)) {
         m_activeBoards[boardId].hotkey = hotkey;
-        m_repo.saveBoard(m_activeBoards[boardId]);
+        m_dirtyBoards.insert(boardId);
     } else {
-        // Load, update, save the board
+        // Load, update, mark as dirty
         auto loaded = m_repo.loadBoard(boardId);
         if (loaded) {
             loaded->hotkey = hotkey;
-            m_repo.saveBoard(*loaded);
+            m_dirtyBoards.insert(boardId);
         }
     }
 
-    // Save index
-    m_repo.saveIndex(m_state);
+    // Mark index as dirty
+    m_indexDirty = true;
     emit boardsChanged();
 
     return true;
@@ -2138,7 +2137,7 @@ void SoundboardService::setTheme(const QString& theme)
     if (m_state.settings.theme == theme)
         return;
     m_state.settings.theme = theme;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2147,7 +2146,7 @@ void SoundboardService::setAccentColor(const QString& color)
     if (m_state.settings.accentColor == color)
         return;
     m_state.settings.accentColor = color;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2156,7 +2155,7 @@ void SoundboardService::setSlotSize(const QString& size)
     if (m_state.settings.slotSize == size)
         return;
     m_state.settings.slotSize = size;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2167,7 +2166,7 @@ void SoundboardService::setSlotSizeScale(double scale)
     if (qFuzzyCompare(m_state.settings.slotSizeScale, scale))
         return;
     m_state.settings.slotSizeScale = scale;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2176,7 +2175,7 @@ void SoundboardService::setLanguage(const QString& lang)
     if (m_state.settings.language == lang)
         return;
     m_state.settings.language = lang;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2185,7 +2184,7 @@ void SoundboardService::setHotkeyMode(const QString& mode)
     if (m_state.settings.hotkeyMode == mode)
         return;
     m_state.settings.hotkeyMode = mode;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2197,7 +2196,7 @@ void SoundboardService::setBufferSizeFrames(int frames)
     if (m_state.settings.bufferSizeFrames == frames)
         return;
     m_state.settings.bufferSizeFrames = frames;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
     // Note: Audio engine needs restart to apply new buffer settings
 }
@@ -2210,7 +2209,7 @@ void SoundboardService::setBufferPeriods(int periods)
     if (m_state.settings.bufferPeriods == periods)
         return;
     m_state.settings.bufferPeriods = periods;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2222,7 +2221,7 @@ void SoundboardService::setSampleRate(int rate)
     if (m_state.settings.sampleRate == rate)
         return;
     m_state.settings.sampleRate = rate;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2234,7 +2233,7 @@ void SoundboardService::setAudioChannels(int channels)
     if (m_state.settings.channels == channels)
         return;
     m_state.settings.channels = channels;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2323,8 +2322,8 @@ bool SoundboardService::importSettings(const QString& filePath)
         m_state.settings.sampleRate = s.value("sampleRate").toInt(m_state.settings.sampleRate);
         m_state.settings.channels = s.value("channels").toInt(m_state.settings.channels);
 
-        // Save updated state
-        m_repo.saveIndex(m_state);
+        // Mark as dirty instead of immediate save
+        m_indexDirty = true;
 
         // Apply settings
         if (m_audioEngine) {
@@ -2369,6 +2368,6 @@ void SoundboardService::resetSettings()
         m_audioEngine->setMicSoundboardBalance(m_state.settings.micSoundboardBalance);
     }
 
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }

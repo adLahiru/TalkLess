@@ -8,32 +8,36 @@ import "../styles"
 
 Rectangle {
     id: root
-    
+
     property string placeholder: "Select..."
     property string selectedValue: ""
     property string selectedId: ""
     property string icon: ""
     property var model: []  // Array of objects with {id, name, isDefault}
-    
+
     signal itemSelected(string id, string name)
     signal aboutToOpen()
+
     // Internal list model to properly manage items
     property var internalModel: []
-    
+
     onModelChanged: {
         // Copy model to internal list to avoid binding issues
         var items = []
         if (model && model.length > 0) {
             for (var i = 0; i < model.length; i++) {
+                var rawId = model[i] && model[i].id
+                var rawName = model[i] && model[i].name
                 items.push({
-                    id: model[i].id || "",
-                    name: model[i].name || "",
-                    isDefault: model[i].isDefault || false
+                    // IMPORTANT: normalize ids to string to avoid "1" vs 1 mismatch
+                    id: (rawId !== undefined && rawId !== null) ? String(rawId) : "",
+                    name: (rawName !== undefined && rawName !== null) ? String(rawName) : "",
+                    isDefault: (model[i] && model[i].isDefault) ? true : false
                 })
             }
         }
         internalModel = items
-        
+
         // Update selected name if models change
         updateSelectedName()
     }
@@ -41,20 +45,24 @@ Rectangle {
     onSelectedIdChanged: updateSelectedName()
 
     function updateSelectedName() {
-        if (!selectedId) {
+        var sid = (selectedId !== undefined && selectedId !== null) ? String(selectedId) : ""
+
+        if (sid.length === 0) {
             selectedValue = ""
             return
         }
+
         for (var i = 0; i < internalModel.length; i++) {
-            if (internalModel[i].id === selectedId) {
+            if (internalModel[i].id === sid) {
                 selectedValue = internalModel[i].name
                 return
             }
         }
-        // If not found in model, it might still be loading or model not yet populated
-        // We don't clear selectedValue here to avoid flickering if it was already set
+
+        // If selectedId is not in the model, show placeholder
+        selectedValue = ""
     }
-    
+
     height: 50
     color: dropdownMouseArea.containsMouse || dropdownPopup.visible ? Colors.surfaceLight : Colors.surface
     radius: 12
@@ -113,7 +121,6 @@ Rectangle {
                 dropdownPopup.open()
             }
         }
-
     }
 
     // Dropdown popup menu
@@ -127,13 +134,13 @@ Rectangle {
         modal: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         z: 1000
-        
+
         background: Rectangle {
             color: Colors.surface
             radius: 10
             border.color: Colors.border
             border.width: 1
-            
+
             // Shadow effect
             Rectangle {
                 anchors.fill: parent
@@ -153,24 +160,26 @@ Rectangle {
             contentHeight: itemColumn.implicitHeight
             contentWidth: width
             boundsBehavior: Flickable.StopAtBounds
-            
+
             Column {
                 id: itemColumn
                 width: parent.width
                 spacing: 4
-                
+
                 Repeater {
                     model: root.internalModel
-                    
+
                     delegate: Rectangle {
                         id: itemDelegate
                         required property var modelData
                         required property int index
-                        
+
                         width: itemColumn.width
                         height: 42
                         radius: 8
-                        color: itemMouseArea.containsMouse ? Colors.surfaceLight : (root.selectedId === modelData.id ? Colors.surfaceDark : "transparent")
+                        color: itemMouseArea.containsMouse
+                               ? Colors.surfaceLight
+                               : (root.selectedId === modelData.id ? Colors.surfaceDark : "transparent")
 
                         RowLayout {
                             anchors.fill: parent
@@ -222,9 +231,10 @@ Rectangle {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                root.selectedId = itemDelegate.modelData.id
+                                // Keep ids as strings
+                                root.selectedId = String(itemDelegate.modelData.id)
                                 root.selectedValue = itemDelegate.modelData.name
-                                root.itemSelected(itemDelegate.modelData.id, itemDelegate.modelData.name)
+                                root.itemSelected(root.selectedId, root.selectedValue)
                                 dropdownPopup.close()
                             }
                         }
@@ -234,7 +244,7 @@ Rectangle {
                         }
                     }
                 }
-                
+
                 // Empty state when no devices
                 Rectangle {
                     visible: root.internalModel.length === 0
@@ -251,7 +261,7 @@ Rectangle {
                     }
                 }
             }
-            
+
             ScrollBar.vertical: ScrollBar {
                 active: flickable.contentHeight > flickable.height
                 policy: flickable.contentHeight > flickable.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff

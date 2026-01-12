@@ -30,6 +30,9 @@ public:
     explicit SoundboardService(QObject* parent = nullptr);
     ~SoundboardService();
 
+    // ---- Saving ----
+    Q_INVOKABLE void saveAllChanges();
+
     // ---- Index / Settings ----
     Q_PROPERTY(double masterGainDb READ masterGainDb WRITE setMasterGainDb NOTIFY settingsChanged)
     Q_PROPERTY(double micGainDb READ micGainDb WRITE setMicGainDb NOTIFY settingsChanged)
@@ -258,4 +261,8 @@ private:
 
     // Preview state
     bool m_recordingPreviewPlaying = false;
+
+    // Dirty flags to track unsaved changes
+    bool m_indexDirty = false;
+    QSet<int> m_dirtyBoards;
 };

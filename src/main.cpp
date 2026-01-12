@@ -47,6 +47,11 @@ int main(int argc, char* argv[])
         hotkeyManager.saveHotkeysOnClose();
     });
 
+    // Save all soundboard changes when application closes
+    QObject::connect(&app, &QGuiApplication::aboutToQuit, [&soundboardService]() {
+        soundboardService.saveAllChanges();
+    });
+
     // Expose to QML
     engine.rootContext()->setContextProperty("soundboardService", &soundboardService);
     engine.rootContext()->setContextProperty("soundboardsModel", &soundboardsModel);
