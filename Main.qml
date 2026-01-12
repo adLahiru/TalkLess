@@ -7,8 +7,7 @@ import "qml/pages"
 import "qml/styles"
 
 ApplicationWindow {
-    id: mainWindow
-
+    id: mainWindow        
     width: 1280
     height: 800
     minimumWidth: 800

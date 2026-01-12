@@ -15,12 +15,11 @@ set(CMAKE_AUTORCC ON)
 
 set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "" FORCE)
 
-# Require Qt 6.5+ (matches qt_standard_project_setup below)
+# Require Qt 6.5+
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg)
 qt_standard_project_setup(REQUIRES 6.5)
 
 # ---- FIX: QTP0004 only exists in newer Qt versions (not in 6.5.x) ----
-# Silence QTP0004 warning (no qmldir required) when available.
 if (QT_KNOWN_POLICY_QTP0004)
     qt_policy(SET QTP0004 OLD)
 endif()
@@ -85,7 +84,7 @@ set_source_files_properties(qml/styles/Theme.qml      PROPERTIES QT_QML_SINGLETO
 set_source_files_properties(qml/utils/Functions.qml   PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 # ----------------------------
-# Resources (fix absolute /resources/... issue)
+# Resources
 # ----------------------------
 set(TALKLESS_RESOURCES
     resources/icons/sidebar/ic_logo.png
@@ -196,7 +195,7 @@ target_link_libraries(appTalkLess PRIVATE
 )
 
 # ----------------------------
-# FFmpeg (optional: avoids config failing)
+# FFmpeg (optional)
 # ----------------------------
 option(TALKLESS_ENABLE_FFMPEG "Enable FFmpeg integration" ON)
 set(FFMPEG_ROOT "${CMAKE_SOURCE_DIR}/lib/ffmpeg" CACHE PATH "FFmpeg root (include/, lib/ or bin/)")
@@ -241,6 +240,29 @@ set_target_properties(appTalkLess PROPERTIES
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
 )
+
+# ---- Windows: embed taskbar icon from .ico (NO .rc in git) ----
+if (WIN32)
+    # Make sure this file exists in your repo:
+    #   resources/icons/appicon.ico
+    set(APP_ICO_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/appicon.ico")
+
+    if (EXISTS "${APP_ICO_SOURCE}")
+        # Copy ico into build folder
+        configure_file("${APP_ICO_SOURCE}"
+                       "${CMAKE_CURRENT_BINARY_DIR}/appicon.ico"
+                       COPYONLY)
+
+        # Generate rc in build folder
+        set(GENERATED_RC "${CMAKE_CURRENT_BINARY_DIR}/appicon.rc")
+        file(WRITE "${GENERATED_RC}" "IDI_ICON1 ICON \"appicon.ico\"\n")
+
+        # IMPORTANT: add to the correct target
+        target_sources(appTalkLess PRIVATE "${GENERATED_RC}")
+    else()
+        message(WARNING "Windows ICO not found at: ${APP_ICO_SOURCE} (taskbar icon will stay default)")
+    endif()
+endif()
 
 if(APPLE)
     target_link_libraries(appTalkLess PRIVATE "-framework Carbon")

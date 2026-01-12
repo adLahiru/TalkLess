@@ -2,6 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QQmlContext>
+#include <QIcon>
 
 #include "services/soundboardService.h"
 #include "qmlmodels/soundboardsListModel.h"
@@ -16,6 +17,8 @@ int main(int argc, char* argv[])
     QGuiApplication::setOrganizationName("TalkLess");
     QGuiApplication::setOrganizationDomain("talkless.app");
     QGuiApplication::setApplicationName("TalkLess");
+
+    app.setWindowIcon(QIcon(":/resources/icons/appIcon.png"));
     app.setQuitOnLastWindowClosed(true);
 
     QQmlApplicationEngine engine;
