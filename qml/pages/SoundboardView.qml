@@ -1499,6 +1499,9 @@ Rectangle {
                     spacing: 6
                     visible: rightSidebar.currentTabIndex === 2
 
+                    // Recording waveform peaks data (to be populated by recording)
+                    property var recordingPeaks: []
+
                     // ============================================================
                     // Name Audio File (SINGLE INPUT - fixed duplicate name issue)
                     // ============================================================
@@ -1817,7 +1820,7 @@ Rectangle {
                             totalDuration: Math.max(soundboardService?.recordingDuration ?? 0, 10)
 
                             // use real waveform after stop later (optional)
-                            waveformData: recordingPeaks.length > 0 ? recordingPeaks : waveformTrim.generateMockWaveform()
+                            waveformData: recordingTab.recordingPeaks.length > 0 ? recordingTab.recordingPeaks : waveformTrim.generateMockWaveform()
 
                             onTrimStartMoved: function (pos) {
                                 waveformTrim.trimStart = pos;
@@ -3485,6 +3488,7 @@ Rectangle {
 
                 // Speaker Tab Content (Tab 4)
                 ColumnLayout {
+                    id: speakerTabContent
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: 12
@@ -3554,6 +3558,7 @@ Rectangle {
                             }
 
                             Column {
+                                id: outputMeterColumn
                                 anchors.centerIn: parent
                                 spacing: 4
 
@@ -3562,21 +3567,22 @@ Rectangle {
                                 // Map dBFS (-60..0) -> 0..1
                                 readonly property real minDb: -60.0
                                 readonly property real maxDb: 0.0
-                                readonly property real norm: Math.max(0.0, Math.min(1.0, (rmsDb - minDb) / (maxDb - minDb)))
+                                readonly property real norm: Math.max(0.0, Math.min(1.0, (speakerTabContent.rmsDb - minDb) / (maxDb - minDb)))
 
                                 readonly property int activeCount: Math.round(norm * segmentCount)
 
                                 Repeater {
-                                    model: parent.segmentCount
+                                    model: outputMeterColumn.segmentCount
                                     delegate: Rectangle {
+                                        required property int index
                                         width: 24
                                         height: 5
                                         radius: 2
 
-                                        property int idxFromBottom: (parent.segmentCount - 1) - index
+                                        property int idxFromBottom: (outputMeterColumn.segmentCount - 1) - index
 
                                         color: {
-                                            var on = (idxFromBottom < parent.activeCount);
+                                            var on = (idxFromBottom < outputMeterColumn.activeCount);
                                             if (!on)
                                                 return Qt.rgba(1, 1, 1, 0.10);
                                             if (idxFromBottom >= 14)
@@ -3604,9 +3610,9 @@ Rectangle {
                                 orientation: Qt.Vertical
                                 from: 12
                                 to: -60
-                                onMoved: soundboardService.masterGainDb = value
+                                onMoved: if (soundboardService) soundboardService.masterGainDb = value
                                 Binding on value {
-                                    value: soundboardService.masterGainDb
+                                    value: soundboardService?.masterGainDb ?? 0
                                     when: !masterVerticalSlider.pressed
                                 }
 
@@ -3697,9 +3703,9 @@ Rectangle {
                                 orientation: Qt.Vertical
                                 from: 12
                                 to: -60
-                                onMoved: soundboardService.micGainDb = value
+                                onMoved: if (soundboardService) soundboardService.micGainDb = value
                                 Binding on value {
-                                    value: soundboardService.micGainDb
+                                    value: soundboardService?.micGainDb ?? 0
                                     when: !micVerticalSlider.pressed
                                 }
 
@@ -3720,7 +3726,7 @@ Rectangle {
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
                                         width: 32
-                                        height: slider.visualPosition * parent.height
+                                        height: micVerticalSlider.visualPosition * parent.height
                                         radius: width / 2
                                         gradient: Gradient {
                                             GradientStop {

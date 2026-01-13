@@ -79,6 +79,14 @@ Item {
             passwordError.text = "Password must be at least 6 characters";
             passwordError.visible = true;
             isValid = false;
+        } else if (!/[A-Z]/.test(passwordInput.text)) {
+            passwordError.text = "Password must contain at least one uppercase letter";
+            passwordError.visible = true;
+            isValid = false;
+        } else if (!/[0-9]/.test(passwordInput.text)) {
+            passwordError.text = "Password must contain at least one number";
+            passwordError.visible = true;
+            isValid = false;
         } else {
             passwordError.visible = false;
         }

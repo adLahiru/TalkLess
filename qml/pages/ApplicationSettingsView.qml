@@ -893,29 +893,36 @@ Rectangle {
                                                         value: "dark"
                                                     }
                                                 ]
-                                                delegate: RowLayout {
-                                                    spacing: 8
-                                                    Rectangle {
-                                                        width: 16
-                                                        height: 16
-                                                        radius: 8
-                                                        color: "transparent"
-                                                        border.color: Colors.textPrimary
-                                                        border.width: 1
+                                                delegate: Item {
+                                                    required property var modelData
+                                                    implicitWidth: themeOptionRow.implicitWidth
+                                                    implicitHeight: themeOptionRow.implicitHeight
+
+                                                    RowLayout {
+                                                        id: themeOptionRow
+                                                        spacing: 8
                                                         Rectangle {
-                                                            anchors.centerIn: parent
-                                                            width: 8
-                                                            height: 8
-                                                            radius: 4
-                                                            color: Colors.accent
-                                                            // Check case-insensitive to be safe, or direct match
-                                                            visible: (soundboardService?.theme ?? "dark").toLowerCase() === modelData.value
+                                                            width: 16
+                                                            height: 16
+                                                            radius: 8
+                                                            color: "transparent"
+                                                            border.color: Colors.textPrimary
+                                                            border.width: 1
+                                                            Rectangle {
+                                                                anchors.centerIn: parent
+                                                                width: 8
+                                                                height: 8
+                                                                radius: 4
+                                                                color: Colors.accent
+                                                                // Check case-insensitive to be safe, or direct match
+                                                                visible: (soundboardService?.theme ?? "dark").toLowerCase() === modelData.value
+                                                            }
                                                         }
-                                                    }
-                                                    Text {
-                                                        text: modelData.label
-                                                        color: Colors.textPrimary
-                                                        font.pixelSize: 14
+                                                        Text {
+                                                            text: modelData.label
+                                                            color: Colors.textPrimary
+                                                            font.pixelSize: 14
+                                                        }
                                                     }
                                                     MouseArea {
                                                         anchors.fill: parent
@@ -1085,29 +1092,35 @@ Rectangle {
                                                     scale: 1.3
                                                 }
                                             ]
-                                            delegate: RowLayout {
+                                            delegate: Item {
                                                 required property var modelData
-                                                spacing: 10
-                                                Rectangle {
-                                                    width: 16
-                                                    height: 16
-                                                    radius: 8
-                                                    color: "transparent"
-                                                    border.color: Colors.textPrimary
-                                                    border.width: 1
+                                                implicitWidth: slotSizeOptionRow.implicitWidth
+                                                implicitHeight: slotSizeOptionRow.implicitHeight
+
+                                                RowLayout {
+                                                    id: slotSizeOptionRow
+                                                    spacing: 10
                                                     Rectangle {
-                                                        anchors.centerIn: parent
-                                                        width: 8
-                                                        height: 8
-                                                        radius: 4
-                                                        color: Colors.accent
-                                                        visible: Math.abs((soundboardService?.slotSizeScale ?? 1.0) - modelData.scale) < 0.1
+                                                        width: 16
+                                                        height: 16
+                                                        radius: 8
+                                                        color: "transparent"
+                                                        border.color: Colors.textPrimary
+                                                        border.width: 1
+                                                        Rectangle {
+                                                            anchors.centerIn: parent
+                                                            width: 8
+                                                            height: 8
+                                                            radius: 4
+                                                            color: Colors.accent
+                                                            visible: Math.abs((soundboardService?.slotSizeScale ?? 1.0) - modelData.scale) < 0.1
+                                                        }
                                                     }
-                                                }
-                                                Text {
-                                                    text: modelData.name
-                                                    color: Colors.textPrimary
-                                                    font.pixelSize: 14
+                                                    Text {
+                                                        text: modelData.name
+                                                        color: Colors.textPrimary
+                                                        font.pixelSize: 14
+                                                    }
                                                 }
                                                 MouseArea {
                                                     anchors.fill: parent

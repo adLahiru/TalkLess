@@ -1,14 +1,15 @@
-#include <QGuiApplication>
-#include <QQmlApplicationEngine>
-#include <QQuickStyle>
-#include <QQmlContext>
-#include <QIcon>
-#include <QtQml>
-
-#include "services/soundboardService.h"
-#include "qmlmodels/soundboardsListModel.h"
-#include "qmlmodels/clipsListModel.h"
 #include "controllers/hotkeymanager.h"
+#include "qmlmodels/clipsListModel.h"
+#include "qmlmodels/soundboardsListModel.h"
+#include "services/ApiClient.h"
+#include "services/soundboardService.h"
+
+#include <QGuiApplication>
+#include <QIcon>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include <QQuickStyle>
+#include <QtQml>
 
 int main(int argc, char* argv[])
 {
@@ -27,6 +28,9 @@ int main(int argc, char* argv[])
     // Backend
     SoundboardService soundboardService;
 
+    // API Client for authentication
+    ApiClient apiClient;
+
     // Model for QML
     SoundboardsListModel soundboardsModel;
     soundboardsModel.setService(&soundboardService);
@@ -40,13 +44,11 @@ int main(int argc, char* argv[])
     hotkeyManager.setSoundboardService(&soundboardService);
 
     // Connect hotkey actions to soundboard service
-    QObject::connect(&hotkeyManager, &HotkeyManager::actionTriggered,
-                     &soundboardService, &SoundboardService::handleHotkeyAction);
+    QObject::connect(&hotkeyManager, &HotkeyManager::actionTriggered, &soundboardService,
+                     &SoundboardService::handleHotkeyAction);
 
     // Auto-save hotkeys when application closes
-    QObject::connect(&app, &QGuiApplication::aboutToQuit, [&hotkeyManager]() {
-        hotkeyManager.saveHotkeysOnClose();
-    });
+    QObject::connect(&app, &QGuiApplication::aboutToQuit, [&hotkeyManager]() { hotkeyManager.saveHotkeysOnClose(); });
 
     // Save all soundboard changes and STOP ALL CLIPS when application closes
     QObject::connect(&app, &QGuiApplication::aboutToQuit, [&soundboardService]() {
@@ -56,6 +58,7 @@ int main(int argc, char* argv[])
 
     // Expose to QML
     engine.rootContext()->setContextProperty("soundboardService", &soundboardService);
+    engine.rootContext()->setContextProperty("apiClient", &apiClient);
     engine.rootContext()->setContextProperty("soundboardsModel", &soundboardsModel);
     engine.rootContext()->setContextProperty("clipsModel", &clipsModel);
     engine.rootContext()->setContextProperty("hotkeyManager", &hotkeyManager);
@@ -64,8 +67,7 @@ int main(int argc, char* argv[])
     qmlRegisterType<ClipsListModel>("TalkLess.Models", 1, 0, "ClipsListModel");
 
     QObject::connect(
-        &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
-        []() { QCoreApplication::exit(-1); },
+        &engine, &QQmlApplicationEngine::objectCreationFailed, &app, []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
 
     engine.loadFromModule("TalkLess", "Main");
