@@ -1401,7 +1401,9 @@ Rectangle {
         // RIGHT COLUMN: Modern Sidebar with Premium Styling
         Rectangle {
             id: rightSidebar
-            Layout.preferredWidth: 300
+            Layout.preferredWidth: 340
+            Layout.minimumWidth: 340
+            Layout.maximumWidth: 340
             Layout.fillHeight: true
             Layout.alignment: Qt.AlignRight
             Layout.topMargin: 0
@@ -1417,7 +1419,7 @@ Rectangle {
 
             // Tab state: 0=Editor, 1=Plus, 2=Record, 3=Teleprompter, 4=Speaker
             property int currentTabIndex: 0  // Default to Record tab
-            property var tabState: ["Clip Editor", "Add Audio", "Recording", "Teleprompter", "Speaker"]
+            property var tabState: ["Editor", "Add", "Record", "Prompter", "TTS"]
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 12
