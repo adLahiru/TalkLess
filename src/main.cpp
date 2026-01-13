@@ -48,8 +48,9 @@ int main(int argc, char* argv[])
         hotkeyManager.saveHotkeysOnClose();
     });
 
-    // Save all soundboard changes when application closes
+    // Save all soundboard changes and STOP ALL CLIPS when application closes
     QObject::connect(&app, &QGuiApplication::aboutToQuit, [&soundboardService]() {
+        soundboardService.stopAllClips();
         soundboardService.saveAllChanges();
     });
 
