@@ -1338,7 +1338,7 @@ Rectangle {
                 }
                 onPauseClicked: {
                     if (root.displayedClipData) {
-                        soundboardService.stopClip(root.displayedClipData.clipId);
+                        soundboardService.playClip(root.displayedClipData.clipId);
                     }
                 }
 

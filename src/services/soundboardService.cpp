@@ -2327,22 +2327,22 @@ void SoundboardService::finalizeClipPlayback(int clipId)
     }
 
     // If something else is currently playing (not paused), DO NOT auto-resume paused clips.
-    {
-        QVariantList others = playingClipIDs(); // excludes paused by your logic
-        for (int i = others.size() - 1; i >= 0; --i) {
-            bool ok = false;
-            const int cid = others[i].toInt(&ok);
-            if (ok && cid == clipId) {
-                others.removeAt(i);
-            }
-        }
-
-        if (!others.isEmpty()) {
-            qDebug() << "finalizeClipPlayback: skip resuming paused clips because other clips are playing:" << others;
-            emit clipPlaybackStopped(clipId);
-            return;
+    
+    QVariantList others = playingClipIDs(); // excludes paused by your logic
+    for (int i = others.size() - 1; i >= 0; --i) {
+        bool ok = false;
+        const int cid = others[i].toInt(&ok);
+        if (ok && cid == clipId) {
+            others.removeAt(i);
         }
     }
+
+    if (!others.isEmpty()) {
+        qDebug() << "finalizeClipPlayback: skip resuming paused clips because other clips are playing:" << others;
+        emit clipPlaybackStopped(clipId);
+        return;
+    }
+    
 
     // Resume clips that were paused by this clip (Play/Pause mode)
     if (m_pausedByClip.contains(clipId)) {
