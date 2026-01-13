@@ -11,6 +11,7 @@
 #include <QStringList>
 #include <QVariant>
 #include <QVector>
+#include <QTimer>
 
 #include <memory>
 #include <optional>
@@ -128,7 +129,7 @@ public:
 
     Q_INVOKABLE bool activate(int boardId);   // Activate a board (adds to active set)
     Q_INVOKABLE bool deactivate(int boardId); // Deactivate a board (removes from active set)
-    bool saveActive();            // Save all active boards
+    bool saveActive();                        // Save all active boards
 
     // ---- Clip operations (board-wise) ----
     Q_INVOKABLE bool addClip(int boardId, const QString& filePath);
@@ -204,9 +205,15 @@ public:
     Q_INVOKABLE bool startRecording();
     Q_INVOKABLE bool stopRecording();
     bool isRecording() const;
+
     QString lastRecordingPath() const { return m_lastRecordingPath; }
     float recordingDuration() const;
     Q_INVOKABLE QString getRecordingOutputPath() const;
+
+    // pending recording lifecycle (prevents duplicate saves)
+    Q_INVOKABLE bool hasPendingRecording() const;
+    Q_INVOKABLE QString consumePendingRecordingPath(); // returns path once, then clears it
+    Q_INVOKABLE void cancelPendingRecording();         // stops + deletes file + clears state
 
     // ---- Recording preview (NO soundboard add) ----
     Q_INVOKABLE bool playLastRecordingPreview();
@@ -230,7 +237,7 @@ signals:
     void clipPlaybackStarted(int clipId);
     void clipPlaybackStopped(int clipId);
     void clipPlaybackPaused(int clipId);
-    void clipLooped(int clipId);  // Emitted when a looping clip restarts from the beginning
+    void clipLooped(int clipId); // Emitted when a looping clip restarts from the beginning
     void clipUpdated(int boardId, int clipId);
 
     void playSelectedRequested();
@@ -267,14 +274,15 @@ private:
     QHash<int, int> m_clipIdToSlot;
     int m_nextSlot = 0;
     QSet<int> m_clipsThatMutedMic;
-    QHash<int, QList<int>> m_pausedByClip;  // Maps clipId -> list of clip IDs that were paused when this clip started
+    QHash<int, QList<int>> m_pausedByClip; // Maps clipId -> list of clip IDs that were paused when this clip started
 
     std::optional<Clip> m_clipboardClip;
     QString m_lastRecordingPath;
 
-    // Preview state
+    // Recording state
     bool m_recordingPreviewPlaying = false;
     bool m_hasUnsavedRecording = false;
+    QTimer* m_recordingTickTimer = nullptr;
 
     // Dirty flags to track unsaved changes
     bool m_indexDirty = false;

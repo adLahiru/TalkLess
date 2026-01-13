@@ -1726,6 +1726,20 @@ Rectangle {
                             font.weight: Font.Normal
                             Layout.alignment: Qt.AlignHCenter
                         }
+
+                        Text {
+                            visible: soundboardService?.isRecording ?? false
+                            text: {
+                                const t = soundboardService?.recordingDuration ?? 0;
+                                const mins = Math.floor(t / 60);
+                                const secs = Math.floor(t % 60);
+                                return mins + ":" + (secs < 10 ? "0" + secs : secs);
+                            }
+                            color: Colors.textSecondary
+                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                            font.pixelSize: 11
+                            Layout.alignment: Qt.AlignHCenter
+                        }
                     }
 
                     // Spacer
@@ -1830,9 +1844,7 @@ Rectangle {
                                 onClicked: {
                                     recordingNameInput.text = "";
                                     rightSidebar.currentTabIndex = 0;
-                                    if (soundboardService?.isRecording ?? false) {
-                                        soundboardService.stopRecording();
-                                    }
+                                    soundboardService.cancelPendingRecording(); // NEW: stops + deletes + clears
                                 }
                             }
 
@@ -1877,13 +1889,16 @@ Rectangle {
                                 onClicked: {
                                     console.log("Save clicked");
                                     const boardId = clipsModel.boardId;
+
+                                    // stop recording if still recording
                                     if (soundboardService?.isRecording ?? false) {
                                         soundboardService.stopRecording();
                                     }
 
-                                    if (boardId >= 0 && soundboardService.lastRecordingPath !== "") {
+                                    const path = soundboardService.consumePendingRecordingPath(); // NEW
+                                    if (boardId >= 0 && path !== "") {
                                         const title = recordingNameInput.text.trim() || "New Recording";
-                                        const success = soundboardService.addClipWithTitle(boardId, "file:///" + soundboardService.lastRecordingPath, title);
+                                        const success = soundboardService.addClipWithTitle(boardId, "file:///" + path, title);
 
                                         if (success) {
                                             clipsModel.reload();
@@ -1891,7 +1906,7 @@ Rectangle {
                                             rightSidebar.currentTabIndex = 0;
                                         }
                                     } else {
-                                        console.log("Cannot save: Board ID", boardId, "Recording Path", soundboardService.lastRecordingPath);
+                                        console.log("Cannot save: Board ID", boardId, "Pending path", path);
                                     }
                                 }
                             }
