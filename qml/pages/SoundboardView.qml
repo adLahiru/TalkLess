@@ -3490,24 +3490,326 @@ Rectangle {
                     spacing: 12
                     visible: rightSidebar.currentTabIndex === 4
 
+                    // --- Meters & Monitoring (Speaker Tab) ---
                     Text {
-                        text: "Audio Output"
+                        text: "Meters & Monitoring"
                         color: Colors.textOnPrimary
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                        font.pixelSize: 14
+                        font.pixelSize: 22
                         font.weight: Font.DemiBold
+                        topPadding: 6
                     }
 
-                    Text {
-                        text: "Speaker and output settings here"
-                        color: Colors.textSecondary
-                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                        font.pixelSize: 12
+                    // Audio Monitoring Properties & Logic
+                    property real rmsLevel: 0.0
+                    property real micLevel: 0.0
+                    property real rmsDb: -60.0
+                    property real micDb: -60.0
+                    property bool volumeTooHigh: (rmsLevel >= 0.90)
+
+                    Timer {
+                        interval: 50
+                        running: rightSidebar.currentTabIndex === 4 && Qt.application.state === Qt.ApplicationActive
+                        repeat: true
+                        onTriggered: {
+                            if (soundboardService) {
+                                var out = soundboardService.getMonitorPeakLevel();
+                                var mic = soundboardService.getMicPeakLevel();
+
+                                // Defensive: handle undefined / NaN
+                                out = (out === undefined || isNaN(out)) ? 0.0 : out;
+                                mic = (mic === undefined || isNaN(mic)) ? 0.0 : mic;
+
+                                // Clamp to 0..1 (assuming service returns linear peak)
+                                rmsLevel = Math.max(0.0, Math.min(1.0, out));
+                                micLevel = Math.max(0.0, Math.min(1.0, mic));
+
+                                // Convert to dBFS (min clamp avoids -Inf)
+                                var outLin = Math.max(rmsLevel, 0.0001);
+                                var micLin = Math.max(micLevel, 0.0001);
+
+                                rmsDb = 20 * Math.log(outLin) / Math.LN10;
+                                micDb = 20 * Math.log(micLin) / Math.LN10;
+                            }
+                        }
                     }
 
-                    Item {
-                        Layout.fillHeight: true
+                    // Main meters row
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 220
+                        spacing: 16
+
+                        // Left segmented meter (Real-time Output Level)
+                        Item {
+                            Layout.preferredWidth: 40
+                            Layout.fillHeight: true
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 6
+                                color: "transparent"
+                                border.color: Qt.rgba(1, 1, 1, 0.10)
+                                border.width: 1
+                            }
+
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: 4
+
+                                readonly property int segmentCount: 25
+
+                                // Map dBFS (-60..0) -> 0..1
+                                readonly property real minDb: -60.0
+                                readonly property real maxDb: 0.0
+                                readonly property real norm: Math.max(0.0, Math.min(1.0, (rmsDb - minDb) / (maxDb - minDb)))
+
+                                readonly property int activeCount: Math.round(norm * segmentCount)
+
+                                Repeater {
+                                    model: parent.segmentCount
+                                    delegate: Rectangle {
+                                        width: 24
+                                        height: 5
+                                        radius: 2
+
+                                        property int idxFromBottom: (parent.segmentCount - 1) - index
+
+                                        color: {
+                                            var on = (idxFromBottom < parent.activeCount);
+                                            if (!on)
+                                                return Qt.rgba(1, 1, 1, 0.10);
+                                            if (idxFromBottom >= 14)
+                                                return "#FF3B30";  // red
+                                            if (idxFromBottom >= 10)
+                                                return "#FFD60A";  // yellow
+                                            return "#34C759";                           // green
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Center: Master Gain Slider (Vertical)
+                        ColumnLayout {
+                            Layout.fillHeight: true
+                            Layout.preferredWidth: 40
+                            spacing: 8
+
+                            Slider {
+                                id: masterVerticalSlider
+                                Layout.alignment: Qt.AlignHCenter
+                                Layout.fillHeight: true
+                                Layout.preferredWidth: 40
+                                orientation: Qt.Vertical
+                                from: 12
+                                to: -60
+                                onMoved: soundboardService.masterGainDb = value
+                                Binding on value {
+                                    value: soundboardService.masterGainDb
+                                    when: !masterVerticalSlider.pressed
+                                }
+
+                                background: Item {
+                                    implicitWidth: 46
+
+                                    // Track
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        width: 32
+                                        height: parent.height
+                                        radius: width / 2
+                                        color: Qt.rgba(1, 1, 1, 0.10)
+                                    }
+
+                                    // Fill (Gradient Red)
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.bottom: parent.bottom
+                                        width: 32
+                                        height: (1.0 - masterVerticalSlider.visualPosition) * parent.height
+                                        radius: width / 2
+                                        gradient: Gradient {
+                                            GradientStop {
+                                                position: 0.0
+                                                color: "#FF453A"
+                                            }
+                                            GradientStop {
+                                                position: 1.0
+                                                color: "#FF3B30"
+                                            }
+                                        }
+                                    }
+                                }
+
+                                handle: Rectangle {
+                                    // Bubble Handle
+                                    x: masterVerticalSlider.leftPadding + masterVerticalSlider.availableWidth / 2 - width / 2
+                                    y: masterVerticalSlider.topPadding + masterVerticalSlider.availableHeight * masterVerticalSlider.visualPosition - height / 2
+                                    width: 40
+                                    height: 40
+                                    radius: 20
+                                    color: Colors.accent // Purple bubble
+                                    border.color: "white"
+                                    border.width: 2
+
+                                    // Text inside bubble
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: Math.round(masterVerticalSlider.value) // + "db" (too small space)
+                                        color: "white"
+                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                        font.pixelSize: 11
+                                        font.weight: Font.Bold
+                                    }
+
+                                    // Shadow for gloss effect
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: "#80000000"
+                                        shadowBlur: 8
+                                        shadowVerticalOffset: 2
+                                    }
+                                }
+                            }
+
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: "RMS Volume"
+                                color: Colors.textOnPrimary
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 12
+                            }
+                        }
+
+                        // Right: Mic Gain Slider (Vertical)
+                        ColumnLayout {
+                            Layout.fillHeight: true
+                            Layout.preferredWidth: 40
+                            spacing: 8
+
+                            Slider {
+                                id: micVerticalSlider
+                                Layout.alignment: Qt.AlignHCenter
+                                Layout.fillHeight: true
+                                Layout.preferredWidth: 40
+                                orientation: Qt.Vertical
+                                from: 12
+                                to: -60
+                                onMoved: soundboardService.micGainDb = value
+                                Binding on value {
+                                    value: soundboardService.micGainDb
+                                    when: !micVerticalSlider.pressed
+                                }
+
+                                background: Item {
+                                    implicitWidth: 46
+
+                                    // Track
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        width: 32
+                                        height: parent.height
+                                        radius: width / 2
+                                        color: Qt.rgba(1, 1, 1, 0.10)
+                                    }
+
+                                    // Fill (Gradient Green)
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.bottom: parent.bottom
+                                        width: 32
+                                        height: slider.visualPosition * parent.height
+                                        radius: width / 2
+                                        gradient: Gradient {
+                                            GradientStop {
+                                                position: 0.0
+                                                color: "#34C759"
+                                            }
+                                            GradientStop {
+                                                position: 1.0
+                                                color: '#16662a'
+                                            }
+                                        }
+                                    }
+                                }
+
+                                handle: Rectangle {
+                                    // Bubble Handle
+                                    x: micVerticalSlider.leftPadding + micVerticalSlider.availableWidth / 2 - width / 2
+                                    y: micVerticalSlider.topPadding + micVerticalSlider.availableHeight * micVerticalSlider.visualPosition - height / 2
+                                    width: 40
+                                    height: 40
+                                    radius: 20
+                                    color: Colors.accent // Purple bubble
+                                    border.color: Colors.textPrimary
+                                    border.width: 2
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: Math.round(micVerticalSlider.value)  + "db"
+                                        color: "white"
+                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                        font.pixelSize: 11
+                                        font.weight: Font.Bold
+                                    }
+
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: "#80000000"
+                                        shadowBlur: 8
+                                        shadowVerticalOffset: 2
+                                    }
+                                }
+                            }
+
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: "Mic input"
+                                color: Colors.textOnPrimary
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 12
+                            }
+                        }
                     }
+
+                    // // Warning row
+                    // RowLayout {
+                    //     Layout.fillWidth: true
+                    //     spacing: 10
+                    //     visible: volumeTooHigh
+
+                    //     // simple warning icon
+                    //     Canvas {
+                    //         Layout.preferredWidth: 18
+                    //         Layout.preferredHeight: 18
+                    //         onPaint: {
+                    //             var ctx = getContext("2d");
+                    //             ctx.clearRect(0, 0, width, height);
+
+                    //             ctx.beginPath();
+                    //             ctx.moveTo(width / 2, 2);
+                    //             ctx.lineTo(width - 2, height - 2);
+                    //             ctx.lineTo(2, height - 2);
+                    //             ctx.closePath();
+                    //             ctx.fillStyle = "rgba(255, 214, 10, 0.95)";
+                    //             ctx.fill();
+
+                    //             ctx.fillStyle = "rgba(0,0,0,0.70)";
+                    //             ctx.fillRect(width / 2 - 1, 6, 2, 6);
+                    //             ctx.fillRect(width / 2 - 1, 13.5, 2, 2);
+                    //         }
+                    //     }
+
+                    //     Text {
+                    //         text: "Volume too high"
+                    //         color: Colors.textSecondary
+                    //         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                    //         font.pixelSize: 12
+                    //     }
+                    // }
                 }
             }
         }

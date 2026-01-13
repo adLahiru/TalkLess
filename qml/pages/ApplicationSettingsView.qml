@@ -1183,49 +1183,6 @@ Rectangle {
                                 anchors.margins: 22
                                 spacing: 22
 
-                                // // ---- Row 1: Mic Input ----
-                                // RowLayout {
-                                //     spacing: 18
-                                //     Layout.fillWidth: true
-
-                                //     Label {
-                                //         text: "Mic Input:"
-                                //         color: "#EDEDED"
-                                //         font.pixelSize: 14
-                                //         Layout.preferredWidth: 110
-                                //     }
-
-                                //     DropdownSelector {
-                                //         id: micInputDropdown
-                                //         Layout.preferredWidth: 280
-                                //         placeholder: "Select Input Device"
-                                //         model: soundboardService.getInputDevices()
-
-                                //         Component.onCompleted: {
-                                //             var devices = soundboardService.getInputDevices()
-                                //             for (var i = 0; i < devices.length; i++) {
-                                //                 if (devices[i].isDefault) {
-                                //                     selectedId = devices[i].id
-                                //                     selectedValue = devices[i].name
-                                //                     break
-                                //                 }
-                                //             }
-                                //         }
-
-                                //         onItemSelected: function(id, name) {
-                                //             console.log("Mic input selected:", name)
-                                //             soundboardService.setInputDevice(id)
-                                //         }
-                                //     }
-
-                                //     DotMeter {
-                                //         Layout.leftMargin: 10
-                                //         activeDots: 3
-                                //     }
-
-                                //     Item { Layout.fillWidth: true } // pushes items left
-                                // }
-
                                 // ---- Row 2: Speaker Output ----
                                 RowLayout {
                                     spacing: 18
