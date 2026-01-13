@@ -1792,17 +1792,69 @@ Rectangle {
                             }
                         }
 
-                        WaveformDisplay {
+                        TrimWaveform {
+                            id: waveformTrim
                             Layout.fillWidth: true
                             Layout.preferredHeight: 90
+
                             currentTime: soundboardService?.recordingDuration ?? 0
                             totalDuration: Math.max(soundboardService?.recordingDuration ?? 0, 10)
+
+                            // use real waveform after stop later (optional)
+                            waveformData: recordingPeaks.length > 0 ? recordingPeaks : waveformTrim.generateMockWaveform()
+
+                            onTrimStartMoved: function(pos) { waveformTrim.trimStart = pos }
+                            onTrimEndMoved: function(pos) { waveformTrim.trimEnd = pos }
+                        }
+                    }
+
+                    Item {
+                        Layout.preferredHeight: 1
+                    }
+
+                    Text {
+                        text: "Add To Soundboard"
+                        color: Colors.textPrimary
+                        font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                        font.pixelSize: 14
+                        font.weight: Font.DemiBold
+                    }
+                    
+
+                    DropdownSelector {
+                        id: recordingBoardDropdown
+                        Layout.fillWidth: true
+                        placeholder: "Select Soundboard"
+                        selectedId: ""     // keep as string for your dropdown component
+                        model: []
+
+                        function refreshBoards() {
+                            const boards = soundboardService.listBoardsForDropdown();
+                            model = boards.map(b => ({ id: String(b.id), name: b.name }));
+
+                            // default -> opened soundboard (clipsModel.boardId)
+                            if (selectedId === "" && clipsModel.boardId >= 0) {
+                                selectedId = String(clipsModel.boardId);
+                            }
+                        }
+
+                        Component.onCompleted: refreshBoards()
+                        onAboutToOpen: refreshBoards()
+                    }
+
+                    // If user changes boards elsewhere, keep default synced (only when user hasn't picked manually)
+                    Connections {
+                        target: clipsModel
+                        function onBoardIdChanged() {
+                            if (recordingBoardDropdown.selectedId === "" || recordingBoardDropdown.selectedId === "-1") {
+                                recordingBoardDropdown.selectedId = String(clipsModel.boardId);
+                            }
                         }
                     }
 
                     // Spacer
                     Item {
-                        Layout.preferredHeight: 6
+                        Layout.preferredHeight: 2
                     }
 
                     // ============================================================
@@ -1829,7 +1881,7 @@ Rectangle {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: "Cancel"
+                                text: "Rest"
                                 color: Colors.textPrimary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
@@ -1843,7 +1895,6 @@ Rectangle {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     recordingNameInput.text = "";
-                                    rightSidebar.currentTabIndex = 0;
                                     soundboardService.cancelPendingRecording(); // NEW: stops + deletes + clears
                                 }
                             }
@@ -1864,11 +1915,11 @@ Rectangle {
                                 orientation: Gradient.Horizontal
                                 GradientStop {
                                     position: 0.0
-                                    color: saveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6"
+                                    color: saveBtnArea.containsMouse ? Colors.accentLight : Colors.accent
                                 }
                                 GradientStop {
                                     position: 1.0
-                                    color: saveBtnArea.containsMouse ? "#E040FB" : "#D214FD"
+                                    color: saveBtnArea.containsMouse ? Colors.accentDark : Colors.accentMedium
                                 }
                             }
 
@@ -1888,25 +1939,63 @@ Rectangle {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     console.log("Save clicked");
-                                    const boardId = clipsModel.boardId;
+
+                                    const boardId = parseInt(recordingBoardDropdown.selectedId);
+                                    if (isNaN(boardId) || boardId < 0) {
+                                        console.log("Cannot save: invalid board id", recordingBoardDropdown.selectedId);
+                                        return;
+                                    }
 
                                     // stop recording if still recording
                                     if (soundboardService?.isRecording ?? false) {
                                         soundboardService.stopRecording();
                                     }
 
-                                    const path = soundboardService.consumePendingRecordingPath(); // NEW
-                                    if (boardId >= 0 && path !== "") {
-                                        const title = recordingNameInput.text.trim() || "New Recording";
-                                        const success = soundboardService.addClipWithTitle(boardId, "file:///" + path, title);
+                                    // IMPORTANT: this returns the path ONCE and clears internal state
+                                    const localPath = soundboardService.consumePendingRecordingPath();
+                                    if (!localPath || localPath === "") {
+                                        console.log("Cannot save: no pending recording");
+                                        return;
+                                    }
 
-                                        if (success) {
-                                            clipsModel.reload();
-                                            recordingNameInput.text = "";
-                                            rightSidebar.currentTabIndex = 0;
-                                        }
+                                    const title = recordingNameInput.text.trim() || "New Recording";
+                                    const pathUrl = Qt.resolvedUrl("file:///" + localPath); // ok, but see below
+                                    // Better if you expose a helper in C++ (recommended): QUrl::fromLocalFile(localPath).toString()
+
+                                    // Convert normalized trim (0..1) to milliseconds
+                                    const durationSec = soundboardService.getFileDuration(pathUrl); // seconds
+                                    const durationMs = Math.max(0, durationSec * 1000.0);
+
+                                    let trimStartMs = waveformTrim.trimStart * durationMs;
+                                    let trimEndMs   = waveformTrim.trimEnd   * durationMs;
+
+                                    trimStartMs = Math.max(0, Math.min(trimStartMs, durationMs));
+                                    trimEndMs   = Math.max(0, Math.min(trimEndMs, durationMs));
+
+                                    if (trimEndMs <= trimStartMs + 10) {
+                                        trimEndMs = Math.min(durationMs, trimStartMs + 10);
+                                    }
+
+                                    const noTrim = (waveformTrim.trimStart <= 0.0001 && waveformTrim.trimEnd >= 0.9999);
+                                    if (noTrim) {
+                                        trimStartMs = 0;
+                                        trimEndMs = 0; // your engine treats 0 as full length
+                                    }
+
+                                    const success = soundboardService.addClipWithSettings(
+                                        boardId,
+                                        pathUrl,
+                                        title,
+                                        trimStartMs,
+                                        trimEndMs
+                                    );
+
+                                    if (success) {
+                                        clipsModel.reload();
+                                        recordingNameInput.text = "";
+                                        rightSidebar.currentTabIndex = 0;
                                     } else {
-                                        console.log("Cannot save: Board ID", boardId, "Pending path", path);
+                                        console.log("addClipWithSettings failed");
                                     }
                                 }
                             }
@@ -2314,156 +2403,6 @@ Rectangle {
                                     }
                                 }
                             }
-
-                            //                     // ===== PLAYBACK CONTROLS =====
-                            //                     RowLayout {
-                            //                         Layout.alignment: Qt.AlignHCenter
-                            //                         spacing: 6
-
-                            //                         // Previous button
-                            //                         Rectangle {
-                            //                             width: 28
-                            //                             height: 28
-                            //                             radius: 6
-                            //                             color: prevBtnArea.containsMouse ? "#3A3A3A" : "transparent"
-
-                            //                             Text {
-                            //                                 anchors.centerIn: parent
-                            //                                 text: "◀"
-                            //                                 color: "#FFFFFF"
-                            //                                 font.pixelSize: 10
-                            //                             }
-
-                            //                             MouseArea {
-                            //                                 id: prevBtnArea
-                            //                                 anchors.fill: parent
-                            //                                 hoverEnabled: true
-                            //                                 cursorShape: Qt.PointingHandCursor
-                            //                                 onClicked: console.log("Previous clicked")
-                            //                             }
-                            //                         }
-
-                            //                         // Skip backward button
-                            //                         Rectangle {
-                            //                             width: 28
-                            //                             height: 28
-                            //                             radius: 6
-                            //                             color: skipBackArea.containsMouse ? "#3A3A3A" : "transparent"
-
-                            //                             Text {
-                            //                                 anchors.centerIn: parent
-                            //                                 text: "⏮"
-                            //                                 color: "#FFFFFF"
-                            //                                 font.pixelSize: 12
-                            //                             }
-
-                            //                             MouseArea {
-                            //                                 id: skipBackArea
-                            //                                 anchors.fill: parent
-                            //                                 hoverEnabled: true
-                            //                                 cursorShape: Qt.PointingHandCursor
-                            //                                 onClicked: console.log("Skip backward clicked")
-                            //                             }
-                            //                         }
-
-                            //                         // Main Play Button (larger, gradient)
-                            //                         Rectangle {
-                            //                             width: 36
-                            //                             height: 36
-                            //                             radius: 18
-
-                            //                             gradient: Gradient {
-                            //                                 orientation: Gradient.Horizontal
-                            //                                 GradientStop {
-                            //                                     position: 0.0
-                            //                                     color: "#3B82F6"
-                            //                                 }
-                            //                                 GradientStop {
-                            //                                     position: 1.0
-                            //                                     color: "#8B5CF6"
-                            //                                 }
-                            //                             }
-
-                            //                             Text {
-                            //                                 anchors.centerIn: parent
-                            //                                 text: root.displayedClipData && root.displayedClipData.isPlaying ? "⏸" : "▶"
-                            //                                 color: "#FFFFFF"
-                            //                                 font.pixelSize: 14
-                            //                             }
-
-                            //                             MouseArea {
-                            //                                 anchors.fill: parent
-                            //                                 cursorShape: Qt.PointingHandCursor
-                            //                                 onClicked: {
-                            //                                     if (root.selectedClipId !== -1) {
-                            //                                         if (soundboardService.isClipPlaying(root.selectedClipId)) {
-                            //                                             soundboardService.stopClip(root.selectedClipId);
-                            //                                         } else {
-                            //                                             soundboardService.playClip(root.selectedClipId);
-                            //                                         }
-                            //                                     }
-                            //                                 }
-                            //                             }
-                            //                         }
-
-                            //                         // Skip forward button
-                            //                         Rectangle {
-                            //                             width: 28
-                            //                             height: 28
-                            //                             radius: 6
-                            //                             color: skipFwdArea.containsMouse ? "#3A3A3A" : "transparent"
-
-                            //                             Text {
-                            //                                 anchors.centerIn: parent
-                            //                                 text: "⏭"
-                            //                                 color: "#FFFFFF"
-                            //                                 font.pixelSize: 12
-                            //                             }
-
-                            //                             MouseArea {
-                            //                                 id: skipFwdArea
-                            //                                 anchors.fill: parent
-                            //                                 hoverEnabled: true
-                            //                                 cursorShape: Qt.PointingHandCursor
-                            //                                 onClicked: console.log("Skip forward clicked")
-                            //                             }
-                            //                         }
-
-                            //                         // Loop button - toggles repeat for selected clip
-                            //                         Rectangle {
-                            //                             width: 28
-                            //                             height: 28
-                            //                             radius: 6
-                            //                             color: {
-                            //                                 // Active when repeat is on
-                            //                                 if (clipEditorTab.clipIsRepeat) {
-                            //                                     return loopBtnArea.containsMouse ? "#7C3AED" : "#8B5CF6";
-                            //                                 }
-                            //                                 return loopBtnArea.containsMouse ? "#3A3A3A" : "transparent";
-                            //                             }
-
-                            //                             Text {
-                            //                                 anchors.centerIn: parent
-                            //                                 text: "🔁"
-                            //                                 color: clipEditorTab.clipIsRepeat ? "#FFFFFF" : "#888888"
-                            //                                 font.pixelSize: 12
-                            //                             }
-
-                            //                             MouseArea {
-                            //                                 id: loopBtnArea
-                            //                                 anchors.fill: parent
-                            //                                 hoverEnabled: true
-                            //                                 cursorShape: Qt.PointingHandCursor
-                            //                                 onClicked: {
-                            //                                     // Toggle repeat for selected clip
-                            //                                     if (root.selectedClipId !== -1) {
-                            //                                         clipEditorTab.clipIsRepeat = !clipEditorTab.clipIsRepeat;
-                            //                                         clipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
-                            //                                     }
-                            //                                 }
-                            //                             }
-                            //                         }
-                            //                     }
 
                             // ===== VOICE VOLUME SLIDER =====
                             ColumnLayout {

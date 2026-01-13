@@ -216,6 +216,7 @@ public:
     Q_INVOKABLE void cancelPendingRecording();         // stops + deletes file + clears state
 
     // ---- Recording preview (NO soundboard add) ----
+    Q_INVOKABLE QVariantList listBoardsForDropdown() const;
     Q_INVOKABLE bool playLastRecordingPreview();
     Q_INVOKABLE void stopLastRecordingPreview();
     Q_INVOKABLE bool isRecordingPreviewPlaying() const;

@@ -2191,13 +2191,18 @@ bool SoundboardService::setRecordingInputDevice(const QString& deviceId)
     if (!m_audioEngine)
         return false;
 
-    // Set the recording input device (capture device for recording)
-    bool success = m_audioEngine->setCaptureDevice(deviceId.toStdString());
+    // This should control the dedicated recording-input device
+    const bool success = m_audioEngine->setRecordingDevice(deviceId.toStdString());
     if (success) {
+        // Optional: persist separately (recommended you add a field in settings)
+        // m_state.settings.selectedRecordingCaptureDeviceId = deviceId;
+        // m_indexDirty = true;
+
         emit settingsChanged();
     }
     return success;
 }
+
 
 bool SoundboardService::playLastRecordingPreview()
 {
@@ -2243,6 +2248,18 @@ void SoundboardService::stopLastRecordingPreview()
 bool SoundboardService::isRecordingPreviewPlaying() const
 {
     return m_recordingPreviewPlaying;
+}
+
+QVariantList SoundboardService::listBoardsForDropdown() const
+{
+    QVariantList out;
+    for (const auto& b : m_state.soundboards) {
+        QVariantMap m;
+        m["id"] = b.id;
+        m["name"] = b.name;
+        out.append(m);
+    }
+    return out;
 }
 
 void SoundboardService::finalizeClipPlayback(int clipId)
@@ -2441,40 +2458,30 @@ QVariantList SoundboardService::playingClipIDs() const
 
 int SoundboardService::getOrAssignSlot(int clipId)
 {
-    // Check if clip already has a slot
-    if (m_clipIdToSlot.contains(clipId)) {
+    if (m_clipIdToSlot.contains(clipId))
         return m_clipIdToSlot[clipId];
-    }
 
-    // Find a free slot (one not currently in use by another clip)
-    // First, try to find a slot that's not in the map at all
     QSet<int> usedSlots;
-    for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it) {
+    for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it)
         usedSlots.insert(it.value());
-    }
 
-    // Try to find an unused slot
-    for (int i = 0; i < 16; ++i) { // MAX_CLIPS is 16
-        int candidateSlot = (m_nextSlot + i) % 16;
+    // Only use 0..14 (reserve 15 for preview)
+    for (int i = 0; i < kClipSlotsUsable; ++i) {
+        int candidateSlot = (m_nextSlot + i) % kClipSlotsUsable;
         if (!usedSlots.contains(candidateSlot)) {
             m_clipIdToSlot[clipId] = candidateSlot;
-            m_nextSlot = candidateSlot + 1;
+            m_nextSlot = (candidateSlot + 1) % kClipSlotsUsable;
             return candidateSlot;
         }
     }
 
-    // All slots are in use - find the slot with the oldest/least recently used clip
-    // For now, just use round-robin but remove the old mapping
-    int slotId = m_nextSlot % 16;
+    // Evict using round-robin within usable slots only
+    int slotId = m_nextSlot % kClipSlotsUsable;
 
-    // Remove any existing clip that has this slot
     for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end();) {
         if (it.value() == slotId && it.key() != clipId) {
-            qDebug() << "Evicting clip" << it.key() << "from slot" << slotId << "for new clip" << clipId;
-            // Stop the old clip if playing
-            if (m_audioEngine && m_audioEngine->isClipPlaying(slotId)) {
+            if (m_audioEngine && m_audioEngine->isClipPlaying(slotId))
                 m_audioEngine->stopClip(slotId);
-            }
             it = m_clipIdToSlot.erase(it);
         } else {
             ++it;
@@ -2482,8 +2489,7 @@ int SoundboardService::getOrAssignSlot(int clipId)
     }
 
     m_clipIdToSlot[clipId] = slotId;
-    m_nextSlot++;
-
+    m_nextSlot = (slotId + 1) % kClipSlotsUsable;
     return slotId;
 }
 
