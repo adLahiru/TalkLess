@@ -1144,7 +1144,7 @@ void AudioEngine::processRecordingInput(const void* input, ma_uint32 frameCount,
 // ------------------------------------------------------------
 // Clips - Decoder thread
 // ------------------------------------------------------------
-void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slotId)
+void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slotId, uint64_t token)
 {
     const std::string filepath = slot->filePath;
     if (filepath.empty()) {
@@ -1312,8 +1312,17 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 
         slot->state.store(ClipState::Stopped, std::memory_order_release);
 
-        std::lock_guard<std::mutex> lock(engine->callbackMutex);
-        if (engine->clipFinishedCallback) engine->clipFinishedCallback(slotId);
+        // ONLY fire finished callback if this thread is still the latest play of this slot
+        const bool stillCurrent =
+            (slot->playToken.load(std::memory_order_acquire) == token);
+
+        const bool wasStopped =
+            (slot->state.load(std::memory_order_acquire) == ClipState::Stopping);
+
+        if (stillCurrent && !wasStopped) {
+            std::lock_guard<std::mutex> lock(engine->callbackMutex);
+            if (engine->clipFinishedCallback) engine->clipFinishedCallback(slotId);
+        }
         return;
     }
 
@@ -1389,6 +1398,7 @@ void AudioEngine::playClip(int slotId)
     // ensure at least one output running so it drains
     if (!isDeviceRunning() && !isMonitorRunning()) return;
 
+    // stop previous decoder thread if any
     if (slot.decoderThread.joinable()) {
         slot.state.store(ClipState::Stopping, std::memory_order_release);
         slot.decoderThread.join();
@@ -1402,9 +1412,16 @@ void AudioEngine::playClip(int slotId)
         slot.playbackFrameCount.store(0, std::memory_order_relaxed);
     }
 
+    // IMPORTANT: bump token so old threads/callbacks become stale
+    const uint64_t token =
+        slot.playToken.fetch_add(1, std::memory_order_acq_rel) + 1;
+
     slot.state.store(ClipState::Playing, std::memory_order_release);
-    slot.decoderThread = std::thread(&AudioEngine::decoderThreadFunc, this, &slot, slotId);
+
+    // pass token into thread
+    slot.decoderThread = std::thread(&AudioEngine::decoderThreadFunc, this, &slot, slotId, token);
 }
+
 
 void AudioEngine::pauseClip(int slotId)
 {

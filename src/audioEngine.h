@@ -179,6 +179,8 @@ private:
         std::atomic<int> channels{2};
         std::atomic<double> totalDurationMs{0.0};
 
+        std::atomic<uint64_t> playToken {0};
+
         // Ring buffers (float stereo)
         void*     ringBufferMainData = nullptr;
         void*     ringBufferMonData  = nullptr;
@@ -235,7 +237,7 @@ private:
     void processRecordingInput(const void* input, ma_uint32 frameCount, ma_uint32 captureChannels);
 
     // Decoder thread
-    static void decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slotId);
+    static void decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slotId, uint64_t token);
 
     // WAV writer
     bool writeWavFile(const std::string& path, const std::vector<float>& samples, int sampleRate, int channels);

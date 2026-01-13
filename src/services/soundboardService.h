@@ -270,6 +270,7 @@ private:
     AppState m_state;
     QHash<int, Soundboard> m_activeBoards;
     QHash<QString, int> m_hotkeyToClipId;
+    QHash<int, int> m_slotToClipId; 
 
     std::unique_ptr<AudioEngine> m_audioEngine;
     QHash<int, int> m_clipIdToSlot;
