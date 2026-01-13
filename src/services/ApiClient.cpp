@@ -34,16 +34,18 @@ void ApiClient::signup(const QString& email, const QString& password, const QStr
     sendPostRequest("/auth/signup", data, "signup");
 }
 
-void ApiClient::login(const QString& email, const QString& password)
+void ApiClient::login(const QString& email, const QString& password, bool rememberMe)
 {
     setLoading(true);
     setError("");
+
+    m_rememberMe = rememberMe;
 
     QJsonObject data;
     data["email"] = email;
     data["password"] = password;
 
-    qDebug() << "[ApiClient] Sending login request for:" << email;
+    qDebug() << "[ApiClient] Sending login request for:" << email << "Remember me:" << rememberMe;
     sendPostRequest("/auth/login", data, "login");
 }
 
@@ -60,6 +62,7 @@ void ApiClient::loginAsGuest()
     m_lastName = "";
     m_email = "";
     m_userId = "";
+    m_rememberMe = false;
 
     setLoggedIn(true, true);
     emit loginSuccess();
@@ -242,7 +245,14 @@ void ApiClient::onNetworkReply(QNetworkReply* reply)
         QString token = data["token"].toString();
 
         m_authToken = token;
-        saveAuthToken(token);
+
+        // Only save persistence data if "Remember Me" was checked
+        if (m_rememberMe) {
+            saveAuthToken(token);
+        } else {
+            clearAuthToken(); // Ensure no old token persists
+        }
+
         setUserData(user);
         setLoggedIn(true, false);
 
@@ -337,8 +347,12 @@ void ApiClient::setLoggedIn(bool loggedIn, bool isGuest)
     m_isLoggedIn = loggedIn;
     m_isGuest = isGuest;
 
-    if (loggedIn) {
+    if (loggedIn && m_rememberMe) {
         saveUserData();
+    } else if (loggedIn && !m_rememberMe) {
+        // If logged in but not remembering, ensure user data is cleared from disk
+        // (It stays in memory variables via setUserData)
+        clearUserData();
     }
 
     if (loggedInChanged) {

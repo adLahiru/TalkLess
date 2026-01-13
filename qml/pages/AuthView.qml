@@ -103,7 +103,7 @@ Item {
         LoginPage {
             onLoginRequested: function(email, password, rememberMe) {
                 console.log("[AuthView] Login requested:", email, "remember:", rememberMe);
-                apiClient.login(email, password);
+                apiClient.login(email, password, rememberMe);
             }
 
             onSignupRequested: {

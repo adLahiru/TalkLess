@@ -40,7 +40,7 @@ public:
     // API Methods (Q_INVOKABLE for QML access)
     Q_INVOKABLE void signup(const QString& email, const QString& password, const QString& firstName,
                             const QString& lastName, const QString& phoneNumber = QString());
-    Q_INVOKABLE void login(const QString& email, const QString& password);
+    Q_INVOKABLE void login(const QString& email, const QString& password, bool rememberMe = false);
     Q_INVOKABLE void loginAsGuest();
     Q_INVOKABLE void logout();
     Q_INVOKABLE void checkSavedSession();
@@ -73,6 +73,7 @@ private:
     bool m_isLoading = false;
     bool m_isLoggedIn = false;
     bool m_isGuest = false;
+    bool m_rememberMe = false;
     QString m_errorMessage;
 
     // User data

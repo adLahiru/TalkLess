@@ -210,14 +210,13 @@ Rectangle {
                             anchors.fill: parent
                             anchors.margins: 4
                             radius: 8
-                            color: logoutMouse.containsMouse ? Colors.surfaceLight : "transparent"
 
                             RowLayout {
                                 anchors.centerIn: parent
                                 spacing: 10
                                 
                                 Text {
-                                    text: "Log out"
+                                    text: (apiClient && apiClient.isGuest) ? "Log in" : "Log out"
                                     color: Colors.textPrimary
                                     font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
                                     font.pixelSize: 15
@@ -231,10 +230,16 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    console.log("Logout clicked");
+                                    console.log(apiClient && apiClient.isGuest ? "Login clicked" : "Logout clicked");
                                     logoutPopup.close();
                                     apiClient.logout();
                                 }
+                            }
+                            
+                            color: logoutMouse.containsPress ? Colors.surfaceLight : (logoutMouse.containsMouse ? Qt.lighter(Colors.surface, 1.2) : "transparent")
+                            
+                            Behavior on color {
+                                ColorAnimation { duration: 100 }
                             }
                         }
                     }
