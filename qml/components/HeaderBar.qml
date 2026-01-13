@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import "../styles"
 
 Rectangle {
@@ -13,6 +14,12 @@ Rectangle {
     FontLoader {
         id: orelegaOneFont
         source: "https://fonts.gstatic.com/s/orelegaone/v12/3qTpojOggD2XtAdFb-QXZGt61EcYaQ7F.ttf"
+    }
+    
+    // Load Outfit font for UI elements
+    FontLoader {
+        id: outfitFont
+        source: "https://fonts.gstatic.com/s/outfit/v11/QGYyz_MVcBeNP4NjuGObqx1XmO1I4TC1C4G-EiAou6Y.ttf"
     }
 
     // Content container with max-width constraint
@@ -54,7 +61,7 @@ Rectangle {
                         Layout.preferredWidth: 20
                         Layout.preferredHeight: 20
                         color: "transparent"
-                        
+
                         Text {
                             anchors.centerIn: parent
                             text: "🔍"
@@ -101,7 +108,9 @@ Rectangle {
                 }
 
                 Behavior on border.color {
-                    ColorAnimation { duration: 150 }
+                    ColorAnimation {
+                        duration: 150
+                    }
                 }
             }
 
@@ -122,17 +131,37 @@ Rectangle {
                     visible: profileMouseArea.containsPress
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "#3E66FF" }
-                        GradientStop { position: 1.0; color: "#B44CFF" }
+                        GradientStop {
+                            position: 0.0
+                            color: "#3E66FF"
+                        }
+                        GradientStop {
+                            position: 1.0
+                            color: "#B44CFF"
+                        }
                     }
                     opacity: 0.3
                 }
 
-                // Profile Icon (placeholder - user silhouette)
+                // Profile Initials
                 Text {
                     anchors.centerIn: parent
-                    text: "👤"
-                    font.pixelSize: 18
+                    text: {
+                        if (apiClient && apiClient.isGuest) return "G"
+                        if (apiClient && apiClient.currentUserFirstName) {
+                            var first = apiClient.currentUserFirstName.charAt(0).toUpperCase()
+                            var last = apiClient.currentUserLastName ? apiClient.currentUserLastName.charAt(0).toUpperCase() : ""
+                            return first + last
+                        }
+                        return "U"
+                    }
+                    color: Colors.textPrimary
+                    font.family: orelegaOneFont.status === FontLoader.Ready ? orelegaOneFont.name : "Arial"
+                    font.weight: Font.Normal // 400
+                    font.pixelSize: 18 // rounded from 18.4
+                    // font.styleName: "Regular" // Removed to avoid conflict
+                    lineHeight: 1.0
+                    verticalAlignment: Text.AlignVCenter
                 }
 
                 MouseArea {
@@ -141,13 +170,80 @@ Rectangle {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        console.log("Profile clicked")
-                        // TODO: Open profile menu/dialog
+                        console.log("Profile clicked");
+                        logoutPopup.open();
+                    }
+                }
+
+                // Logout Popup
+                Popup {
+                    id: logoutPopup
+                    y: parent.height + 8
+                    x: -width + parent.width // Align right edge
+                    width: 160
+                    height: 50
+                    padding: 0
+                    margins: 0
+
+                    background: Rectangle {
+                        color: Colors.surface
+                        radius: 12
+                        border.color: Colors.border
+                        border.width: 1
+
+                        // Shadow effect
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            shadowEnabled: true
+                            shadowColor: "#80000000"
+                            shadowBlur: 1.0
+                            shadowVerticalOffset: 4
+                            shadowHorizontalOffset: 0
+                        }
+                    }
+
+                    contentItem: Item {
+                        anchors.fill: parent
+
+                        Rectangle {
+                            id: logoutBtn
+                            anchors.fill: parent
+                            anchors.margins: 4
+                            radius: 8
+                            color: logoutMouse.containsMouse ? Colors.surfaceLight : "transparent"
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 10
+                                
+                                Text {
+                                    text: "Log out"
+                                    color: Colors.textPrimary
+                                    font.family: outfitFont.status === FontLoader.Ready ? outfitFont.name : "Arial"
+                                    font.pixelSize: 15
+                                    font.weight: Font.Medium
+                                }
+                            }
+
+                            MouseArea {
+                                id: logoutMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    console.log("Logout clicked");
+                                    logoutPopup.close();
+                                    apiClient.logout();
+                                }
+                            }
+                        }
                     }
                 }
 
                 Behavior on color {
-                    ColorAnimation { duration: 150 }
+                    ColorAnimation {
+                        duration: 150
+                    }
                 }
             }
 
