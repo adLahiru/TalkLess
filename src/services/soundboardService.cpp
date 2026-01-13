@@ -77,12 +77,24 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
                  << "dB, Mic:" << m_state.settings.micGainDb << "dB";
     }
 
-    // 5) Now start audio device with correct devices already configured
+    // 5) Apply audio configuration (sample rate, buffer size, periods, channels)
+    //    These settings require app restart to take effect
+    if (m_audioEngine) {
+        m_audioEngine->setAudioConfig(static_cast<ma_uint32>(m_state.settings.sampleRate),
+                                      static_cast<ma_uint32>(m_state.settings.bufferSizeFrames),
+                                      static_cast<ma_uint32>(m_state.settings.bufferPeriods),
+                                      static_cast<ma_uint32>(m_state.settings.channels));
+        qDebug() << "Applied audio config - SampleRate:" << m_state.settings.sampleRate
+                 << "Hz, Buffer:" << m_state.settings.bufferSizeFrames
+                 << "frames, Periods:" << m_state.settings.bufferPeriods << ", Channels:" << m_state.settings.channels;
+    }
+
+    // 6) Now start audio device with correct devices and config already configured
     if (!m_audioEngine->startAudioDevice()) {
         qWarning() << "Failed to start audio device";
     }
 
-    // 6) Start monitor device if a monitor output was configured
+    // 7) Start monitor device if a monitor output was configured
     if (!m_state.settings.selectedMonitorDeviceId.isEmpty()) {
         if (!m_audioEngine->startMonitorDevice()) {
             qWarning() << "Failed to start monitor device";
@@ -92,13 +104,10 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
     // 7) Setup AudioEngine callbacks
     if (m_audioEngine) {
         m_audioEngine->setClipFinishedCallback([this](int slotId) {
-        const int finishedClipId = m_slotToClipId.value(slotId, -1);
-        if (finishedClipId != -1) {
-            QMetaObject::invokeMethod(
-                this,
-                [this, finishedClipId]() { finalizeClipPlayback(finishedClipId); },
-                Qt::QueuedConnection
-                );
+            const int finishedClipId = m_slotToClipId.value(slotId, -1);
+            if (finishedClipId != -1) {
+                QMetaObject::invokeMethod(
+                    this, [this, finishedClipId]() { finalizeClipPlayback(finishedClipId); }, Qt::QueuedConnection);
             }
         });
 
@@ -1807,7 +1816,7 @@ void SoundboardService::playClip(int clipId)
     }
 
     const int slotId = getOrAssignSlot(clipId);
-    m_slotToClipId[slotId] = clipId; 
+    m_slotToClipId[slotId] = clipId;
 
     // IMPORTANT: reproductionMode of *Clip_B* affects *previous playing clips*.
     // 0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop
@@ -1818,7 +1827,6 @@ void SoundboardService::playClip(int clipId)
 
     // Per-clip behavior (when user taps the same clip again)
     if (mode == 1 && isCurrentlyPlaying) {
-
         if (!isPaused) {
             // Currently playing -> pause self
             clip->lastPlayedPosMs = m_audioEngine->getClipPlaybackPositionMs(slotId);
@@ -1848,7 +1856,8 @@ void SoundboardService::playClip(int clipId)
             for (const QVariant& v : others) {
                 bool ok = false;
                 const int otherId = v.toInt(&ok);
-                if (ok) pausedClipIds.append(otherId);
+                if (ok)
+                    pausedClipIds.append(otherId);
             }
 
             reproductionPlayingClip(others, 1);
@@ -2038,16 +2047,17 @@ void SoundboardService::playClip(int clipId)
     static const char* modeNames[] = {"Overlay", "Play/Pause", "Play/Stop", "Restart", "Loop"};
     if (mode >= 0 && mode <= 4) {
         qDebug() << "mode" << modeNames[mode];
-    }
-    else {
+    } else {
         qDebug() << "mode" << mode;
     }
 }
 
 void SoundboardService::stopClip(int clipId)
 {
-    if (!m_audioEngine) return;
-    if (!m_clipIdToSlot.contains(clipId)) return;
+    if (!m_audioEngine)
+        return;
+    if (!m_clipIdToSlot.contains(clipId))
+        return;
 
     int slotId = m_clipIdToSlot[clipId];
     m_audioEngine->stopClip(slotId);
@@ -2081,7 +2091,8 @@ bool SoundboardService::startRecording()
     const bool success = m_audioEngine->startRecording(m_lastRecordingPath.toStdString());
     if (success) {
         // Start periodic UI updates
-        if (m_recordingTickTimer) m_recordingTickTimer->start();
+        if (m_recordingTickTimer)
+            m_recordingTickTimer->start();
 
         emit recordingStateChanged();
     } else {
@@ -2099,7 +2110,8 @@ bool SoundboardService::stopRecording()
 
     const bool success = m_audioEngine->stopRecording();
 
-    if (m_recordingTickTimer) m_recordingTickTimer->stop();
+    if (m_recordingTickTimer)
+        m_recordingTickTimer->stop();
 
     // Only mark as pending if a real file exists
     if (success && !m_lastRecordingPath.isEmpty() && QFileInfo::exists(m_lastRecordingPath)) {
@@ -2115,9 +2127,7 @@ bool SoundboardService::stopRecording()
 
 bool SoundboardService::hasPendingRecording() const
 {
-    return m_hasUnsavedRecording
-        && !m_lastRecordingPath.isEmpty()
-        && QFileInfo::exists(m_lastRecordingPath);
+    return m_hasUnsavedRecording && !m_lastRecordingPath.isEmpty() && QFileInfo::exists(m_lastRecordingPath);
 }
 
 QString SoundboardService::consumePendingRecordingPath()
@@ -2158,7 +2168,8 @@ void SoundboardService::cancelPendingRecording()
         m_audioEngine->stopRecording();
     }
 
-    if (m_recordingTickTimer) m_recordingTickTimer->stop();
+    if (m_recordingTickTimer)
+        m_recordingTickTimer->stop();
 
     // Stop preview if playing
     if (m_recordingPreviewPlaying) {
