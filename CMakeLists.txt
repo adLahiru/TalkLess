@@ -116,7 +116,13 @@ set(TALKLESS_RESOURCES
     resources/images/audioClipDefaultBackground.png
     resources/images/addAudioBackground.png
     resources/images/sondboard.jpg
+    resources/images/login_page.png
+    resources/images/signup_page.png
     resources/images/Subtract.svg
+
+    resources/icons/facebook.svg
+    resources/icons/google.svg
+    resources/icons/apple.svg
 
     resources/icons/reproduction/loop_dark.svg
     resources/icons/reproduction/loop_light.svg
@@ -171,6 +177,9 @@ qt_add_qml_module(appTalkLess
         qml/components/AudioPlayerCard.qml
         qml/pages/ApplicationSettingsView.qml
         qml/pages/SoundboardView.qml
+        qml/pages/AuthView.qml
+        qml/pages/LoginPage.qml
+        qml/pages/SignupPage.qml
         qml/styles/Colors.qml
         qml/styles/Typography.qml
         qml/styles/Theme.qml

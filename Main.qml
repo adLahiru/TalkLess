@@ -105,6 +105,9 @@ ApplicationWindow {
         }
     }
 
+    // ---- Authentication State ----
+    property bool isLoggedIn: false
+
     // ---- Toast Notification ----
     Rectangle {
         id: toastMessage
@@ -150,9 +153,22 @@ ApplicationWindow {
         }
     }
 
+    // ---- Authentication View ----
+    AuthView {
+        id: authView
+        anchors.fill: parent
+        z: 900 // Above main content, below splash screen
+        visible: !isLoggedIn
+
+        onAuthComplete: {
+            mainWindow.isLoggedIn = true;
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 10
+        visible: isLoggedIn // Only show main content when logged in
 
         // Main content row (sidebar + pages)
         RowLayout {

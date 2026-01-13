@@ -90,43 +90,51 @@ Item {
                         Layout.fillWidth: true
                         spacing: 4
 
-                        Rectangle {
+                        Item {
                             Layout.fillWidth: true
-                            height: 56
-                            color: "transparent"
-                            border.color: emailInput.activeFocus ? Colors.accent : "#333333"
-                            border.width: 1
-                            radius: 4
+                            height: 64 // Increased height to accommodate label on top
 
-                            ColumnLayout {
+                            TextField {
+                                id: emailInput
                                 anchors.fill: parent
-                                anchors.margins: 12
-                                spacing: 2
-
-                                Text {
-                                    text: "Email"
-                                    font.pixelSize: 11
-                                    color: "#888888"
+                                anchors.topMargin: 8
+                                placeholderText: "john.doe@gmail.com"
+                                placeholderTextColor: "#555555"
+                                color: "#FFFFFF"
+                                font.pixelSize: 14
+                                topPadding: 16
+                                leftPadding: 16
+                                rightPadding: 16
+                                background: Rectangle {
+                                    anchors.fill: parent
+                                    color: "transparent"
+                                    border.color: emailInput.activeFocus ? Colors.accent : "#333333"
+                                    border.width: 1
+                                    radius: 4
                                 }
 
-                                TextField {
-                                    id: emailInput
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    placeholderText: "john.doe@gmail.com"
-                                    placeholderTextColor: "#555555"
-                                    color: "#FFFFFF"
-                                    font.pixelSize: 14
-                                    background: Rectangle { color: "transparent" }
-                                    leftPadding: 0
-
-                                    onTextChanged: {
-                                        if (emailError.visible) {
-                                            if (isValidEmail(text.trim())) {
-                                                emailError.visible = false;
-                                            }
+                                onTextChanged: {
+                                    if (emailError.visible) {
+                                        if (isValidEmail(text.trim())) {
+                                            emailError.visible = false;
                                         }
                                     }
+                                }
+                            }
+
+                            Rectangle {
+                                x: 12
+                                y: 0
+                                width: emailLabel.width + 10
+                                height: 16
+                                color: "#0D0D0D"
+
+                                Text {
+                                    id: emailLabel
+                                    anchors.centerIn: parent
+                                    text: "Email"
+                                    font.pixelSize: 12
+                                    color: "#888888"
                                 }
                             }
                         }
@@ -145,65 +153,71 @@ Item {
                         Layout.fillWidth: true
                         spacing: 4
 
-                        Rectangle {
+                        Item {
                             Layout.fillWidth: true
-                            height: 56
-                            color: "transparent"
-                            border.color: passwordInput.activeFocus ? Colors.accent : "#333333"
-                            border.width: 1
-                            radius: 4
+                            height: 64
 
-                            RowLayout {
+                            TextField {
+                                id: passwordInput
                                 anchors.fill: parent
-                                anchors.margins: 12
-                                spacing: 8
-
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    spacing: 2
-
-                                    Text {
-                                        text: "Password"
-                                        font.pixelSize: 11
-                                        color: "#888888"
-                                    }
-
-                                    TextField {
-                                        id: passwordInput
-                                        Layout.fillWidth: true
-                                        Layout.fillHeight: true
-                                        echoMode: showPassword.checked ? TextInput.Normal : TextInput.Password
-                                        placeholderText: "••••••••••••"
-                                        placeholderTextColor: "#555555"
-                                        color: "#FFFFFF"
-                                        font.pixelSize: 14
-                                        background: Rectangle { color: "transparent" }
-                                        leftPadding: 0
-
-                                        onTextChanged: {
-                                            if (passwordError.visible && text.length >= 6) {
-                                                passwordError.visible = false;
-                                            }
-                                        }
-                                    }
+                                anchors.topMargin: 8
+                                echoMode: showPassword.checked ? TextInput.Normal : TextInput.Password
+                                placeholderText: "••••••••••••"
+                                placeholderTextColor: "#555555"
+                                color: "#FFFFFF"
+                                font.pixelSize: 14
+                                topPadding: 16
+                                leftPadding: 16
+                                rightPadding: 40 // Space for eye icon
+                                inputMethodHints: Qt.ImhHiddenText | Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText | Qt.ImhSensitiveData
+                                background: Rectangle {
+                                    anchors.fill: parent
+                                    color: "transparent"
+                                    border.color: passwordInput.activeFocus ? Colors.accent : "#333333"
+                                    border.width: 1
+                                    radius: 4
                                 }
 
-                                CheckBox {
-                                    id: showPassword
-                                    Layout.alignment: Qt.AlignVCenter
-                                    indicator: Rectangle {
-                                        width: 24
-                                        height: 24
-                                        color: "transparent"
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: showPassword.checked ? "👁" : "👁‍🗨"
-                                            font.pixelSize: 16
-                                            color: "#888888"
-                                        }
+                                onTextChanged: {
+                                    if (passwordError.visible && text.length >= 6) {
+                                        passwordError.visible = false;
                                     }
+                                }
+                            }
+
+                            // Eye Icon inside the field
+                            CheckBox {
+                                id: showPassword
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: passwordInput.verticalCenter
+                                indicator: Rectangle {
+                                    width: 24
+                                    height: 24
+                                    color: "transparent"
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: showPassword.checked ? "👁" : "👁‍🗨"
+                                        font.pixelSize: 16
+                                        color: "#888888"
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                x: 12
+                                y: 0
+                                width: passwordLabel.width + 10
+                                height: 16
+                                color: "#0D0D0D"
+
+                                Text {
+                                    id: passwordLabel
+                                    anchors.centerIn: parent
+                                    text: "Password"
+                                    font.pixelSize: 12
+                                    color: "#888888"
                                 }
                             }
                         }
@@ -224,6 +238,7 @@ Item {
 
                         CheckBox {
                             id: rememberMeCheck
+                            Layout.alignment: Qt.AlignVCenter
                             indicator: Rectangle {
                                 width: 18
                                 height: 18
@@ -246,6 +261,7 @@ Item {
                             text: "Remember me"
                             font.pixelSize: 13
                             color: "#CCCCCC"
+                            Layout.alignment: Qt.AlignVCenter
                         }
 
                         Item { Layout.fillWidth: true }
@@ -254,6 +270,7 @@ Item {
                             text: "Forgot Password"
                             font.pixelSize: 13
                             color: "#CCCCCC"
+                            Layout.alignment: Qt.AlignVCenter
 
                             MouseArea {
                                 anchors.fill: parent
@@ -295,20 +312,39 @@ Item {
                     }
 
                     // Don't have account link
-                    RowLayout {
+                    ColumnLayout {
                         Layout.alignment: Qt.AlignHCenter
-                        spacing: 4
+                        spacing: 8
 
-                        Text {
-                            text: "Don't Have an account?"
-                            font.pixelSize: 13
-                            color: "#888888"
+                        RowLayout {
+                            Layout.alignment: Qt.AlignHCenter
+                            spacing: 4
+
+                            Text {
+                                text: "Don't Have an account?"
+                                font.pixelSize: 13
+                                color: "#888888"
+                            }
+
+                            Text {
+                                text: "Sign Up"
+                                font.pixelSize: 13
+                                font.bold: true
+                                color: Colors.gradientPrimaryEnd
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.signupRequested()
+                                }
+                            }
                         }
 
                         Text {
                             text: "Try as guest"
                             font.pixelSize: 13
-                            color: Colors.accent
+                            color: Colors.textSecondary
+                            Layout.alignment: Qt.AlignHCenter
 
                             MouseArea {
                                 anchors.fill: parent
@@ -345,22 +381,23 @@ Item {
 
                     // Social login buttons
                     RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 12
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: 16
 
-                        // Facebook
                         Rectangle {
-                            Layout.fillWidth: true
-                            height: 44
-                            color: "#1877F2"
-                            radius: 6
+                            width: 100
+                            height: 50
+                            color: "transparent"
+                            border.color: "#333333"
+                            border.width: 1
+                            radius: 8
 
-                            Text {
+                            Image {
                                 anchors.centerIn: parent
-                                text: "f"
-                                font.pixelSize: 20
-                                font.weight: Font.Bold
-                                color: "#FFFFFF"
+                                source: "qrc:/qt/qml/TalkLess/resources/icons/facebook.svg"
+                                width: 24
+                                height: 24
+                                fillMode: Image.PreserveAspectFit
                             }
 
                             MouseArea {
@@ -370,19 +407,20 @@ Item {
                             }
                         }
 
-                        // Google
                         Rectangle {
-                            Layout.fillWidth: true
-                            height: 44
-                            color: "#FFFFFF"
-                            radius: 6
+                            width: 100
+                            height: 50
+                            color: "transparent"
+                            border.color: "#333333"
+                            border.width: 1
+                            radius: 8
 
-                            Text {
+                            Image {
                                 anchors.centerIn: parent
-                                text: "G"
-                                font.pixelSize: 18
-                                font.weight: Font.Bold
-                                color: "#4285F4"
+                                source: "qrc:/qt/qml/TalkLess/resources/icons/google.svg"
+                                width: 24
+                                height: 24
+                                fillMode: Image.PreserveAspectFit
                             }
 
                             MouseArea {
@@ -392,20 +430,22 @@ Item {
                             }
                         }
 
-                        // Apple
                         Rectangle {
-                            Layout.fillWidth: true
-                            height: 44
-                            color: "#000000"
+                            width: 100
+                            height: 50
+                            color: "transparent"
                             border.color: "#333333"
                             border.width: 1
-                            radius: 6
+                            radius: 8
 
-                            Text {
+                            Image {
                                 anchors.centerIn: parent
-                                text: ""
-                                font.pixelSize: 20
-                                color: "#FFFFFF"
+                                source: "qrc:/qt/qml/TalkLess/resources/icons/apple.svg"
+                                width: 24
+                                height: 24
+                                fillMode: Image.PreserveAspectFit
+                                sourceSize.width: 24
+                                sourceSize.height: 24
                             }
 
                             MouseArea {
@@ -430,39 +470,11 @@ Item {
                     radius: 20
 
                     Image {
-                        anchors.centerIn: parent
-                        width: parent.width * 0.85
-                        height: parent.height * 0.85
+                        anchors.fill: parent
                         source: "qrc:/qt/qml/TalkLess/resources/images/login_page.png"
-                        fillMode: Image.PreserveAspectFit
+                        fillMode: Image.PreserveAspectCrop
                     }
 
-                    // Page indicators
-                    RowLayout {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: 25
-                        spacing: 8
-
-                        Rectangle {
-                            width: 24
-                            height: 8
-                            radius: 4
-                            color: "#00D9FF"
-                        }
-                        Rectangle {
-                            width: 8
-                            height: 8
-                            radius: 4
-                            color: "#333333"
-                        }
-                        Rectangle {
-                            width: 8
-                            height: 8
-                            radius: 4
-                            color: "#333333"
-                        }
-                    }
                 }
             }
         }
