@@ -30,7 +30,7 @@ Rectangle {
     property var previousOutputDevices: []
 
     // Signal to notify dropdowns to refresh
-    signal deviceRefreshRequested()
+    signal deviceRefreshRequested
 
     // Function to refresh device selections from backend
     function refreshDeviceSelections() {
@@ -42,10 +42,10 @@ Rectangle {
     function checkDeviceChanges() {
         var currentInputDevices = soundboardService.getInputDevices();
         var currentOutputDevices = soundboardService.getOutputDevices();
-        
+
         var inputChanged = JSON.stringify(currentInputDevices) !== JSON.stringify(previousInputDevices);
         var outputChanged = JSON.stringify(currentOutputDevices) !== JSON.stringify(previousOutputDevices);
-        
+
         if (inputChanged || outputChanged) {
             console.log("Audio devices changed, refreshing...");
             previousInputDevices = currentInputDevices;
@@ -591,7 +591,10 @@ Rectangle {
                                         leftLabel: "0% mic"
                                         rightLabel: "100% soundboard"
                                         value: soundboardService?.micSoundboardBalance ?? 0.5
-                                        onBalanceChanged: newValue => { if (soundboardService) soundboardService.setMicSoundboardBalance(newValue) }
+                                        onBalanceChanged: newValue => {
+                                            if (soundboardService)
+                                                soundboardService.setMicSoundboardBalance(newValue);
+                                        }
                                     }
 
                                     Text {
@@ -607,9 +610,9 @@ Rectangle {
                     ColumnLayout {
                         id: advancedAudioSection
                         width: fill.parent.width
-                        x: 20
+                        x: 40
                         y: microphoneContent.y + microphoneContent.height + 40  // More top margin
-                        spacing: 16
+                        spacing: 20
 
                         // Title
                         Text {
@@ -623,7 +626,7 @@ Rectangle {
                         // Row 1: Sample Rate and Channels
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 40
+                            spacing: 200
 
                             // Sample Rate
                             RowLayout {
@@ -701,7 +704,7 @@ Rectangle {
                         // Row 2: Buffer Size
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 40
+                            spacing: 200
 
                             RowLayout {
                                 spacing: 12
@@ -786,23 +789,26 @@ Rectangle {
                                 }
                             }
                         }
-
-                        // Note about restarting
-                        Text {
+                        RowLayout {
                             Layout.fillWidth: true
-                            Layout.topMargin: 8
-                            text: "⚠ Changes require app restart to take effect"
-                            color: Colors.textSecondary
-                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                            font.pixelSize: 12
-                            font.italic: true
-                        }
+                            spacing: 20
+                            // Note about restarting
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.topMargin: 8
+                                text: "⚠ Changes require app restart to take effect"
+                                color: Colors.textSecondary
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 12
+                                font.italic: true
+                            }
 
-                        Button {
-                            text: "Restart Now"
-                            Layout.preferredWidth: 120
-                            onClicked: {
-                                soundboardService.restartApplication();
+                            Button {
+                                text: "Restart Now"
+                                Layout.preferredWidth: 120
+                                onClicked: {
+                                    soundboardService.restartApplication();
+                                }
                             }
                         }
                     }
@@ -868,7 +874,10 @@ Rectangle {
                                                 }
                                             ]
                                             selectedId: soundboardService?.language ?? "English"
-                                            onItemSelected: id => { if (soundboardService) soundboardService.setLanguage(id) }
+                                            onItemSelected: id => {
+                                                if (soundboardService)
+                                                    soundboardService.setLanguage(id);
+                                            }
                                         }
                                     }
 
@@ -919,7 +928,10 @@ Rectangle {
                                                     }
                                                     MouseArea {
                                                         anchors.fill: parent
-                                                        onClicked: { if (soundboardService) soundboardService.setTheme(modelData.value) }
+                                                        onClicked: {
+                                                            if (soundboardService)
+                                                                soundboardService.setTheme(modelData.value);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -954,7 +966,10 @@ Rectangle {
                                                     border.width: (soundboardService?.accentColor ?? "") === modelData ? 2 : 0
                                                     MouseArea {
                                                         anchors.fill: parent
-                                                        onClicked: { if (soundboardService) soundboardService.setAccentColor(modelData) }
+                                                        onClicked: {
+                                                            if (soundboardService)
+                                                                soundboardService.setAccentColor(modelData);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -985,7 +1000,10 @@ Rectangle {
                                                     color: Colors.textPrimary
                                                     font.pixelSize: 13
                                                     text: soundboardService?.accentColor ?? "#3B82F6"
-                                                    onEditingFinished: { if (soundboardService) soundboardService.setAccentColor(text) }
+                                                    onEditingFinished: {
+                                                        if (soundboardService)
+                                                            soundboardService.setAccentColor(text);
+                                                    }
                                                 }
                                             }
                                             Rectangle {
@@ -1002,7 +1020,10 @@ Rectangle {
                                                 }
                                                 MouseArea {
                                                     anchors.fill: parent
-                                                    onClicked: { if (soundboardService) soundboardService.setAccentColor(customColorInput.text) }
+                                                    onClicked: {
+                                                        if (soundboardService)
+                                                            soundboardService.setAccentColor(customColorInput.text);
+                                                    }
                                                 }
                                             }
                                         }
@@ -1111,7 +1132,10 @@ Rectangle {
                                                 }
                                                 MouseArea {
                                                     anchors.fill: parent
-                                                    onClicked: { if (soundboardService) soundboardService.setSlotSizeScale(modelData.scale) }
+                                                    onClicked: {
+                                                        if (soundboardService)
+                                                            soundboardService.setSlotSizeScale(modelData.scale);
+                                                    }
                                                 }
                                             }
                                         }
@@ -1621,8 +1645,14 @@ Rectangle {
                                 primaryText: "Reassign"
                                 secondaryText: "Reset"
 
-                                onPrimaryClicked: { if (hotkeyManager) hotkeyManager.reassignSystem(id) }
-                                onSecondaryClicked: { if (hotkeyManager) hotkeyManager.resetSystem(id) }
+                                onPrimaryClicked: {
+                                    if (hotkeyManager)
+                                        hotkeyManager.reassignSystem(id);
+                                }
+                                onSecondaryClicked: {
+                                    if (hotkeyManager)
+                                        hotkeyManager.resetSystem(id);
+                                }
                             }
                         }
 
@@ -1637,8 +1667,14 @@ Rectangle {
                                 primaryText: "Reassign"
                                 secondaryText: "Delete"
 
-                                onPrimaryClicked: { if (hotkeyManager) hotkeyManager.reassignPreference(id) }
-                                onSecondaryClicked: { if (hotkeyManager) hotkeyManager.deletePreference(id) }
+                                onPrimaryClicked: {
+                                    if (hotkeyManager)
+                                        hotkeyManager.reassignPreference(id);
+                                }
+                                onSecondaryClicked: {
+                                    if (hotkeyManager)
+                                        hotkeyManager.deletePreference(id);
+                                }
                             }
                         }
                     }
