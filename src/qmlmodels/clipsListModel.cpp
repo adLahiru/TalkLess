@@ -14,6 +14,7 @@ void ClipsListModel::setService(SoundboardService* service)
     }
 
     m_service = service;
+    emit serviceChanged();
 
     if (m_service) {
         connect(m_service, &SoundboardService::activeClipsChanged, this, &ClipsListModel::onActiveClipsChanged);

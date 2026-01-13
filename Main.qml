@@ -2,12 +2,13 @@ import QtQuick
 import QtQuick.Window
 import QtQuick.Controls
 import QtQuick.Layouts
+import TalkLess.Models 1.0
 import "qml/components"
 import "qml/pages"
 import "qml/styles"
 
 ApplicationWindow {
-    id: mainWindow        
+    id: mainWindow
     width: 1280
     height: 800
     minimumWidth: 800
@@ -18,12 +19,17 @@ ApplicationWindow {
     title: qsTr("TalkLess")
     color: Colors.background
 
+    // Close all detached windows when main window closes
+    onClosing: function (close) {
+        closeAllDetachedWindows();
+    }
+
     // Link Backend Theme & Settings to UI Singleton
     Connections {
         target: soundboardService
         function onSettingsChanged() {
-            Colors.setTheme(soundboardService.theme)
-            Colors.setAccent(soundboardService.accentColor)
+            Colors.setTheme(soundboardService.theme);
+            Colors.setAccent(soundboardService.accentColor);
         }
     }
 
@@ -31,7 +37,7 @@ ApplicationWindow {
     // This runs globally so device changes are detected even when not in settings view
     property var lastKnownInputDevices: []
     property var lastKnownOutputDevices: []
-    
+
     Timer {
         id: globalDevicePollTimer
         interval: 2000  // Check every 2 seconds
@@ -40,10 +46,10 @@ ApplicationWindow {
         onTriggered: {
             var currentInputDevices = soundboardService.getInputDevices();
             var currentOutputDevices = soundboardService.getOutputDevices();
-            
+
             var inputChanged = JSON.stringify(currentInputDevices) !== JSON.stringify(mainWindow.lastKnownInputDevices);
             var outputChanged = JSON.stringify(currentOutputDevices) !== JSON.stringify(mainWindow.lastKnownOutputDevices);
-            
+
             if (inputChanged || outputChanged) {
                 mainWindow.lastKnownInputDevices = currentInputDevices;
                 mainWindow.lastKnownOutputDevices = currentOutputDevices;
@@ -52,15 +58,15 @@ ApplicationWindow {
             }
         }
     }
-    
+
     Component.onCompleted: {
         // Store initial device lists for hotplug detection
         lastKnownInputDevices = soundboardService.getInputDevices();
         lastKnownOutputDevices = soundboardService.getOutputDevices();
         // Initialize Theme from Backend
-        Colors.setTheme(soundboardService.theme)
-        Colors.setAccent(soundboardService.accentColor)
-        
+        Colors.setTheme(soundboardService.theme);
+        Colors.setAccent(soundboardService.accentColor);
+
         // Initialize first soundboard on startup
         var firstBoardId = soundboardService.activeBoardId();
         if (firstBoardId >= 0) {
@@ -217,21 +223,32 @@ ApplicationWindow {
                         SoundboardView {
                             id: internalSoundboardView
                             anchors.fill: parent
-                            isDetached: mainWindow.isSoundboardDetached
-                            visible: !mainWindow.isSoundboardDetached
+                            // Always visible - users can detach multiple soundboards
+                            visible: true
+                            // Mark as detached only if THIS specific board is detached
+                            isDetached: mainWindow.isBoardDetached(clipsModel.boardId)
 
                             onRequestDetach: {
-                                mainWindow.isSoundboardDetached = true;
+                                // Detach the currently displayed board
+                                var currentBoardId = clipsModel.boardId;
+                                if (currentBoardId >= 0) {
+                                    mainWindow.detachBoard(currentBoardId);
+                                }
                             }
                             onRequestDock: {
-                                mainWindow.isSoundboardDetached = false;
+                                // Dock the currently displayed board
+                                var currentBoardId = clipsModel.boardId;
+                                if (currentBoardId >= 0) {
+                                    mainWindow.dockBoard(currentBoardId);
+                                }
                             }
                         }
 
+                        // Overlay message when current board is detached
                         Rectangle {
                             anchors.fill: parent
-                            visible: mainWindow.isSoundboardDetached
-                            color: Colors.background
+                            visible: mainWindow.isBoardDetached(clipsModel.boardId)
+                            color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.9)
                             radius: 10
 
                             ColumnLayout {
@@ -239,10 +256,18 @@ ApplicationWindow {
                                 spacing: 20
 
                                 Text {
-                                    text: "Soundboard Detached"
+                                    text: "This soundboard is detached"
                                     color: Colors.textSecondary
                                     font.pixelSize: 24
                                     Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                Text {
+                                    text: "Select another soundboard from the sidebar,\nor click below to dock this one back."
+                                    color: Colors.textSecondary
+                                    font.pixelSize: 14
+                                    Layout.alignment: Qt.AlignHCenter
+                                    horizontalAlignment: Text.AlignHCenter
                                 }
 
                                 Rectangle {
@@ -263,7 +288,10 @@ ApplicationWindow {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            mainWindow.isSoundboardDetached = false;
+                                            var currentBoardId = clipsModel.boardId;
+                                            if (currentBoardId >= 0) {
+                                                mainWindow.dockBoard(currentBoardId);
+                                            }
                                         }
                                     }
                                 }
@@ -349,26 +377,182 @@ ApplicationWindow {
         }
     }
 
-    // ---- Detached Soundboard Window ----
-    Window {
-        id: detachedSoundboardWindow
-        title: "Soundboard - Detached"
-        width: 1000
-        height: 700
-        visible: mainWindow.isSoundboardDetached
-        color: Colors.background
+    // ---- Detached Soundboard Windows ----
+    // Track multiple detached soundboard instances by boardId
+    property var detachedBoardIds: []  // Array of board IDs that are currently detached
+    property var detachedWindows: ({})  // Map of boardId -> Window object
 
-        onClosing: {
+    // Helper function to check if a board is detached
+    function isBoardDetached(boardId) {
+        return detachedBoardIds.indexOf(boardId) !== -1;
+    }
+
+    // Helper function to detach a board - creates a new window
+    function detachBoard(boardId) {
+        if (isBoardDetached(boardId)) {
+            console.log("Board", boardId, "is already detached");
+            return;
+        }
+
+        // Create the window dynamically
+        var component = detachedWindowComponent;
+        var windowObj = component.createObject(null, {
+            "windowBoardId": boardId,
+            "windowBoardName": soundboardService.getBoardName(boardId) || ("Soundboard " + boardId)
+        });
+
+        if (windowObj) {
+            // Store reference
+            var newWindows = Object.assign({}, detachedWindows);
+            newWindows[boardId] = windowObj;
+            detachedWindows = newWindows;
+
+            // Update the list
+            var newList = detachedBoardIds.slice();
+            newList.push(boardId);
+            detachedBoardIds = newList;
+
+            // Connect to window's dock request
+            windowObj.dockRequested.connect(function () {
+                mainWindow.dockBoard(boardId);
+            });
+
+            // NOTE: We do NOT change the global clipsModel here
+            // The detached window uses overrideBoardId to display its specific board
+
+            console.log("Detached board", boardId, "- window created");
+        }
+    }
+
+    // Helper function to close ALL detached windows (called when main app closes)
+    function closeAllDetachedWindows() {
+        console.log("Closing all detached windows...");
+        var boardIds = detachedBoardIds.slice(); // Make a copy
+        for (var i = 0; i < boardIds.length; i++) {
+            var boardId = boardIds[i];
+            if (detachedWindows[boardId]) {
+                detachedWindows[boardId].destroy();
+            }
+        }
+        detachedWindows = {};
+        detachedBoardIds = [];
+    }
+
+    // Helper function to dock a board (re-attach to main window)
+    function dockBoard(boardId) {
+        console.log("Docking board", boardId);
+
+        // Remove from list first
+        var idx = detachedBoardIds.indexOf(boardId);
+        if (idx !== -1) {
+            var newList = detachedBoardIds.slice();
+            newList.splice(idx, 1);
+            detachedBoardIds = newList;
+        }
+
+        // Destroy the window if it exists
+        if (detachedWindows[boardId]) {
+            var windowToDestroy = detachedWindows[boardId];
+            var newWindows = Object.assign({}, detachedWindows);
+            delete newWindows[boardId];
+            detachedWindows = newWindows;
+
+            // Destroy window after a short delay to avoid issues
+            Qt.callLater(function () {
+                if (windowToDestroy) {
+                    windowToDestroy.destroy();
+                }
+            });
+        }
+
+        // Reset the legacy flag if no more detached windows
+        if (detachedBoardIds.length === 0) {
             mainWindow.isSoundboardDetached = false;
         }
 
-        SoundboardView {
-            anchors.fill: parent
-            isDetached: true
+        console.log("Board", boardId, "docked back");
+    }
 
-            onRequestDock: {
-                mainWindow.isSoundboardDetached = false;
+    // Component for creating detached windows
+    Component {
+        id: detachedWindowComponent
+
+        Window {
+            id: detachedWin
+
+            property int windowBoardId: -1
+            property string windowBoardName: "Soundboard"
+
+            // Signal to notify main window to dock
+            signal dockRequested
+
+            title: windowBoardName + " - Detached"
+            width: 1000
+            height: 700
+            visible: true
+            color: Colors.background
+
+            // CRITICAL: Set transientParent to null so this window is independent
+            // from the main window. This prevents it from minimizing when parent minimizes.
+            transientParent: null
+
+            // Use standard Window flags with minimize capability
+            flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint
+
+            // Create a per-window ClipsListModel so this window shows its specific board
+            ClipsListModel {
+                id: localClipsModel
+
+                Component.onCompleted: {
+                    // Set up the model with the service and board ID
+                    localClipsModel.service = soundboardService;
+                    localClipsModel.boardId = detachedWin.windowBoardId;
+                    localClipsModel.reload();
+                    console.log("Created local ClipsListModel for board:", detachedWin.windowBoardId);
+                }
             }
+
+            onClosing: function (close) {
+                // Emit dock request when closing
+                dockRequested();
+            }
+
+            SoundboardView {
+                anchors.fill: parent
+                isDetached: true
+
+                // CRITICAL: Use overrideBoardId so this view shows THIS specific board
+                overrideBoardId: detachedWin.windowBoardId
+
+                // Use the local clips model specific to this window
+                localClipsModel: localClipsModel
+
+                onRequestDock: {
+                    // Emit dock request signal
+                    detachedWin.dockRequested();
+                }
+
+                // Prevent re-detaching from already detached window
+                onRequestDetach: {
+                    console.log("Re-detach prevented - already detached");
+                }
+            }
+        }
+    }
+
+    // Legacy single-board detach support (for backward compatibility)
+    // This connects to the existing isSoundboardDetached property from the inner view
+    Connections {
+        target: mainWindow
+        function onIsSoundboardDetachedChanged() {
+            var currentBoardId = clipsModel.boardId;
+            if (currentBoardId < 0)
+                return;
+
+            if (mainWindow.isSoundboardDetached) {
+                mainWindow.detachBoard(currentBoardId);
+            }
+            // Note: docking is now handled by the dockBoard function directly
         }
     }
 }

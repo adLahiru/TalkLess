@@ -3,6 +3,7 @@
 #include <QQuickStyle>
 #include <QQmlContext>
 #include <QIcon>
+#include <QtQml>
 
 #include "services/soundboardService.h"
 #include "qmlmodels/soundboardsListModel.h"
@@ -57,6 +58,9 @@ int main(int argc, char* argv[])
     engine.rootContext()->setContextProperty("soundboardsModel", &soundboardsModel);
     engine.rootContext()->setContextProperty("clipsModel", &clipsModel);
     engine.rootContext()->setContextProperty("hotkeyManager", &hotkeyManager);
+
+    // Register ClipsListModel as a QML type so detached windows can create their own instances
+    qmlRegisterType<ClipsListModel>("TalkLess.Models", 1, 0, "ClipsListModel");
 
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app,

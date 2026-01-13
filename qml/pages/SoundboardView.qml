@@ -30,6 +30,20 @@ Rectangle {
     property point dragPosition: Qt.point(0, 0)
 
     property bool isDetached: false
+
+    // Override board ID for detached windows - if set, this view shows that specific board
+    // instead of following the global clipsModel.boardId
+    property int overrideBoardId: -1
+
+    // Local clips model for detached windows (optional - if not set, uses global clipsModel)
+    property var localClipsModel: null
+
+    // Active clips model - uses local if available, otherwise global clipsModel
+    readonly property var activeClipsModel: localClipsModel ? localClipsModel : clipsModel
+
+    // Effective board ID - uses override if set, otherwise uses active model's boardId
+    readonly property int effectiveBoardId: overrideBoardId >= 0 ? overrideBoardId : (activeClipsModel ? activeClipsModel.boardId : -1)
+
     signal requestDetach
     signal requestDock
 
@@ -86,7 +100,7 @@ Rectangle {
             return null;
 
         // Use the new backend function for more reliable and efficient data retrieval
-        const data = soundboardService.getClipData(clipsModel.boardId, clipId);
+        const data = soundboardService.getClipData(activeClipsModel.boardId, clipId);
         if (!data || Object.keys(data).length === 0)
             return null;
 
@@ -184,7 +198,7 @@ Rectangle {
 
     // Refresh editor when model data changes (e.g., after saving settings)
     Connections {
-        target: clipsModel
+        target: activeClipsModel
         function onClipsChanged() {
             // Re-fetch and push data to editor when model reloads
             if (root.selectedClipId !== -1) {
@@ -199,11 +213,11 @@ Rectangle {
         title: "Select Audio File"
         nameFilters: ["Audio files (*.mp3 *.wav *.ogg *.m4a)", "All files (*)"]
         onAccepted: {
-            const boardId = clipsModel.boardId;
+            const boardId = activeClipsModel.boardId;
             if (boardId >= 0) {
                 const success = soundboardService.addClip(boardId, selectedFile.toString());
                 if (success) {
-                    clipsModel.reload();
+                    activeClipsModel.reload();
                 }
             }
         }
@@ -219,9 +233,9 @@ Rectangle {
         nameFilters: ["Image files (*.png *.jpg *.jpeg *.gif *.webp *.bmp)", "All files (*)"]
         onAccepted: {
             if (root.clipToEditImageId >= 0) {
-                const success = clipsModel.updateClipImage(root.clipToEditImageId, selectedFile.toString());
+                const success = activeClipsModel.updateClipImage(root.clipToEditImageId, selectedFile.toString());
                 if (success) {
-                    clipsModel.reload();  // Reload to show new image
+                    activeClipsModel.reload();  // Reload to show new image
                 }
                 root.clipToEditImageId = -1;
             }
@@ -246,7 +260,7 @@ Rectangle {
     }
 
     Connections {
-        target: clipsModel
+        target: activeClipsModel
         function onBoardIdChanged() {
             root.selectedClipId = -1;
             root.playingClipId = -1;
@@ -302,10 +316,10 @@ Rectangle {
             if (root.playingClipId === clipId) {
                 // Find if any other clip is still playing
                 let foundPlaying = -1;
-                for (let i = 0; i < clipsModel.count; i++) {
-                    const index = clipsModel.index(i, 0);
-                    if (clipsModel.data(index, 263)) { // IsPlayingRole
-                        foundPlaying = clipsModel.data(index, 257); // IdRole
+                for (let i = 0; i < activeClipsModel.count; i++) {
+                    const index = activeClipsModel.index(i, 0);
+                    if (activeClipsModel.data(index, 263)) { // IsPlayingRole
+                        foundPlaying = activeClipsModel.data(index, 257); // IdRole
                         break;
                     }
                 }
@@ -364,7 +378,7 @@ Rectangle {
                 // Dark overlay for text readability
                 Rectangle {
                     anchors.fill: parent
-                    color: "#000000"
+                    color: Colors.overlay
                     opacity: 0.3
                 }
 
@@ -391,7 +405,7 @@ Rectangle {
                                 width: 3
                                 height: 3
                                 radius: 1.5
-                                color: "#FFFFFF"
+                                color: Colors.primary
                             }
                         }
                     }
@@ -485,7 +499,7 @@ Rectangle {
 
                         // Main text
                         Text {
-                            text: clipsModel?.boardName ?? "Soundboard"
+                            text: activeClipsModel?.boardName ?? "Soundboard"
                             color: Colors.textPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 28
@@ -640,8 +654,8 @@ Rectangle {
                 readonly property real tileWidth: (width - tilePadding * 2 - tileSpacing * (columnsCount - 1)) / columnsCount
                 readonly property real tileHeight: tileWidth * 79 / 111  // 111:79 aspect ratio maintained
 
-                // Dummy clips data - REMOVED, now using real clipsModel
-                // The clipsModel is exposed from C++ and updated when a soundboard is selected
+                // Dummy clips data - REMOVED, now using real activeClipsModel
+                // The activeClipsModel is exposed from C++ and updated when a soundboard is selected
 
                 // Flickable area for scrolling
                 Flickable {
@@ -666,11 +680,11 @@ Rectangle {
                                     urls.push(drop.urls[i].toString());
                                 }
 
-                                const boardId = clipsModel.boardId;
+                                const boardId = activeClipsModel.boardId;
                                 if (boardId !== -1) {
                                     const success = soundboardService.addClips(boardId, urls);
                                     if (success) {
-                                        clipsModel.reload();
+                                        activeClipsModel.reload();
                                     }
                                 }
                                 drop.accept();
@@ -736,9 +750,9 @@ Rectangle {
                             text: "Paste Clip"
                             enabled: soundboardService?.canPaste ?? false
                             onTriggered: {
-                                const bId = clipsModel.boardId;
+                                const bId = activeClipsModel.boardId;
                                 if (bId !== -1 && soundboardService.pasteClip(bId)) {
-                                    clipsModel.reload();
+                                    activeClipsModel.reload();
                                 }
                             }
                         }
@@ -771,7 +785,7 @@ Rectangle {
                             var index = row * contentArea.columnsCount + col - 1; // -1 for AddAudioTile
 
                             // Clamp to valid clip range
-                            return Math.max(0, Math.min(index, clipsModel.count - 1));
+                            return Math.max(0, Math.min(index, activeClipsModel.count - 1));
                         }
 
                         // Add Audio Tile (first item)
@@ -786,10 +800,10 @@ Rectangle {
                             }
                         }
 
-                        // Real Clip Tiles from clipsModel with drag-and-drop reordering
+                        // Real Clip Tiles from activeClipsModel with drag-and-drop reordering
                         Repeater {
                             id: clipsRepeater
-                            model: clipsModel
+                            model: activeClipsModel
 
                             Item {
                                 id: clipWrapper
@@ -977,7 +991,7 @@ Rectangle {
                                     clipId: clipWrapper.clipId
                                     playbackProgress: progressUpdateTimer.clipProgressMap[clipWrapper.clipId] || 0.0
                                     filePath: clipWrapper.filePath
-                                    currentBoardId: clipsModel.boardId
+                                    currentBoardId: activeClipsModel.boardId
 
                                     onClicked: {
                                         // Selecting the clip updates the sidebar
@@ -992,10 +1006,10 @@ Rectangle {
                                         soundboardService.stopClip(clipWrapper.clipId);
                                     }
                                     onDeleteClicked: {
-                                        if (soundboardService.deleteClip(clipsModel.boardId, clipWrapper.clipId)) {
+                                        if (soundboardService.deleteClip(activeClipsModel.boardId, clipWrapper.clipId)) {
                                             if (root.selectedClipId === clipWrapper.clipId)
                                                 root.selectedClipId = -1;
-                                            clipsModel.reload();
+                                            activeClipsModel.reload();
                                         }
                                     }
                                     onEditClicked: {
@@ -1009,8 +1023,8 @@ Rectangle {
                                         // Popup opens automatically from ClipTile
                                     }
                                     onPasteClicked: {
-                                        if (soundboardService.pasteClip(clipsModel.boardId)) {
-                                            clipsModel.reload();
+                                        if (soundboardService.pasteClip(activeClipsModel.boardId)) {
+                                            activeClipsModel.reload();
                                         }
                                     }
                                     onEditBackgroundClicked: {
@@ -1063,8 +1077,8 @@ Rectangle {
 
                                             // If dropped on a valid position, reorder
                                             if (finalDropIndex >= 0 && finalDropIndex !== sourceIndex) {
-                                                soundboardService.moveClip(clipsModel.boardId, sourceIndex, finalDropIndex);
-                                                clipsModel.reload();
+                                                soundboardService.moveClip(activeClipsModel.boardId, sourceIndex, finalDropIndex);
+                                                activeClipsModel.reload();
                                             }
                                         }
                                     }
@@ -1330,14 +1344,14 @@ Rectangle {
 
                 // Navigate to previous/next clip in the list
                 onPreviousClicked: {
-                    if (clipsModel.count === 0)
+                    if (activeClipsModel.count === 0)
                         return;
 
                     // Find current index and go to previous
                     let currentIndex = -1;
-                    for (let i = 0; i < clipsModel.count; i++) {
-                        const index = clipsModel.index(i, 0);
-                        const id = clipsModel.data(index, 257);
+                    for (let i = 0; i < activeClipsModel.count; i++) {
+                        const index = activeClipsModel.index(i, 0);
+                        const id = activeClipsModel.data(index, 257);
                         if (id === root.selectedClipId) {
                             currentIndex = i;
                             break;
@@ -1345,36 +1359,36 @@ Rectangle {
                     }
 
                     if (currentIndex > 0) {
-                        const prevIndex = clipsModel.index(currentIndex - 1, 0);
-                        root.selectedClipId = clipsModel.data(prevIndex, 257);
-                    } else if (currentIndex === 0 && clipsModel.count > 0) {
+                        const prevIndex = activeClipsModel.index(currentIndex - 1, 0);
+                        root.selectedClipId = activeClipsModel.data(prevIndex, 257);
+                    } else if (currentIndex === 0 && activeClipsModel.count > 0) {
                         // Wrap to last clip
-                        const lastIndex = clipsModel.index(clipsModel.count - 1, 0);
-                        root.selectedClipId = clipsModel.data(lastIndex, 257);
+                        const lastIndex = activeClipsModel.index(activeClipsModel.count - 1, 0);
+                        root.selectedClipId = activeClipsModel.data(lastIndex, 257);
                     }
                 }
                 onNextClicked: {
-                    if (clipsModel.count === 0)
+                    if (activeClipsModel.count === 0)
                         return;
 
                     // Find current index and go to next
                     let currentIndex = -1;
-                    for (let i = 0; i < clipsModel.count; i++) {
-                        const index = clipsModel.index(i, 0);
-                        const id = clipsModel.data(index, 257);
+                    for (let i = 0; i < activeClipsModel.count; i++) {
+                        const index = activeClipsModel.index(i, 0);
+                        const id = activeClipsModel.data(index, 257);
                         if (id === root.selectedClipId) {
                             currentIndex = i;
                             break;
                         }
                     }
 
-                    if (currentIndex >= 0 && currentIndex < clipsModel.count - 1) {
-                        const nextIndex = clipsModel.index(currentIndex + 1, 0);
-                        root.selectedClipId = clipsModel.data(nextIndex, 257);
-                    } else if (currentIndex === clipsModel.count - 1) {
+                    if (currentIndex >= 0 && currentIndex < activeClipsModel.count - 1) {
+                        const nextIndex = activeClipsModel.index(currentIndex + 1, 0);
+                        root.selectedClipId = activeClipsModel.data(nextIndex, 257);
+                    } else if (currentIndex === activeClipsModel.count - 1) {
                         // Wrap to first clip
-                        const firstIndex = clipsModel.index(0, 0);
-                        root.selectedClipId = clipsModel.data(firstIndex, 257);
+                        const firstIndex = activeClipsModel.index(0, 0);
+                        root.selectedClipId = activeClipsModel.data(firstIndex, 257);
                     }
                 }
                 isMuted: !(soundboardService?.isMicEnabled() ?? true)
@@ -1803,8 +1817,12 @@ Rectangle {
                             // use real waveform after stop later (optional)
                             waveformData: recordingPeaks.length > 0 ? recordingPeaks : waveformTrim.generateMockWaveform()
 
-                            onTrimStartMoved: function(pos) { waveformTrim.trimStart = pos }
-                            onTrimEndMoved: function(pos) { waveformTrim.trimEnd = pos }
+                            onTrimStartMoved: function (pos) {
+                                waveformTrim.trimStart = pos;
+                            }
+                            onTrimEndMoved: function (pos) {
+                                waveformTrim.trimEnd = pos;
+                            }
                         }
                     }
 
@@ -1819,7 +1837,6 @@ Rectangle {
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
                     }
-                    
 
                     DropdownSelector {
                         id: recordingBoardDropdown
@@ -1830,11 +1847,14 @@ Rectangle {
 
                         function refreshBoards() {
                             const boards = soundboardService.listBoardsForDropdown();
-                            model = boards.map(b => ({ id: String(b.id), name: b.name }));
+                            model = boards.map(b => ({
+                                        id: String(b.id),
+                                        name: b.name
+                                    }));
 
-                            // default -> opened soundboard (clipsModel.boardId)
-                            if (selectedId === "" && clipsModel.boardId >= 0) {
-                                selectedId = String(clipsModel.boardId);
+                            // default -> opened soundboard (activeClipsModel.boardId)
+                            if (selectedId === "" && activeClipsModel.boardId >= 0) {
+                                selectedId = String(activeClipsModel.boardId);
                             }
                         }
 
@@ -1844,10 +1864,10 @@ Rectangle {
 
                     // If user changes boards elsewhere, keep default synced (only when user hasn't picked manually)
                     Connections {
-                        target: clipsModel
+                        target: activeClipsModel
                         function onBoardIdChanged() {
                             if (recordingBoardDropdown.selectedId === "" || recordingBoardDropdown.selectedId === "-1") {
-                                recordingBoardDropdown.selectedId = String(clipsModel.boardId);
+                                recordingBoardDropdown.selectedId = String(activeClipsModel.boardId);
                             }
                         }
                     }
@@ -1967,10 +1987,10 @@ Rectangle {
                                     const durationMs = Math.max(0, durationSec * 1000.0);
 
                                     let trimStartMs = waveformTrim.trimStart * durationMs;
-                                    let trimEndMs   = waveformTrim.trimEnd   * durationMs;
+                                    let trimEndMs = waveformTrim.trimEnd * durationMs;
 
                                     trimStartMs = Math.max(0, Math.min(trimStartMs, durationMs));
-                                    trimEndMs   = Math.max(0, Math.min(trimEndMs, durationMs));
+                                    trimEndMs = Math.max(0, Math.min(trimEndMs, durationMs));
 
                                     if (trimEndMs <= trimStartMs + 10) {
                                         trimEndMs = Math.min(durationMs, trimStartMs + 10);
@@ -1982,16 +2002,10 @@ Rectangle {
                                         trimEndMs = 0; // your engine treats 0 as full length
                                     }
 
-                                    const success = soundboardService.addClipWithSettings(
-                                        boardId,
-                                        pathUrl,
-                                        title,
-                                        trimStartMs,
-                                        trimEndMs
-                                    );
+                                    const success = soundboardService.addClipWithSettings(boardId, pathUrl, title, trimStartMs, trimEndMs);
 
                                     if (success) {
-                                        clipsModel.reload();
+                                        activeClipsModel.reload();
                                         recordingNameInput.text = "";
                                         rightSidebar.currentTabIndex = 0;
                                     } else {
@@ -2260,10 +2274,10 @@ Rectangle {
                                     // Save on Enter key
                                     Keys.onReturnPressed: {
                                         if (root.selectedClipId !== -1 && text.length > 0) {
-                                            clipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                            activeClipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
                                             clipEditorTab.editingClipName = text;
                                             clipEditorTab.displayComputedTitle = text;
-                                            clipsModel.reload();
+                                            activeClipsModel.reload();
                                         }
                                         clipEditorTab.isTitleEditing = false;
                                     }
@@ -2272,10 +2286,10 @@ Rectangle {
                                     onActiveFocusChanged: {
                                         if (!activeFocus && visible) {
                                             if (root.selectedClipId !== -1 && text.length > 0 && text !== clipEditorTab.editingClipName) {
-                                                clipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                                activeClipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
                                                 clipEditorTab.editingClipName = text;
                                                 clipEditorTab.displayComputedTitle = text;
-                                                clipsModel.reload();
+                                                activeClipsModel.reload();
                                             }
                                             clipEditorTab.isTitleEditing = false;
                                         }
@@ -2443,7 +2457,7 @@ Rectangle {
                                         clipEditorTab.clipVolume = value;
                                         // Real-time volume update - no need to save
                                         if (root.selectedClipId !== -1) {
-                                            clipsModel.setClipVolume(root.selectedClipId, Math.round(value));
+                                            activeClipsModel.setClipVolume(root.selectedClipId, Math.round(value));
                                         }
                                     }
 
@@ -2524,7 +2538,7 @@ Rectangle {
                                         clipEditorTab.clipSpeed = value;
                                         // Auto-save speed changes
                                         if (root.selectedClipId !== -1) {
-                                            clipsModel.updateClipAudioSettings(root.selectedClipId, Math.round(clipEditorTab.clipVolume), value);
+                                            activeClipsModel.updateClipAudioSettings(root.selectedClipId, Math.round(clipEditorTab.clipVolume), value);
                                         }
                                     }
 
@@ -2598,17 +2612,21 @@ Rectangle {
                                     trimEnd: (clipEditorTab.durationSec > 0 && clipEditorTab.trimEndMs > 0) ? (clipEditorTab.trimEndMs / 1000.0) / clipEditorTab.durationSec : 1.0
 
                                     onTrimStartMoved: function (pos) {
+                                        console.log("Trim start moved to:", pos, "selectedClipId:", root.selectedClipId, "durationSec:", clipEditorTab.durationSec);
                                         if (root.selectedClipId !== -1 && clipEditorTab.durationSec > 0) {
                                             var newStartMs = pos * clipEditorTab.durationSec * 1000.0;
+                                            console.log("Setting trim start:", newStartMs, "ms for clip:", root.selectedClipId, "on board:", activeClipsModel.boardId);
                                             clipEditorTab.trimStartMs = newStartMs;
-                                            soundboardService.setClipTrim(clipsModel.boardId, root.selectedClipId, newStartMs, clipEditorTab.trimEndMs);
+                                            soundboardService.setClipTrim(activeClipsModel.boardId, root.selectedClipId, newStartMs, clipEditorTab.trimEndMs);
                                         }
                                     }
                                     onTrimEndMoved: function (pos) {
+                                        console.log("Trim end moved to:", pos, "selectedClipId:", root.selectedClipId, "durationSec:", clipEditorTab.durationSec);
                                         if (root.selectedClipId !== -1 && clipEditorTab.durationSec > 0) {
                                             var newEndMs = pos * clipEditorTab.durationSec * 1000.0;
+                                            console.log("Setting trim end:", newEndMs, "ms for clip:", root.selectedClipId, "on board:", activeClipsModel.boardId);
                                             clipEditorTab.trimEndMs = newEndMs;
-                                            soundboardService.setClipTrim(clipsModel.boardId, root.selectedClipId, clipEditorTab.trimStartMs, newEndMs);
+                                            soundboardService.setClipTrim(activeClipsModel.boardId, root.selectedClipId, clipEditorTab.trimStartMs, newEndMs);
                                         }
                                     }
                                     onSeekRequested: function (pos) {
@@ -2617,7 +2635,7 @@ Rectangle {
 
                                             // If playing, seek audio
                                             if (soundboardService?.isClipPlaying(root.selectedClipId) ?? false) {
-                                                soundboardService.seekClip(clipsModel.boardId, root.selectedClipId, seekMs);
+                                                soundboardService.seekClip(activeClipsModel.boardId, root.selectedClipId, seekMs);
                                             } else {
                                                 // If not playing, just update visual cursor
                                                 waveform.currentTime = seekMs / 1000.0;
@@ -2786,7 +2804,7 @@ Rectangle {
                                                 onClicked: {
                                                     if (root.selectedClipId !== -1 && soundboardService) {
                                                         clipEditorTab.stopOtherSounds = !clipEditorTab.stopOtherSounds;
-                                                        soundboardService.setClipStopOtherSounds(clipsModel.boardId, root.selectedClipId, clipEditorTab.stopOtherSounds);
+                                                        soundboardService.setClipStopOtherSounds(activeClipsModel.boardId, root.selectedClipId, clipEditorTab.stopOtherSounds);
                                                     }
                                                 }
                                             }
@@ -2832,11 +2850,11 @@ Rectangle {
                                                 onClicked: {
                                                     if (root.selectedClipId !== -1 && soundboardService) {
                                                         clipEditorTab.muteOtherSounds = !clipEditorTab.muteOtherSounds;
-                                                        soundboardService.setClipMuteOtherSounds(clipsModel.boardId, root.selectedClipId, clipEditorTab.muteOtherSounds);
+                                                        soundboardService.setClipMuteOtherSounds(activeClipsModel.boardId, root.selectedClipId, clipEditorTab.muteOtherSounds);
                                                         // If muteOtherSounds is enabled, also enable muteMicDuringPlayback
                                                         if (clipEditorTab.muteOtherSounds) {
                                                             clipEditorTab.muteMicDuringPlayback = true;
-                                                            soundboardService.setClipMuteMicDuringPlayback(clipsModel.boardId, root.selectedClipId, true);
+                                                            soundboardService.setClipMuteMicDuringPlayback(activeClipsModel.boardId, root.selectedClipId, true);
                                                         }
                                                     }
                                                 }
@@ -2882,7 +2900,7 @@ Rectangle {
                                                 onClicked: {
                                                     if (root.selectedClipId !== -1 && soundboardService) {
                                                         clipEditorTab.muteMicDuringPlayback = !clipEditorTab.muteMicDuringPlayback;
-                                                        soundboardService.setClipMuteMicDuringPlayback(clipsModel.boardId, root.selectedClipId, clipEditorTab.muteMicDuringPlayback);
+                                                        soundboardService.setClipMuteMicDuringPlayback(activeClipsModel.boardId, root.selectedClipId, clipEditorTab.muteMicDuringPlayback);
                                                     }
                                                 }
                                             }
@@ -2959,9 +2977,9 @@ Rectangle {
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
                                                     // Toggle repeat - real-time update, saved immediately
-                                                    if (root.selectedClipId !== -1 && clipsModel) {
+                                                    if (root.selectedClipId !== -1 && activeClipsModel) {
                                                         clipEditorTab.clipIsRepeat = !clipEditorTab.clipIsRepeat;
-                                                        clipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
+                                                        activeClipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
                                                     }
                                                 }
                                             }
@@ -3015,8 +3033,8 @@ Rectangle {
                                                 clipEditorTab.editingClipTags.push(text.trim());
                                                 // Auto-save tags
                                                 if (root.selectedClipId !== -1) {
-                                                    clipsModel.updateClip(root.selectedClipId, clipTitleInput.text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
-                                                    clipsModel.reload();
+                                                    activeClipsModel.updateClip(root.selectedClipId, clipTitleInput.text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                                    activeClipsModel.reload();
                                                 }
                                                 text = "";
                                             }
@@ -3069,8 +3087,8 @@ Rectangle {
                                                     clipEditorTab.editingClipTagsChanged();
                                                     // Auto-save tags
                                                     if (root.selectedClipId !== -1) {
-                                                        clipsModel.updateClip(root.selectedClipId, clipTitleInput.text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
-                                                        clipsModel.reload();
+                                                        activeClipsModel.updateClip(root.selectedClipId, clipTitleInput.text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                                        activeClipsModel.reload();
                                                     }
                                                 }
                                             }
@@ -3098,16 +3116,16 @@ Rectangle {
                             // Update immediately from tile click
                             const data = root.getClipDataById(root.hotkeyEditingClipId);
                             if (data) {
-                                clipsModel.updateClip(root.hotkeyEditingClipId, data.title, hotkeyText, data.tags);
-                                clipsModel.reload();
+                                activeClipsModel.updateClip(root.hotkeyEditingClipId, data.title, hotkeyText, data.tags);
+                                activeClipsModel.reload();
                             }
                             root.hotkeyEditingClipId = -1;
                         } else {
                             // Standard editor behavior - AUTO-SAVE hotkey
                             clipEditorTab.editingClipHotkey = hotkeyText;
                             if (root.selectedClipId !== -1) {
-                                clipsModel.updateClip(root.selectedClipId, clipTitleInput.text, hotkeyText, clipEditorTab.editingClipTags);
-                                clipsModel.reload();
+                                activeClipsModel.updateClip(root.selectedClipId, clipTitleInput.text, hotkeyText, clipEditorTab.editingClipTags);
+                                activeClipsModel.reload();
                             }
                         }
                     }
@@ -3299,16 +3317,16 @@ Rectangle {
                             Layout.preferredHeight: 60
                             currentTime: 0
                             totalDuration: fileDropArea.fileDuration
-                            trimStart: 0.0
-                            trimEnd: 1.0
 
                             property real trimStartMs: 0
                             property real trimEndMs: fileDropArea.fileDuration * 1000.0
 
                             onTrimStartMoved: function (pos) {
+                                trimStart = pos;  // Update visual position
                                 trimStartMs = pos * totalDuration * 1000.0;
                             }
                             onTrimEndMoved: function (pos) {
+                                trimEnd = pos;  // Update visual position
                                 trimEndMs = pos * totalDuration * 1000.0;
                             }
                         }
@@ -3398,7 +3416,7 @@ Rectangle {
                                     }
 
                                     // Get the board ID
-                                    const boardId = clipsModel.boardId;
+                                    const boardId = activeClipsModel.boardId;
                                     if (boardId < 0) {
                                         console.log("No board selected");
                                         return;
@@ -3413,7 +3431,7 @@ Rectangle {
                                     if (success) {
                                         console.log("Clip saved successfully with trim:", uploadWaveform.trimStartMs, uploadWaveform.trimEndMs);
                                         // Reload the clips model
-                                        clipsModel.reload();
+                                        activeClipsModel.reload();
 
                                         // Clear the form
                                         fileDropArea.droppedFilePath = "";
@@ -3533,7 +3551,7 @@ Rectangle {
             onClicked: {
                 if (root.selectedClipId !== -1) {
                     clipEditorTab.reproductionMode = parent.mode;
-                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, parent.mode);
+                    soundboardService.setClipReproductionMode(activeClipsModel.boardId, root.selectedClipId, parent.mode);
                     console.log("Reproduction mode changed to:", parent.mode, "- SAVED!");
                 }
             }

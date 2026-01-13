@@ -9,6 +9,7 @@
 class ClipsListModel : public QAbstractListModel
 {
     Q_OBJECT
+    Q_PROPERTY(SoundboardService* service READ service WRITE setService NOTIFY serviceChanged)
     Q_PROPERTY(int boardId READ boardId WRITE setBoardId NOTIFY boardIdChanged)
     Q_PROPERTY(QString boardName READ boardName NOTIFY boardNameChanged)
     Q_PROPERTY(int count READ count NOTIFY clipsChanged)
@@ -37,6 +38,8 @@ public:
 
     explicit ClipsListModel(QObject* parent = nullptr);
 
+    // Service property
+    SoundboardService* service() const { return m_service; }
     void setService(SoundboardService* service);
 
     // Board ID to display clips from
@@ -62,6 +65,7 @@ public:
     Q_INVOKABLE void setClipRepeat(int clipId, bool repeat); // Toggle repeat mode
 
 signals:
+    void serviceChanged();
     void boardIdChanged();
     void boardNameChanged();
     void clipsChanged();
