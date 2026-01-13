@@ -218,8 +218,13 @@ private:
 
     // Main audio callback
     static void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
-    void processAudio(void* output, const void* input, ma_uint32 frameCount,
-                      ma_uint32 playbackChannels, ma_uint32 captureChannels);
+    
+    void processAudio(void* output,
+                               const void* input,
+                               ma_uint32 frameCount,
+                               ma_uint32 playbackChannels,
+                               ma_uint32 captureChannels,
+                               ma_format captureFormat);
 
     // Monitor callback
     static void monitorCallback(ma_device* pDevice, void* pOutput, const void*, ma_uint32 frameCount);

@@ -19,6 +19,7 @@ Rectangle {
     property int playingClipId: -1   // Last started clip that is still playing
     property var displayedClipData: null // Data currently shown in the player card
     property int hotkeyEditingClipId: -1 // Track which clip's hotkey is being edited from a tile
+    property var pausedClipIds: ({}) // Track paused clips to keep showing progress
 
     // Drag and drop state for clip reordering
     property bool isDragging: false
@@ -53,11 +54,23 @@ Rectangle {
             var playingIds = soundboardService.playingClipIDs();
             var newMap = {};
 
+            // Add playing clips
             for (var i = 0; i < playingIds.length; i++) {
                 var clipId = playingIds[i];
                 var progress = soundboardService.getClipPlaybackProgress(clipId);
-                // Clamp progress to valid range to prevent rendering issues
                 newMap[clipId] = Math.max(0, Math.min(1, progress));
+            }
+
+            // Add paused clips
+
+            for (var pId in root.pausedClipIds) {
+                // Ensure it's not already added
+                if (newMap[pId] === undefined) {
+                    var pClipId = parseInt(pId);
+                    var pProgress = soundboardService.getClipPlaybackProgress(pClipId);
+
+                    newMap[pId] = Math.max(0, Math.min(1, pProgress));
+                }
             }
 
             // Only update if there are changes (avoid unnecessary re-renders)
@@ -161,6 +174,7 @@ Rectangle {
                 displayTitle = filename;
             }
         }
+        clipEditorTab.displayComputedTitle = displayTitle;
         clipTitleInput.text = displayTitle;
     }
 
@@ -258,15 +272,33 @@ Rectangle {
 
         function onClipPlaybackStarted(clipId) {
             root.playingClipId = clipId;
+            // Remove from paused list if it was there
+            var pIds = Object.assign({}, root.pausedClipIds);
+            if (pIds[clipId]) {
+                delete pIds[clipId];
+                root.pausedClipIds = pIds; // Trigger change
+            }
             root.updateDisplayedClipData();
         }
 
         function onClipPlaybackPaused(clipId) {
+            // Add to paused list
+            var pIds = Object.assign({}, root.pausedClipIds);
+            pIds[clipId] = true;
+            root.pausedClipIds = pIds; // Trigger change
+
             // Update the UI when a clip is paused (but keep it as the displayed clip)
             root.updateDisplayedClipData();
         }
 
         function onClipPlaybackStopped(clipId) {
+            // Remove from paused list
+            var pIds = Object.assign({}, root.pausedClipIds);
+            if (pIds[clipId]) {
+                delete pIds[clipId];
+                root.pausedClipIds = pIds; // Trigger change
+            }
+
             if (root.playingClipId === clipId) {
                 // Find if any other clip is still playing
                 let foundPlaying = -1;
@@ -943,7 +975,7 @@ Rectangle {
                                     }
                                     isPlaying: clipWrapper.clipIsPlaying
                                     clipId: clipWrapper.clipId
-                                    playbackProgress: clipWrapper.clipIsPlaying ? progressUpdateTimer.clipProgressMap[clipWrapper.clipId] || 0.0 : 0.0
+                                    playbackProgress: progressUpdateTimer.clipProgressMap[clipWrapper.clipId] || 0.0
                                     filePath: clipWrapper.filePath
                                     currentBoardId: clipsModel.boardId
 
@@ -1400,7 +1432,7 @@ Rectangle {
 
                         // Current Tab Title
                         Text {
-                            text: tabState[currentTabIndex]
+                            text: rightSidebar.tabState[rightSidebar.currentTabIndex]
                             color: Colors.textPrimary
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 18
@@ -1798,6 +1830,9 @@ Rectangle {
                                 onClicked: {
                                     recordingNameInput.text = "";
                                     rightSidebar.currentTabIndex = 0;
+                                    if (soundboardService?.isRecording ?? false) {
+                                        soundboardService.stopRecording();
+                                    }
                                 }
                             }
 
@@ -1842,6 +1877,9 @@ Rectangle {
                                 onClicked: {
                                     console.log("Save clicked");
                                     const boardId = clipsModel.boardId;
+                                    if (soundboardService?.isRecording ?? false) {
+                                        soundboardService.stopRecording();
+                                    }
 
                                     if (boardId >= 0 && soundboardService.lastRecordingPath !== "") {
                                         const title = recordingNameInput.text.trim() || "New Recording";
@@ -1903,11 +1941,14 @@ Rectangle {
                         property real durationSec: 0.0
                         property real trimStartMs: 0.0
                         property real trimEndMs: 0.0
+                        property string displayComputedTitle: ""
+                        property bool isTitleEditing: false
 
                         // Update when selected clip changes
                         Connections {
                             target: root
                             function onSelectedClipIdChanged() {
+                                clipEditorTab.isTitleEditing = false;
                                 if (root.selectedClipId !== -1) {
                                     const data = root.getClipDataById(root.selectedClipId);
                                     if (data) {
@@ -2089,13 +2130,22 @@ Rectangle {
                                     id: clipTitleInput
                                     Layout.fillWidth: true
                                     horizontalAlignment: Text.AlignHCenter
-                                    color: Colors.textPrimary // was #FFFFFF
+                                    color: Colors.textPrimary
                                     font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                     font.pixelSize: 16
                                     font.weight: Font.DemiBold
                                     clip: true
                                     selectByMouse: true
                                     wrapMode: TextInput.NoWrap
+                                    visible: clipEditorTab.isTitleEditing
+
+                                    onVisibleChanged: {
+                                        if (visible) {
+                                            forceActiveFocus();
+                                            // Select all text when entering edit mode? Optional.
+                                            // selectAll();
+                                        }
+                                    }
 
                                     onTextChanged: {
                                         if (text !== clipEditorTab.editingClipName) {
@@ -2103,31 +2153,50 @@ Rectangle {
                                         }
                                     }
 
-                                    // Auto-save on Enter key
+                                    // Save on Enter key
                                     Keys.onReturnPressed: {
                                         if (root.selectedClipId !== -1 && text.length > 0) {
                                             clipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
                                             clipEditorTab.editingClipName = text;
+                                            clipEditorTab.displayComputedTitle = text;
                                             clipsModel.reload();
                                         }
-                                        focus = false; // Remove focus after saving
+                                        clipEditorTab.isTitleEditing = false;
                                     }
 
-                                    // Auto-save on focus loss
+                                    // Save on focus loss
                                     onActiveFocusChanged: {
-                                        if (!activeFocus && root.selectedClipId !== -1 && text.length > 0 && text !== clipEditorTab.editingClipName) {
-                                            clipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
-                                            clipEditorTab.editingClipName = text;
-                                            clipsModel.reload();
+                                        if (!activeFocus && visible) {
+                                            if (root.selectedClipId !== -1 && text.length > 0 && text !== clipEditorTab.editingClipName) {
+                                                clipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                                clipEditorTab.editingClipName = text;
+                                                clipEditorTab.displayComputedTitle = text;
+                                                clipsModel.reload();
+                                            }
+                                            clipEditorTab.isTitleEditing = false;
                                         }
                                     }
+                                }
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "Enter title..."
-                                        color: Colors.textSecondary // was #666666
-                                        font: parent.font
-                                        visible: !clipTitleInput.text && !clipTitleInput.activeFocus
+                                // Read-only Title Display
+                                Text {
+                                    id: clipTitleDisplay
+                                    Layout.fillWidth: true
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: clipEditorTab.displayComputedTitle
+                                    color: Colors.textPrimary
+                                    font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                                    font.pixelSize: 16
+                                    font.weight: Font.DemiBold
+                                    wrapMode: Text.Wrap
+                                    visible: !clipEditorTab.isTitleEditing
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onDoubleClicked: {
+                                            clipTitleInput.text = clipEditorTab.displayComputedTitle;
+                                            clipEditorTab.isTitleEditing = true;
+                                        }
                                     }
                                 }
 
@@ -2149,7 +2218,10 @@ Rectangle {
                                     MouseArea {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: clipTitleInput.forceActiveFocus()
+                                        onClicked: {
+                                            clipTitleInput.text = clipEditorTab.displayComputedTitle;
+                                            clipEditorTab.isTitleEditing = true;
+                                        }
                                     }
                                 }
                             }

@@ -27,8 +27,8 @@ struct Clip
     bool isRepeat  = false;   // loop flag
     bool locked    = false;   // read-only while playing
     
-    // Reproduction mode (0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Loop/Repeat)
-    int reproductionMode = 0;  // Defaults to Overlay mode
+    // Reproduction mode (0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Repeat,   4=Loop)
+    int reproductionMode = 2;  // Defaults to Play/Stop mode
     
     // Playback behavior options
     bool stopOtherSounds = false;       // Stop other clips when this plays

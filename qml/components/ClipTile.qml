@@ -198,8 +198,11 @@ Item {
             id: progressOverlayContainer
             anchors.fill: parent
             anchors.margins: 2 * root.scaleFactor
-            visible: root.isPlaying && root.playbackProgress > 0.001
-            z: 5  // Above background, below UI elements
+            visible: root.playbackProgress > 0
+            z: 5
+
+            // Debug logging
+
             clip: true
 
             // Rounded clip mask - applied to the entire container
@@ -230,7 +233,7 @@ Item {
                 radius: Math.min(14 * root.scaleFactor, width / 2, height / 2)
                 clip: true
                 // Only show when there's meaningful progress to display
-                visible: root.isPlaying && safeProgress > 0.001
+                visible: safeProgress > 0.001
 
                 // Gradient effect for the progress overlay
                 gradient: Gradient {
@@ -434,7 +437,6 @@ Item {
                     }
                 }
 
-                
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true

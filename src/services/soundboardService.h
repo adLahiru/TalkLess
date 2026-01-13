@@ -274,6 +274,7 @@ private:
 
     // Preview state
     bool m_recordingPreviewPlaying = false;
+    bool m_hasUnsavedRecording = false;
 
     // Dirty flags to track unsaved changes
     bool m_indexDirty = false;

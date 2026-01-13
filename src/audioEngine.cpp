@@ -829,19 +829,29 @@ void AudioEngine::audioCallback(ma_device* pDevice, void* pOutput, const void* p
 {
     auto* engine = static_cast<AudioEngine*>(pDevice->pUserData);
     if (engine && engine->deviceRunning.load(std::memory_order_acquire)) {
-        engine->processAudio(pOutput, pInput, frameCount, pDevice->playback.channels, pDevice->capture.channels);
+        engine->processAudio(
+            pOutput,
+            pInput,
+            frameCount,
+            pDevice->playback.channels,
+            pDevice->capture.channels,
+            pDevice->capture.format
+        );
     } else if (pOutput) {
         std::memset(pOutput, 0, frameCount * pDevice->playback.channels * sizeof(float));
     }
 }
 
-void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameCount,
-                               ma_uint32 playbackChannels, ma_uint32 captureChannels)
+void AudioEngine::processAudio(void* output,
+                               const void* input,
+                               ma_uint32 frameCount,
+                               ma_uint32 playbackChannels,
+                               ma_uint32 captureChannels,
+                               ma_format captureFormat)
 {
     if (!output) return;
 
     float* out = static_cast<float*>(output);
-    const float* micIn = static_cast<const float*>(input);
 
     const ma_uint32 totalSamples = frameCount * playbackChannels;
     std::memset(out, 0, totalSamples * sizeof(float));
@@ -850,7 +860,7 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
     float micMul = 1.0f, clipMul = 1.0f;
     computeBalanceMultipliers(micSoundboardBalance.load(std::memory_order_relaxed), micMul, clipMul);
 
-    // Optional recording temp (stereo)
+    // Optional recording temp (stereo or N-ch playback-sized)
     const bool recActive = recording.load(std::memory_order_relaxed);
     thread_local std::vector<float> recTemp;
     if (recActive) {
@@ -858,20 +868,42 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
         std::fill(recTemp.begin(), recTemp.end(), 0.0f);
     }
 
-    // -------------------------
-    // Mic
-    // -------------------------
+    // --------------------------------------------------------
+    // Mic (handles f32 OR s16 capture correctly)
+    // --------------------------------------------------------
     float micPeak = 0.0f;
     const bool passthrough = micPassthroughEnabled.load(std::memory_order_relaxed);
     const bool micOn = micEnabled.load(std::memory_order_relaxed);
     const float micG = micGain.load(std::memory_order_relaxed);
 
-    if (micIn && captureChannels > 0 && micOn) {
+    auto readCaptureSample = [&](ma_uint32 frame, ma_uint32 ch) -> float {
+        if (!input) return 0.0f;
+        if (captureChannels == 0) return 0.0f;
+
+        switch (captureFormat) {
+            case ma_format_f32: {
+                const float* in = static_cast<const float*>(input);
+                return in[frame * captureChannels + ch];
+            }
+            case ma_format_s16: {
+                const int16_t* in = static_cast<const int16_t*>(input);
+                // convert int16 PCM [-32768..32767] -> float [-1..1]
+                return (float)in[frame * captureChannels + ch] / 32768.0f;
+            }
+            default:
+                // If you add more formats in initDevice(), handle them here.
+                return 0.0f;
+        }
+    };
+
+    if (input && captureChannels > 0 && micOn) {
         for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
             float mono = 0.0f;
+
             for (ma_uint32 ch = 0; ch < captureChannels; ++ch) {
-                mono += micIn[frame * captureChannels + ch];
+                mono += readCaptureSample(frame, ch);
             }
+
             mono = (mono / (float)captureChannels) * micG * micMul;
 
             micPeak = std::max(micPeak, std::abs(mono));
@@ -898,9 +930,9 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
         if (micPeak > cur) micPeakLevel.store(micPeak, std::memory_order_relaxed);
     }
 
-    // -------------------------
+    // --------------------------------------------------------
     // Clips mixing (MAIN ring buffers)
-    // -------------------------
+    // --------------------------------------------------------
     for (int slotId = 0; slotId < MAX_CLIPS; ++slotId) {
         ClipSlot& slot = clips[slotId];
         auto st = slot.state.load(std::memory_order_relaxed);
@@ -944,10 +976,9 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
         }
     }
 
-    // -------------------------
+    // --------------------------------------------------------
     // Recording-input device (optional)
-    // If "-1" => disabled => not recorded.
-    // -------------------------
+    // --------------------------------------------------------
     if (recActive && recordingInputEnabled.load(std::memory_order_relaxed)) {
         // ring buffer is mono frames
         void* pRead = nullptr;
@@ -964,12 +995,11 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
             }
             ma_pcm_rb_commit_read(&recordingInputRb, want);
         }
-        // if not enough frames, missing portion is silence (fine)
     }
 
-    // -------------------------
+    // --------------------------------------------------------
     // Master gain + peak + limiter (playback)
-    // -------------------------
+    // --------------------------------------------------------
     const float mg = masterGain.load(std::memory_order_relaxed);
     float outPeak = 0.0f;
 
@@ -983,11 +1013,10 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
     float cur = masterPeakLevel.load(std::memory_order_relaxed);
     if (outPeak > cur) masterPeakLevel.store(outPeak, std::memory_order_relaxed);
 
-    // -------------------------
+    // --------------------------------------------------------
     // Write recording buffer (post-master, post-limiter)
-    // -------------------------
+    // --------------------------------------------------------
     if (recActive) {
-        // apply master + limiter to recording too (matches what user hears)
         for (ma_uint32 i = 0; i < totalSamples; ++i) {
             float v = recTemp[i] * mg;
             if (v > 1.0f) v = 1.0f;
