@@ -59,22 +59,6 @@ ApplicationWindow {
         }
     }
 
-    Component.onCompleted: {
-        // Store initial device lists for hotplug detection
-        lastKnownInputDevices = soundboardService.getInputDevices();
-        lastKnownOutputDevices = soundboardService.getOutputDevices();
-        // Initialize Theme from Backend
-        Colors.setTheme(soundboardService.theme);
-        Colors.setAccent(soundboardService.accentColor);
-
-        // Initialize first soundboard on startup
-        var firstBoardId = soundboardService.activeBoardId();
-        if (firstBoardId >= 0) {
-            clipsModel.boardId = firstBoardId;
-            clipsModel.reload();
-        }
-    }
-
     property bool isSoundboardDetached: false
 
     // ---- Hotkey Capture Popup ----
@@ -106,7 +90,46 @@ ApplicationWindow {
     }
 
     // ---- Authentication State ----
-    property bool isLoggedIn: false
+    // Bind to apiClient state
+    property bool isLoggedIn: apiClient.isLoggedIn
+    property string userDisplayName: apiClient.displayName
+
+    // Check for saved session on startup
+    Component.onCompleted: {
+        // Store initial device lists for hotplug detection
+        lastKnownInputDevices = soundboardService.getInputDevices();
+        lastKnownOutputDevices = soundboardService.getOutputDevices();
+        // Initialize Theme from Backend
+        Colors.setTheme(soundboardService.theme);
+        Colors.setAccent(soundboardService.accentColor);
+
+        // Initialize first soundboard on startup
+        var firstBoardId = soundboardService.activeBoardId;
+        if (firstBoardId >= 0) {
+            clipsModel.boardId = firstBoardId;
+            clipsModel.reload();
+        }
+
+        // Check for saved authentication session
+        apiClient.checkSavedSession();
+    }
+
+    // Connect to apiClient for logout handling
+    Connections {
+        target: apiClient
+
+        function onLogoutSuccess() {
+            console.log("[Main] User logged out");
+        }
+
+        function onSessionRestored() {
+            console.log("[Main] Session restored for:", apiClient.displayName);
+        }
+
+        function onSessionInvalid() {
+            console.log("[Main] No valid session, showing login");
+        }
+    }
 
     // ---- Toast Notification ----
     Rectangle {
@@ -159,10 +182,6 @@ ApplicationWindow {
         anchors.fill: parent
         z: 900 // Above main content, below splash screen
         visible: !isLoggedIn
-
-        onAuthComplete: {
-            mainWindow.isLoggedIn = true;
-        }
     }
 
     ColumnLayout {
@@ -242,18 +261,18 @@ ApplicationWindow {
                             // Always visible - users can detach multiple soundboards
                             visible: true
                             // Mark as detached only if THIS specific board is detached
-                            isDetached: mainWindow.isBoardDetached(clipsModel.boardId)
+                            isDetached: clipsModel ? mainWindow.isBoardDetached(clipsModel.boardId) : false
 
                             onRequestDetach: {
                                 // Detach the currently displayed board
-                                var currentBoardId = clipsModel.boardId;
+                                var currentBoardId = clipsModel ? clipsModel.boardId : -1;
                                 if (currentBoardId >= 0) {
                                     mainWindow.detachBoard(currentBoardId);
                                 }
                             }
                             onRequestDock: {
                                 // Dock the currently displayed board
-                                var currentBoardId = clipsModel.boardId;
+                                var currentBoardId = clipsModel ? clipsModel.boardId : -1;
                                 if (currentBoardId >= 0) {
                                     mainWindow.dockBoard(currentBoardId);
                                 }
@@ -263,7 +282,7 @@ ApplicationWindow {
                         // Overlay message when current board is detached
                         Rectangle {
                             anchors.fill: parent
-                            visible: mainWindow.isBoardDetached(clipsModel.boardId)
+                            visible: clipsModel ? mainWindow.isBoardDetached(clipsModel.boardId) : false
                             color: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.9)
                             radius: 10
 
@@ -304,7 +323,7 @@ ApplicationWindow {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            var currentBoardId = clipsModel.boardId;
+                                            var currentBoardId = clipsModel ? clipsModel.boardId : -1;
                                             if (currentBoardId >= 0) {
                                                 mainWindow.dockBoard(currentBoardId);
                                             }
@@ -561,7 +580,7 @@ ApplicationWindow {
     Connections {
         target: mainWindow
         function onIsSoundboardDetachedChanged() {
-            var currentBoardId = clipsModel.boardId;
+            var currentBoardId = clipsModel ? clipsModel.boardId : -1;
             if (currentBoardId < 0)
                 return;
 

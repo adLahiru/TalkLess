@@ -151,14 +151,19 @@ Rectangle {
                 }
             }
 
-            // User Name
+            // User Name - shows "Guest" for guest users, first name otherwise
             Text {
-                text: "Johnson"
-                color: "#FFFFFF"
-                font.family: orelegaOneFont.status === FontLoader.Ready ? orelegaOneFont.name : "Arial"
-                font.pixelSize: 18
+                text: apiClient && apiClient.isLoggedIn ? apiClient.displayName : ""
+                color: Colors.textPrimary
+                font.family: "Orelega One"
+                font.pixelSize: 20
                 font.weight: Font.Normal
+                font.styleName: "Regular"
+                lineHeight: 1.0
+                lineHeightMode: Text.ProportionalHeight
+                verticalAlignment: Text.AlignVCenter
                 Layout.alignment: Qt.AlignVCenter
+                visible: apiClient && apiClient.isLoggedIn
             }
         }
     }

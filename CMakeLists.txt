@@ -16,7 +16,7 @@ set(CMAKE_AUTORCC ON)
 set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "" FORCE)
 
 # Require Qt 6.5+
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg Network)
 qt_standard_project_setup(REQUIRES 6.5)
 
 # ---- FIX: QTP0004 only exists in newer Qt versions (not in 6.5.x) ----
@@ -146,6 +146,9 @@ endforeach()
 qt_add_qml_module(appTalkLess
     URI TalkLess
     VERSION 1.0
+    SOURCES
+        src/services/ApiClient.h
+        src/services/ApiClient.cpp
     QML_FILES
         Main.qml
         qml/components/Sidebar.qml
@@ -190,6 +193,7 @@ qt_add_qml_module(appTalkLess
 
 target_include_directories(appTalkLess PRIVATE
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/services
     ${CMAKE_SOURCE_DIR}/lib
 )
 
@@ -200,6 +204,7 @@ target_link_libraries(appTalkLess PRIVATE
     Qt6::Multimedia
     Qt6::QuickControls2
     Qt6::Svg
+    Qt6::Network
     QHotkey::QHotkey
 )
 

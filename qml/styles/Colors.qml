@@ -27,6 +27,12 @@ QtObject {
     property color surface: currentTheme === "light" ? "#FFFFFF" : "#121214"
     property color surfaceLight: currentTheme === "light" ? "#FDFDFD" : "#1C1C1E"
     property color surfaceDark: currentTheme === "light" ? "#CBD5E1" : "#080809"
+    property color surfaceHighlight: currentTheme === "light" ? "#E2E8F0" : "#2A2A2E"
+
+    // Accent Variations
+    property color accentLight: Qt.lighter(accent, 1.2)
+    property color accentDark: Qt.darker(accent, 1.2)
+    property color accentMedium: Qt.darker(accent, 1.1)
 
     // Panel & Card Colors
     property color panelBg: currentTheme === "light" ? "#FFFFFF" : "#141416"
