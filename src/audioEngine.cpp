@@ -94,11 +94,27 @@ AudioEngine::~AudioEngine()
         delete context;
         context = nullptr;
     }
+    
+    // stop recording writer if still running
+    recording.store(false, std::memory_order_release);
+    recordingWriterRunning.store(false, std::memory_order_release);
+    if (recordingWriterThread.joinable()) {
+        recordingWriterThread.join();
+    }
+    shutdownRecordingRingBuffer();
+
 }
 
 // ------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------
+static inline float softClip(float x)
+{
+    // Fast soft clipper: x/(1+|x|)  -> smoother than hard clamp, avoids harsh distortion
+    const float ax = std::fabs(x);
+    return x / (1.0f + ax);
+}
+
 float AudioEngine::dBToLinear(float db)
 {
     return std::pow(10.0f, db / 20.0f);
@@ -877,10 +893,12 @@ float AudioEngine::getMicPeakLevel() const
 {
     return micPeakLevel.load(std::memory_order_relaxed);
 }
+
 float AudioEngine::getMasterPeakLevel() const
 {
     return masterPeakLevel.load(std::memory_order_relaxed);
 }
+
 float AudioEngine::getMonitorPeakLevel() const
 {
     return monitorPeakLevel.load(std::memory_order_relaxed);
@@ -928,14 +946,12 @@ void AudioEngine::audioCallback(ma_device* pDevice, void* pOutput, const void* p
     }
 }
 
-void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameCount, ma_uint32 playbackChannels,
-                               ma_uint32 captureChannels, ma_format captureFormat)
+void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameCount,
+                               ma_uint32 playbackChannels, ma_uint32 captureChannels, ma_format captureFormat)
 {
-    if (!output)
-        return;
+    if (!output) return;
 
     float* out = static_cast<float*>(output);
-
     const ma_uint32 totalSamples = frameCount * playbackChannels;
     std::memset(out, 0, totalSamples * sizeof(float));
 
@@ -943,17 +959,16 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
     float micMul = 1.0f, clipMul = 1.0f;
     computeBalanceMultipliers(micSoundboardBalance.load(std::memory_order_relaxed), micMul, clipMul);
 
-    // Optional recording temp (stereo or N-ch playback-sized)
+    // Recording temp buffer (same channels as playback)
     const bool recActive = recording.load(std::memory_order_relaxed);
     thread_local std::vector<float> recTemp;
     if (recActive) {
-        if (recTemp.size() != totalSamples)
-            recTemp.resize(totalSamples);
+        if (recTemp.size() != totalSamples) recTemp.resize(totalSamples);
         std::fill(recTemp.begin(), recTemp.end(), 0.0f);
     }
 
     // --------------------------------------------------------
-    // Mic (handles f32 OR s16 capture correctly)
+    // Mic (handles f32 OR s16 capture)
     // --------------------------------------------------------
     float micPeak = 0.0f;
     const bool passthrough = micPassthroughEnabled.load(std::memory_order_relaxed);
@@ -961,10 +976,7 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
     const float micG = micGain.load(std::memory_order_relaxed);
 
     auto readCaptureSample = [&](ma_uint32 frame, ma_uint32 ch) -> float {
-        if (!input)
-            return 0.0f;
-        if (captureChannels == 0)
-            return 0.0f;
+        if (!input || captureChannels == 0) return 0.0f;
 
         switch (captureFormat) {
         case ma_format_f32: {
@@ -973,11 +985,9 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
         }
         case ma_format_s16: {
             const int16_t* in = static_cast<const int16_t*>(input);
-            // convert int16 PCM [-32768..32767] -> float [-1..1]
             return (float)in[frame * captureChannels + ch] / 32768.0f;
         }
         default:
-            // If you add more formats in initDevice(), handle them here.
             return 0.0f;
         }
     };
@@ -985,13 +995,11 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
     if (input && captureChannels > 0 && micOn) {
         for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
             float mono = 0.0f;
-
             for (ma_uint32 ch = 0; ch < captureChannels; ++ch) {
                 mono += readCaptureSample(frame, ch);
             }
 
             mono = (mono / (float)captureChannels) * micG * micMul;
-
             micPeak = std::max(micPeak, std::abs(mono));
 
             // playback routing (only if passthrough ON)
@@ -1002,7 +1010,7 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
                 }
             }
 
-            // recording always records mic when micEnabled==true (even if passthrough OFF)
+            // recording captures mic when micEnabled==true (even if passthrough OFF)
             if (recActive) {
                 const ma_uint32 o = frame * playbackChannels;
                 for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) {
@@ -1011,10 +1019,8 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
             }
         }
 
-        // peak update
         float cur = micPeakLevel.load(std::memory_order_relaxed);
-        if (micPeak > cur)
-            micPeakLevel.store(micPeak, std::memory_order_relaxed);
+        if (micPeak > cur) micPeakLevel.store(micPeak, std::memory_order_relaxed);
     }
 
     // --------------------------------------------------------
@@ -1023,39 +1029,43 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
     for (int slotId = 0; slotId < MAX_CLIPS; ++slotId) {
         ClipSlot& slot = clips[slotId];
         auto st = slot.state.load(std::memory_order_relaxed);
-        if (st != ClipState::Playing && st != ClipState::Draining)
-            continue;
+        if (st != ClipState::Playing && st != ClipState::Draining) continue;
 
         const float clipGain = slot.gain.load(std::memory_order_relaxed) * clipMul;
 
         void* pRead = nullptr;
         ma_uint32 availFrames = frameCount;
-        if (ma_pcm_rb_acquire_read(&slot.ringBufferMain, &availFrames, &pRead) == MA_SUCCESS && availFrames > 0 &&
-            pRead) {
+
+        if (ma_pcm_rb_acquire_read(&slot.ringBufferMain, &availFrames, &pRead) == MA_SUCCESS &&
+            availFrames > 0 && pRead)
+        {
             float* clip = static_cast<float*>(pRead); // stereo (2ch)
 
             if (playbackChannels == 2) {
                 for (ma_uint32 f = 0; f < availFrames; ++f) {
                     const ma_uint32 o = f * 2;
-                    out[o] += clip[f * 2] * clipGain;
-                    out[o + 1] += clip[f * 2 + 1] * clipGain;
+
+                    const float L = clip[f * 2] * clipGain;
+                    const float R = clip[f * 2 + 1] * clipGain;
+
+                    out[o]     += L;
+                    out[o + 1] += R;
 
                     if (recActive) {
-                        recTemp[o] += clip[f * 2] * clipGain;
-                        recTemp[o + 1] += clip[f * 2 + 1] * clipGain;
+                        recTemp[o]     += L;
+                        recTemp[o + 1] += R;
                     }
                 }
             } else {
                 for (ma_uint32 f = 0; f < availFrames; ++f) {
-                    float L = clip[f * 2] * clipGain;
-                    float R = clip[f * 2 + 1] * clipGain;
-                    float mono = (L + R) * 0.5f;
+                    const float L = clip[f * 2] * clipGain;
+                    const float R = clip[f * 2 + 1] * clipGain;
+                    const float mono = (L + R) * 0.5f;
 
                     const ma_uint32 o = f * playbackChannels;
                     for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) {
                         out[o + ch] += mono;
-                        if (recActive)
-                            recTemp[o + ch] += mono;
+                        if (recActive) recTemp[o + ch] += mono;
                     }
                 }
             }
@@ -1067,61 +1077,70 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
     }
 
     // --------------------------------------------------------
-    // Recording-input device (optional)
+    // Recording-input device (optional): record-only, no playback
     // --------------------------------------------------------
     if (recActive && recordingInputEnabled.load(std::memory_order_relaxed)) {
-        // ring buffer is mono frames
         void* pRead = nullptr;
         ma_uint32 want = frameCount;
-        if (recordingInputRbData && ma_pcm_rb_acquire_read(&recordingInputRb, &want, &pRead) == MA_SUCCESS &&
-            want > 0 && pRead) {
+
+        if (recordingInputRbData &&
+            ma_pcm_rb_acquire_read(&recordingInputRb, &want, &pRead) == MA_SUCCESS &&
+            want > 0 && pRead)
+        {
             float* mono = static_cast<float*>(pRead);
+
             for (ma_uint32 f = 0; f < want; ++f) {
                 const float s = mono[f];
                 const ma_uint32 o = f * playbackChannels;
                 for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) {
-                    recTemp[o + ch] += s; // record only (not routed to playback)
+                    recTemp[o + ch] += s;
                 }
             }
+
             ma_pcm_rb_commit_read(&recordingInputRb, want);
         }
     }
 
     // --------------------------------------------------------
-    // Master gain + peak + limiter (playback)
+    // Master gain + headroom + soft limiting (no harsh clipping)
     // --------------------------------------------------------
     const float mg = masterGain.load(std::memory_order_relaxed);
-    float outPeak = 0.0f;
+    const float headroom = 0.5f; // -6 dB (use 0.25f if you still clip with many sources)
 
+    float outPeak = 0.0f;
     for (ma_uint32 i = 0; i < totalSamples; ++i) {
-        out[i] *= mg;
-        outPeak = std::max(outPeak, std::abs(out[i]));
-        if (out[i] > 1.0f)
-            out[i] = 1.0f;
-        if (out[i] < -1.0f)
-            out[i] = -1.0f;
+        float v = out[i] * (mg * headroom);
+        v = softClip(v);
+        out[i] = v;
+        outPeak = std::max(outPeak, std::abs(v));
     }
 
     float cur = masterPeakLevel.load(std::memory_order_relaxed);
-    if (outPeak > cur)
-        masterPeakLevel.store(outPeak, std::memory_order_relaxed);
+    if (outPeak > cur) masterPeakLevel.store(outPeak, std::memory_order_relaxed);
 
     // --------------------------------------------------------
-    // Write recording buffer (post-master, post-limiter)
+    // Recording output (REALTIME SAFE): write to ringbuffer only
     // --------------------------------------------------------
-    if (recActive) {
+    if (recActive && recordingRbData) {
+        // Apply same final processing to recorded stream
         for (ma_uint32 i = 0; i < totalSamples; ++i) {
-            float v = recTemp[i] * mg;
-            if (v > 1.0f)
-                v = 1.0f;
-            if (v < -1.0f)
-                v = -1.0f;
-            recTemp[i] = v;
+            float v = recTemp[i] * (mg * headroom);
+            recTemp[i] = softClip(v);
         }
 
-        std::lock_guard<std::mutex> lock(recordingMutex);
-        recordingBuffer.insert(recordingBuffer.end(), recTemp.begin(), recTemp.end());
-        recordedFrames.fetch_add(frameCount, std::memory_order_relaxed);
+        void* pWrite = nullptr;
+        ma_uint32 framesToWrite = frameCount;
+
+        if (ma_pcm_rb_acquire_write(&recordingRb, &framesToWrite, &pWrite) == MA_SUCCESS &&
+            framesToWrite > 0 && pWrite)
+        {
+            const size_t samplesToCopy = (size_t)framesToWrite * (size_t)playbackChannels;
+            std::memcpy(pWrite, recTemp.data(), samplesToCopy * sizeof(float));
+            ma_pcm_rb_commit_write(&recordingRb, framesToWrite);
+
+            recordedFrames.fetch_add(framesToWrite, std::memory_order_relaxed);
+        }
+        // If rb full: drop frames (better than glitching playback)
     }
 }
 
@@ -1703,60 +1722,113 @@ void AudioEngine::unloadClip(int slotId)
 // ------------------------------------------------------------
 bool AudioEngine::startRecording(const std::string& outputPath)
 {
-    if (recording.load(std::memory_order_relaxed))
-        return false;
-    if (outputPath.empty())
-        return false;
+    if (recording.load(std::memory_order_relaxed)) return false;
+    if (outputPath.empty()) return false;
 
-    // Ensure main device running
+    // Ensure main device running so callback executes
     if (!deviceRunning.load(std::memory_order_relaxed)) {
-        if (!startAudioDevice())
-            return false;
+        if (!startAudioDevice()) return false;
     }
 
-    // If recording-input device is enabled, start it (it may be selected already).
+    // Determine channel count from active playback device
+    recordingChannels = (device ? (int)device->playback.channels : (int)m_channels);
+    if (recordingChannels <= 0) recordingChannels = 2;
+
+    recordingOutputPath = outputPath;
+    recordedFrames.store(0, std::memory_order_relaxed);
+    recordingWriteOk.store(false, std::memory_order_relaxed);
+
+    // Init realtime ringbuffer for recording output
+    if (!initRecordingRingBuffer(m_sampleRate, (ma_uint32)recordingChannels)) {
+        return false;
+    }
+    ma_pcm_rb_reset(&recordingRb);
+
+    // Start optional extra recording input device
     if (recordingInputEnabled.load(std::memory_order_relaxed)) {
-        // safe start
         startRecordingInputDevice();
         ma_pcm_rb_reset(&recordingInputRb);
     }
 
-    {
-        std::lock_guard<std::mutex> lock(recordingMutex);
-        recordingBuffer.clear();
-        recordingBuffer.reserve(m_sampleRate * 2 * 60); // 60s stereo
-    }
+    // Start writer thread (non-realtime)
+    recordingWriterRunning.store(true, std::memory_order_release);
+    recordingWriterThread = std::thread([this]() {
+        std::vector<float> collected;
+        collected.reserve((size_t)m_sampleRate * (size_t)recordingChannels * 60); // reserve ~60s
 
-    recordingOutputPath = outputPath;
-    recordedFrames.store(0, std::memory_order_relaxed);
+        // Drain while running
+        while (recordingWriterRunning.load(std::memory_order_acquire)) {
+            void* pRead = nullptr;
+            ma_uint32 frames = 1024;
+
+            if (ma_pcm_rb_acquire_read(&recordingRb, &frames, &pRead) == MA_SUCCESS &&
+                frames > 0 && pRead)
+            {
+                float* f = static_cast<float*>(pRead);
+                collected.insert(collected.end(),
+                                 f,
+                                 f + (size_t)frames * (size_t)recordingChannels);
+                ma_pcm_rb_commit_read(&recordingRb, frames);
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+        }
+
+        // Final drain
+        for (;;) {
+            void* pRead = nullptr;
+            ma_uint32 frames = 1024;
+
+            if (ma_pcm_rb_acquire_read(&recordingRb, &frames, &pRead) == MA_SUCCESS &&
+                frames > 0 && pRead)
+            {
+                float* f = static_cast<float*>(pRead);
+                collected.insert(collected.end(),
+                                 f,
+                                 f + (size_t)frames * (size_t)recordingChannels);
+                ma_pcm_rb_commit_read(&recordingRb, frames);
+            } else {
+                break;
+            }
+        }
+
+        const bool ok =
+            !collected.empty() &&
+            writeWavFile(recordingOutputPath, collected, (int)m_sampleRate, recordingChannels);
+
+        recordingWriteOk.store(ok, std::memory_order_release);
+    });
+
+    // Enable recording for audio callback
     recording.store(true, std::memory_order_release);
     return true;
 }
 
 bool AudioEngine::stopRecording()
 {
-    if (!recording.load(std::memory_order_relaxed))
-        return false;
+    if (!recording.load(std::memory_order_relaxed)) return false;
 
+    // Stop callback from pushing new frames
     recording.store(false, std::memory_order_release);
+
+    // Let current callback finish
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-    // stop recording input device if it was running (optional)
+    // Stop recording input device if it was running
     if (recordingInputRunning.load(std::memory_order_relaxed)) {
         stopRecordingInputDevice();
     }
 
-    std::vector<float> samples;
-    {
-        std::lock_guard<std::mutex> lock(recordingMutex);
-        samples = std::move(recordingBuffer);
-        recordingBuffer.clear();
+    // Stop writer thread and wait for WAV writing to complete
+    recordingWriterRunning.store(false, std::memory_order_release);
+    if (recordingWriterThread.joinable()) {
+        recordingWriterThread.join();
     }
 
-    if (samples.empty())
-        return false;
+    // Free recording ringbuffer
+    shutdownRecordingRingBuffer();
 
-    return writeWavFile(recordingOutputPath, samples, (int)m_sampleRate, 2);
+    return recordingWriteOk.load(std::memory_order_acquire);
 }
 
 bool AudioEngine::isRecording() const
@@ -1768,6 +1840,44 @@ float AudioEngine::getRecordingDuration() const
 {
     uint64_t frames = recordedFrames.load(std::memory_order_relaxed);
     return (float)frames / (float)m_sampleRate;
+}
+
+bool AudioEngine::initRecordingRingBuffer(ma_uint32 sampleRate, ma_uint32 channels)
+{
+    // Keep ~10 seconds in RAM
+    const ma_uint32 seconds = 10;
+    const ma_uint32 frames = sampleRate * seconds;
+
+    // Recreate if already exists
+    shutdownRecordingRingBuffer();
+
+    const size_t bytes = (size_t)frames * (size_t)channels * sizeof(float);
+    recordingRbData = std::malloc(bytes);
+    if (!recordingRbData) {
+        recordingRbFrames = 0;
+        return false;
+    }
+
+    ma_result r = ma_pcm_rb_init(ma_format_f32, channels, frames, recordingRbData, nullptr, &recordingRb);
+    if (r != MA_SUCCESS) {
+        std::free(recordingRbData);
+        recordingRbData = nullptr;
+        recordingRbFrames = 0;
+        return false;
+    }
+
+    recordingRbFrames = frames;
+    return true;
+}
+
+void AudioEngine::shutdownRecordingRingBuffer()
+{
+    if (recordingRbData) {
+        ma_pcm_rb_uninit(&recordingRb);
+        std::free(recordingRbData);
+        recordingRbData = nullptr;
+        recordingRbFrames = 0;
+    }
 }
 
 // ------------------------------------------------------------

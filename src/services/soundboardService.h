@@ -215,6 +215,9 @@ public:
     Q_INVOKABLE QString consumePendingRecordingPath(); // returns path once, then clears it
     Q_INVOKABLE void cancelPendingRecording();         // stops + deletes file + clears state
 
+    // ---- Application Control ----
+    Q_INVOKABLE void restartApplication();
+
     // ---- Recording preview (NO soundboard add) ----
     Q_INVOKABLE QVariantList listBoardsForDropdown() const;
     Q_INVOKABLE bool playLastRecordingPreview();

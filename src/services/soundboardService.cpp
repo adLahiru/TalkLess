@@ -2,6 +2,7 @@
 
 #include "audioEngine.h"
 
+#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDebug>
@@ -176,6 +177,28 @@ void SoundboardService::saveAllChanges()
     }
 
     qDebug() << "All changes saved successfully.";
+}
+
+void SoundboardService::restartApplication()
+{
+    qDebug() << "Restarting application...";
+
+    // 1) Save all changes before restarting
+    saveAllChanges();
+
+    // 2) Get the application path
+    QString appPath = QCoreApplication::applicationFilePath();
+    qDebug() << "Application path:" << appPath;
+
+    // 3) Start a new instance of the application
+    bool started = QProcess::startDetached(appPath, QStringList());
+    if (!started) {
+        qWarning() << "Failed to start new application instance";
+        return;
+    }
+
+    // 4) Quit the current instance
+    QCoreApplication::quit();
 }
 
 void SoundboardService::reloadIndex()

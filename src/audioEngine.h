@@ -8,6 +8,8 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <condition_variable>
+#include <cmath>
 
 // miniaudio implementation is in miniaudio_impl.cpp
 #include "miniaudio.h"
@@ -152,7 +154,7 @@ public:
     // ---------------------------
     // Recording (WAV)
     // - Records: Mic (if enabled) + Clips + RecordingInputDevice (if enabled and not "-1")
-    // - Always outputs stereo 48kHz
+    // - Outputs using current playback channel count (usually stereo)
     // ---------------------------
     bool startRecording(const std::string& outputPath);
     bool stopRecording();
@@ -234,6 +236,10 @@ private:
     // DSP helpers
     static float dBToLinear(float db);
     static void computeBalanceMultipliers(float balance, float& micMul, float& clipMul);
+
+    // Realtime-safe recording ringbuffer helpers
+    bool initRecordingRingBuffer(ma_uint32 sampleRate, ma_uint32 channels);
+    void shutdownRecordingRingBuffer();
 
     // Main audio callback
     static void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
@@ -329,10 +335,25 @@ private:
     ClipErrorCallback clipErrorCallback;
     ClipLoopedCallback clipLoopedCallback;
 
-    // Recording
+    // ------------------------------------------------------------
+    // Recording (realtime-safe)
+    // ------------------------------------------------------------
     std::atomic<bool> recording{false};
-    std::mutex recordingMutex;
-    std::vector<float> recordingBuffer; // float stereo interleaved
+
+    // New: ringbuffer for recording output (float interleaved)
+    ma_pcm_rb recordingRb{};
+    void* recordingRbData = nullptr;
+    ma_uint32 recordingRbFrames = 0;
+
+    std::thread recordingWriterThread;
+    std::atomic<bool> recordingWriterRunning{false};
+    std::atomic<bool> recordingWriteOk{false};
+
+    int recordingChannels = 2; // usually = device->playback.channels
     std::string recordingOutputPath;
     std::atomic<uint64_t> recordedFrames{0};
+
+    // Legacy (old method) - keep if other code uses it, but should not be used anymore
+    std::mutex recordingMutex;
+    std::vector<float> recordingBuffer; // legacy
 };

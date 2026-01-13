@@ -603,11 +603,10 @@ Rectangle {
                             }
                         }
                     }
-
                     // Advanced Audio Settings Section
                     ColumnLayout {
                         id: advancedAudioSection
-                        width: parent.width - 40
+                        width: fill.parent.width
                         x: 20
                         y: microphoneContent.y + microphoneContent.height + 40  // More top margin
                         spacing: 16
@@ -797,6 +796,14 @@ Rectangle {
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 12
                             font.italic: true
+                        }
+
+                        Button {
+                            text: "Restart Now"
+                            Layout.preferredWidth: 120
+                            onClicked: {
+                                soundboardService.restartApplication();
+                            }
                         }
                     }
                 }
