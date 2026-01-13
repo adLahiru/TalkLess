@@ -946,6 +946,9 @@ void AudioEngine::audioCallback(ma_device* pDevice, void* pOutput, const void* p
     }
 }
 
+// ------------------------------------------------------------
+// Main callback processing (FIXED: no constant attenuation, transparent limiter)
+// ------------------------------------------------------------
 void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameCount,
                                ma_uint32 playbackChannels, ma_uint32 captureChannels, ma_format captureFormat)
 {
@@ -1045,7 +1048,7 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
                 for (ma_uint32 f = 0; f < availFrames; ++f) {
                     const ma_uint32 o = f * 2;
 
-                    const float L = clip[f * 2] * clipGain;
+                    const float L = clip[f * 2]     * clipGain;
                     const float R = clip[f * 2 + 1] * clipGain;
 
                     out[o]     += L;
@@ -1058,7 +1061,7 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
                 }
             } else {
                 for (ma_uint32 f = 0; f < availFrames; ++f) {
-                    const float L = clip[f * 2] * clipGain;
+                    const float L = clip[f * 2]     * clipGain;
                     const float R = clip[f * 2 + 1] * clipGain;
                     const float mono = (L + R) * 0.5f;
 
@@ -1102,17 +1105,35 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
     }
 
     // --------------------------------------------------------
-    // Master gain + headroom + soft limiting (no harsh clipping)
+    // Master gain + transparent limiter (NO constant loudness loss)
     // --------------------------------------------------------
     const float mg = masterGain.load(std::memory_order_relaxed);
-    const float headroom = 0.5f; // -6 dB (use 0.25f if you still clip with many sources)
 
+    // safety peak (leave tiny headroom)
+    constexpr float targetPeak = 0.95f;
+
+    float prePeak = 0.0f;
+
+    // Apply master gain and measure peak
+    for (ma_uint32 i = 0; i < totalSamples; ++i) {
+        float v = out[i] * mg;
+        out[i] = v;
+        prePeak = std::max(prePeak, std::abs(v));
+    }
+
+    // Scale down whole block only if needed
+    float limiterGain = 1.0f;
+    if (prePeak > targetPeak && prePeak > 0.000001f) {
+        limiterGain = targetPeak / prePeak;
+        for (ma_uint32 i = 0; i < totalSamples; ++i) {
+            out[i] *= limiterGain;
+        }
+    }
+
+    // Peak meter (post)
     float outPeak = 0.0f;
     for (ma_uint32 i = 0; i < totalSamples; ++i) {
-        float v = out[i] * (mg * headroom);
-        v = softClip(v);
-        out[i] = v;
-        outPeak = std::max(outPeak, std::abs(v));
+        outPeak = std::max(outPeak, std::abs(out[i]));
     }
 
     float cur = masterPeakLevel.load(std::memory_order_relaxed);
@@ -1120,12 +1141,24 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
 
     // --------------------------------------------------------
     // Recording output (REALTIME SAFE): write to ringbuffer only
+    // (same processing as output: master gain + limiter)
     // --------------------------------------------------------
     if (recActive && recordingRbData) {
-        // Apply same final processing to recorded stream
+        float rPeak = 0.0f;
+
+        // Apply master gain to recorded mix and measure peak
         for (ma_uint32 i = 0; i < totalSamples; ++i) {
-            float v = recTemp[i] * (mg * headroom);
-            recTemp[i] = softClip(v);
+            float v = recTemp[i] * mg;
+            recTemp[i] = v;
+            rPeak = std::max(rPeak, std::abs(v));
+        }
+
+        float rLimiter = 1.0f;
+        if (rPeak > targetPeak && rPeak > 0.000001f) {
+            rLimiter = targetPeak / rPeak;
+            for (ma_uint32 i = 0; i < totalSamples; ++i) {
+                recTemp[i] *= rLimiter;
+            }
         }
 
         void* pWrite = nullptr;
@@ -1143,6 +1176,7 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
         // If rb full: drop frames (better than glitching playback)
     }
 }
+
 
 // ------------------------------------------------------------
 // Monitor callback + processing (clips only)
@@ -1750,53 +1784,62 @@ bool AudioEngine::startRecording(const std::string& outputPath)
         ma_pcm_rb_reset(&recordingInputRb);
     }
 
-    // Start writer thread (non-realtime)
+    // Start writer thread (non-realtime) - STREAM TO DISK (no huge RAM vector)
     recordingWriterRunning.store(true, std::memory_order_release);
+
     recordingWriterThread = std::thread([this]() {
-        std::vector<float> collected;
-        collected.reserve((size_t)m_sampleRate * (size_t)recordingChannels * 60); // reserve ~60s
+        // WAV encoder (32-bit float for high quality - better for editing)
+        ma_encoder encoder;
+        ma_encoder_config ecfg = ma_encoder_config_init(
+            ma_encoding_format_wav,
+            ma_format_f32,  // Use 32-bit float for better quality
+            (ma_uint32)recordingChannels,
+            m_sampleRate
+        );
+
+        ma_result er = ma_encoder_init_file(recordingOutputPath.c_str(), &ecfg, &encoder);
+        if (er != MA_SUCCESS) {
+            recordingWriteOk.store(false, std::memory_order_release);
+            // Drain/discard while running (avoid blocking the audio thread forever)
+            while (recordingWriterRunning.load(std::memory_order_acquire)) {
+                void* pRead = nullptr;
+                ma_uint32 frames = 4096;
+                if (ma_pcm_rb_acquire_read(&recordingRb, &frames, &pRead) == MA_SUCCESS && frames > 0 && pRead) {
+                    ma_pcm_rb_commit_read(&recordingRb, frames);
+                } else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                }
+            }
+            return;
+        }
+
+        auto drainOnce = [&](ma_uint32 framesWanted) -> bool {
+            void* pRead = nullptr;
+            ma_uint32 frames = framesWanted;
+
+            if (ma_pcm_rb_acquire_read(&recordingRb, &frames, &pRead) == MA_SUCCESS && frames > 0 && pRead) {
+                // Write float data directly - no conversion needed
+                ma_encoder_write_pcm_frames(&encoder, pRead, frames, nullptr);
+                ma_pcm_rb_commit_read(&recordingRb, frames);
+                return true;
+            }
+            return false;
+        };
 
         // Drain while running
         while (recordingWriterRunning.load(std::memory_order_acquire)) {
-            void* pRead = nullptr;
-            ma_uint32 frames = 1024;
-
-            if (ma_pcm_rb_acquire_read(&recordingRb, &frames, &pRead) == MA_SUCCESS &&
-                frames > 0 && pRead)
-            {
-                float* f = static_cast<float*>(pRead);
-                collected.insert(collected.end(),
-                                 f,
-                                 f + (size_t)frames * (size_t)recordingChannels);
-                ma_pcm_rb_commit_read(&recordingRb, frames);
-            } else {
+            if (!drainOnce(4096)) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(2));
             }
         }
 
         // Final drain
-        for (;;) {
-            void* pRead = nullptr;
-            ma_uint32 frames = 1024;
-
-            if (ma_pcm_rb_acquire_read(&recordingRb, &frames, &pRead) == MA_SUCCESS &&
-                frames > 0 && pRead)
-            {
-                float* f = static_cast<float*>(pRead);
-                collected.insert(collected.end(),
-                                 f,
-                                 f + (size_t)frames * (size_t)recordingChannels);
-                ma_pcm_rb_commit_read(&recordingRb, frames);
-            } else {
-                break;
-            }
+        while (drainOnce(4096)) {
+            // keep draining
         }
 
-        const bool ok =
-            !collected.empty() &&
-            writeWavFile(recordingOutputPath, collected, (int)m_sampleRate, recordingChannels);
-
-        recordingWriteOk.store(ok, std::memory_order_release);
+        ma_encoder_uninit(&encoder);
+        recordingWriteOk.store(true, std::memory_order_release);
     });
 
     // Enable recording for audio callback
@@ -1819,7 +1862,7 @@ bool AudioEngine::stopRecording()
         stopRecordingInputDevice();
     }
 
-    // Stop writer thread and wait for WAV writing to complete
+    // Stop writer thread and wait for WAV finalize
     recordingWriterRunning.store(false, std::memory_order_release);
     if (recordingWriterThread.joinable()) {
         recordingWriterThread.join();
@@ -1842,10 +1885,13 @@ float AudioEngine::getRecordingDuration() const
     return (float)frames / (float)m_sampleRate;
 }
 
+// ------------------------------------------------------------
+// Recording ringbuffer (FIXED: bigger buffer for fewer dropouts)
+// ------------------------------------------------------------
 bool AudioEngine::initRecordingRingBuffer(ma_uint32 sampleRate, ma_uint32 channels)
 {
-    // Keep ~10 seconds in RAM
-    const ma_uint32 seconds = 10;
+    // Keep ~30 seconds in RAM (bigger = fewer dropouts if disk stalls)
+    const ma_uint32 seconds = 30;
     const ma_uint32 frames = sampleRate * seconds;
 
     // Recreate if already exists

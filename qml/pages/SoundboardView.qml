@@ -1984,11 +1984,11 @@ Rectangle {
                                     }
 
                                     const title = recordingNameInput.text.trim() || "New Recording";
-                                    const pathUrl = Qt.resolvedUrl("file:///" + localPath); // ok, but see below
-                                    // Better if you expose a helper in C++ (recommended): QUrl::fromLocalFile(localPath).toString()
+                                    // Use local path directly - C++ handles file:// prefix conversion
+                                    // DO NOT use Qt.resolvedUrl as it creates malformed URLs on Windows
 
                                     // Convert normalized trim (0..1) to milliseconds
-                                    const durationSec = soundboardService.getFileDuration(pathUrl); // seconds
+                                    const durationSec = soundboardService.getFileDuration(localPath); // seconds
                                     const durationMs = Math.max(0, durationSec * 1000.0);
 
                                     let trimStartMs = waveformTrim.trimStart * durationMs;
@@ -2007,14 +2007,16 @@ Rectangle {
                                         trimEndMs = 0; // your engine treats 0 as full length
                                     }
 
-                                    const success = soundboardService.addClipWithSettings(boardId, pathUrl, title, trimStartMs, trimEndMs);
+                                    console.log("Adding clip - boardId:", boardId, "path:", localPath, "title:", title);
+                                    const success = soundboardService.addClipWithSettings(boardId, localPath, title, trimStartMs, trimEndMs);
 
                                     if (success) {
+                                        console.log("Clip added successfully");
                                         activeClipsModel.reload();
                                         recordingNameInput.text = "";
                                         rightSidebar.currentTabIndex = 0;
                                     } else {
-                                        console.log("addClipWithSettings failed");
+                                        console.log("addClipWithSettings failed for path:", localPath);
                                     }
                                 }
                             }
