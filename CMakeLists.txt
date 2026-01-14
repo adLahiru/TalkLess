@@ -179,6 +179,7 @@ qt_add_qml_module(appTalkLess
         qml/components/TrimWaveform.qml
         qml/components/AudioPlayerCard.qml
         qml/pages/ApplicationSettingsView.qml
+        qml/pages/AudioPlaybackView.qml
         qml/pages/SoundboardView.qml
         qml/pages/AuthView.qml
         qml/pages/LoginPage.qml

@@ -334,17 +334,13 @@ ApplicationWindow {
                         }
                     }
 
-                    // Audio Playback Engine (placeholder)
-                    Rectangle {
-                        color: Colors.background
-                        radius: 10
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Audio Playback Engine"
-                            color: Colors.textSecondary
-                            font.pixelSize: 32
-                        }
+
+                    // Audio Playback Engine
+                    AudioPlaybackView {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
                     }
+
 
                     // Macros & Automation (placeholder)
                     Rectangle {
