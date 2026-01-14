@@ -14,53 +14,54 @@ Rectangle {
     property string selectedId: ""
     property string icon: ""
     property var model: []  // Array of objects with {id, name, isDefault}
+    property bool openUpward: false  // When true, popup opens above the control
 
     signal itemSelected(string id, string name)
-    signal aboutToOpen()
+    signal aboutToOpen
 
     // Internal list model to properly manage items
     property var internalModel: []
 
     onModelChanged: {
         // Copy model to internal list to avoid binding issues
-        var items = []
+        var items = [];
         if (model && model.length > 0) {
             for (var i = 0; i < model.length; i++) {
-                var rawId = model[i] && model[i].id
-                var rawName = model[i] && model[i].name
+                var rawId = model[i] && model[i].id;
+                var rawName = model[i] && model[i].name;
                 items.push({
                     // IMPORTANT: normalize ids to string to avoid "1" vs 1 mismatch
                     id: (rawId !== undefined && rawId !== null) ? String(rawId) : "",
                     name: (rawName !== undefined && rawName !== null) ? String(rawName) : "",
                     isDefault: (model[i] && model[i].isDefault) ? true : false
-                })
+                });
             }
         }
-        internalModel = items
+        internalModel = items;
 
         // Update selected name if models change
-        updateSelectedName()
+        updateSelectedName();
     }
 
     onSelectedIdChanged: updateSelectedName()
 
     function updateSelectedName() {
-        var sid = (selectedId !== undefined && selectedId !== null) ? String(selectedId) : ""
+        var sid = (selectedId !== undefined && selectedId !== null) ? String(selectedId) : "";
 
         if (sid.length === 0) {
-            selectedValue = ""
-            return
+            selectedValue = "";
+            return;
         }
 
         for (var i = 0; i < internalModel.length; i++) {
             if (internalModel[i].id === sid) {
-                selectedValue = internalModel[i].name
-                return
+                selectedValue = internalModel[i].name;
+                return;
             }
         }
 
         // If selectedId is not in the model, show placeholder
-        selectedValue = ""
+        selectedValue = "";
     }
 
     height: 50
@@ -70,7 +71,9 @@ Rectangle {
     border.color: dropdownPopup.visible ? Colors.borderLight : Colors.border
 
     Behavior on color {
-        ColorAnimation { duration: 150 }
+        ColorAnimation {
+            duration: 150
+        }
     }
 
     FontLoader {
@@ -115,10 +118,10 @@ Rectangle {
         hoverEnabled: true
         onClicked: {
             if (dropdownPopup.visible) {
-                dropdownPopup.close()
+                dropdownPopup.close();
             } else {
-                root.aboutToOpen()
-                dropdownPopup.open()
+                root.aboutToOpen();
+                dropdownPopup.open();
             }
         }
     }
@@ -126,7 +129,8 @@ Rectangle {
     // Dropdown popup menu
     Popup {
         id: dropdownPopup
-        y: parent.height + 4
+        // Position based on openUpward property
+        y: root.openUpward ? -height - 4 : parent.height + 4
         x: 0
         width: parent.width
         height: Math.min(itemColumn.implicitHeight + 16, 300)
@@ -177,9 +181,7 @@ Rectangle {
                         width: itemColumn.width
                         height: 42
                         radius: 8
-                        color: itemMouseArea.containsMouse
-                               ? Colors.surfaceLight
-                               : (root.selectedId === modelData.id ? Colors.surfaceDark : "transparent")
+                        color: itemMouseArea.containsMouse ? Colors.surfaceLight : (root.selectedId === modelData.id ? Colors.surfaceDark : "transparent")
 
                         RowLayout {
                             anchors.fill: parent
@@ -232,15 +234,17 @@ Rectangle {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 // Keep ids as strings
-                                root.selectedId = String(itemDelegate.modelData.id)
-                                root.selectedValue = itemDelegate.modelData.name
-                                root.itemSelected(root.selectedId, root.selectedValue)
-                                dropdownPopup.close()
+                                root.selectedId = String(itemDelegate.modelData.id);
+                                root.selectedValue = itemDelegate.modelData.name;
+                                root.itemSelected(root.selectedId, root.selectedValue);
+                                dropdownPopup.close();
                             }
                         }
 
                         Behavior on color {
-                            ColorAnimation { duration: 100 }
+                            ColorAnimation {
+                                duration: 100
+                            }
                         }
                     }
                 }
@@ -269,12 +273,27 @@ Rectangle {
         }
 
         enter: Transition {
-            NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 120 }
-            NumberAnimation { property: "scale"; from: 0.95; to: 1.0; duration: 120 }
+            NumberAnimation {
+                property: "opacity"
+                from: 0.0
+                to: 1.0
+                duration: 120
+            }
+            NumberAnimation {
+                property: "scale"
+                from: 0.95
+                to: 1.0
+                duration: 120
+            }
         }
 
         exit: Transition {
-            NumberAnimation { property: "opacity"; from: 1.0; to: 0.0; duration: 80 }
+            NumberAnimation {
+                property: "opacity"
+                from: 1.0
+                to: 0.0
+                duration: 80
+            }
         }
     }
 }

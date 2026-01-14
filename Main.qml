@@ -229,6 +229,12 @@ ApplicationWindow {
                     clipsModel.boardId = boardId;
                     clipsModel.reload();
                 }
+
+                // Call internalSoundboardView's open dialog function
+                onAddSoundboardClicked: {
+                    contentStack.currentIndex = 0; // Ensure soundboard view is visible
+                    internalSoundboardView.showAddSoundboardDialog();
+                }
             }
 
             // Main content area - header + pages in column
@@ -334,13 +340,11 @@ ApplicationWindow {
                         }
                     }
 
-
                     // Audio Playback Engine
                     AudioPlaybackView {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
-
 
                     // Macros & Automation (placeholder)
                     Rectangle {

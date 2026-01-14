@@ -720,8 +720,8 @@ Rectangle {
                                 DropdownSelector {
                                     id: bufferSizeDropdown
                                     Layout.preferredWidth: 200
-                                    height: 40
                                     placeholder: "Select Buffer Size"
+                                    openUpward: true
                                     selectedId: (soundboardService?.bufferSizeFrames ?? 1024).toString()
                                     model: [
                                         {
@@ -766,8 +766,8 @@ Rectangle {
                                 DropdownSelector {
                                     id: bufferPeriodsDropdown
                                     Layout.preferredWidth: 200
-                                    height: 40
                                     placeholder: "Select Periods"
+                                    openUpward: true
                                     selectedId: (soundboardService?.bufferPeriods ?? 3).toString()
                                     model: [
                                         {

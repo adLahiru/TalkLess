@@ -62,6 +62,9 @@ public:
     Q_PROPERTY(bool isRecording READ isRecording NOTIFY recordingStateChanged)
     Q_PROPERTY(QString lastRecordingPath READ lastRecordingPath NOTIFY recordingStateChanged)
     Q_PROPERTY(float recordingDuration READ recordingDuration NOTIFY recordingStateChanged)
+    Q_PROPERTY(float recordingPeakLevel READ getRecordingPeakLevel NOTIFY recordingStateChanged)
+    Q_PROPERTY(bool recordWithInputDevice READ recordWithInputDevice WRITE setRecordWithInputDevice NOTIFY settingsChanged)
+    Q_PROPERTY(bool recordWithClipboard READ recordWithClipboard WRITE setRecordWithClipboard NOTIFY settingsChanged)
 
     // ---- Index / Settings ----
     double masterGainDb() const { return m_state.settings.masterGainDb; }
@@ -111,13 +114,16 @@ public:
     Q_INVOKABLE void resetSettings();
 
     Q_INVOKABLE int createBoard(const QString& name);
+    Q_INVOKABLE int createBoardWithArtwork(const QString& name, const QString& artworkPath);
     Q_INVOKABLE bool renameBoard(int boardId, const QString& newName);
     Q_INVOKABLE bool deleteBoard(int boardId);
 
     QVector<SoundboardInfo> listBoards() const { return m_state.soundboards; }
     Q_INVOKABLE QString getBoardName(int boardId) const;
     Q_INVOKABLE QString getBoardHotkey(int boardId) const;
+    Q_INVOKABLE QString getBoardArtwork(int boardId) const;
     Q_INVOKABLE bool setBoardHotkey(int boardId, const QString& hotkey);
+    Q_INVOKABLE bool setBoardArtwork(int boardId, const QString& artworkPath);
     Q_INVOKABLE void reloadIndex(); // re-read index.json
 
     // ---- Active boards (multiple can be active) ----
@@ -215,6 +221,18 @@ public:
     Q_INVOKABLE QString consumePendingRecordingPath(); // returns path once, then clears it
     Q_INVOKABLE void cancelPendingRecording();         // stops + deletes file + clears state
 
+    // ---- Recording options ----
+    Q_INVOKABLE float getRecordingPeakLevel() const;
+    bool recordWithInputDevice() const { return m_recordWithInputDevice; }
+    void setRecordWithInputDevice(bool enabled);
+    bool recordWithClipboard() const { return m_recordWithClipboard; }
+    void setRecordWithClipboard(bool enabled);
+
+    // ---- Name validation ----
+    Q_INVOKABLE bool boardNameExists(const QString& name) const;
+    Q_INVOKABLE bool clipTitleExistsInBoard(int boardId, const QString& title) const;
+    Q_INVOKABLE QString generateUniqueClipTitle(int boardId, const QString& baseTitle) const;
+
     // ---- Application Control ----
     Q_INVOKABLE void restartApplication();
 
@@ -288,6 +306,8 @@ private:
     bool m_recordingPreviewPlaying = false;
     bool m_hasUnsavedRecording = false;
     QTimer* m_recordingTickTimer = nullptr;
+    bool m_recordWithInputDevice = true;
+    bool m_recordWithClipboard = false;
 
     // Dirty flags to track unsaved changes
     bool m_indexDirty = false;

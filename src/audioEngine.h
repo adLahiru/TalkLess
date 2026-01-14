@@ -161,7 +161,9 @@ public:
     // ------------------------------------------------------------
     // Recording
     // ------------------------------------------------------------
-    bool startRecording(const std::string& outputPath);
+    // recordMic: include microphone/input device in recording
+    // recordPlayback: include soundboard clips output in recording
+    bool startRecording(const std::string& outputPath, bool recordMic = true, bool recordPlayback = false);
     bool stopRecording();
     bool isRecording() const;
     float getRecordingDuration() const;
@@ -334,6 +336,10 @@ private:
     std::atomic<bool> recordingWriteOk{false};
     std::string recordingOutputPath;
     int recordingChannels = 2;
+    
+    // Recording source selection flags
+    std::atomic<bool> recordMicEnabled{true};       // include mic input in recording
+    std::atomic<bool> recordPlaybackEnabled{false}; // include soundboard clips in recording
 
     // ------------------------------------------------------------
     // Scratch buffers (avoid realloc in audio callback)

@@ -94,6 +94,11 @@ Rectangle {
         }
     }
 
+    // Expose function to open the add soundboard dialog
+    function showAddSoundboardDialog() {
+        addSoundboardDialog.open();
+    }
+
     // Helper function to find clip data by ID in the model
     function getClipDataById(clipId) {
         if (clipId === -1)
@@ -345,6 +350,285 @@ Rectangle {
         source: "https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.ttf"
     }
 
+    // ============================================
+    // Add Soundboard Dialog
+    // ============================================
+    Popup {
+        id: addSoundboardDialog
+        anchors.centerIn: parent
+        width: 400
+        height: 340
+        modal: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        padding: 0
+
+        property string errorMessage: ""
+        property string selectedArtworkPath: ""
+
+        background: Rectangle {
+            color: Colors.surface
+            radius: 16
+            border.color: Colors.border
+            border.width: 1
+        }
+
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 16
+
+            Text {
+                text: "Add New Soundboard"
+                color: Colors.textPrimary
+                font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                font.pixelSize: 18
+                font.weight: Font.Bold
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            // Artwork picker
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 16
+
+                // Image preview/picker
+                Rectangle {
+                    id: artworkPreview
+                    Layout.preferredWidth: 80
+                    Layout.preferredHeight: 80
+                    radius: 12
+                    color: Colors.surfaceDark
+                    border.color: artworkMouseArea.containsMouse ? Colors.accent : Colors.border
+                    border.width: 1
+                    clip: true
+
+                    Image {
+                        id: artworkImage
+                        anchors.fill: parent
+                        source: addSoundboardDialog.selectedArtworkPath || ""
+                        fillMode: Image.PreserveAspectCrop
+                        visible: addSoundboardDialog.selectedArtworkPath !== ""
+                    }
+
+                    // Default placeholder when no image
+                    Column {
+                        anchors.centerIn: parent
+                        visible: addSoundboardDialog.selectedArtworkPath === ""
+                        spacing: 4
+
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "+"
+                            font.pixelSize: 28
+                            font.weight: Font.Light
+                            color: Colors.textDisabled
+                        }
+
+                        Text {
+                            text: "Add Image"
+                            font.pixelSize: 10
+                            color: Colors.textDisabled
+                        }
+                    }
+
+                    MouseArea {
+                        id: artworkMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            soundboardArtworkPicker.open();
+                        }
+                    }
+                }
+
+                // Name input area
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Text {
+                        text: "Soundboard Name"
+                        color: Colors.textSecondary
+                        font.pixelSize: 12
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 44
+                        color: Colors.surfaceDark
+                        radius: 8
+                        border.color: newSoundboardNameInput.activeFocus ? Colors.accent : (addSoundboardDialog.errorMessage ? Colors.error : Colors.border)
+                        border.width: 1
+
+                        TextInput {
+                            id: newSoundboardNameInput
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            color: Colors.textPrimary
+                            font.pixelSize: 14
+                            clip: true
+                            selectByMouse: true
+
+                            Text {
+                                anchors.fill: parent
+                                text: "Enter soundboard name..."
+                                color: Colors.textDisabled
+                                font: parent.font
+                                visible: !parent.text && !parent.activeFocus
+                            }
+
+                            onTextChanged: {
+                                addSoundboardDialog.errorMessage = "";
+                            }
+
+                            Keys.onReturnPressed: {
+                                createSoundboardBtn.clicked();
+                            }
+                        }
+                    }
+
+                    Text {
+                        visible: addSoundboardDialog.errorMessage !== ""
+                        text: addSoundboardDialog.errorMessage
+                        color: Colors.error
+                        font.pixelSize: 11
+                    }
+                }
+            }
+
+            Text {
+                text: "Cover image is optional. If not provided, a default will be used."
+                color: Colors.textDisabled
+                font.pixelSize: 11
+                font.italic: true
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+            }
+
+            Item {
+                Layout.fillHeight: true
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                Rectangle {
+                    Layout.preferredWidth: 80
+                    Layout.preferredHeight: 36
+                    color: cancelSoundboardBtn.containsMouse ? Colors.surfaceLight : Colors.surface
+                    radius: 8
+                    border.color: Colors.border
+                    border.width: 1
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Cancel"
+                        color: Colors.textPrimary
+                        font.pixelSize: 13
+                    }
+
+                    MouseArea {
+                        id: cancelSoundboardBtn
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            addSoundboardDialog.close();
+                            newSoundboardNameInput.text = "";
+                            addSoundboardDialog.errorMessage = "";
+                            addSoundboardDialog.selectedArtworkPath = "";
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: createSoundboardBtn
+                    Layout.preferredWidth: 100
+                    Layout.preferredHeight: 36
+                    radius: 8
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop {
+                            position: 0.0
+                            color: createSoundboardBtnArea.containsMouse ? Colors.primaryLight : Colors.primary
+                        }
+                        GradientStop {
+                            position: 1.0
+                            color: createSoundboardBtnArea.containsMouse ? Colors.secondary : "#D214FD"
+                        }
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Create"
+                        color: Colors.textOnPrimary
+                        font.pixelSize: 13
+                        font.weight: Font.Medium
+                    }
+
+                    signal clicked
+
+                    MouseArea {
+                        id: createSoundboardBtnArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: parent.clicked()
+                    }
+
+                    onClicked: {
+                        const name = newSoundboardNameInput.text.trim();
+                        if (name === "") {
+                            addSoundboardDialog.errorMessage = "Please enter a name";
+                            return;
+                        }
+
+                        if (soundboardService.boardNameExists(name)) {
+                            addSoundboardDialog.errorMessage = "A soundboard with this name already exists";
+                            return;
+                        }
+
+                        // Create board with or without artwork
+                        if (addSoundboardDialog.selectedArtworkPath !== "") {
+                            soundboardService.createBoardWithArtwork(name, addSoundboardDialog.selectedArtworkPath);
+                        } else {
+                            soundboardService.createBoard(name);
+                        }
+
+                        soundboardsModel.reload();
+                        addSoundboardDialog.close();
+                        newSoundboardNameInput.text = "";
+                        addSoundboardDialog.errorMessage = "";
+                        addSoundboardDialog.selectedArtworkPath = "";
+                    }
+                }
+            }
+        }
+
+        onOpened: {
+            newSoundboardNameInput.text = "";
+            addSoundboardDialog.errorMessage = "";
+            addSoundboardDialog.selectedArtworkPath = "";
+            newSoundboardNameInput.forceActiveFocus();
+        }
+    }
+
+    // File dialog for soundboard artwork
+    FileDialog {
+        id: soundboardArtworkPicker
+        title: "Select Soundboard Cover Image"
+        nameFilters: ["Image files (*.png *.jpg *.jpeg *.gif *.bmp *.webp)"]
+        onAccepted: {
+            addSoundboardDialog.selectedArtworkPath = currentFile.toString();
+        }
+    }
+
     // Main 3-column layout
     RowLayout {
         anchors.fill: parent
@@ -558,8 +842,7 @@ Rectangle {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                soundboardService.createBoard("New Soundboard");
-                                soundboardsModel.reload();
+                                addSoundboardDialog.open();
                             }
                         }
                     }
@@ -1574,7 +1857,7 @@ Rectangle {
                                 spacing: 4
 
                                 Text {
-                                    text: "Enter Name Here:"
+                                    text: ""
                                     color: Colors.textSecondary
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 13
@@ -1591,7 +1874,7 @@ Rectangle {
 
                                     Text {
                                         anchors.fill: parent
-                                        text: "_ _ _ _ _ _ _ _ _ _ _ _ _ _"
+                                        text: "Enter Name Here"
                                         color: Colors.textDisabled
                                         font.family: parent.font.family
                                         font.pixelSize: parent.font.pixelSize
@@ -1647,6 +1930,28 @@ Rectangle {
                     // Spacer
                     Item {
                         Layout.preferredHeight: 4
+                    }
+                    ColumnLayout {
+                        CheckBox {
+                            id: isInputDeviceRecording
+                            text: "Input Device Recording"
+                            checked: soundboardService?.recordWithInputDevice ?? true
+                            onToggled: {
+                                if (soundboardService) {
+                                    soundboardService.recordWithInputDevice = checked;
+                                }
+                            }
+                        }
+                        CheckBox {
+                            id: isClipboardRecording
+                            text: "Clipboard Recording"
+                            checked: soundboardService?.recordWithClipboard ?? false
+                            onToggled: {
+                                if (soundboardService) {
+                                    soundboardService.recordWithClipboard = checked;
+                                }
+                            }
+                        }
                     }
 
                     // ============================================================
@@ -3612,7 +3917,8 @@ Rectangle {
                                 orientation: Qt.Vertical
                                 from: 12
                                 to: -60
-                                onMoved: if (soundboardService) soundboardService.masterGainDb = value
+                                onMoved: if (soundboardService)
+                                    soundboardService.masterGainDb = value
                                 Binding on value {
                                     value: soundboardService?.masterGainDb ?? 0
                                     when: !masterVerticalSlider.pressed
@@ -3705,7 +4011,8 @@ Rectangle {
                                 orientation: Qt.Vertical
                                 from: 12
                                 to: -60
-                                onMoved: if (soundboardService) soundboardService.micGainDb = value
+                                onMoved: if (soundboardService)
+                                    soundboardService.micGainDb = value
                                 Binding on value {
                                     value: soundboardService?.micGainDb ?? 0
                                     when: !micVerticalSlider.pressed
@@ -3756,7 +4063,7 @@ Rectangle {
 
                                     Text {
                                         anchors.centerIn: parent
-                                        text: Math.round(micVerticalSlider.value)  + "db"
+                                        text: Math.round(micVerticalSlider.value) + "db"
                                         color: "white"
                                         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                         font.pixelSize: 11

@@ -1047,6 +1047,9 @@ void AudioEngine::processPlaybackAudio(void* output, ma_uint32 frameCount, ma_ui
         }
     }
 
+    const bool recordMic = recordMicEnabled.load(std::memory_order_relaxed);
+    const bool recordClips = recordPlaybackEnabled.load(std::memory_order_relaxed);
+
     if (micOn) {
         for (ma_uint32 f = 0; f < frameCount; ++f) {
             const float mono = micMono[f] * micMul;
@@ -1057,8 +1060,8 @@ void AudioEngine::processPlaybackAudio(void* output, ma_uint32 frameCount, ma_ui
                 for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) out[o + ch] += mono;
             }
 
-            // to recording always when mic enabled
-            if (recActive) {
+            // to recording only when mic recording is enabled
+            if (recActive && recordMic) {
                 const ma_uint32 o = f * playbackChannels;
                 for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) recTempScratch[o + ch] += mono;
             }
@@ -1092,7 +1095,8 @@ void AudioEngine::processPlaybackAudio(void* output, ma_uint32 frameCount, ma_ui
                     out[o]     += L;
                     out[o + 1] += R;
 
-                    if (recActive) {
+                    // Only add clips to recording if recordClips is enabled
+                    if (recActive && recordClips) {
                         recTempScratch[o]     += L;
                         recTempScratch[o + 1] += R;
                     }
@@ -1106,7 +1110,8 @@ void AudioEngine::processPlaybackAudio(void* output, ma_uint32 frameCount, ma_ui
                     const ma_uint32 o = f * playbackChannels;
                     for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) {
                         out[o + ch] += mono;
-                        if (recActive) recTempScratch[o + ch] += mono;
+                        // Only add clips to recording if recordClips is enabled
+                        if (recActive && recordClips) recTempScratch[o + ch] += mono;
                     }
                 }
             }
@@ -1706,10 +1711,14 @@ double AudioEngine::getFileDuration(const std::string& filepath)
 // ------------------------------------------------------------
 // Recording
 // ------------------------------------------------------------
-bool AudioEngine::startRecording(const std::string& outputPath)
+bool AudioEngine::startRecording(const std::string& outputPath, bool recordMic, bool recordPlayback)
 {
     if (recording.load(std::memory_order_relaxed)) return false;
     if (outputPath.empty()) return false;
+    
+    // Store recording source settings
+    recordMicEnabled.store(recordMic, std::memory_order_relaxed);
+    recordPlaybackEnabled.store(recordPlayback, std::memory_order_relaxed);
 
     // Ensure main devices running so playback callback executes
     if (!deviceRunning.load(std::memory_order_relaxed)) {

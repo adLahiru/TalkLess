@@ -13,7 +13,7 @@ Rectangle {
 
     // Collapsible state
     property bool isCollapsed: false
-    
+
     // Animated width based on collapsed state
     Behavior on Layout.preferredWidth {
         NumberAnimation {
@@ -36,7 +36,8 @@ Rectangle {
     property int editingBoardId: -1
     property int selectedBoardId: soundboardService?.activeBoardId ?? -1  // Track which board is selected (for viewing), initialize to first active board
     signal selected(string route)
-    signal soundboardSelected(int boardId)  // Emitted when a soundboard is selected
+    signal soundboardSelected(int boardId)
+    signal addSoundboardClicked  // Emitted when a soundboard is selected
 
     ListModel {
         id: menuModel
@@ -113,13 +114,11 @@ Rectangle {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        root.isCollapsed = !root.isCollapsed
+                        root.isCollapsed = !root.isCollapsed;
                     }
                 }
             }
         }
-
-
 
         // Divider
         Image {
@@ -339,7 +338,7 @@ Rectangle {
                             // Lower z than interactive child elements
                             z: 0
 
-                            onClicked: (mouse) => {
+                            onClicked: mouse => {
                                 if (root.editingBoardId === -1) {
                                     // Select this soundboard (for viewing)
                                     console.log("Soundboard row clicked:", boardRow.boardId, boardRow.boardName);
@@ -436,7 +435,7 @@ Rectangle {
                                     cursorShape: Qt.PointingHandCursor
                                     z: 20
 
-                                    onClicked: (mouse) => {
+                                    onClicked: mouse => {
                                         mouse.accepted = true;  // Stop propagation
                                         console.log("Collapsed checkbox clicked - toggling board:", boardRow.boardId);
                                         soundboardsModel.toggleActiveById(boardRow.boardId);
@@ -452,7 +451,7 @@ Rectangle {
                             anchors.rightMargin: 10
                             spacing: 10
                             visible: !root.isCollapsed
-                            
+
                             // Allow mouse events to pass through to mouse2 below, except for interactive children
                             // This is handled by not setting z and letting child MouseAreas handle their own events
 
@@ -486,7 +485,7 @@ Rectangle {
                                     cursorShape: Qt.PointingHandCursor
                                     z: 20
 
-                                    onClicked: (mouse) => {
+                                    onClicked: mouse => {
                                         mouse.accepted = true;  // Stop propagation
                                         console.log("Checkbox clicked - toggling board:", boardRow.boardId);
                                         soundboardsModel.toggleActiveById(boardRow.boardId);
@@ -760,22 +759,7 @@ Rectangle {
                 }
 
                 onClicked: {
-                    // Create immediately with a placeholder name
-                    const newId = soundboardService.createBoard("New Soundboard");
-                    if (!root.isCollapsed) {
-                        root.editingBoardId = newId;
-                    }
-
-                    // Refresh model (usually boardsChanged triggers reload automatically,
-                    // but calling reload makes it immediate)
-                    soundboardsModel.reload();
-
-                    // Scroll to the new one and start editing
-                    const row = soundboardsModel.rowForId(newId);
-                    if (row >= 0) {
-                        boardsList.positionViewAtIndex(row, ListView.End);
-                        // Focus happens automatically when the TextField becomes visible
-                    }
+                    root.addSoundboardClicked();
                 }
 
                 // Tooltip for collapsed sidebar
@@ -891,4 +875,3 @@ Rectangle {
         }
     }
 }
-

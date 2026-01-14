@@ -286,6 +286,44 @@ QString SoundboardService::getBoardName(int boardId) const
     return QString("");
 }
 
+QString SoundboardService::getBoardArtwork(int boardId) const
+{
+    for (const auto& b : m_state.soundboards) {
+        if (b.id == boardId)
+            return b.artwork;
+    }
+    return QString("");
+}
+
+bool SoundboardService::setBoardArtwork(int boardId, const QString& artworkPath)
+{
+    QString localPath = artworkPath;
+    if (localPath.startsWith("file:")) {
+        localPath = QUrl(localPath).toLocalFile();
+    }
+
+    // If updating an active board
+    if (m_activeBoards.contains(boardId)) {
+        m_activeBoards[boardId].artwork = localPath;
+        return saveActive();
+    }
+
+    // Otherwise load -> modify -> save
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded)
+        return false;
+
+    Soundboard b = *loaded;
+    b.artwork = localPath;
+
+    const bool ok = m_repo.saveBoard(b);
+    if (ok) {
+        m_state = m_repo.loadIndex();
+        emit boardsChanged();
+    }
+    return ok;
+}
+
 bool SoundboardService::activate(int boardId)
 {
     // Check if already active
@@ -638,10 +676,15 @@ bool SoundboardService::addClipWithTitle(int boardId, const QString& filePath, c
         localPath = QUrl(localPath).toLocalFile();
     }
 
+    // Determine base title: use provided title or fall back to filename
+    QString baseTitle = title.trimmed().isEmpty() ? QFileInfo(localPath).baseName() : title.trimmed();
+    
+    // Generate a unique title if needed
+    QString uniqueTitle = generateUniqueClipTitle(boardId, baseTitle);
+
     Clip draft;
     draft.filePath = localPath;
-    // Use custom title if provided, otherwise fall back to filename
-    draft.title = title.trimmed().isEmpty() ? QFileInfo(draft.filePath).baseName() : title.trimmed();
+    draft.title = uniqueTitle;
 
     return addClipToBoard(boardId, draft);
 }
@@ -657,9 +700,15 @@ bool SoundboardService::addClipWithSettings(int boardId, const QString& filePath
         localPath = QUrl(localPath).toLocalFile();
     }
 
+    // Determine base title: use provided title or fall back to filename
+    QString baseTitle = title.trimmed().isEmpty() ? QFileInfo(localPath).baseName() : title.trimmed();
+    
+    // Generate a unique title if needed
+    QString uniqueTitle = generateUniqueClipTitle(boardId, baseTitle);
+
     Clip draft;
     draft.filePath = localPath;
-    draft.title = title.trimmed().isEmpty() ? QFileInfo(draft.filePath).baseName() : title.trimmed();
+    draft.title = uniqueTitle;
     draft.trimStartMs = trimStartMs;
     draft.trimEndMs = trimEndMs;
 
@@ -1673,12 +1722,31 @@ void SoundboardService::removeFromSharedBoardIds(const QString& filePath, int bo
 
 int SoundboardService::createBoard(const QString& name)
 {
+    return createBoardWithArtwork(name, QString());
+}
+
+int SoundboardService::createBoardWithArtwork(const QString& name, const QString& artworkPath)
+{
     QString finalName = name.trimmed();
     if (finalName.isEmpty())
         finalName = "New Soundboard";
 
     // Create board on disk + update index
     int id = m_repo.createBoard(finalName);
+
+    // If artwork was provided, update the board with it
+    if (!artworkPath.isEmpty() && id >= 0) {
+        auto loaded = m_repo.loadBoard(id);
+        if (loaded) {
+            Soundboard b = *loaded;
+            QString localPath = artworkPath;
+            if (localPath.startsWith("file:")) {
+                localPath = QUrl(localPath).toLocalFile();
+            }
+            b.artwork = localPath;
+            m_repo.saveBoard(b);
+        }
+    }
 
     // Reload index in memory and notify UI
     m_state = m_repo.loadIndex();
@@ -1692,6 +1760,14 @@ bool SoundboardService::renameBoard(int boardId, const QString& newName)
     const QString name = newName.trimmed();
     if (name.isEmpty())
         return false;
+
+    // Check for duplicate name (excluding the current board)
+    for (const auto& b : m_state.soundboards) {
+        if (b.id != boardId && b.name.compare(name, Qt::CaseInsensitive) == 0) {
+            qWarning() << "Cannot rename board: name already exists:" << name;
+            return false;
+        }
+    }
 
     // If renaming an active board (in memory)
     if (m_activeBoards.contains(boardId)) {
@@ -2113,7 +2189,23 @@ bool SoundboardService::startRecording()
     m_lastRecordingPath = getRecordingOutputPath();
     QDir().mkpath(QFileInfo(m_lastRecordingPath).absolutePath());
 
-    const bool success = m_audioEngine->startRecording(m_lastRecordingPath.toStdString());
+    // Determine recording sources based on UI settings
+    // Priority rule: If both are selected, only record from input device
+    bool recordMic = m_recordWithInputDevice;
+    bool recordPlayback = m_recordWithClipboard;
+    
+    if (recordMic && recordPlayback) {
+        // Both selected: prioritize input device only
+        recordPlayback = false;
+    }
+    
+    // Ensure at least one source is enabled
+    if (!recordMic && !recordPlayback) {
+        // Default to mic if neither selected
+        recordMic = true;
+    }
+
+    const bool success = m_audioEngine->startRecording(m_lastRecordingPath.toStdString(), recordMic, recordPlayback);
     if (success) {
         // Start periodic UI updates
         if (m_recordingTickTimer)
@@ -2242,6 +2334,94 @@ QString SoundboardService::getRecordingOutputPath() const
     QString filename = QString("recording_%1.wav").arg(timestamp);
 
     return QDir(recordingsPath).filePath(filename);
+}
+
+float SoundboardService::getRecordingPeakLevel() const
+{
+    if (!m_audioEngine)
+        return 0.0f;
+    // Use mic peak level as proxy for recording input level
+    return m_audioEngine->getMicPeakLevel();
+}
+
+void SoundboardService::setRecordWithInputDevice(bool enabled)
+{
+    if (m_recordWithInputDevice != enabled) {
+        m_recordWithInputDevice = enabled;
+        emit settingsChanged();
+    }
+}
+
+void SoundboardService::setRecordWithClipboard(bool enabled)
+{
+    if (m_recordWithClipboard != enabled) {
+        m_recordWithClipboard = enabled;
+        emit settingsChanged();
+    }
+}
+
+bool SoundboardService::boardNameExists(const QString& name) const
+{
+    const QString trimmedName = name.trimmed();
+    if (trimmedName.isEmpty())
+        return false;
+
+    for (const auto& board : m_state.soundboards) {
+        if (board.name.compare(trimmedName, Qt::CaseInsensitive) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool SoundboardService::clipTitleExistsInBoard(int boardId, const QString& title) const
+{
+    const QString trimmedTitle = title.trimmed();
+    if (trimmedTitle.isEmpty())
+        return false;
+
+    // Check in active boards first
+    if (m_activeBoards.contains(boardId)) {
+        const Soundboard& board = m_activeBoards.value(boardId);
+        for (const auto& clip : board.clips) {
+            if (clip.title.compare(trimmedTitle, Qt::CaseInsensitive) == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Check in inactive boards
+    auto loaded = m_repo.loadBoard(boardId);
+    if (loaded) {
+        for (const auto& clip : loaded->clips) {
+            if (clip.title.compare(trimmedTitle, Qt::CaseInsensitive) == 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+QString SoundboardService::generateUniqueClipTitle(int boardId, const QString& baseTitle) const
+{
+    QString title = baseTitle.trimmed();
+    if (title.isEmpty()) {
+        title = "Recording";
+    }
+
+    if (!clipTitleExistsInBoard(boardId, title)) {
+        return title;
+    }
+
+    // Try appending numbers until we find a unique name
+    int counter = 1;
+    QString uniqueTitle;
+    do {
+        uniqueTitle = QString("%1 (%2)").arg(title).arg(counter++);
+    } while (clipTitleExistsInBoard(boardId, uniqueTitle) && counter < 1000);
+
+    return uniqueTitle;
 }
 
 bool SoundboardService::setRecordingInputDevice(const QString& deviceId)

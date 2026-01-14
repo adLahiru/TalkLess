@@ -68,6 +68,7 @@ static QJsonObject soundboardInfoToJson(const SoundboardInfo& i)
     o["id"] = i.id;
     o["name"] = i.name;
     o["hotkey"] = i.hotkey;
+    o["artwork"] = i.artwork;
     o["clipCount"] = i.clipCount;
     return o;
 }
@@ -78,6 +79,7 @@ static SoundboardInfo soundboardInfoFromJson(const QJsonObject& o)
     i.id = o.value("id").toInt(-1);
     i.name = o.value("name").toString();
     i.hotkey = o.value("hotkey").toString();
+    i.artwork = o.value("artwork").toString();
     i.clipCount = o.value("clipCount").toInt(0);
     return i;
 }
@@ -162,6 +164,7 @@ static QJsonObject soundboardToJson(const Soundboard& b)
     root["id"] = b.id;
     root["name"] = b.name;
     root["hotkey"] = b.hotkey;
+    root["artwork"] = b.artwork;
 
     QJsonArray clipsArr;
     for (const auto& c : b.clips) clipsArr.append(clipToJson(c));
@@ -176,6 +179,7 @@ static Soundboard soundboardFromJson(const QJsonObject& root)
     b.id = root.value("id").toInt(-1);
     b.name = root.value("name").toString();
     b.hotkey = root.value("hotkey").toString();
+    b.artwork = root.value("artwork").toString();
 
     const auto clipsArr = root.value("clips").toArray();
     for (const auto& v : clipsArr) b.clips.push_back(clipFromJson(v.toObject()));
@@ -353,6 +357,7 @@ bool StorageRepository::saveBoard(const Soundboard& board)
         if (info.id == board.id) {
             info.name = board.name;
             info.hotkey = board.hotkey;
+            info.artwork = board.artwork;
             info.clipCount = board.clips.size();
             found = true;
             break;
@@ -362,6 +367,7 @@ bool StorageRepository::saveBoard(const Soundboard& board)
         SoundboardInfo info;
         info.id = board.id;
         info.name = board.name;
+        info.artwork = board.artwork;
         info.clipCount = board.clips.size();
         state.soundboards.push_back(info);
     }
