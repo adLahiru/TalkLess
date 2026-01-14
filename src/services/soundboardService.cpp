@@ -142,7 +142,9 @@ SoundboardService::~SoundboardService()
     if (m_audioEngine) {
         for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it) {
             m_audioEngine->stopClip(it.value());
+            m_audioEngine->unloadClip(it.value());
         }
+        m_audioEngine->stopMonitorDevice();
         m_audioEngine->stopAudioDevice();
     }
 }
@@ -2521,7 +2523,6 @@ QVariantList SoundboardService::playingClipIDs() const
             }
         }
     }
-    qDebug() << "playingClipIDs: returning" << playingIds;
     return playingIds;
 }
 
