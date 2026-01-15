@@ -2075,7 +2075,8 @@ Rectangle {
                             Layout.fillWidth: true
                             icon: "🔴"
                             placeholder: "Select Mic Device"
-                            selectedId: "-1"
+                            // Default to the selected recording device (which defaults to capture device)
+                            selectedId: soundboardService?.selectedRecordingDeviceId ?? "-1"
                             model: []
 
                             onAboutToOpen: {

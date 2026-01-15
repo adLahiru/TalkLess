@@ -102,6 +102,14 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
         }
     }
 
+    // 8) Initialize recording device to default to the audio input (capture) device
+    //    This ensures recording uses the same microphone as the main input by default
+    if (m_audioEngine && !m_state.settings.selectedCaptureDeviceId.isEmpty()) {
+        m_selectedRecordingDeviceId = m_state.settings.selectedCaptureDeviceId;
+        m_audioEngine->setRecordingDevice(m_state.settings.selectedCaptureDeviceId.toStdString());
+        qDebug() << "Recording device defaulted to capture device:" << m_selectedRecordingDeviceId;
+    }
+
     // 7) Setup AudioEngine callbacks
     if (m_audioEngine) {
         m_audioEngine->setClipFinishedCallback([this](int slotId) {
@@ -2270,17 +2278,13 @@ bool SoundboardService::startRecording()
     }
 
     // Determine recording sources:
-    // - Always record from input device when one is selected via setRecordingInputDevice()
-    // - The audio engine handles using the dedicated recording device
-    bool recordMic = true; // Always use the selected recording input device
-    bool recordPlayback = m_recordWithClipboard;
+    // - Always record from the recording device (microphone input)
+    // - Also record soundboard clips if the "record with clips" checkbox is enabled
+    // Both can be active simultaneously - we record the mic AND the clips when enabled
+    bool recordMic = true;  // Always record the recording device (microphone)
+    bool recordClips = m_recordWithClipboard;  // Record clips only if checkbox is enabled
 
-    // If both selected, prioritize input device only
-    if (recordMic && recordPlayback) {
-        recordPlayback = false;
-    }
-
-    const bool success = m_audioEngine->startRecording(m_lastRecordingPath.toStdString(), recordMic, recordPlayback);
+    const bool success = m_audioEngine->startRecording(m_lastRecordingPath.toStdString(), recordMic, recordClips);
     if (success) {
         // Start periodic UI updates
         if (m_recordingTickTimer)
@@ -2983,6 +2987,13 @@ bool SoundboardService::setInputDevice(const QString& deviceId)
         m_state.settings.selectedCaptureDeviceId = deviceId;
         m_indexDirty = true; // Mark as dirty instead of immediate save
         qDebug() << "Input device set to:" << deviceId;
+        
+        // Also update the recording device to match the capture device by default
+        // This ensures the recording device stays in sync with the input device
+        m_selectedRecordingDeviceId = deviceId;
+        m_audioEngine->setRecordingDevice(deviceId.toStdString());
+        qDebug() << "Recording device synced to capture device:" << deviceId;
+        
         emit settingsChanged();
     } else {
         qWarning() << "Failed to set input device:" << deviceId;

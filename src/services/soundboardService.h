@@ -66,6 +66,7 @@ public:
     Q_PROPERTY(
         bool recordWithInputDevice READ recordWithInputDevice WRITE setRecordWithInputDevice NOTIFY settingsChanged)
     Q_PROPERTY(bool recordWithClipboard READ recordWithClipboard WRITE setRecordWithClipboard NOTIFY settingsChanged)
+    Q_PROPERTY(QString selectedRecordingDeviceId READ selectedRecordingDeviceId NOTIFY settingsChanged)
 
     // ---- Index / Settings ----
     double masterGainDb() const { return m_state.settings.masterGainDb; }
@@ -74,6 +75,7 @@ public:
     QString selectedCaptureDeviceId() const { return m_state.settings.selectedCaptureDeviceId; }
     QString selectedPlaybackDeviceId() const { return m_state.settings.selectedPlaybackDeviceId; }
     QString selectedMonitorDeviceId() const { return m_state.settings.selectedMonitorDeviceId; }
+    QString selectedRecordingDeviceId() const { return m_selectedRecordingDeviceId; }
 
     Q_INVOKABLE void setMasterGainDb(double db);
     Q_INVOKABLE void setMicGainDb(double db);
