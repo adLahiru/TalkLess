@@ -2344,6 +2344,96 @@ float SoundboardService::getRecordingPeakLevel() const
     return m_audioEngine->getMicPeakLevel();
 }
 
+QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int numBars) const
+{
+    QVariantList result;
+    
+    if (filePath.isEmpty() || numBars <= 0)
+        return result;
+    
+    // Convert file URL to local path if necessary
+    QString localPath = filePath;
+    if (localPath.startsWith("file:///")) {
+        localPath = QUrl(filePath).toLocalFile();
+    }
+    
+    if (!QFileInfo::exists(localPath))
+        return result;
+    
+    // Use miniaudio to read the file peaks
+    // Create a decoder to read the audio file
+    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, 48000);
+    ma_decoder decoder;
+    
+    if (ma_decoder_init_file(localPath.toUtf8().constData(), &cfg, &decoder) != MA_SUCCESS) {
+        return result;
+    }
+    
+    // Get total frames
+    ma_uint64 totalFrames = 0;
+    if (ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames) != MA_SUCCESS || totalFrames == 0) {
+        ma_decoder_uninit(&decoder);
+        return result;
+    }
+    
+    // Calculate frames per bar
+    ma_uint64 framesPerBar = totalFrames / (ma_uint64)numBars;
+    if (framesPerBar == 0) framesPerBar = 1;
+    
+    // Buffer for reading
+    constexpr size_t kBufferSize = 4096;
+    float buffer[kBufferSize * 2]; // stereo
+    
+    float globalMaxPeak = 0.0f;
+    QVector<float> peaks;
+    peaks.reserve(numBars);
+    
+    for (int bar = 0; bar < numBars; ++bar) {
+        // Seek to the start of this bar's segment
+        ma_uint64 startFrame = (ma_uint64)bar * framesPerBar;
+        if (ma_decoder_seek_to_pcm_frame(&decoder, startFrame) != MA_SUCCESS) {
+            peaks.append(0.1f);
+            continue;
+        }
+        
+        float maxPeak = 0.0f;
+        ma_uint64 framesRemaining = framesPerBar;
+        
+        while (framesRemaining > 0) {
+            ma_uint64 framesToRead = std::min((ma_uint64)kBufferSize, framesRemaining);
+            ma_uint64 framesRead = 0;
+            
+            if (ma_decoder_read_pcm_frames(&decoder, buffer, framesToRead, &framesRead) != MA_SUCCESS || framesRead == 0) {
+                break;
+            }
+            
+            // Find max amplitude in this chunk (stereo - 2 channels)
+            for (ma_uint64 i = 0; i < framesRead * 2; ++i) {
+                float absVal = std::abs(buffer[i]);
+                if (absVal > maxPeak) maxPeak = absVal;
+            }
+            
+            framesRemaining -= framesRead;
+        }
+        
+        peaks.append(maxPeak);
+        if (maxPeak > globalMaxPeak) globalMaxPeak = maxPeak;
+    }
+    
+    ma_decoder_uninit(&decoder);
+    
+    // Normalize peaks to 0.1 - 1.0 range
+    for (int i = 0; i < peaks.size(); ++i) {
+        float normalized = 0.1f;
+        if (globalMaxPeak > 0.001f) {
+            normalized = 0.1f + (peaks[i] / globalMaxPeak) * 0.9f;
+        }
+        result.append(QVariant::fromValue(normalized));
+    }
+    
+    return result;
+}
+
 void SoundboardService::setRecordWithInputDevice(bool enabled)
 {
     if (m_recordWithInputDevice != enabled) {

@@ -1729,14 +1729,21 @@ Rectangle {
                         anchors.rightMargin: 8
                         spacing: 6
 
-                        // Current Tab Title
+                        // Current Tab Title (shows clip name for Editor tab)
                         Text {
-                            text: rightSidebar.tabState[rightSidebar.currentTabIndex]
+                            text: {
+                                if (rightSidebar.currentTabIndex === 0 && root.selectedClipId !== -1 && clipEditorTab.displayComputedTitle !== "") {
+                                    return clipEditorTab.displayComputedTitle;
+                                }
+                                return rightSidebar.tabState[rightSidebar.currentTabIndex];
+                            }
                             color: Colors.textPrimary
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 18
                             font.weight: Font.Bold
                             Layout.alignment: Qt.AlignVCenter
+                            elide: Text.ElideRight
+                            Layout.maximumWidth: 200
                         }
 
                         Item {
@@ -1784,6 +1791,87 @@ Rectangle {
 
                     // Recording waveform peaks data (to be populated by recording)
                     property var recordingPeaks: []
+                    // Error message for validation
+                    property string recordingError: ""
+                    // Final recorded duration (updated after recording stops)
+                    property real finalRecordedDuration: 0
+
+                    // Initialize input device dropdown when tab becomes visible
+                    onVisibleChanged: {
+                        if (visible && inputDeviceDropdown.model.length === 0) {
+                            const list = soundboardService.getInputDevices();
+                            list.unshift({
+                                id: "-1",
+                                name: "None",
+                                isDefault: false
+                            });
+                            inputDeviceDropdown.model = list;
+                        }
+                    }
+
+                    // Timer to collect peaks during recording for waveform visualization
+                    Timer {
+                        id: waveformPeakTimer
+                        interval: 100 // Collect peak every 100ms
+                        repeat: true
+                        running: soundboardService?.isRecording ?? false
+
+                        onTriggered: {
+                            if (soundboardService) {
+                                const peakLevel = soundboardService.recordingPeakLevel;
+                                // Normalize peak level (already 0-1 from service)
+                                const normalizedPeak = Math.max(0.1, Math.min(1.0, peakLevel));
+
+                                // Create a new array to trigger property change
+                                let peaks = recordingTab.recordingPeaks.slice();
+                                peaks.push(normalizedPeak);
+
+                                // Keep only last 60 samples for display
+                                if (peaks.length > 60) {
+                                    peaks = peaks.slice(-60);
+                                }
+                                recordingTab.recordingPeaks = peaks;
+                            }
+                        }
+                    }
+
+                    // Reset peaks when recording starts/stops
+                    Connections {
+                        target: soundboardService
+                        function onRecordingStateChanged() {
+                            if (!soundboardService.isRecording) {
+                                // Recording stopped - load full waveform from file after a short delay
+                                // (to ensure file is fully written)
+                                waveformLoadTimer.start();
+                            } else {
+                                // Clear peaks and duration when recording starts
+                                recordingTab.recordingPeaks = [];
+                                recordingTab.recordingError = "";
+                                recordingTab.finalRecordedDuration = 0;
+                            }
+                        }
+                    }
+
+                    // Timer to delay loading waveform until file is ready
+                    Timer {
+                        id: waveformLoadTimer
+                        interval: 300  // Wait 300ms for file to be fully written
+                        repeat: false
+                        onTriggered: {
+                            if (soundboardService && soundboardService.lastRecordingPath && soundboardService.lastRecordingPath !== "") {
+                                // Load waveform peaks from the recorded file
+                                const peaks = soundboardService.getWaveformPeaks(soundboardService.lastRecordingPath, 60);
+                                if (peaks && peaks.length > 0) {
+                                    recordingTab.recordingPeaks = peaks;
+                                }
+                                // Get accurate file duration
+                                const duration = soundboardService.getFileDuration(soundboardService.lastRecordingPath);
+                                if (duration > 0) {
+                                    recordingTab.finalRecordedDuration = duration;
+                                }
+                            }
+                        }
+                    }
 
                     // ============================================================
                     // Name Audio File (SINGLE INPUT - fixed duplicate name issue)
@@ -1952,6 +2040,20 @@ Rectangle {
                                 }
                             }
                         }
+
+                        // Error message display for recording validation
+                        Text {
+                            visible: recordingTab.recordingError !== ""
+                            text: recordingTab.recordingError
+                            color: Colors.error
+                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                            font.pixelSize: 11
+                            font.weight: Font.Medium
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                            Layout.leftMargin: 5
+                            Layout.rightMargin: 5
+                        }
                     }
 
                     // ============================================================
@@ -2028,8 +2130,24 @@ Rectangle {
                                     if (soundboardService?.isRecording ?? false) {
                                         soundboardService.stopRecording();
                                     } else {
-                                        // If your C++ startRecording needs a name/path, change this call accordingly.
-                                        // Example: soundboardService.startRecording(recordingNameInput.text)
+                                        // Validate recording source selection
+                                        const recordFromInput = isInputDeviceRecording.checked;
+                                        const recordFromClipboard = isClipboardRecording.checked;
+                                        const hasInputDevice = inputDeviceDropdown.selectedId !== "" && inputDeviceDropdown.selectedId !== "-1";
+
+                                        // Check if neither source is selected
+                                        if (!recordFromInput && !recordFromClipboard) {
+                                            recordingTab.recordingError = "Please select at least one recording source (Input Device or Clipboard)";
+                                            return;
+                                        }
+
+                                        // Check if input device recording is selected but no device is chosen
+                                        if (recordFromInput && !hasInputDevice) {
+                                            recordingTab.recordingError = "Please select an input device for recording";
+                                            return;
+                                        }
+
+                                        recordingTab.recordingError = "";
                                         soundboardService.startRecording();
                                     }
                                 }
@@ -2121,10 +2239,18 @@ Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 90
 
-                            currentTime: soundboardService?.recordingDuration ?? 0
-                            totalDuration: Math.max(soundboardService?.recordingDuration ?? 0, 10)
+                            // Use final duration after recording, or live recording duration during recording
+                            currentTime: (soundboardService?.isRecording ?? false) ? (soundboardService?.recordingDuration ?? 0) : 0
+                            totalDuration: {
+                                // After recording: use accurate file duration
+                                if (recordingTab.finalRecordedDuration > 0) {
+                                    return recordingTab.finalRecordedDuration;
+                                }
+                                // During recording: use live duration with minimum
+                                return Math.max(soundboardService?.recordingDuration ?? 0, 5);
+                            }
 
-                            // use real waveform after stop later (optional)
+                            // Use real waveform from file, or live peaks during recording
                             waveformData: recordingTab.recordingPeaks.length > 0 ? recordingTab.recordingPeaks : waveformTrim.generateMockWaveform()
 
                             onTrimStartMoved: function (pos) {
@@ -2583,9 +2709,19 @@ Rectangle {
                                         }
                                     }
 
-                                    // Save on Enter key
+                                    // Save on Enter key with duplicate name validation
                                     Keys.onReturnPressed: {
                                         if (root.selectedClipId !== -1 && text.length > 0) {
+                                            // Check for duplicate name (only if name changed)
+                                            if (text !== clipEditorTab.editingClipName) {
+                                                const isDuplicate = soundboardService.clipTitleExistsInBoard(soundboardService.activeBoardId, text);
+                                                if (isDuplicate) {
+                                                    // Generate a unique name instead
+                                                    const uniqueName = soundboardService.generateUniqueClipTitle(soundboardService.activeBoardId, text);
+                                                    clipTitleInput.text = uniqueName;
+                                                    return; // Don't save yet, let user see the suggested name
+                                                }
+                                            }
                                             activeClipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
                                             clipEditorTab.editingClipName = text;
                                             clipEditorTab.displayComputedTitle = text;
@@ -2594,13 +2730,20 @@ Rectangle {
                                         clipEditorTab.isTitleEditing = false;
                                     }
 
-                                    // Save on focus loss
+                                    // Save on focus loss with duplicate name validation
                                     onActiveFocusChanged: {
                                         if (!activeFocus && visible) {
                                             if (root.selectedClipId !== -1 && text.length > 0 && text !== clipEditorTab.editingClipName) {
-                                                activeClipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
-                                                clipEditorTab.editingClipName = text;
-                                                clipEditorTab.displayComputedTitle = text;
+                                                // Check for duplicate name
+                                                const isDuplicate = soundboardService.clipTitleExistsInBoard(soundboardService.activeBoardId, text);
+                                                let finalName = text;
+                                                if (isDuplicate) {
+                                                    // Generate a unique name
+                                                    finalName = soundboardService.generateUniqueClipTitle(soundboardService.activeBoardId, text);
+                                                }
+                                                activeClipsModel.updateClip(root.selectedClipId, finalName, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                                clipEditorTab.editingClipName = finalName;
+                                                clipEditorTab.displayComputedTitle = finalName;
                                                 activeClipsModel.reload();
                                             }
                                             clipEditorTab.isTitleEditing = false;

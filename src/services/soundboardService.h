@@ -223,6 +223,7 @@ public:
 
     // ---- Recording options ----
     Q_INVOKABLE float getRecordingPeakLevel() const;
+    Q_INVOKABLE QVariantList getWaveformPeaks(const QString& filePath, int numBars = 60) const;
     bool recordWithInputDevice() const { return m_recordWithInputDevice; }
     void setRecordWithInputDevice(bool enabled);
     bool recordWithClipboard() const { return m_recordWithClipboard; }
