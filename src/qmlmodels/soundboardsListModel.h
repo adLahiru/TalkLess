@@ -42,6 +42,7 @@ private slots:
     void onActiveBoardChanged();
 
 private:
+    void updateFromService();  // Incremental update without full model reset
     QPointer<SoundboardService> m_service;
     QVector<SoundboardInfo> m_cache;
 };

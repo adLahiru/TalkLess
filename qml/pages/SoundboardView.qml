@@ -676,7 +676,7 @@ Rectangle {
                             soundboardService.createBoard(name);
                         }
 
-                        soundboardsModel.reload();
+                        // Model automatically reloads when boardsChanged is emitted by the service
                         addSoundboardDialog.close();
                         newSoundboardNameInput.text = "";
                         addSoundboardDialog.errorMessage = "";

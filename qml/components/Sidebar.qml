@@ -378,14 +378,16 @@ Rectangle {
                             height: 44
                             visible: root.isCollapsed
 
-                            // Soundboard image - rounded corners with layer mask
+                            // Soundboard image - simple clip for rounded corners (performant)
                             Rectangle {
                                 anchors.fill: parent
                                 radius: 12
                                 color: "#141414"
+                                clip: true
 
                                 Image {
                                     anchors.fill: parent
+                                    anchors.margins: 0
                                     fillMode: Image.PreserveAspectCrop
                                     // Add file:// prefix for local paths
                                     source: {
@@ -395,19 +397,10 @@ Rectangle {
                                         if (boardRow.boardImage.startsWith("qrc:") || boardRow.boardImage.startsWith("file:")) {
                                             return boardRow.boardImage;
                                         }
-                                        return "file://" + boardRow.boardImage;
+                                        return "file:///" + boardRow.boardImage;
                                     }
-                                    layer.enabled: true
-                                    layer.effect: MultiEffect {
-                                        maskEnabled: true
-                                        maskSource: ShaderEffectSource {
-                                            sourceItem: Rectangle {
-                                                width: 44
-                                                height: 44
-                                                radius: 12
-                                            }
-                                        }
-                                    }
+                                    asynchronous: true
+                                    cache: true
                                 }
                             }
 
@@ -522,14 +515,16 @@ Rectangle {
                                     visible: false
                                 }
 
-                                // Use ShaderEffectSource and OpacityMask via layer
+                                // Simple clip for rounded corners (performant)
                                 Rectangle {
                                     anchors.fill: parent
                                     radius: 12
                                     color: Colors.surface
+                                    clip: true
 
                                     Image {
                                         anchors.fill: parent
+                                        anchors.margins: 0
                                         fillMode: Image.PreserveAspectCrop
                                         // Add file:// prefix for local paths (paths not starting with qrc: or file:)
                                         source: {
@@ -542,17 +537,8 @@ Rectangle {
                                             // Windows paths need file:/// (three slashes) for absolute paths
                                             return "file:///" + boardRow.boardImage;
                                         }
-                                        layer.enabled: true
-                                        layer.effect: MultiEffect {
-                                            maskEnabled: true
-                                            maskSource: ShaderEffectSource {
-                                                sourceItem: Rectangle {
-                                                    width: 44
-                                                    height: 44
-                                                    radius: 12
-                                                }
-                                            }
-                                        }
+                                        asynchronous: true
+                                        cache: true
                                     }
                                 }
                             }
@@ -619,7 +605,7 @@ Rectangle {
                                         const newName = text.trim();
                                         if (newName.length > 0 && newName !== boardRow.boardName) {
                                             soundboardService.renameBoard(boardRow.boardId, newName);
-                                            soundboardsModel.reload();
+                                            // Model automatically reloads via boardsChanged signal
                                         }
                                         root.editingBoardId = -1;
                                     }
@@ -872,7 +858,7 @@ Rectangle {
                         console.log("Deleting board:", deleteConfirmDialog.boardIdToDelete);
                         const result = soundboardService.deleteBoard(deleteConfirmDialog.boardIdToDelete);
                         console.log("Delete result:", result);
-                        soundboardsModel.reload();
+                        // Model automatically reloads via boardsChanged signal
                         deleteConfirmDialog.close();
                     }
 

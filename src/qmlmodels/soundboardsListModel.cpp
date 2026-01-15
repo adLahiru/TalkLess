@@ -92,6 +92,83 @@ void SoundboardsListModel::reload()
     endResetModel();
 }
 
+void SoundboardsListModel::updateFromService()
+{
+    if (!m_service)
+        return;
+
+    const QVector<SoundboardInfo> newData = m_service->listBoards();
+    
+    // Build lookup maps for efficient comparison
+    QHash<int, int> oldIdToRow;
+    for (int i = 0; i < m_cache.size(); ++i) {
+        oldIdToRow[m_cache[i].id] = i;
+    }
+    
+    QHash<int, int> newIdToRow;
+    for (int i = 0; i < newData.size(); ++i) {
+        newIdToRow[newData[i].id] = i;
+    }
+    
+    // Find removed items (in old but not in new) - process from end to avoid index shifting
+    QVector<int> removedRows;
+    for (int i = 0; i < m_cache.size(); ++i) {
+        if (!newIdToRow.contains(m_cache[i].id)) {
+            removedRows.append(i);
+        }
+    }
+    // Remove from end to beginning
+    for (int i = removedRows.size() - 1; i >= 0; --i) {
+        int row = removedRows[i];
+        beginRemoveRows(QModelIndex(), row, row);
+        m_cache.removeAt(row);
+        endRemoveRows();
+    }
+    
+    // Rebuild oldIdToRow after removals
+    oldIdToRow.clear();
+    for (int i = 0; i < m_cache.size(); ++i) {
+        oldIdToRow[m_cache[i].id] = i;
+    }
+    
+    // Find added items (in new but not in old) and insert at correct position
+    for (int newRow = 0; newRow < newData.size(); ++newRow) {
+        const SoundboardInfo& info = newData[newRow];
+        if (!oldIdToRow.contains(info.id)) {
+            // Insert at the target row
+            int insertAt = qMin(newRow, m_cache.size());
+            beginInsertRows(QModelIndex(), insertAt, insertAt);
+            m_cache.insert(insertAt, info);
+            endInsertRows();
+            
+            // Update oldIdToRow for subsequent insertions
+            oldIdToRow.clear();
+            for (int i = 0; i < m_cache.size(); ++i) {
+                oldIdToRow[m_cache[i].id] = i;
+            }
+        }
+    }
+    
+    // Update existing items that may have changed (name, artwork, etc.)
+    for (int newRow = 0; newRow < newData.size(); ++newRow) {
+        const SoundboardInfo& newInfo = newData[newRow];
+        if (oldIdToRow.contains(newInfo.id)) {
+            int oldRow = oldIdToRow[newInfo.id];
+            const SoundboardInfo& oldInfo = m_cache[oldRow];
+            
+            // Check if any data changed
+            if (oldInfo.name != newInfo.name || 
+                oldInfo.artwork != newInfo.artwork ||
+                oldInfo.clipCount != newInfo.clipCount ||
+                oldInfo.hotkey != newInfo.hotkey) {
+                m_cache[oldRow] = newInfo;
+                const QModelIndex idx = index(oldRow, 0);
+                emit dataChanged(idx, idx, {NameRole, ImagePathRole, ClipCountRole, HotkeyRole});
+            }
+        }
+    }
+}
+
 bool SoundboardsListModel::activateByRow(int row)
 {
     if (!m_service)
@@ -118,7 +195,8 @@ bool SoundboardsListModel::toggleActiveById(int boardId)
 
 void SoundboardsListModel::onBoardsChanged()
 {
-    reload();
+    // Use incremental update instead of full reload for better performance
+    updateFromService();
 }
 
 void SoundboardsListModel::onActiveBoardChanged()

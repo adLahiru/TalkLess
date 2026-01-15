@@ -1787,21 +1787,31 @@ int SoundboardService::createBoardWithArtwork(const QString& name, const QString
     if (finalName.isEmpty())
         finalName = "New Soundboard";
 
-    // Create board on disk + update index
-    int id = m_repo.createBoard(finalName);
-
-    // If artwork was provided, update the board with it
-    if (!artworkPath.isEmpty() && id >= 0) {
-        auto loaded = m_repo.loadBoard(id);
-        if (loaded) {
-            Soundboard b = *loaded;
-            QString localPath = artworkPath;
-            if (localPath.startsWith("file:")) {
-                localPath = QUrl(localPath).toLocalFile();
-            }
-            b.artwork = localPath;
-            m_repo.saveBoard(b);
+    // Convert artwork path if needed
+    QString localArtworkPath;
+    if (!artworkPath.isEmpty()) {
+        localArtworkPath = artworkPath;
+        if (localArtworkPath.startsWith("file:")) {
+            localArtworkPath = QUrl(localArtworkPath).toLocalFile();
         }
+    }
+
+    // Get next ID from current state
+    int id = 1;
+    for (const auto& b : m_state.soundboards) {
+        id = std::max(id, b.id + 1);
+    }
+
+    // Create the board with artwork in one shot
+    Soundboard newBoard;
+    newBoard.id = id;
+    newBoard.name = finalName;
+    newBoard.artwork = localArtworkPath;
+
+    // Save board file + update index (single operation)
+    const bool ok = m_repo.saveBoard(newBoard);
+    if (!ok) {
+        return -1;
     }
 
     // Reload index in memory and notify UI
