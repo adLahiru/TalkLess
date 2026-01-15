@@ -313,6 +313,8 @@ private:
     QTimer* m_recordingTickTimer = nullptr;
     bool m_recordWithInputDevice = true;
     bool m_recordWithClipboard = false;
+    QString m_selectedRecordingDeviceId;               // Track the selected recording input device
+    bool m_micPassthroughDisabledForRecording = false; // Track if we disabled passthrough for recording
 
     // Dirty flags to track unsaved changes
     bool m_indexDirty = false;
