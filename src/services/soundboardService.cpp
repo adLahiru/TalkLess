@@ -581,7 +581,16 @@ bool SoundboardService::addClip(int boardId, const QString& filePath)
 
     Clip draft;
     draft.filePath = localPath;
-    draft.title = QFileInfo(draft.filePath).baseName();
+    draft.title = QFileInfo(localPath).baseName();
+
+    // Check if a clip with this name already exists - reject duplicates
+    if (clipTitleExistsInBoard(boardId, draft.title)) {
+        QString errorMsg = QString("A clip named '%1' already exists in this soundboard").arg(draft.title);
+        emit errorOccurred(errorMsg);
+        qWarning() << errorMsg;
+        return false;
+    }
+
     // other defaults are handled inside addClipToBoard
 
     return addClipToBoard(boardId, draft);
@@ -610,6 +619,15 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
             Clip c;
             c.filePath = localPath;
             c.title = QFileInfo(localPath).baseName();
+
+            // Skip if a clip with this name already exists
+            if (clipTitleExistsInBoard(boardId, c.title)) {
+                QString errorMsg = QString("A clip named '%1' already exists in this soundboard").arg(c.title);
+                emit errorOccurred(errorMsg);
+                qWarning() << errorMsg;
+                continue;
+            }
+
             c.id = ++maxId;
             c.isPlaying = false;
             c.locked = false;
@@ -646,6 +664,15 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
         Clip c;
         c.filePath = localPath;
         c.title = QFileInfo(localPath).baseName();
+
+        // Skip if a clip with this name already exists
+        if (clipTitleExistsInBoard(boardId, c.title)) {
+            QString errorMsg = QString("A clip named '%1' already exists in this soundboard").arg(c.title);
+            emit errorOccurred(errorMsg);
+            qWarning() << errorMsg;
+            continue;
+        }
+
         c.id = ++maxId;
         c.isPlaying = false;
         c.locked = false;
@@ -678,13 +705,18 @@ bool SoundboardService::addClipWithTitle(int boardId, const QString& filePath, c
 
     // Determine base title: use provided title or fall back to filename
     QString baseTitle = title.trimmed().isEmpty() ? QFileInfo(localPath).baseName() : title.trimmed();
-    
-    // Generate a unique title if needed
-    QString uniqueTitle = generateUniqueClipTitle(boardId, baseTitle);
+
+    // Check if a clip with this name already exists - reject duplicates
+    if (clipTitleExistsInBoard(boardId, baseTitle)) {
+        QString errorMsg = QString("A clip named '%1' already exists in this soundboard").arg(baseTitle);
+        emit errorOccurred(errorMsg);
+        qWarning() << errorMsg;
+        return false;
+    }
 
     Clip draft;
     draft.filePath = localPath;
-    draft.title = uniqueTitle;
+    draft.title = baseTitle;
 
     return addClipToBoard(boardId, draft);
 }
@@ -702,13 +734,18 @@ bool SoundboardService::addClipWithSettings(int boardId, const QString& filePath
 
     // Determine base title: use provided title or fall back to filename
     QString baseTitle = title.trimmed().isEmpty() ? QFileInfo(localPath).baseName() : title.trimmed();
-    
-    // Generate a unique title if needed
-    QString uniqueTitle = generateUniqueClipTitle(boardId, baseTitle);
+
+    // Check if a clip with this name already exists - reject duplicates
+    if (clipTitleExistsInBoard(boardId, baseTitle)) {
+        QString errorMsg = QString("A clip named '%1' already exists in this soundboard").arg(baseTitle);
+        emit errorOccurred(errorMsg);
+        qWarning() << errorMsg;
+        return false;
+    }
 
     Clip draft;
     draft.filePath = localPath;
-    draft.title = uniqueTitle;
+    draft.title = baseTitle;
     draft.trimStartMs = trimStartMs;
     draft.trimEndMs = trimEndMs;
 
@@ -803,6 +840,14 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
             c.title = c.title.trimmed();
         }
 
+        // Reject if a clip with this name already exists
+        if (clipTitleExistsInBoard(boardId, c.title)) {
+            QString errorMsg = QString("A clip named '%1' already exists in this soundboard").arg(c.title);
+            emit errorOccurred(errorMsg);
+            qWarning() << errorMsg;
+            return false;
+        }
+
         // Extract artwork if no image set
         if (c.imgPath.isEmpty()) {
             c.imgPath = extractAudioArtwork(c.filePath);
@@ -846,8 +891,19 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
 
     Clip c = draft;
     c.filePath = sanitizedPath; // Use sanitized path
+    // Set title from filename if empty
     if (c.title.trimmed().isEmpty())
         c.title = QFileInfo(c.filePath).baseName();
+    else
+        c.title = c.title.trimmed();
+
+    // Reject if a clip with this name already exists
+    if (clipTitleExistsInBoard(boardId, c.title)) {
+        QString errorMsg = QString("A clip named '%1' already exists in this soundboard").arg(c.title);
+        emit errorOccurred(errorMsg);
+        qWarning() << errorMsg;
+        return false;
+    }
 
     // Extract artwork if no image set
     if (c.imgPath.isEmpty()) {
@@ -2193,12 +2249,12 @@ bool SoundboardService::startRecording()
     // Priority rule: If both are selected, only record from input device
     bool recordMic = m_recordWithInputDevice;
     bool recordPlayback = m_recordWithClipboard;
-    
+
     if (recordMic && recordPlayback) {
         // Both selected: prioritize input device only
         recordPlayback = false;
     }
-    
+
     // Ensure at least one source is enabled
     if (!recordMic && !recordPlayback) {
         // Default to mic if neither selected
@@ -2347,47 +2403,48 @@ float SoundboardService::getRecordingPeakLevel() const
 QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int numBars) const
 {
     QVariantList result;
-    
+
     if (filePath.isEmpty() || numBars <= 0)
         return result;
-    
+
     // Convert file URL to local path if necessary
     QString localPath = filePath;
     if (localPath.startsWith("file:///")) {
         localPath = QUrl(filePath).toLocalFile();
     }
-    
+
     if (!QFileInfo::exists(localPath))
         return result;
-    
+
     // Use miniaudio to read the file peaks
     // Create a decoder to read the audio file
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, 48000);
     ma_decoder decoder;
-    
+
     if (ma_decoder_init_file(localPath.toUtf8().constData(), &cfg, &decoder) != MA_SUCCESS) {
         return result;
     }
-    
+
     // Get total frames
     ma_uint64 totalFrames = 0;
     if (ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames) != MA_SUCCESS || totalFrames == 0) {
         ma_decoder_uninit(&decoder);
         return result;
     }
-    
+
     // Calculate frames per bar
     ma_uint64 framesPerBar = totalFrames / (ma_uint64)numBars;
-    if (framesPerBar == 0) framesPerBar = 1;
-    
+    if (framesPerBar == 0)
+        framesPerBar = 1;
+
     // Buffer for reading
     constexpr size_t kBufferSize = 4096;
     float buffer[kBufferSize * 2]; // stereo
-    
+
     float globalMaxPeak = 0.0f;
     QVector<float> peaks;
     peaks.reserve(numBars);
-    
+
     for (int bar = 0; bar < numBars; ++bar) {
         // Seek to the start of this bar's segment
         ma_uint64 startFrame = (ma_uint64)bar * framesPerBar;
@@ -2395,33 +2452,36 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
             peaks.append(0.1f);
             continue;
         }
-        
+
         float maxPeak = 0.0f;
         ma_uint64 framesRemaining = framesPerBar;
-        
+
         while (framesRemaining > 0) {
             ma_uint64 framesToRead = std::min((ma_uint64)kBufferSize, framesRemaining);
             ma_uint64 framesRead = 0;
-            
-            if (ma_decoder_read_pcm_frames(&decoder, buffer, framesToRead, &framesRead) != MA_SUCCESS || framesRead == 0) {
+
+            if (ma_decoder_read_pcm_frames(&decoder, buffer, framesToRead, &framesRead) != MA_SUCCESS ||
+                framesRead == 0) {
                 break;
             }
-            
+
             // Find max amplitude in this chunk (stereo - 2 channels)
             for (ma_uint64 i = 0; i < framesRead * 2; ++i) {
                 float absVal = std::abs(buffer[i]);
-                if (absVal > maxPeak) maxPeak = absVal;
+                if (absVal > maxPeak)
+                    maxPeak = absVal;
             }
-            
+
             framesRemaining -= framesRead;
         }
-        
+
         peaks.append(maxPeak);
-        if (maxPeak > globalMaxPeak) globalMaxPeak = maxPeak;
+        if (maxPeak > globalMaxPeak)
+            globalMaxPeak = maxPeak;
     }
-    
+
     ma_decoder_uninit(&decoder);
-    
+
     // Normalize peaks to 0.1 - 1.0 range
     for (int i = 0; i < peaks.size(); ++i) {
         float normalized = 0.1f;
@@ -2430,7 +2490,7 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
         }
         result.append(QVariant::fromValue(normalized));
     }
-    
+
     return result;
 }
 
@@ -2599,7 +2659,7 @@ void SoundboardService::finalizeClipPlayback(int clipId)
     }
 
     // If something else is currently playing (not paused), DO NOT auto-resume paused clips.
-    
+
     QVariantList others = playingClipIDs(); // excludes paused by your logic
     for (int i = others.size() - 1; i >= 0; --i) {
         bool ok = false;
@@ -2614,7 +2674,6 @@ void SoundboardService::finalizeClipPlayback(int clipId)
         emit clipPlaybackStopped(clipId);
         return;
     }
-    
 
     // Resume clips that were paused by this clip (Play/Pause mode)
     if (m_pausedByClip.contains(clipId)) {

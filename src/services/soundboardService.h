@@ -9,9 +9,9 @@
 #include <QObject>
 #include <QSet>
 #include <QStringList>
+#include <QTimer>
 #include <QVariant>
 #include <QVector>
-#include <QTimer>
 
 #include <memory>
 #include <optional>
@@ -63,7 +63,8 @@ public:
     Q_PROPERTY(QString lastRecordingPath READ lastRecordingPath NOTIFY recordingStateChanged)
     Q_PROPERTY(float recordingDuration READ recordingDuration NOTIFY recordingStateChanged)
     Q_PROPERTY(float recordingPeakLevel READ getRecordingPeakLevel NOTIFY recordingStateChanged)
-    Q_PROPERTY(bool recordWithInputDevice READ recordWithInputDevice WRITE setRecordWithInputDevice NOTIFY settingsChanged)
+    Q_PROPERTY(
+        bool recordWithInputDevice READ recordWithInputDevice WRITE setRecordWithInputDevice NOTIFY settingsChanged)
     Q_PROPERTY(bool recordWithClipboard READ recordWithClipboard WRITE setRecordWithClipboard NOTIFY settingsChanged)
 
     // ---- Index / Settings ----
@@ -269,6 +270,9 @@ signals:
     void recordingStateChanged();
     void audioDevicesChanged();
 
+    // Error notification for UI
+    void errorOccurred(const QString& message);
+
 private:
     void rebuildHotkeyIndex();
     Clip* findActiveClipById(int clipId);
@@ -292,7 +296,7 @@ private:
     AppState m_state;
     QHash<int, Soundboard> m_activeBoards;
     QHash<QString, int> m_hotkeyToClipId;
-    QHash<int, int> m_slotToClipId; 
+    QHash<int, int> m_slotToClipId;
 
     std::unique_ptr<AudioEngine> m_audioEngine;
     QHash<int, int> m_clipIdToSlot;

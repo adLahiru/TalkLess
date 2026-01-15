@@ -2,10 +2,7 @@
 
 #include <QtGlobal>
 
-SoundboardsListModel::SoundboardsListModel(QObject* parent)
-    : QAbstractListModel(parent)
-{
-}
+SoundboardsListModel::SoundboardsListModel(QObject* parent) : QAbstractListModel(parent) {}
 
 void SoundboardsListModel::setService(SoundboardService* service)
 {
@@ -19,11 +16,9 @@ void SoundboardsListModel::setService(SoundboardService* service)
     m_service = service;
 
     if (m_service) {
-        connect(m_service, &SoundboardService::boardsChanged,
-                this, &SoundboardsListModel::onBoardsChanged);
+        connect(m_service, &SoundboardService::boardsChanged, this, &SoundboardsListModel::onBoardsChanged);
 
-        connect(m_service, &SoundboardService::activeBoardChanged,
-                this, &SoundboardsListModel::onActiveBoardChanged);
+        connect(m_service, &SoundboardService::activeBoardChanged, this, &SoundboardsListModel::onActiveBoardChanged);
 
         reload();
     } else {
@@ -52,15 +47,22 @@ QVariant SoundboardsListModel::data(const QModelIndex& index, int role) const
     const SoundboardInfo& b = m_cache[row];
 
     switch (role) {
-    case IdRole:        return b.id;
-    case NameRole:      return b.name;
-    case ClipCountRole: return b.clipCount;
+    case IdRole:
+        return b.id;
+    case NameRole:
+        return b.name;
+    case ClipCountRole:
+        return b.clipCount;
 
     case HotkeyRole:
         return b.hotkey;
 
+    case ImagePathRole:
+        return b.artwork;
+
     case IsActiveRole:
-        if (!m_service) return false;
+        if (!m_service)
+            return false;
         return m_service->isBoardActive(b.id);
 
     default:
@@ -71,12 +73,12 @@ QVariant SoundboardsListModel::data(const QModelIndex& index, int role) const
 QHash<int, QByteArray> SoundboardsListModel::roleNames() const
 {
     return {
-        { IdRole, "id" },
-        { NameRole, "name" },
-        { ClipCountRole, "clipCount" },
-        { HotkeyRole, "hotkey" },
-        { ImagePathRole, "imagePath" },
-        { IsActiveRole, "isActive" }
+        {       IdRole,        "id"},
+        {     NameRole,      "name"},
+        {ClipCountRole, "clipCount"},
+        {   HotkeyRole,    "hotkey"},
+        {ImagePathRole, "imagePath"},
+        { IsActiveRole,  "isActive"}
     };
 }
 
@@ -86,7 +88,7 @@ void SoundboardsListModel::reload()
         return;
 
     beginResetModel();
-    m_cache = m_service->listBoards();  // expects QVector<SoundboardInfo>
+    m_cache = m_service->listBoards(); // expects QVector<SoundboardInfo>
     endResetModel();
 }
 
@@ -127,7 +129,7 @@ void SoundboardsListModel::onActiveBoardChanged()
     // Only the IsActiveRole changes for all rows
     const QModelIndex top = index(0, 0);
     const QModelIndex bottom = index(m_cache.size() - 1, 0);
-    emit dataChanged(top, bottom, { IsActiveRole });
+    emit dataChanged(top, bottom, {IsActiveRole});
 }
 
 int SoundboardsListModel::rowForId(int boardId) const

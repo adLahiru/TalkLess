@@ -387,7 +387,16 @@ Rectangle {
                                 Image {
                                     anchors.fill: parent
                                     fillMode: Image.PreserveAspectCrop
-                                    source: boardRow.boardImage || "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
+                                    // Add file:// prefix for local paths
+                                    source: {
+                                        if (!boardRow.boardImage || boardRow.boardImage.length === 0) {
+                                            return "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg";
+                                        }
+                                        if (boardRow.boardImage.startsWith("qrc:") || boardRow.boardImage.startsWith("file:")) {
+                                            return boardRow.boardImage;
+                                        }
+                                        return "file://" + boardRow.boardImage;
+                                    }
                                     layer.enabled: true
                                     layer.effect: MultiEffect {
                                         maskEnabled: true
@@ -522,7 +531,16 @@ Rectangle {
                                     Image {
                                         anchors.fill: parent
                                         fillMode: Image.PreserveAspectCrop
-                                        source: boardRow.boardImage || "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg"
+                                        // Add file:// prefix for local paths (paths not starting with qrc: or file:)
+                                        source: {
+                                            if (!boardRow.boardImage || boardRow.boardImage.length === 0) {
+                                                return "qrc:/qt/qml/TalkLess/resources/images/sondboard.jpg";
+                                            }
+                                            if (boardRow.boardImage.startsWith("qrc:") || boardRow.boardImage.startsWith("file:")) {
+                                                return boardRow.boardImage;
+                                            }
+                                            return "file://" + boardRow.boardImage;
+                                        }
                                         layer.enabled: true
                                         layer.effect: MultiEffect {
                                             maskEnabled: true

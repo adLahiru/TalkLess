@@ -337,6 +337,12 @@ Rectangle {
             // Update the UI when a looping clip restarts - this helps reset progress display
             root.updateDisplayedClipData();
         }
+        
+        function onErrorOccurred(message) {
+            // Show error popup to user
+            errorNotificationText.text = message;
+            errorNotificationPopup.open();
+        }
     }
 
     // Load fonts at root level
@@ -348,6 +354,75 @@ Rectangle {
     FontLoader {
         id: interFont
         source: "https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.ttf"
+    }
+
+    // ============================================
+    // Error Notification Popup
+    // ============================================
+    Popup {
+        id: errorNotificationPopup
+        anchors.centerIn: parent
+        width: 360
+        height: 140
+        modal: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        padding: 0
+        
+        background: Rectangle {
+            color: Colors.surface
+            radius: 16
+            border.color: "#FF6B6B"
+            border.width: 2
+        }
+        
+        contentItem: Column {
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 16
+            
+            Text {
+                text: "⚠️ Error"
+                font.family: "Inter"
+                font.pixelSize: 18
+                font.weight: Font.Bold
+                color: "#FF6B6B"
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+            
+            Text {
+                id: errorNotificationText
+                text: ""
+                font.family: "Inter"
+                font.pixelSize: 14
+                color: Colors.textPrimary
+                wrapMode: Text.WordWrap
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+            }
+            
+            Rectangle {
+                width: 100
+                height: 36
+                radius: 8
+                color: "#FF6B6B"
+                anchors.horizontalCenter: parent.horizontalCenter
+                
+                Text {
+                    text: "OK"
+                    font.family: "Inter"
+                    font.pixelSize: 14
+                    font.weight: Font.Medium
+                    color: "white"
+                    anchors.centerIn: parent
+                }
+                
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: errorNotificationPopup.close()
+                }
+            }
+        }
     }
 
     // ============================================
