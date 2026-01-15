@@ -20,6 +20,26 @@ Rectangle {
     property real masterPeakLevel: 0.0
     property real monitorPeakLevel: 0.0
 
+    // Helper function to convert linear amplitude (0.0-1.0) to a perceptually correct
+    // meter level (0.0-1.0) using logarithmic/dB scaling.
+    // This maps -60dB to 0dB onto 0.0 to 1.0, which matches how professional audio meters work.
+    function linearToMeterLevel(linearAmplitude) {
+        if (linearAmplitude <= 0.0001)
+            return 0.0;  // Below -80dB, show as silent
+
+        // Convert to dB: 20 * log10(amplitude)
+        var dB = 20 * Math.log10(linearAmplitude);
+
+        // Map dB range [-60, 0] to [0, 1]
+        // -60 dB = 0.0 (minimum), 0 dB = 1.0 (maximum)
+        var minDB = -60.0;
+        var maxDB = 0.0;
+        var normalized = (dB - minDB) / (maxDB - minDB);
+
+        // Clamp to [0, 1]
+        return Math.max(0.0, Math.min(1.0, normalized));
+    }
+
     function restartUI() {
         mainLoader.active = false;
         mainLoader.active = true;
@@ -418,9 +438,9 @@ Rectangle {
                                     Layout.fillWidth: true
                                     spacing: 4
 
-                                    // Calculate how many squares should be lit based on mic peak (0.0-1.0)
-                                    // We use 12 squares, so multiply peak by 12
-                                    property int activeSquares: Math.min(12, Math.floor(root.micPeakLevel * 12))
+                                    // Calculate how many squares should be lit based on mic peak level
+                                    // Using logarithmic (dB) scaling for perceptually correct display
+                                    property int activeSquares: Math.min(12, Math.floor(root.linearToMeterLevel(root.micPeakLevel) * 12))
 
                                     // Label and squares on same row
                                     RowLayout {
@@ -1272,7 +1292,8 @@ Rectangle {
 
                                     DotMeter {
                                         Layout.leftMargin: 10
-                                        activeDots: Math.floor(Math.min(1.0, root.masterPeakLevel) * 10)
+                                        // Using logarithmic (dB) scaling for perceptually correct display
+                                        activeDots: Math.floor(root.linearToMeterLevel(root.masterPeakLevel) * 10)
                                     }
 
                                     Item {
@@ -1325,7 +1346,8 @@ Rectangle {
 
                                     DotMeter {
                                         Layout.leftMargin: 10
-                                        activeDots: Math.floor(Math.min(1.0, root.monitorPeakLevel) * 10)
+                                        // Using logarithmic (dB) scaling for perceptually correct display
+                                        activeDots: Math.floor(root.linearToMeterLevel(root.monitorPeakLevel) * 10)
                                     }
 
                                     Item {
