@@ -134,6 +134,13 @@ set(TALKLESS_RESOURCES
     resources/icons/reproduction/restart_light.svg
     resources/icons/reproduction/play-stop_dark.svg
     resources/icons/reproduction/play-stop_light.svg
+
+    resources/icons/play.svg
+    resources/icons/stop.svg
+    resources/icons/pause.svg
+    resources/icons/web.svg
+    resources/icons/copy_icon.svg
+    resources/icons/delete.svg
 )
 
 # Force every resource to be accessible with a RELATIVE alias.
