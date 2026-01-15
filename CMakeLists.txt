@@ -138,6 +138,10 @@ set(TALKLESS_RESOURCES
     resources/icons/play.svg
     resources/icons/stop.svg
     resources/icons/pause.svg
+    resources/icons/previous.svg
+    resources/icons/next.svg
+    resources/icons/microphone.svg
+    resources/icons/microphone_muted.svg
     resources/icons/web.svg
     resources/icons/copy_icon.svg
     resources/icons/delete.svg
