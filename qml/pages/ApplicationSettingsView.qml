@@ -440,7 +440,7 @@ Rectangle {
 
                                     // Calculate how many squares should be lit based on mic peak level
                                     // Using logarithmic (dB) scaling for perceptually correct display
-                                    property int activeSquares: Math.min(12, Math.floor(root.linearToMeterLevel(root.micPeakLevel) * 12))
+                                    property int activeSquares: Math.min(13, Math.floor(root.linearToMeterLevel(root.micPeakLevel) * 13))
 
                                     // Label and squares on same row
                                     RowLayout {
