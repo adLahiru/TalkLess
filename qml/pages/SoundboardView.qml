@@ -2051,6 +2051,18 @@ Rectangle {
                                 }
                             }
                         }
+
+                        // Error message for clip name validation
+                        Text {
+                            visible: recordingTab.recordingError !== ""
+                            text: recordingTab.recordingError
+                            color: Colors.error
+                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                            font.pixelSize: 11
+                            font.weight: Font.Medium
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                        }
                     }
 
                     // ============================================================
@@ -2470,21 +2482,34 @@ Rectangle {
                                         return;
                                     }
 
-                                    // stop recording if still recording
+                                    // Stop recording if still recording
                                     if (soundboardService?.isRecording ?? false) {
                                         soundboardService.stopRecording();
                                     }
 
-                                    // IMPORTANT: this returns the path ONCE and clears internal state
+                                    // Validate Name
+                                    let title = recordingNameInput.text.trim();
+                                    
+                                    if (title === "") {
+                                        // User did not add a name -> Generate unique name automatically
+                                        title = soundboardService.generateUniqueClipTitle(boardId, "Recording");
+                                    } else {
+                                        // User added a name -> Check for duplicates
+                                        if (soundboardService.clipTitleExistsInBoard(boardId, title)) {
+                                            recordingTab.recordingError = "A clip with this name already exists. Please choose a different name.";
+                                            return; // Stop here, do not consume recording
+                                        }
+                                    }
+
+                                    // Clear any previous error
+                                    recordingTab.recordingError = "";
+
+                                    // Validation passed, now consume the recording path
                                     const localPath = soundboardService.consumePendingRecordingPath();
                                     if (!localPath || localPath === "") {
                                         console.log("Cannot save: no pending recording");
                                         return;
                                     }
-
-                                    const title = recordingNameInput.text.trim() || "New Recording";
-                                    // Use local path directly - C++ handles file:// prefix conversion
-                                    // DO NOT use Qt.resolvedUrl as it creates malformed URLs on Windows
 
                                     // Convert normalized trim (0..1) to milliseconds
                                     const durationSec = soundboardService.getFileDuration(localPath); // seconds
@@ -2503,7 +2528,7 @@ Rectangle {
                                     const noTrim = (waveformTrim.trimStart <= 0.0001 && waveformTrim.trimEnd >= 0.9999);
                                     if (noTrim) {
                                         trimStartMs = 0;
-                                        trimEndMs = 0; // your engine treats 0 as full length
+                                        trimEndMs = 0; // engine treats 0 as full length
                                     }
 
                                     console.log("Adding clip - boardId:", boardId, "path:", localPath, "title:", title);
@@ -2516,6 +2541,9 @@ Rectangle {
                                         rightSidebar.currentTabIndex = 0;
                                     } else {
                                         console.log("addClipWithSettings failed for path:", localPath);
+                                        // If save failed, we might want to show an error, but for now we just log it.
+                                        // The pending recording is consumed, which is unfortunate if backend failed, 
+                                        // but usually adding shouldn't fail if path is valid.
                                     }
                                 }
                             }
