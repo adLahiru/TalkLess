@@ -53,7 +53,7 @@ Item {
     // =========================
     Timer {
         id: autoCloseTimer
-        interval: 300
+        interval: 200
         repeat: false
         onTriggered: {
             // Only close if cursor is NOT on the tile AND NOT on the popup
@@ -68,7 +68,7 @@ Item {
     // =========================
     Timer {
         id: hoverDelayTimer
-        interval: 300
+        interval: 5
         repeat: false
         onTriggered: {
             if (root.tileHover) {
