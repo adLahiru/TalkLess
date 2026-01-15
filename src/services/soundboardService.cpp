@@ -2245,20 +2245,29 @@ bool SoundboardService::startRecording()
     m_lastRecordingPath = getRecordingOutputPath();
     QDir().mkpath(QFileInfo(m_lastRecordingPath).absolutePath());
 
-    // Determine recording sources based on UI settings
-    // Priority rule: If both are selected, only record from input device
-    bool recordMic = m_recordWithInputDevice;
-    bool recordPlayback = m_recordWithClipboard;
-
-    if (recordMic && recordPlayback) {
-        // Both selected: prioritize input device only
-        recordPlayback = false;
+    // Check if the recording device matches the application capture device
+    // If they are the same, we need to disable mic passthrough to avoid feedback
+    m_micPassthroughDisabledForRecording = false;
+    if (!m_selectedRecordingDeviceId.isEmpty() && m_selectedRecordingDeviceId != "-1" &&
+        m_state.settings.micPassthroughEnabled) {
+        // Check if recording device matches the app's capture device
+        if (m_selectedRecordingDeviceId == m_state.settings.selectedCaptureDeviceId) {
+            // Same device - disable mic passthrough to avoid feedback during recording
+            qDebug() << "Recording device matches capture device, temporarily disabling mic passthrough";
+            m_audioEngine->setMicPassthroughEnabled(false);
+            m_micPassthroughDisabledForRecording = true;
+        }
     }
 
-    // Ensure at least one source is enabled
-    if (!recordMic && !recordPlayback) {
-        // Default to mic if neither selected
-        recordMic = true;
+    // Determine recording sources:
+    // - Always record from input device when one is selected via setRecordingInputDevice()
+    // - The audio engine handles using the dedicated recording device
+    bool recordMic = true; // Always use the selected recording input device
+    bool recordPlayback = m_recordWithClipboard;
+
+    // If both selected, prioritize input device only
+    if (recordMic && recordPlayback) {
+        recordPlayback = false;
     }
 
     const bool success = m_audioEngine->startRecording(m_lastRecordingPath.toStdString(), recordMic, recordPlayback);
@@ -2271,6 +2280,12 @@ bool SoundboardService::startRecording()
     } else {
         // If failed, don't keep stale path
         m_lastRecordingPath.clear();
+
+        // Restore mic passthrough if we disabled it
+        if (m_micPassthroughDisabledForRecording) {
+            m_audioEngine->setMicPassthroughEnabled(true);
+            m_micPassthroughDisabledForRecording = false;
+        }
         emit recordingStateChanged();
     }
     return success;
@@ -2285,6 +2300,13 @@ bool SoundboardService::stopRecording()
 
     if (m_recordingTickTimer)
         m_recordingTickTimer->stop();
+
+    // Restore mic passthrough if we disabled it for recording
+    if (m_micPassthroughDisabledForRecording) {
+        qDebug() << "Restoring mic passthrough after recording";
+        m_audioEngine->setMicPassthroughEnabled(true);
+        m_micPassthroughDisabledForRecording = false;
+    }
 
     // Only mark as pending if a real file exists
     if (success && !m_lastRecordingPath.isEmpty() && QFileInfo::exists(m_lastRecordingPath)) {
@@ -2332,6 +2354,7 @@ void SoundboardService::cancelPendingRecording()
         m_lastRecordingPath.clear();
         m_hasUnsavedRecording = false;
         m_recordingPreviewPlaying = false;
+        m_micPassthroughDisabledForRecording = false;
         emit recordingStateChanged();
         return;
     }
@@ -2343,6 +2366,13 @@ void SoundboardService::cancelPendingRecording()
 
     if (m_recordingTickTimer)
         m_recordingTickTimer->stop();
+
+    // Restore mic passthrough if we disabled it for recording
+    if (m_micPassthroughDisabledForRecording) {
+        qDebug() << "Restoring mic passthrough after cancelling recording";
+        m_audioEngine->setMicPassthroughEnabled(true);
+        m_micPassthroughDisabledForRecording = false;
+    }
 
     // Stop preview if playing
     if (m_recordingPreviewPlaying) {
@@ -2579,13 +2609,12 @@ bool SoundboardService::setRecordingInputDevice(const QString& deviceId)
     if (!m_audioEngine)
         return false;
 
+    // Track the selected recording device ID for comparison with capture device
+    m_selectedRecordingDeviceId = deviceId;
+
     // This should control the dedicated recording-input device
     const bool success = m_audioEngine->setRecordingDevice(deviceId.toStdString());
     if (success) {
-        // Optional: persist separately (recommended you add a field in settings)
-        // m_state.settings.selectedRecordingCaptureDeviceId = deviceId;
-        // m_indexDirty = true;
-
         emit settingsChanged();
     }
     return success;

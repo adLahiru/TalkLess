@@ -2096,16 +2096,6 @@ Rectangle {
                     }
                     ColumnLayout {
                         CheckBox {
-                            id: isInputDeviceRecording
-                            text: "Input Device Recording"
-                            checked: soundboardService?.recordWithInputDevice ?? true
-                            onToggled: {
-                                if (soundboardService) {
-                                    soundboardService.recordWithInputDevice = checked;
-                                }
-                            }
-                        }
-                        CheckBox {
                             id: isClipboardRecording
                             text: "Clipboard Recording"
                             checked: soundboardService?.recordWithClipboard ?? false
@@ -2206,19 +2196,12 @@ Rectangle {
                                         soundboardService.stopRecording();
                                     } else {
                                         // Validate recording source selection
-                                        const recordFromInput = isInputDeviceRecording.checked;
                                         const recordFromClipboard = isClipboardRecording.checked;
                                         const hasInputDevice = inputDeviceDropdown.selectedId !== "" && inputDeviceDropdown.selectedId !== "-1";
 
-                                        // Check if neither source is selected
-                                        if (!recordFromInput && !recordFromClipboard) {
-                                            recordingTab.recordingError = "Please select at least one recording source (Input Device or Clipboard)";
-                                            return;
-                                        }
-
-                                        // Check if input device recording is selected but no device is chosen
-                                        if (recordFromInput && !hasInputDevice) {
-                                            recordingTab.recordingError = "Please select an input device for recording";
+                                        // Check if neither source is selected (need input device OR clipboard)
+                                        if (!hasInputDevice && !recordFromClipboard) {
+                                            recordingTab.recordingError = "Please select an input device or enable Clipboard Recording";
                                             return;
                                         }
 
@@ -2265,13 +2248,14 @@ Rectangle {
                     }
 
                     // ============================================================
-                    // Trim Audio Section
+                    // Trim Audio Section (visible only after recording finishes)
                     // ============================================================
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
+                        visible: !(soundboardService?.isRecording ?? false) && (soundboardService?.lastRecordingPath ?? "") !== ""
 
                         RowLayout {
                             Layout.fillWidth: true
@@ -2347,6 +2331,7 @@ Rectangle {
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
+                        visible: !(soundboardService?.isRecording ?? false) && (soundboardService?.lastRecordingPath ?? "") !== ""
                     }
 
                     DropdownSelector {
@@ -2355,6 +2340,7 @@ Rectangle {
                         placeholder: "Select Soundboard"
                         selectedId: ""     // keep as string for your dropdown component
                         model: []
+                        visible: !(soundboardService?.isRecording ?? false) && (soundboardService?.lastRecordingPath ?? "") !== ""
 
                         function refreshBoards() {
                             const boards = soundboardService.listBoardsForDropdown();
@@ -2389,13 +2375,14 @@ Rectangle {
                     }
 
                     // ============================================================
-                    // Cancel and Save buttons
+                    // Cancel and Save buttons (visible only after recording finishes)
                     // ============================================================
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
+                        visible: !(soundboardService?.isRecording ?? false) && (soundboardService?.lastRecordingPath ?? "") !== ""
 
                         Item {
                             Layout.fillWidth: true
