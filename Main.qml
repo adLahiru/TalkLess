@@ -11,8 +11,8 @@ ApplicationWindow {
     id: mainWindow
     width: 1280
     height: 800
-    minimumWidth: 800
-    minimumHeight: 600
+    minimumWidth: 1200
+    minimumHeight: 700
     visible: true
     // Start in normal windowed mode, not fullscreen
     visibility: Window.Windowed

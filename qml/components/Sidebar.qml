@@ -539,7 +539,8 @@ Rectangle {
                                             if (boardRow.boardImage.startsWith("qrc:") || boardRow.boardImage.startsWith("file:")) {
                                                 return boardRow.boardImage;
                                             }
-                                            return "file://" + boardRow.boardImage;
+                                            // Windows paths need file:/// (three slashes) for absolute paths
+                                            return "file:///" + boardRow.boardImage;
                                         }
                                         layer.enabled: true
                                         layer.effect: MultiEffect {

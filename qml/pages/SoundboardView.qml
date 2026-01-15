@@ -337,7 +337,7 @@ Rectangle {
             // Update the UI when a looping clip restarts - this helps reset progress display
             root.updateDisplayedClipData();
         }
-        
+
         function onErrorOccurred(message) {
             // Show error popup to user
             errorNotificationText.text = message;
@@ -367,19 +367,19 @@ Rectangle {
         modal: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         padding: 0
-        
+
         background: Rectangle {
             color: Colors.surface
             radius: 16
             border.color: "#FF6B6B"
             border.width: 2
         }
-        
+
         contentItem: Column {
             anchors.fill: parent
             anchors.margins: 20
             spacing: 16
-            
+
             Text {
                 text: "⚠️ Error"
                 font.family: "Inter"
@@ -388,7 +388,7 @@ Rectangle {
                 color: "#FF6B6B"
                 anchors.horizontalCenter: parent.horizontalCenter
             }
-            
+
             Text {
                 id: errorNotificationText
                 text: ""
@@ -399,14 +399,14 @@ Rectangle {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
             }
-            
+
             Rectangle {
                 width: 100
                 height: 36
                 radius: 8
                 color: "#FF6B6B"
                 anchors.horizontalCenter: parent.horizontalCenter
-                
+
                 Text {
                     text: "OK"
                     font.family: "Inter"
@@ -415,7 +415,7 @@ Rectangle {
                     color: "white"
                     anchors.centerIn: parent
                 }
-                
+
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
@@ -1759,9 +1759,14 @@ Rectangle {
         // RIGHT COLUMN: Modern Sidebar with Premium Styling
         Rectangle {
             id: rightSidebar
-            Layout.preferredWidth: 340
-            Layout.minimumWidth: 340
-            Layout.maximumWidth: 340
+            // Responsive width calculation: prefer 340px but allow shrinking to 280px minimum
+            // and take up to 35% of parent width on very wide screens
+            property real parentWidth: root.width > 0 ? root.width : 800
+            property real responsiveWidth: Math.min(340, Math.max(280, parentWidth * 0.35))
+
+            Layout.preferredWidth: responsiveWidth
+            Layout.minimumWidth: 280
+            Layout.maximumWidth: 380
             Layout.fillHeight: true
             Layout.alignment: Qt.AlignRight
             Layout.topMargin: 0

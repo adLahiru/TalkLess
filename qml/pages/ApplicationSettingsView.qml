@@ -646,7 +646,7 @@ Rectangle {
                         // Row 1: Sample Rate and Channels
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 200
+                            spacing: 40
 
                             // Sample Rate
                             RowLayout {
@@ -721,10 +721,10 @@ Rectangle {
                             }
                         }
 
-                        // Row 2: Buffer Size
+                        // Row 2: Buffer Size and Latency
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 200
+                            spacing: 40
 
                             RowLayout {
                                 spacing: 12
@@ -1261,7 +1261,9 @@ Rectangle {
 
                                     DropdownSelector {
                                         id: speakerOutputDropdown
-                                        Layout.preferredWidth: 280
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 180
+                                        Layout.maximumWidth: 320
                                         placeholder: "Select Output Device"
                                         selectedId: soundboardService?.selectedPlaybackDeviceId ?? ""
 
@@ -1315,7 +1317,9 @@ Rectangle {
 
                                     DropdownSelector {
                                         id: secondOutputDropdown
-                                        Layout.preferredWidth: 280
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 180
+                                        Layout.maximumWidth: 320
                                         placeholder: "Select Monitor Device"
 
                                         selectedId: soundboardService?.selectedMonitorDeviceId ?? ""
@@ -1598,66 +1602,9 @@ Rectangle {
                                     }
                                 }
 
-                                Item {
-                                    Layout.fillWidth: true
-                                }
-                                // Item { width: parent.width; height: 1 } // push right-side buttons
+                                // Item {Layout.fillWidth: true}
+                                Item { width: parent.width; height: 1 } // push right-side buttons
 
-                                // Undo square button (icon placeholder)
-                                Button {
-                                    width: 30
-                                    height: 30
-                                    onClicked: hotkeyManager.undoHotkeyChanges()
-
-                                    contentItem: Image {
-                                        id: resetIcon
-                                        source: "qrc:/qt/qml/TalkLess/resources/icons/actions/ic_refresh.svg"
-                                        anchors.centerIn: parent
-                                        width: 18
-                                        height: 18
-                                        fillMode: Image.PreserveAspectFit
-                                        smooth: true
-                                    }
-
-                                    background: Rectangle {
-                                        radius: 8
-                                        color: Colors.surface
-                                        border.color: Colors.border
-                                        border.width: 1
-                                    }
-                                }
-
-                                // Save gradient button
-                                Button {
-                                    id: saveButton
-                                    width: 170
-                                    height: 55
-                                    text: "Save"
-                                    onClicked: hotkeyManager.saveHotkeys()
-
-                                    contentItem: Text {
-                                        text: saveButton.text
-                                        color: Colors.textOnPrimary
-                                        font.pixelSize: 14
-                                        font.weight: Font.Medium
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-
-                                    background: Rectangle {
-                                        radius: 10
-                                        gradient: Gradient {
-                                            GradientStop {
-                                                position: 0.0
-                                                color: Colors.gradientPrimaryStart
-                                            }
-                                            GradientStop {
-                                                position: 1.0
-                                                color: Colors.gradientPrimaryEnd
-                                            }
-                                        }
-                                    }
-                                }
                             }
 
                             // Content area - HotkeysTable with dynamic height
