@@ -222,11 +222,20 @@ Item {
             height: 28
             color: "transparent"
             
-            Text {
+            Image {
+                id: prevIcon
                 anchors.centerIn: parent
-                text: "⏮"
-                color: prevButtonArea.containsMouse ? Colors.textPrimary : Colors.textSecondary
-                font.pixelSize: 16
+                width: 14
+                height: 14
+                source: "qrc:/qt/qml/TalkLess/resources/icons/previous.svg"
+                sourceSize: Qt.size(14, 14)
+                visible: false
+            }
+            MultiEffect {
+                anchors.fill: prevIcon
+                source: prevIcon
+                colorization: 1.0
+                colorizationColor: prevButtonArea.containsMouse ? Colors.textPrimary : Colors.textSecondary
             }
             
             MouseArea {
@@ -249,11 +258,20 @@ Item {
             height: 28
             color: "transparent"
             
-            Text {
+            Image {
+                id: nextIcon
                 anchors.centerIn: parent
-                text: "⏭"
-                color: nextButtonArea.containsMouse ? Colors.textPrimary : Colors.textSecondary
-                font.pixelSize: 16
+                width: 14
+                height: 14
+                source: "qrc:/qt/qml/TalkLess/resources/icons/next.svg"
+                sourceSize: Qt.size(14, 14)
+                visible: false
+            }
+            MultiEffect {
+                anchors.fill: nextIcon
+                source: nextIcon
+                colorization: 1.0
+                colorizationColor: nextButtonArea.containsMouse ? Colors.textPrimary : Colors.textSecondary
             }
             
             MouseArea {
@@ -282,22 +300,21 @@ Item {
                 width: 20
                 height: 20
                 
-                Text {
+                Image {
+                    id: micIcon
                     anchors.centerIn: parent
-                    text: "🎤"
-                    font.pixelSize: 16
-                    opacity: root.isMuted ? 0.4 : 1.0
-                    color: muteButtonArea.containsMouse ? Colors.textPrimary : Colors.textSecondary
+                    width: 16
+                    height: 16
+                    source: root.isMuted ? "qrc:/qt/qml/TalkLess/resources/icons/microphone_muted.svg" : "qrc:/qt/qml/TalkLess/resources/icons/microphone.svg"
+                    sourceSize: Qt.size(16, 16)
+                    visible: false
                 }
-                
-                // Diagonal slash when muted
-                Rectangle {
-                    visible: root.isMuted
-                    anchors.centerIn: parent
-                    width: 22
-                    height: 2
-                    color: "#FF5555"
-                    rotation: -45
+                MultiEffect {
+                    anchors.fill: micIcon
+                    source: micIcon
+                    colorization: 1.0
+                    colorizationColor: muteButtonArea.containsMouse ? Colors.textPrimary : Colors.textSecondary
+                    opacity: root.isMuted ? 0.6 : 1.0
                 }
             }
             

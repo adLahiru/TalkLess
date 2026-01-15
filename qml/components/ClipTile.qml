@@ -53,10 +53,11 @@ Item {
     // =========================
     Timer {
         id: autoCloseTimer
-        interval: 800
+        interval: 300
         repeat: false
         onTriggered: {
-            if (!popupHover.hovered) {
+            // Only close if cursor is NOT on the tile AND NOT on the popup
+            if (!root.tileHover && !popupHover.hovered) {
                 root.showActions = false;
             }
         }
@@ -120,9 +121,9 @@ Item {
         autoCloseTimer.restart();
     }
 
-    // Action bar sizing
-    readonly property int actionBarHeight: 40
-    readonly property int actionBarWidth: 150
+    // Action bar sizing - 3 buttons (play, copy, delete) at 30px each + spacing
+    readonly property int actionBarHeight: 32
+    readonly property int actionBarWidth: 110  // 3 buttons * 30px + spacing + padding
     readonly property int popupMargin: 8
 
     Rectangle {
@@ -457,14 +458,24 @@ Item {
 
                     // Play/Stop
                     Rectangle {
-                        width: 30
-                        height: 30
-                        radius: 15
+                        width: 26
+                        height: 26
+                        radius: 13
                         color: playMA.containsMouse ? Colors.surfaceHighlight : "transparent"
-                        Text {
+                        Image {
+                            id: playIcon
                             anchors.centerIn: parent
-                            text: root.isPlaying ? "⏹️" : "▶️"
-                            font.pixelSize: 14
+                            width: 14
+                            height: 14
+                            source: root.isPlaying ? "qrc:/qt/qml/TalkLess/resources/icons/pause.svg" : "qrc:/qt/qml/TalkLess/resources/icons/play.svg"
+                            sourceSize: Qt.size(14, 14)
+                            visible: false
+                        }
+                        MultiEffect {
+                            anchors.fill: playIcon
+                            source: playIcon
+                            colorization: 1.0
+                            colorizationColor: Colors.accent
                         }
                         MouseArea {
                             id: playMA
@@ -482,16 +493,26 @@ Item {
                         }
                     }
 
-                    // Send to other soundboard (arrow icon)
+                    // Copy to other soundboard (copy icon)
                     Rectangle {
-                        width: 30
-                        height: 30
-                        radius: 15
+                        width: 26
+                        height: 26
+                        radius: 13
                         color: sendToMA.containsMouse ? Colors.surfaceHighlight : "transparent"
-                        Text {
+                        Image {
+                            id: copyIcon
                             anchors.centerIn: parent
-                            text: "➡️"
-                            font.pixelSize: 14
+                            width: 14
+                            height: 14
+                            source: "qrc:/qt/qml/TalkLess/resources/icons/copy_icon.svg"
+                            sourceSize: Qt.size(14, 14)
+                            visible: false
+                        }
+                        MultiEffect {
+                            anchors.fill: copyIcon
+                            source: copyIcon
+                            colorization: 1.0
+                            colorizationColor: Colors.accent
                         }
                         MouseArea {
                             id: sendToMA
@@ -500,7 +521,6 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             onEntered: {
                                 // Prevent flicker when moving between buttons
-                                autoCloseTimer.restart();
                                 autoCloseTimer.stop();
                             }
                             onClicked: {
@@ -510,65 +530,26 @@ Item {
                         }
                     }
 
-                    // // Edit bg
-                    // Rectangle {
-                    //     width: 30
-                    //     height: 30
-                    //     radius: 15
-                    //     color: bgMA.containsMouse ? Colors.surfaceHighlight : "transparent"
-                    //     Text { anchors.centerIn: parent; text: "🖼️"; font.pixelSize: 14 }
-                    //     MouseArea { id: bgMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    //         onClicked: { root.editBackgroundClicked(); root.showActions = false } }
-                    // }
-
-                    // Web
-                    Rectangle {
-                        width: 30
-                        height: 30
-                        radius: 15
-                        color: webMA.containsMouse ? Colors.surfaceHighlight : "transparent"
-                        Text {
-                            anchors.centerIn: parent
-                            text: "🌐"
-                            font.pixelSize: 14
-                        }
-                        MouseArea {
-                            id: webMA
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onEntered: {
-                                autoCloseTimer.restart();
-                                autoCloseTimer.stop();
-                            }
-                            onClicked: {
-                                root.webClicked();
-                                root.showActions = false;
-                            }
-                        }
-                    }
-
-                    // // Edit
-                    // Rectangle {
-                    //     width: 30
-                    //     height: 30
-                    //     radius: 15
-                    //     color: editMA.containsMouse ? Colors.surfaceHighlight : "transparent"
-                    //     Text { anchors.centerIn: parent; text: "✏️"; font.pixelSize: 14 }
-                    //     MouseArea { id: editMA; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    //         onClicked: { root.editClicked(); root.showActions = false } }
-                    // }
-
                     // Delete
                     Rectangle {
-                        width: 30
-                        height: 30
-                        radius: 15
+                        width: 26
+                        height: 26
+                        radius: 13
                         color: delMA.containsMouse ? Colors.surfaceHighlight : "transparent"
-                        Text {
+                        Image {
+                            id: deleteIcon
                             anchors.centerIn: parent
-                            text: "🗑️"
-                            font.pixelSize: 14
+                            width: 14
+                            height: 14
+                            source: "qrc:/qt/qml/TalkLess/resources/icons/delete.svg"
+                            sourceSize: Qt.size(14, 14)
+                            visible: false
+                        }
+                        MultiEffect {
+                            anchors.fill: deleteIcon
+                            source: deleteIcon
+                            colorization: 1.0
+                            colorizationColor: Colors.accent
                         }
                         MouseArea {
                             id: delMA
@@ -576,7 +557,6 @@ Item {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onEntered: {
-                                autoCloseTimer.restart();
                                 autoCloseTimer.stop();
                             }
                             onClicked: {
