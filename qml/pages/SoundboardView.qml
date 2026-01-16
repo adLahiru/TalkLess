@@ -724,10 +724,139 @@ Rectangle {
 
         // LEFT COLUMN: Banner and Content Area
         ColumnLayout {
+            id: leftColumn
             Layout.fillWidth: true
             Layout.fillHeight: true
             // Removed maximumWidth to allow pushing sidebar to the right
             spacing: 20
+
+            // Full-coverage DropArea for adding audio files via drag and drop anywhere in the soundboard
+            DropArea {
+                id: fullSoundboardDropArea
+                anchors.fill: parent
+                keys: ["text/uri-list"] // Standard for file drops
+                z: 1000 // Ensure it's above other elements for drag detection
+
+                onEntered: function (drag) {
+                    // Accept the drag if it contains file URLs
+                    drag.accepted = drag.hasUrls;
+                }
+
+                onDropped: function (drop) {
+                    if (drop.hasUrls) {
+                        let urls = [];
+                        for (let i = 0; i < drop.urls.length; i++) {
+                            urls.push(drop.urls[i].toString());
+                        }
+
+                        const boardId = activeClipsModel.boardId;
+                        if (boardId !== -1) {
+                            const success = soundboardService.addClips(boardId, urls);
+                            if (success) {
+                                activeClipsModel.reload();
+                            }
+                        }
+                        drop.accept();
+                    }
+                }
+
+                // Visual feedback overlay for file dragging - covers entire soundboard
+                Rectangle {
+                    id: dropOverlay
+                    anchors.fill: parent
+                    color: Qt.rgba(Colors.success.r, Colors.success.g, Colors.success.b, 0.15)
+                    visible: parent.containsDrag
+                    radius: 16
+                    z: 999
+
+                    // Animated border
+                    Rectangle {
+                        anchors.fill: parent
+                        color: "transparent"
+                        radius: 16
+                        border.color: Colors.success
+                        border.width: 3
+
+                        // Pulsing animation
+                        SequentialAnimation on border.width {
+                            running: dropOverlay.visible
+                            loops: Animation.Infinite
+                            NumberAnimation {
+                                from: 3
+                                to: 5
+                                duration: 400
+                                easing.type: Easing.InOutQuad
+                            }
+                            NumberAnimation {
+                                from: 5
+                                to: 3
+                                duration: 400
+                                easing.type: Easing.InOutQuad
+                            }
+                        }
+                    }
+
+                    // Center content
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 15
+
+                        // Large plus icon with glow effect
+                        Rectangle {
+                            Layout.alignment: Qt.AlignHCenter
+                            width: 80
+                            height: 80
+                            radius: 40
+                            color: Qt.rgba(Colors.success.r, Colors.success.g, Colors.success.b, 0.2)
+                            border.color: Colors.success
+                            border.width: 2
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "+"
+                                color: Colors.success
+                                font.pixelSize: 48
+                                font.weight: Font.Light
+                            }
+
+                            // Pulsing scale animation
+                            SequentialAnimation on scale {
+                                running: dropOverlay.visible
+                                loops: Animation.Infinite
+                                NumberAnimation {
+                                    from: 1.0
+                                    to: 1.1
+                                    duration: 500
+                                    easing.type: Easing.InOutQuad
+                                }
+                                NumberAnimation {
+                                    from: 1.1
+                                    to: 1.0
+                                    duration: 500
+                                    easing.type: Easing.InOutQuad
+                                }
+                            }
+                        }
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "Drop audio files to add to soundboard"
+                            color: Colors.success
+                            font.pixelSize: 24
+                            font.weight: Font.DemiBold
+                        }
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "Supports MP3, WAV, FLAC, OGG, and more"
+                            color: Colors.success
+                            font.pixelSize: 14
+                            font.weight: Font.Normal
+                            opacity: 0.8
+                        }
+                    }
+                }
+            }
 
             // Background Banner
             Rectangle {
@@ -1037,71 +1166,6 @@ Rectangle {
                     contentHeight: clipsGrid.implicitHeight
                     clip: true
                     flickableDirection: Flickable.VerticalFlick
-
-                    // DropArea for adding new files via drag and drop
-                    DropArea {
-                        id: gridFileDropArea
-                        anchors.fill: parent
-                        keys: ["text/uri-list"] // Standard for file drops
-
-                        onDropped: function (drop) {
-                            if (drop.hasUrls) {
-                                let urls = [];
-                                for (let i = 0; i < drop.urls.length; i++) {
-                                    urls.push(drop.urls[i].toString());
-                                }
-
-                                const boardId = activeClipsModel.boardId;
-                                if (boardId !== -1) {
-                                    const success = soundboardService.addClips(boardId, urls);
-                                    if (success) {
-                                        activeClipsModel.reload();
-                                    }
-                                }
-                                drop.accept();
-                            }
-                        }
-
-                        // Visual feedback for file dragging
-                        Rectangle {
-                            anchors.fill: parent
-                            color: Qt.rgba(Colors.success.r, Colors.success.g, Colors.success.b, 0.2)
-                            visible: parent.containsDrag
-                            border.color: Colors.success
-                            border.width: 3
-                            radius: 12
-
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: 10
-
-                                // Large plus icon
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: "+"
-                                    color: Colors.success
-                                    font.pixelSize: 64
-                                    font.weight: Font.Light
-
-                                    layer.enabled: true
-                                    layer.effect: MultiEffect {
-                                        colorization: 1.0
-                                        colorizationColor: Colors.success
-                                        blurEnabled: true
-                                        blur: 0.5
-                                    }
-                                }
-
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: "Drop audio files to add to soundboard"
-                                    color: Colors.success
-                                    font.pixelSize: 22
-                                    font.weight: Font.DemiBold
-                                }
-                            }
-                        }
-                    }
 
                     // Background MouseArea for right-click context menu (Paste)
                     MouseArea {
@@ -1692,7 +1756,7 @@ Rectangle {
                             // New clip - get current position from backend
                             playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId);
                             lastClipId = root.displayedClipData.clipId;
-                            
+
                             // Load waveform data for the new clip (32 bars to match UI strip)
                             currentWaveformData = soundboardService.getClipWaveformPeaks(root.displayedClipData.clipId, 32);
                         }
@@ -1702,7 +1766,7 @@ Rectangle {
                         currentWaveformData = [];
                     }
                 }
-                
+
                 // Bind waveform data to the AudioPlayerCard
                 waveformData: currentWaveformData
 
@@ -1774,9 +1838,9 @@ Rectangle {
                 onMuteClicked: {
                     soundboardService.setMicEnabled(!isMuted);
                 }
-                
+
                 // Handle seek/scrub requests from waveform
-                onSeekRequested: function(positionMs) {
+                onSeekRequested: function (positionMs) {
                     if (root.displayedClipData) {
                         // Use playClipFromPosition for seeking
                         soundboardService.playClipFromPosition(root.displayedClipData.clipId, positionMs);
@@ -3068,8 +3132,6 @@ Rectangle {
                                     }
                                 }
                             }
-
-
 
                             // ===== REPRODUCTION MODES SECTION =====
                             ColumnLayout {
