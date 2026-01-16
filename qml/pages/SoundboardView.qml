@@ -1231,7 +1231,7 @@ Rectangle {
                             enabled: true
                             onClicked: {
                                 rightSidebar.currentTabIndex = 1;
-                                audioFileDialog.open();
+                                rightSidebar.isSoundboardView = false;
                             }
                         }
 
@@ -1432,13 +1432,19 @@ Rectangle {
                                         // Selecting the clip updates the sidebar
                                         soundboardService.setCurrentlySelectedClip(clipWrapper.clipId);
                                         soundboardService.playClip(clipWrapper.clipId);
+                                        rightSidebar.isSoundboardView = true;
+                                        rightSidebar.currentTabIndex = 0;
                                     }
 
                                     onPlayClicked: {
                                         soundboardService.playClip(clipWrapper.clipId);
+                                        rightSidebar.isSoundboardView = true;
+                                        rightSidebar.currentTabIndex = 0;
                                     }
                                     onStopClicked: {
                                         soundboardService.stopClip(clipWrapper.clipId);
+                                        rightSidebar.isSoundboardView = true;
+                                        rightSidebar.currentTabIndex = 0;
                                     }
                                     onDeleteClicked: {
                                         if (soundboardService.deleteClip(activeClipsModel.boardId, clipWrapper.clipId)) {
@@ -1450,6 +1456,7 @@ Rectangle {
                                     onEditClicked: {
                                         soundboardService.setCurrentlySelectedClip(clipWrapper.clipId);
                                         rightSidebar.currentTabIndex = 0; // Focus the editor tab
+                                        rightSidebar.isSoundboardView = true;
                                     }
                                     onWebClicked: {
                                         // Open sharing URL?
@@ -1790,6 +1797,7 @@ Rectangle {
                     if (activeClipsModel.count === 0)
                         return;
 
+                    rightSidebar.isSoundboardView = true;
                     // Find current index and go to previous
                     let currentIndex = -1;
                     for (let i = 0; i < activeClipsModel.count; i++) {
@@ -1814,6 +1822,7 @@ Rectangle {
                     if (activeClipsModel.count === 0)
                         return;
 
+                    rightSidebar.isSoundboardView = true;
                     // Find current index and go to next
                     let currentIndex = -1;
                     for (let i = 0; i < activeClipsModel.count; i++) {
@@ -1874,6 +1883,7 @@ Rectangle {
             radius: 0 // Flush to the right side edge looks better for fixed sidebar
 
             // Tab state: 0=Editor, 1=Plus, 2=Record, 3=Teleprompter, 4=Speaker
+            property bool isSoundboardView: true
             property int currentTabIndex: 0  // Default to Record tab
             property var tabState: ["Editor", "Add", "Record", "Prompter", "TTS"]
             ColumnLayout {
@@ -1931,10 +1941,12 @@ Rectangle {
                             TabButton {
                                 index: 0
                                 iconSource: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_tab_settings.svg"
+                                visible: rightSidebar.isSoundboardView
                             }
                             TabButton {
                                 index: 1
                                 iconSource: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_tab_add.svg"
+                                visible: !rightSidebar.isSoundboardView
                             }
                             TabButton {
                                 index: 2
