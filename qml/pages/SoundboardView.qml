@@ -38,6 +38,17 @@ Rectangle {
     // Local clips model for detached windows (optional - if not set, uses global clipsModel)
     property var localClipsModel: null
 
+    // Track soundboard count for empty state detection
+    property int soundboardCount: soundboardsModel ? soundboardsModel.rowCount() : 0
+
+    // Update soundboard count when model changes
+    Connections {
+        target: soundboardsModel
+        function onRowsInserted() { root.soundboardCount = soundboardsModel.rowCount(); }
+        function onRowsRemoved() { root.soundboardCount = soundboardsModel.rowCount(); }
+        function onModelReset() { root.soundboardCount = soundboardsModel.rowCount(); }
+    }
+
     // Active clips model - uses local if available, otherwise global clipsModel
     readonly property var activeClipsModel: localClipsModel ? localClipsModel : clipsModel
 
@@ -858,12 +869,13 @@ Rectangle {
                 }
             }
 
-            // Background Banner
+            // Background Banner - hidden when no soundboards
             Rectangle {
                 id: bannerContainer
                 Layout.fillWidth: true
-                Layout.preferredHeight: 145
-                Layout.maximumHeight: 145
+                Layout.preferredHeight: root.soundboardCount > 0 ? 145 : 0
+                Layout.maximumHeight: root.soundboardCount > 0 ? 145 : 0
+                visible: root.soundboardCount > 0
                 radius: 16
                 clip: true
                 color: "transparent"
@@ -1112,10 +1124,11 @@ Rectangle {
                 }
             }
 
-            // Spacer between banner and content
+            // Spacer between banner and content - hidden when no soundboards
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 10
+                Layout.preferredHeight: root.soundboardCount > 0 ? 10 : 0
+                visible: root.soundboardCount > 0
             }
 
             // Soundboard content area
@@ -1692,6 +1705,96 @@ Rectangle {
                         policy: ScrollBar.AsNeeded
                     }
                 }
+
+                // Empty state overlay - shown when no soundboards exist
+                Rectangle {
+                    id: noSoundboardsOverlay
+                    anchors.fill: parent
+                    color: Colors.surfaceDark
+                    radius: 12
+                    visible: root.soundboardCount === 0
+                    z: 100
+
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 20
+
+                        // Icon
+                        Rectangle {
+                            width: 80
+                            height: 80
+                            radius: 40
+                            color: Qt.rgba(Colors.primary.r, Colors.primary.g, Colors.primary.b, 0.1)
+                            Layout.alignment: Qt.AlignHCenter
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "🎵"
+                                font.pixelSize: 36
+                            }
+                        }
+
+                        // Title
+                        Text {
+                            text: "No Soundboards"
+                            color: Colors.textPrimary
+                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                            font.pixelSize: 24
+                            font.weight: Font.Bold
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+
+                        // Description
+                        Text {
+                            text: "Create your first soundboard to start\nadding and playing audio clips"
+                            color: Colors.textSecondary
+                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                            font.pixelSize: 14
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+
+                        // Add Soundboard Button
+                        Rectangle {
+                            Layout.preferredWidth: 180
+                            Layout.preferredHeight: 48
+                            Layout.alignment: Qt.AlignHCenter
+                            Layout.topMargin: 10
+                            radius: 12
+
+                            gradient: Gradient {
+                                orientation: Gradient.Horizontal
+                                GradientStop {
+                                    position: 0.0
+                                    color: addSbBtnMouse.containsMouse ? Colors.primaryLight : Colors.primary
+                                }
+                                GradientStop {
+                                    position: 1.0
+                                    color: addSbBtnMouse.containsMouse ? Colors.secondary : "#D214FD"
+                                }
+                            }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "+ Add Soundboard"
+                                color: Colors.textOnPrimary
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 14
+                                font.weight: Font.Medium
+                            }
+
+                            MouseArea {
+                                id: addSbBtnMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    addSoundboardDialog.open();
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Audio Player Card - below the clips grid
@@ -1858,7 +1961,7 @@ Rectangle {
             }
         }
 
-        // RIGHT COLUMN: Modern Sidebar with Premium Styling
+        // RIGHT COLUMN: Modern Sidebar with Premium Styling - hidden when no soundboards
         Rectangle {
             id: rightSidebar
             // Responsive width calculation: prefer 340px but allow shrinking to 280px minimum
@@ -1866,9 +1969,10 @@ Rectangle {
             property real parentWidth: root.width > 0 ? root.width : 800
             property real responsiveWidth: Math.min(340, Math.max(280, parentWidth * 0.35))
 
-            Layout.preferredWidth: responsiveWidth
-            Layout.minimumWidth: 280
-            Layout.maximumWidth: 380
+            visible: root.soundboardCount > 0
+            Layout.preferredWidth: root.soundboardCount > 0 ? responsiveWidth : 0
+            Layout.minimumWidth: root.soundboardCount > 0 ? 280 : 0
+            Layout.maximumWidth: root.soundboardCount > 0 ? 380 : 0
             Layout.fillHeight: true
             Layout.alignment: Qt.AlignRight
             Layout.topMargin: 0

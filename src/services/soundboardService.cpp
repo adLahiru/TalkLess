@@ -1874,10 +1874,6 @@ bool SoundboardService::renameBoard(int boardId, const QString& newName)
 
 bool SoundboardService::deleteBoard(int boardId)
 {
-    // Don't allow deleting the last board
-    if (m_state.soundboards.size() <= 1)
-        return false;
-
     // If deleting an active board, deactivate it first
     if (m_activeBoards.contains(boardId)) {
         m_activeBoards.remove(boardId);
