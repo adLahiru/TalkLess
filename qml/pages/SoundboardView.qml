@@ -1878,6 +1878,9 @@ Rectangle {
 
                     // Initialize input device dropdown when tab becomes visible
                     onVisibleChanged: {
+                        if (!visible) {
+                            recordingNameInput.focus = false;
+                        }
                         if (visible && inputDeviceDropdown.model.length === 0) {
                             const list = soundboardService.getInputDevices();
                             list.unshift({
@@ -2018,36 +2021,26 @@ Rectangle {
                             border.color: Colors.border
                             border.width: 1
 
-                            RowLayout {
+                            TextInput {
+                                id: recordingNameInput
                                 anchors.fill: parent
                                 anchors.leftMargin: 15
                                 anchors.rightMargin: 15
-                                spacing: 4
+                                verticalAlignment: TextInput.AlignVCenter
+                                color: Colors.textPrimary
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 13
+                                clip: true
+                                selectByMouse: true
 
                                 Text {
-                                    text: ""
-                                    color: Colors.textSecondary
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 13
-                                    visible: recordingNameInput.text === ""
-                                }
-
-                                TextInput {
-                                    id: recordingNameInput
-                                    Layout.fillWidth: true
-                                    color: Colors.textPrimary
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 13
-                                    clip: true
-
-                                    Text {
-                                        anchors.fill: parent
-                                        text: "Enter Name Here"
-                                        color: Colors.textDisabled
-                                        font.family: parent.font.family
-                                        font.pixelSize: parent.font.pixelSize
-                                        visible: !parent.text && !parent.activeFocus
-                                    }
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 0
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "Enter a name for your recording..."
+                                    color: Colors.textDisabled
+                                    font: parent.font
+                                    visible: !parent.text && !parent.activeFocus
                                 }
                             }
                         }
@@ -3694,6 +3687,12 @@ Rectangle {
                     spacing: 6
                     visible: rightSidebar.currentTabIndex === 1
 
+                    onVisibleChanged: {
+                        if (!visible) {
+                            uploadAudioNameInput.focus = false;
+                        }
+                    }
+
                     // Name Audio File Section
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -3718,36 +3717,26 @@ Rectangle {
                             border.color: Colors.border
                             border.width: 1
 
-                            RowLayout {
+                            TextInput {
+                                id: uploadAudioNameInput
                                 anchors.fill: parent
                                 anchors.leftMargin: 15
                                 anchors.rightMargin: 15
-                                spacing: 4
+                                verticalAlignment: TextInput.AlignVCenter
+                                color: Colors.textPrimary
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 13
+                                clip: true
+                                selectByMouse: true
 
                                 Text {
-                                    text: "Enter Name Here:"
-                                    color: Colors.textSecondary
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 13
-                                    visible: uploadAudioNameInput.text === ""
-                                }
-
-                                TextInput {
-                                    id: uploadAudioNameInput
-                                    Layout.fillWidth: true
-                                    color: Colors.textPrimary
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 13
-                                    clip: true
-
-                                    Text {
-                                        anchors.fill: parent
-                                        text: "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _"
-                                        color: Colors.textSecondary
-                                        font.family: parent.font.family
-                                        font.pixelSize: parent.font.pixelSize
-                                        visible: !parent.text && !parent.activeFocus
-                                    }
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 0
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "Enter a name for your audio file..."
+                                    color: Colors.textDisabled
+                                    font: parent.font
+                                    visible: !parent.text && !parent.activeFocus
                                 }
                             }
                         }
