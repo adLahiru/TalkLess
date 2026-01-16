@@ -20,6 +20,7 @@
 #include <QtConcurrent>
 #include <QFuture>
 #include <QMutexLocker>
+#include <cmath>
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
@@ -2607,7 +2608,9 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
     for (int i = 0; i < peaks.size(); ++i) {
         float normalized = 0.1f;
         if (globalMaxPeak > 0.001f) {
-            normalized = 0.1f + (peaks[i] / globalMaxPeak) * 0.9f;
+            float ratio = peaks[i] / globalMaxPeak;
+            // Use sqrt for increased sensitivity
+            normalized = 0.1f + std::sqrt(ratio) * 0.9f;
         }
         result.append(QVariant::fromValue(normalized));
     }
