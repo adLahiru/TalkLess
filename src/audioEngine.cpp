@@ -1665,6 +1665,26 @@ void AudioEngine::seekClip(int slotId, double positionMs)
     clips[slotId].playbackFrameCount.store(frames, std::memory_order_relaxed);
 }
 
+void AudioEngine::setClipStartPosition(int slotId, double positionMs)
+{
+    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    
+    // Just set the seekPosMs - the decoder thread will pick this up and seek immediately
+    // This is meant to be called AFTER loadClip but BEFORE playClip
+    clips[slotId].seekPosMs.store(positionMs, std::memory_order_relaxed);
+    
+    // Also pre-calculate playbackFrameCount for correct progress display
+    double startMs = clips[slotId].trimStartMs.load(std::memory_order_relaxed);
+    double diffMs = positionMs - startMs;
+    if (diffMs < 0) diffMs = 0;
+
+    int sr = clips[slotId].sampleRate.load(std::memory_order_relaxed);
+    if (sr <= 0) sr = (int)m_sampleRate;
+
+    long long frames = (long long)(diffMs * sr / 1000.0);
+    clips[slotId].playbackFrameCount.store(frames, std::memory_order_relaxed);
+}
+
 bool AudioEngine::isClipPlaying(int slotId) const
 {
     if (slotId < 0 || slotId >= MAX_CLIPS) return false;

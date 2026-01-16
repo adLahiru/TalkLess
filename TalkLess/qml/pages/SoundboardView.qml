@@ -3072,7 +3072,7 @@ Rectangle {
                                 // Generate static mock waveform data (called once) - 30 bars
                                 function generateMockWaveform() {
                                     var data = [];
-                                    for (var i = 0; i < 100; i++) {
+                                    for (var i = 0; i < 30; i++) {
                                         // Create a realistic-looking waveform pattern
                                         var base = 0.3 + 0.4 * Math.sin(i * 0.5);
                                         var noise = 0.2 * Math.sin(i * 2.3);
@@ -3095,7 +3095,7 @@ Rectangle {
                                     }
 
                                     // Use the new simplified method that takes clipId directly
-                                    var peaks = soundboardService.getClipWaveformPeaks(clipId, 100);
+                                    var peaks = soundboardService.getClipWaveformPeaks(clipId, 30);
 
                                     if (soundboardService)
                                         soundboardService.logFromQml("Got peaks: " + (peaks ? peaks.length : 0));

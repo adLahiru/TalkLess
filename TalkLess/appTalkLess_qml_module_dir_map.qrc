@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="/qt/qml/TalkLess">E:/Projects/TalkLess/TalkLess</file>
+
+  </qresource>
+</RCC>

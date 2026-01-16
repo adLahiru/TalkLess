@@ -12,6 +12,7 @@
 #include <QTimer>
 #include <QVariant>
 #include <QVector>
+#include <QMutex>
 
 #include <memory>
 #include <optional>
@@ -178,6 +179,7 @@ public:
     Q_INVOKABLE void clipClicked(int clipId);
     Q_INVOKABLE void setCurrentlySelectedClip(int clipId);
     Q_INVOKABLE void playClip(int clipId);
+    Q_INVOKABLE void playClipFromPosition(int clipId, double positionMs);
     Q_INVOKABLE void stopClip(int clipId);
     Q_INVOKABLE void stopAllClips();
     Q_INVOKABLE bool isClipPlaying(int clipId) const;
@@ -226,7 +228,8 @@ public:
 
     // ---- Recording options ----
     Q_INVOKABLE float getRecordingPeakLevel() const;
-    Q_INVOKABLE QVariantList getWaveformPeaks(const QString& filePath, int numBars = 60) const;
+    Q_INVOKABLE QVariantList getWaveformPeaks(const QString& filePath, int numBars = 100) const;
+    Q_INVOKABLE QVariantList getClipWaveformPeaks(int clipId, int numBars = 100) const; // Get waveform by clip ID
     bool recordWithInputDevice() const { return m_recordWithInputDevice; }
     void setRecordWithInputDevice(bool enabled);
     bool recordWithClipboard() const { return m_recordWithClipboard; }
@@ -237,8 +240,13 @@ public:
     Q_INVOKABLE bool clipTitleExistsInBoard(int boardId, const QString& title) const;
     Q_INVOKABLE QString generateUniqueClipTitle(int boardId, const QString& baseTitle) const;
 
+    Q_INVOKABLE void logFromQml(const QString& msg) const { qDebug() << "[QML]" << msg; }
+
     // ---- Application Control ----
     Q_INVOKABLE void restartApplication();
+
+    // ---- Waveform Caching ----
+    Q_INVOKABLE void cacheActiveBoardWaveforms();
 
     // ---- Recording preview (NO soundboard add) ----
     Q_INVOKABLE QVariantList listBoardsForDropdown() const;
@@ -321,4 +329,8 @@ private:
     // Dirty flags to track unsaved changes
     bool m_indexDirty = false;
     QSet<int> m_dirtyBoards;
+
+    // Waveform cache (clipId -> peaks)
+    mutable QMap<int, QVariantList> m_waveformCache;
+    mutable QMutex m_waveformCacheMutex;
 };

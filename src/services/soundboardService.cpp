@@ -14,7 +14,12 @@
 #include <QJsonValue>
 #include <QProcess>
 #include <QStandardPaths>
+#include <QStandardPaths>
+#include <QStandardPaths>
 #include <QUrl>
+#include <QtConcurrent>
+#include <QFuture>
+#include <QMutexLocker>
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
@@ -2227,6 +2232,72 @@ void SoundboardService::playClip(int clipId)
     }
 }
 
+void SoundboardService::playClipFromPosition(int clipId, double positionMs)
+{
+    if (!m_audioEngine) {
+        qWarning() << "AudioEngine not initialized";
+        return;
+    }
+
+    Clip* clip = findActiveClipById(clipId);
+    if (!clip) {
+        qWarning() << "Clip not found for playClipFromPosition:" << clipId;
+        return;
+    }
+
+    if (clip->filePath.isEmpty()) {
+        qWarning() << "Clip has no file path:" << clipId;
+        return;
+    }
+
+    qDebug() << "playClipFromPosition: clipId=" << clipId << "positionMs=" << positionMs;
+
+    const int slotId = getOrAssignSlot(clipId);
+    m_slotToClipId[slotId] = clipId;
+
+    const int mode = clip->reproductionMode;
+
+    // Stop the clip if it's currently playing
+    if (m_audioEngine->isClipPlaying(slotId)) {
+        m_audioEngine->stopClip(slotId);
+    }
+
+    // Load the clip (this resets seekPosMs to -1, but we'll set it after)
+    const std::string filePath = clip->filePath.toStdString();
+    auto [startSec, endSec] = m_audioEngine->loadClip(slotId, filePath);
+    if (startSec == endSec) {
+        qWarning() << "Failed to load clip:" << clip->filePath;
+        return;
+    }
+    clip->durationSec = endSec;
+
+    // Apply gain
+    const float gainDb = (clip->volume <= 0) ? -60.0f : 20.0f * std::log10(clip->volume / 100.0f);
+    m_audioEngine->setClipGain(slotId, gainDb);
+
+    // Apply loop behavior
+    const bool loop = (mode == 4) ? true : clip->isRepeat;
+    if (mode == 4)
+        clip->isRepeat = true;
+
+    m_audioEngine->setClipLoop(slotId, loop);
+    m_audioEngine->setClipTrim(slotId, clip->trimStartMs, clip->trimEndMs);
+
+    // *** KEY FIX: Set the start position AFTER loadClip but BEFORE playClip ***
+    // This ensures the decoder thread will see seekPosMs when it starts
+    m_audioEngine->setClipStartPosition(slotId, positionMs);
+    qDebug() << "Set clip start position to" << positionMs << "ms for slot" << slotId;
+
+    // Now play the clip - the decoder thread will pick up the seekPosMs
+    m_audioEngine->playClip(slotId);
+
+    clip->isPlaying = true;
+    emit activeClipsChanged();
+    emit clipPlaybackStarted(clipId);
+
+    qDebug() << "playClipFromPosition: clip" << clipId << "started from position" << positionMs << "ms";
+}
+
 void SoundboardService::stopClip(int clipId)
 {
     if (!m_audioEngine)
@@ -2448,8 +2519,10 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
 {
     QVariantList result;
 
-    if (filePath.isEmpty() || numBars <= 0)
+    if (filePath.isEmpty() || numBars <= 0) {
+        qDebug() << "getWaveformPeaks: Empty path or invalid numBars";
         return result;
+    }
 
     // Convert file URL to local path if necessary
     QString localPath = filePath;
@@ -2457,8 +2530,12 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
         localPath = QUrl(filePath).toLocalFile();
     }
 
-    if (!QFileInfo::exists(localPath))
+    qDebug() << "getWaveformPeaks: Checking path:" << localPath;
+
+    if (!QFileInfo::exists(localPath)) {
+        qDebug() << "getWaveformPeaks: File does not exist:" << localPath;
         return result;
+    }
 
     // Use miniaudio to read the file peaks
     // Create a decoder to read the audio file
@@ -2538,7 +2615,50 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
     return result;
 }
 
+QVariantList SoundboardService::getClipWaveformPeaks(int clipId, int numBars) const
+{
+    // Check Cache
+    {
+        QMutexLocker locker(&m_waveformCacheMutex);
+        if (m_waveformCache.contains(clipId)) {
+            return m_waveformCache[clipId];
+        }
+    }
+
+    // Find the clip and get its file path
+    QString filePath;
+    
+    for (auto it = m_activeBoards.constBegin(); it != m_activeBoards.constEnd(); ++it) {
+        const Soundboard& board = it.value();
+        for (const auto& clip : board.clips) {
+            if (clip.id == clipId) {
+                filePath = clip.filePath;
+                break;
+            }
+        }
+        if (!filePath.isEmpty()) break;
+    }
+    
+    if (filePath.isEmpty()) {
+        qDebug() << "getClipWaveformPeaks: Could not find clip" << clipId;
+        return QVariantList();
+    }
+    
+    // Perform load (expensive)
+    // qDebug() << "getClipWaveformPeaks: Loading clip" << clipId << "from:" << filePath;
+    QVariantList peaks = getWaveformPeaks(filePath, numBars);
+
+    // Update Cache
+    {
+        QMutexLocker locker(&m_waveformCacheMutex);
+        m_waveformCache[clipId] = peaks;
+    }
+    
+    return peaks;
+}
+
 void SoundboardService::setRecordWithInputDevice(bool enabled)
+
 {
     if (m_recordWithInputDevice != enabled) {
         m_recordWithInputDevice = enabled;
@@ -2890,8 +3010,6 @@ QVariantList SoundboardService::playingClipIDs() const
             // Exclude paused clips
             if ((isPlayingInternal || isPlayingEngine) && !isPausedEngine) {
                 playingIds.append(clip.id);
-                qDebug() << "playingClipIDs: clip" << clip.id << "is playing (internal=" << isPlayingInternal
-                         << ", engine=" << isPlayingEngine << ")";
             }
         }
     }
@@ -3587,4 +3705,38 @@ QString SoundboardService::extractAudioArtwork(const QString& audioFilePath)
     }
 
     return QString();
+}
+
+void SoundboardService::cacheActiveBoardWaveforms()
+{
+    // Collect all clip IDs from active boards to minimize lock contention
+    QList<int> clipIds;
+    // Note: m_activeBoards is generally stable on the main thread, 
+    // but better to quickly copy IDs
+    for (auto it = m_activeBoards.constBegin(); it != m_activeBoards.constEnd(); ++it) {
+        for (const auto& clip : it.value().clips) {
+            clipIds.append(clip.id);
+        }
+    }
+
+    if (clipIds.isEmpty()) return;
+
+    // Run in background
+    QtConcurrent::run([this, clipIds]() {
+        for (int clipId : clipIds) {
+            // Check if already cached
+            bool cached = false;
+            {
+                QMutexLocker locker(&m_waveformCacheMutex);
+                cached = m_waveformCache.contains(clipId);
+            }
+
+            if (!cached) {
+                // Determine path and load
+                // We use getClipWaveformPeaks which handles lookup and caching.
+                getClipWaveformPeaks(clipId, 100);
+            }
+        }
+        // qDebug() << "Background waveform caching complete for" << clipIds.size() << "clips.";
+    });
 }

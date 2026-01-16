@@ -1,0 +1,15 @@
+-rootPath
+E:/Projects/TalkLess
+-cmake-output
+-output-file
+E:/Projects/TalkLess/.qt/qml_imports/appTalkLess_build.cmake
+-importPath
+E:/Projects/TalkLess/TalkLess
+-importPath
+E:/Projects/TalkLess
+-importPath
+C:/Qt/6.10.1/msvc2022_64/qml
+-qrcFiles
+E:/Projects/TalkLess/.qt/rcc/qmake_TalkLess.qrc
+E:/Projects/TalkLess/.qt/rcc/appTalkLess_raw_qml_0.qrc
+E:/Projects/TalkLess/.qt/rcc/appTalkLess_raw_res_0.qrc

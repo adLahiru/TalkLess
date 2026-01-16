@@ -151,6 +151,7 @@ public:
 
     void setClipTrim(int slotId, double startMs, double endMs);
     void seekClip(int slotId, double positionMs);
+    void setClipStartPosition(int slotId, double positionMs);  // Sets position BEFORE playClip is called
 
     bool isClipPlaying(int slotId) const;
     bool isClipPaused(int slotId) const;

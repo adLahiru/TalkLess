@@ -1,0 +1,43 @@
+module TalkLess
+typeinfo appTalkLess.qmltypes
+prefer :/qt/qml/TalkLess/
+Main 1.0 Main.qml
+Sidebar 1.0 qml/components/Sidebar.qml
+HeaderBar 1.0 qml/components/HeaderBar.qml
+BackgroundBanner 1.0 qml/components/BackgroundBanner.qml
+SettingsTabSelector 1.0 qml/components/SettingsTabSelector.qml
+ToggleSwitch 1.0 qml/components/ToggleSwitch.qml
+LabeledSlider 1.0 qml/components/LabeledSlider.qml
+DropdownSelector 1.0 qml/components/DropdownSelector.qml
+VolumeMeter 1.0 qml/components/VolumeMeter.qml
+StepIndicator 1.0 qml/components/StepIndicator.qml
+ActionButton 1.0 qml/components/ActionButton.qml
+SettingsPanel 1.0 qml/components/SettingsPanel.qml
+TriangleSlider 1.0 qml/components/TriangleSlider.qml
+BalanceSlider 1.0 qml/components/BalanceSlider.qml
+VolumeMeterSlider 1.0 qml/components/VolumeMeterSlider.qml
+SettingsDropdown 1.0 qml/components/SettingsDropdown.qml
+SettingsToggle 1.0 qml/components/SettingsToggle.qml
+GradientButton 1.0 qml/components/GradientButton.qml
+DotMeter 1.0 qml/components/DotMeter.qml
+HotkeysTable 1.0 qml/components/HotkeysTable.qml
+HotkeyCapturePopup 1.0 qml/components/HotkeyCapturePopup.qml
+ClipTile 1.0 qml/components/ClipTile.qml
+AddAudioTile 1.0 qml/components/AddAudioTile.qml
+AudioClipPanel 1.0 qml/components/AudioClipPanel.qml
+WaveformDisplay 1.0 qml/components/WaveformDisplay.qml
+FileDropArea 1.0 qml/components/FileDropArea.qml
+TrimWaveform 1.0 qml/components/TrimWaveform.qml
+AudioPlayerCard 1.0 qml/components/AudioPlayerCard.qml
+ApplicationSettingsView 1.0 qml/pages/ApplicationSettingsView.qml
+AudioPlaybackView 1.0 qml/pages/AudioPlaybackView.qml
+SoundboardView 1.0 qml/pages/SoundboardView.qml
+AuthView 1.0 qml/pages/AuthView.qml
+LoginPage 1.0 qml/pages/LoginPage.qml
+SignupPage 1.0 qml/pages/SignupPage.qml
+singleton Colors 1.0 qml/styles/Colors.qml
+singleton Typography 1.0 qml/styles/Typography.qml
+singleton Theme 1.0 qml/styles/Theme.qml
+singleton Functions 1.0 qml/utils/Functions.qml
+depends QtQuick
+
