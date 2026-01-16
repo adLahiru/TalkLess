@@ -9,17 +9,16 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QFuture>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QMutexLocker>
 #include <QProcess>
-#include <QStandardPaths>
-#include <QStandardPaths>
 #include <QStandardPaths>
 #include <QUrl>
 #include <QtConcurrent>
-#include <QFuture>
-#include <QMutexLocker>
+
 #include <cmath>
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
@@ -2353,8 +2352,8 @@ bool SoundboardService::startRecording()
     // - Always record from the recording device (microphone input)
     // - Also record soundboard clips if the "record with clips" checkbox is enabled
     // Both can be active simultaneously - we record the mic AND the clips when enabled
-    bool recordMic = true;  // Always record the recording device (microphone)
-    bool recordClips = m_recordWithClipboard;  // Record clips only if checkbox is enabled
+    bool recordMic = true;                    // Always record the recording device (microphone)
+    bool recordClips = m_recordWithClipboard; // Record clips only if checkbox is enabled
 
     const bool success = m_audioEngine->startRecording(m_lastRecordingPath.toStdString(), recordMic, recordClips);
     if (success) {
@@ -2630,7 +2629,7 @@ QVariantList SoundboardService::getClipWaveformPeaks(int clipId, int numBars) co
 
     // Find the clip and get its file path
     QString filePath;
-    
+
     for (auto it = m_activeBoards.constBegin(); it != m_activeBoards.constEnd(); ++it) {
         const Soundboard& board = it.value();
         for (const auto& clip : board.clips) {
@@ -2639,14 +2638,15 @@ QVariantList SoundboardService::getClipWaveformPeaks(int clipId, int numBars) co
                 break;
             }
         }
-        if (!filePath.isEmpty()) break;
+        if (!filePath.isEmpty())
+            break;
     }
-    
+
     if (filePath.isEmpty()) {
         qDebug() << "getClipWaveformPeaks: Could not find clip" << clipId;
         return QVariantList();
     }
-    
+
     // Perform load (expensive)
     // qDebug() << "getClipWaveformPeaks: Loading clip" << clipId << "from:" << filePath;
     QVariantList peaks = getWaveformPeaks(filePath, numBars);
@@ -2656,7 +2656,7 @@ QVariantList SoundboardService::getClipWaveformPeaks(int clipId, int numBars) co
         QMutexLocker locker(&m_waveformCacheMutex);
         m_waveformCache[clipId] = peaks;
     }
-    
+
     return peaks;
 }
 
@@ -3108,13 +3108,13 @@ bool SoundboardService::setInputDevice(const QString& deviceId)
         m_state.settings.selectedCaptureDeviceId = deviceId;
         m_indexDirty = true; // Mark as dirty instead of immediate save
         qDebug() << "Input device set to:" << deviceId;
-        
+
         // Also update the recording device to match the capture device by default
         // This ensures the recording device stays in sync with the input device
         m_selectedRecordingDeviceId = deviceId;
         m_audioEngine->setRecordingDevice(deviceId.toStdString());
         qDebug() << "Recording device synced to capture device:" << deviceId;
-        
+
         emit settingsChanged();
     } else {
         qWarning() << "Failed to set input device:" << deviceId;
@@ -3714,7 +3714,7 @@ void SoundboardService::cacheActiveBoardWaveforms()
 {
     // Collect all clip IDs from active boards to minimize lock contention
     QList<int> clipIds;
-    // Note: m_activeBoards is generally stable on the main thread, 
+    // Note: m_activeBoards is generally stable on the main thread,
     // but better to quickly copy IDs
     for (auto it = m_activeBoards.constBegin(); it != m_activeBoards.constEnd(); ++it) {
         for (const auto& clip : it.value().clips) {
@@ -3722,7 +3722,8 @@ void SoundboardService::cacheActiveBoardWaveforms()
         }
     }
 
-    if (clipIds.isEmpty()) return;
+    if (clipIds.isEmpty())
+        return;
 
     // Run in background
     QtConcurrent::run([this, clipIds]() {

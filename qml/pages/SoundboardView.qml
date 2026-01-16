@@ -1659,6 +1659,7 @@ Rectangle {
                 // currentTime is updated by the timer below
                 property real playbackPositionMs: 0
                 property int lastClipId: -1  // Track which clip we're displaying
+                property var currentWaveformData: []  // Real waveform data for current clip
 
                 // Timer to poll playback position - runs when playing
                 Timer {
@@ -1684,19 +1685,26 @@ Rectangle {
                     }
                 }
 
-                // Reset position when switching to a different clip
+                // Reset position and load waveform when switching to a different clip
                 onDisplayedClipDataChanged: {
                     if (root.displayedClipData) {
                         if (lastClipId !== root.displayedClipData.clipId) {
                             // New clip - get current position from backend
                             playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId);
                             lastClipId = root.displayedClipData.clipId;
+                            
+                            // Load waveform data for the new clip (32 bars to match UI strip)
+                            currentWaveformData = soundboardService.getClipWaveformPeaks(root.displayedClipData.clipId, 32);
                         }
                     } else {
                         playbackPositionMs = 0;
                         lastClipId = -1;
+                        currentWaveformData = [];
                     }
                 }
+                
+                // Bind waveform data to the AudioPlayerCard
+                waveformData: currentWaveformData
 
                 // Helper to access displayed clip data from handlers
                 property var displayedClipData: root.displayedClipData
@@ -1765,6 +1773,14 @@ Rectangle {
                 isMuted: !(soundboardService?.isMicEnabled() ?? true)
                 onMuteClicked: {
                     soundboardService.setMicEnabled(!isMuted);
+                }
+                
+                // Handle seek/scrub requests from waveform
+                onSeekRequested: function(positionMs) {
+                    if (root.displayedClipData) {
+                        // Use playClipFromPosition for seeking
+                        soundboardService.playClipFromPosition(root.displayedClipData.clipId, positionMs);
+                    }
                 }
             }
         }

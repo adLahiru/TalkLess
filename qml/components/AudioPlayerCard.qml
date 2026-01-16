@@ -21,6 +21,10 @@ Item {
     property bool isPlaying: false
     property bool isMuted: false
     
+    // Waveform data - array of normalized peak values (0.1-1.0)
+    // When empty, uses placeholder heights for fallback display
+    property var waveformData: []
+    
     // Time properties for waveform progress
     property real currentTime: 90   // Current position in seconds (1:30)
     property real totalTime: 210    // Total duration in seconds (3:30)
@@ -38,6 +42,11 @@ Item {
     signal previousClicked()
     signal nextClicked()
     signal muteClicked()
+    signal seekRequested(real positionMs)  // Request seek to position in milliseconds
+    
+    // Scrubbing state
+    property bool isScrubbing: false
+    property real scrubPosition: 0  // 0-1 progress during scrub
     
     // Scale factor (85% of original)
     readonly property real scaleFactor: 0.85
@@ -56,14 +65,21 @@ Item {
             radius: 14  // Pill shape
             color: "#3D3D3D"
             
-            // Left timestamp
+            // Left timestamp - shows scrub time while dragging, otherwise current time
             Text {
                 id: currentTimeText
                 anchors.left: parent.left
                 anchors.leftMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.formatTime(root.currentTime)
-                color: "#9CA3AF"
+                text: {
+                    if (root.isScrubbing) {
+                        // Show scrub position time
+                        return root.formatTime(root.scrubPosition * root.totalTime);
+                    } else {
+                        return root.formatTime(root.currentTime);
+                    }
+                }
+                color: root.isScrubbing ? "#3B82F6" : "#9CA3AF"  // Blue while scrubbing
                 font.pixelSize: 11
                 font.weight: Font.Medium
             }
@@ -84,31 +100,142 @@ Item {
             Row {
                 id: waveformBars
                 anchors.centerIn: parent
-                spacing: 2
+                spacing: 1  // Tighter spacing for smoother look
                 
-                // Generate waveform bars with varying heights
+                // Fixed bar count - 42 bars fills the space between timestamps
+                readonly property int barCount: 42
+                
+                // Calculate min/max from actual waveform data for dynamic scaling
+                readonly property real dataMin: {
+                    if (root.waveformData.length === 0) return 0.1;
+                    var min = 1.0;
+                    for (var i = 0; i < root.waveformData.length; i++) {
+                        var val = root.waveformData[i] || 0.1;
+                        if (val < min) min = val;
+                    }
+                    return min;
+                }
+                readonly property real dataMax: {
+                    if (root.waveformData.length === 0) return 1.0;
+                    var max = 0.0;
+                    for (var i = 0; i < root.waveformData.length; i++) {
+                        var val = root.waveformData[i] || 0.1;
+                        if (val > max) max = val;
+                    }
+                    return Math.max(max, 0.1);  // Avoid division by zero
+                }
+                
+                // Generate waveform bars - always fixed count
                 Repeater {
-                    model: 32
+                    model: waveformBars.barCount
                     
                     Rectangle {
                         required property int index
-                        width: 2
-                        // Create varied heights for waveform effect
+                        width: 2  // Narrow bars for smooth waveform look
+                        
+                        // Sample waveform data proportionally and scale dynamically
                         height: {
-                            var heights = [6, 10, 14, 8, 16, 12, 10, 18, 14, 8, 12, 16, 
-                                          14, 10, 18, 12, 8, 14, 16, 10, 12, 8, 14, 10,
-                                          8, 12, 16, 10, 14, 8, 12, 10]
-                            return heights[index] || 10
+                            var maxHeight = 18;
+                            var minHeight = 4;
+                            
+                            if (root.waveformData.length > 0) {
+                                // Map bar index to waveform data index (proportional sampling)
+                                var dataIndex = Math.floor(index * root.waveformData.length / waveformBars.barCount);
+                                dataIndex = Math.min(dataIndex, root.waveformData.length - 1);
+                                
+                                var amplitude = root.waveformData[dataIndex] || 0.1;
+                                
+                                // Normalize amplitude based on song's actual range
+                                var range = waveformBars.dataMax - waveformBars.dataMin;
+                                var normalized = range > 0.01 
+                                    ? (amplitude - waveformBars.dataMin) / range 
+                                    : 0.5;
+                                
+                                // Scale to height range
+                                return minHeight + normalized * (maxHeight - minHeight);
+                            } else {
+                                // Fallback placeholder heights when no data
+                                var heights = [6, 10, 14, 8, 16, 12, 10, 18, 14, 8, 12, 16, 
+                                              14, 10, 18, 12, 8, 14, 16, 10, 12, 8, 14, 10,
+                                              8, 12, 16, 10, 14, 8, 12, 10];
+                                return heights[index % heights.length] || 10;
+                            }
                         }
                         radius: 1
                         // Live progress: white for played portion, gray for remaining
+                        // When scrubbing, show scrub position instead of current time
                         color: {
-                            var progress = root.totalTime > 0 ? root.currentTime / root.totalTime : 0
-                            var barProgress = (index + 1) / 32
-                            return barProgress <= progress ? "#FFFFFF" : "#6B7280"
+                            var displayProgress = root.isScrubbing ? root.scrubPosition : 
+                                (root.totalTime > 0 ? root.currentTime / root.totalTime : 0);
+                            var barProgress = (index + 1) / waveformBars.barCount;
+                            return barProgress <= displayProgress ? "#FFFFFF" : "#6B7280";
                         }
                         anchors.verticalCenter: parent.verticalCenter
                     }
+                }
+            }
+            
+            // Scrub position indicator line (shown while dragging)
+            Rectangle {
+                id: scrubIndicator
+                visible: root.isScrubbing
+                width: 2
+                height: parent.height - 8
+                anchors.verticalCenter: parent.verticalCenter
+                radius: 1
+                color: "#3B82F6"  // Blue accent
+                x: {
+                    // Calculate position within the waveform area
+                    var waveformLeft = waveformBars.x;
+                    var waveformWidth = waveformBars.width;
+                    return waveformLeft + (root.scrubPosition * waveformWidth) - 1;
+                }
+            }
+            
+            // MouseArea for scrubbing - covers the entire waveform strip
+            MouseArea {
+                id: scrubArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                
+                // Calculate seek position from mouse X coordinate
+                function calculateSeekPosition(mouseX: real): real {
+                    // Get waveform bounds
+                    var waveformLeft = waveformBars.x;
+                    var waveformWidth = waveformBars.width;
+                    var waveformRight = waveformLeft + waveformWidth;
+                    
+                    // Clamp to waveform area
+                    var clampedX = Math.max(waveformLeft, Math.min(waveformRight, mouseX));
+                    
+                    // Convert to 0-1 progress
+                    var progress = (clampedX - waveformLeft) / waveformWidth;
+                    return Math.max(0, Math.min(1, progress));
+                }
+                
+                onPressed: function(mouse) {
+                    root.isScrubbing = true;
+                    root.scrubPosition = calculateSeekPosition(mouse.x);
+                }
+                
+                onPositionChanged: function(mouse) {
+                    if (root.isScrubbing) {
+                        root.scrubPosition = calculateSeekPosition(mouse.x);
+                    }
+                }
+                
+                onReleased: function(mouse) {
+                    if (root.isScrubbing) {
+                        var position = calculateSeekPosition(mouse.x);
+                        var positionMs = position * root.totalTime * 1000;
+                        root.seekRequested(positionMs);
+                        root.isScrubbing = false;
+                    }
+                }
+                
+                onCanceled: {
+                    root.isScrubbing = false;
                 }
             }
         }

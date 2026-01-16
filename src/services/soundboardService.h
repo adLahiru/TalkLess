@@ -6,13 +6,13 @@
 #include "services/storageRepository.h"
 
 #include <QHash>
+#include <QMutex>
 #include <QObject>
 #include <QSet>
 #include <QStringList>
 #include <QTimer>
 #include <QVariant>
 #include <QVector>
-#include <QMutex>
 
 #include <memory>
 #include <optional>
