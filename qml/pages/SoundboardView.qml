@@ -3236,7 +3236,7 @@ Rectangle {
                                                         radius: width / 2
 
                                                         // Color based on whether this position has been played (no animation for performance)
-                                                        color: waveformBar.isPlayed ? (seekSection.hasPendingSeek ? Colors.accent : Colors.gradientPrimaryStart) : Colors.surfaceLight
+                                                        color: waveformBar.isPlayed ? Colors.gradientPrimaryStart : Colors.textSecondary
                                                     }
                                                 }
                                             }
