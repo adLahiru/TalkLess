@@ -93,6 +93,11 @@ ApplicationWindow {
     // Bind to apiClient state
     property bool isLoggedIn: apiClient.isLoggedIn
     property string userDisplayName: apiClient.displayName
+    
+    // ---- Asset Loading State ----
+    // Show loading splash while preloading audio clips and waveforms
+    property bool isLoadingAssets: false
+    property string loadingStatus: "Loading..."
 
     // Check for saved session on startup
     Component.onCompleted: {
@@ -114,20 +119,90 @@ ApplicationWindow {
         apiClient.checkSavedSession();
     }
 
-    // Connect to apiClient for logout handling
+    // Connect to apiClient for logout handling and loading trigger
     Connections {
         target: apiClient
 
         function onLogoutSuccess() {
             console.log("[Main] User logged out");
+            mainWindow.isLoadingAssets = false;
         }
 
         function onSessionRestored() {
             console.log("[Main] Session restored for:", apiClient.displayName);
+            // Trigger loading splash for restored session
+            mainWindow.startAssetLoading();
         }
 
         function onSessionInvalid() {
             console.log("[Main] No valid session, showing login");
+        }
+        
+        function onLoginSuccess() {
+            console.log("[Main] Login success, starting asset loading");
+            mainWindow.startAssetLoading();
+        }
+    }
+    
+    // Function to start asset preloading
+    function startAssetLoading() {
+        isLoadingAssets = true;
+        loadingStatus = "Preparing your soundboard...";
+        assetLoadingTimer.start();
+    }
+    
+    // Timer to perform asset loading in steps
+    Timer {
+        id: assetLoadingTimer
+        interval: 300  // Start after short delay to show splash
+        running: false
+        repeat: false
+        onTriggered: {
+            loadingStatus = "Loading audio clips...";
+            // Load clips model
+            var firstBoardId = soundboardService.activeBoardId;
+            if (firstBoardId >= 0) {
+                clipsModel.boardId = firstBoardId;
+                clipsModel.reload();
+            }
+            // Proceed to waveform loading
+            waveformLoadingTimer.start();
+        }
+    }
+    
+    Timer {
+        id: waveformLoadingTimer
+        interval: 200
+        running: false
+        repeat: false
+        onTriggered: {
+            loadingStatus = "Loading waveforms...";
+            // Cache waveforms for active board
+            soundboardService.cacheActiveBoardWaveforms();
+            // Finish loading after a moment
+            finishLoadingTimer.start();
+        }
+    }
+    
+    Timer {
+        id: finishLoadingTimer
+        interval: 800  // Allow time for waveform caching
+        running: false
+        repeat: false
+        onTriggered: {
+            loadingStatus = "Ready!";
+            // Short delay then hide splash
+            hideSplashTimer.start();
+        }
+    }
+    
+    Timer {
+        id: hideSplashTimer
+        interval: 300
+        running: false
+        repeat: false
+        onTriggered: {
+            mainWindow.isLoadingAssets = false;
         }
     }
 
@@ -187,7 +262,8 @@ ApplicationWindow {
     ColumnLayout {
         anchors.fill: parent
         spacing: 10
-        visible: isLoggedIn // Only show main content when logged in
+        // Only show main content when logged in AND not loading assets
+        visible: isLoggedIn && !isLoadingAssets
 
         // Main content row (sidebar + pages)
         RowLayout {
@@ -377,7 +453,62 @@ ApplicationWindow {
         }
     }
 
-    // Splash Screen Overlay
+    // ---- Post-Login Loading Splash Screen ----
+    Rectangle {
+        id: loadingSplash
+        anchors.fill: parent
+        z: 950  // Above main content, below toast
+        visible: isLoggedIn && isLoadingAssets
+        color: Colors.background
+        
+        // Splash background image
+        Image {
+            anchors.fill: parent
+            source: Colors.splashImage
+            fillMode: Image.PreserveAspectCrop
+            opacity: 0.3
+        }
+        
+        // Center loading content
+        Column {
+            anchors.centerIn: parent
+            spacing: 24
+            
+            // App Logo/Title
+            Text {
+                text: "TalkLess"
+                font.pixelSize: 48
+                font.weight: Font.Bold
+                color: Colors.textPrimary
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+            
+            // Loading spinner
+            BusyIndicator {
+                id: loadingSpinner
+                running: loadingSplash.visible
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: 48
+                height: 48
+            }
+            
+            // Loading status text
+            Text {
+                text: mainWindow.loadingStatus
+                font.pixelSize: 16
+                color: Colors.textSecondary
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+        }
+        
+        // Fade in animation
+        opacity: visible ? 1 : 0
+        Behavior on opacity {
+            NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
+        }
+    }
+
+    // Startup Splash Screen Overlay (initial app load)
     Rectangle {
         id: splashScreen
         anchors.fill: parent
