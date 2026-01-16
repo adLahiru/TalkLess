@@ -1825,9 +1825,9 @@ Rectangle {
                         // Current Tab Title (shows clip name for Editor tab)
                         Text {
                             text: {
-                                if (rightSidebar.currentTabIndex === 0 && root.selectedClipId !== -1 && clipEditorTab.displayComputedTitle !== "") {
-                                    return clipEditorTab.displayComputedTitle;
-                                }
+                                // if (rightSidebar.currentTabIndex === 0 && root.selectedClipId !== -1 && clipEditorTab.displayComputedTitle !== "") {
+                                //    return clipEditorTab.displayComputedTitle;
+                                // }
                                 return rightSidebar.tabState[rightSidebar.currentTabIndex];
                             }
                             color: Colors.textPrimary
@@ -1862,7 +1862,7 @@ Rectangle {
                             }
                             TabButton {
                                 index: 3
-                                emoji: "📄"
+                                iconSource: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_tab_prompt.svg"
                             }
                             TabButton {
                                 index: 4

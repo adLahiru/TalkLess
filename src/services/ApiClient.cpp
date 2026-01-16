@@ -66,6 +66,7 @@ void ApiClient::loginAsGuest()
 
     setLoggedIn(true, true);
     emit loginSuccess();
+    emit currentUserChanged();
 }
 
 void ApiClient::logout()

@@ -101,6 +101,7 @@ set(TALKLESS_RESOURCES
     resources/icons/panel/ic_tab_add.svg
     resources/icons/panel/ic_tab_record.svg
     resources/icons/panel/ic_tab_speaker.svg
+    resources/icons/panel/ic_tab_prompt.svg
     resources/icons/panel/ic_clipboard.svg
     resources/icons/panel/ic_scissors.svg
 
