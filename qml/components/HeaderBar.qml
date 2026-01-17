@@ -254,7 +254,10 @@ Rectangle {
 
             // User Name - shows "Guest" for guest users, first name otherwise
             Text {
-                text: apiClient && apiClient.isLoggedIn ? apiClient.displayName : ""
+                text: {
+                    if (apiClient && apiClient.isGuest) return "Guest"
+                    return apiClient && apiClient.isLoggedIn ? apiClient.displayName : ""
+                }
                 color: Colors.textPrimary
                 font.family: "Orelega One"
                 font.pixelSize: 20
@@ -264,7 +267,7 @@ Rectangle {
                 lineHeightMode: Text.ProportionalHeight
                 verticalAlignment: Text.AlignVCenter
                 Layout.alignment: Qt.AlignVCenter
-                visible: apiClient && apiClient.isLoggedIn
+                visible: apiClient && (apiClient.isLoggedIn || apiClient.isGuest)
             }
         }
     }

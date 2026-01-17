@@ -72,26 +72,30 @@ Rectangle {
                 Layout.preferredHeight: 40
                 Layout.preferredWidth: tabText.implicitWidth + 32
                 radius: 20
+                color: "transparent"
 
                 required property int index
                 required property string title
 
                 readonly property bool isSelected: tabItem.index === root.currentIndex
 
-                // Gradient background for selected tab
-                gradient: tabItem.isSelected ? selectedGradient : null
-                color: tabItem.isSelected ? "transparent" : "transparent"
-
-                Gradient {
-                    id: selectedGradient
-                    orientation: Gradient.Horizontal
-                    GradientStop {
-                        position: 0.0
-                        color: Colors.accent
-                    }
-                    GradientStop {
-                        position: 1.0
-                        color: Colors.secondary
+                // Gradient background overlay - always rendered, visibility controlled
+                Rectangle {
+                    id: gradientBg
+                    anchors.fill: parent
+                    radius: parent.radius
+                    visible: tabItem.isSelected
+                    
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop {
+                            position: 0.0
+                            color: Colors.accent
+                        }
+                        GradientStop {
+                            position: 1.0
+                            color: Colors.secondary
+                        }
                     }
                 }
 
