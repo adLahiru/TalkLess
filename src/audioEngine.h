@@ -160,6 +160,11 @@ public:
 
     double getFileDuration(const std::string& filepath);
 
+    // Export a trimmed segment of an audio file to a new file
+    // Returns true on success, false on failure
+    bool exportTrimmedAudio(const std::string& sourcePath, const std::string& destPath, double trimStartMs,
+                            double trimEndMs);
+
     // ------------------------------------------------------------
     // Recording
     // ------------------------------------------------------------

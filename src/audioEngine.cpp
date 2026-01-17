@@ -1890,6 +1890,89 @@ double AudioEngine::getFileDuration(const std::string& filepath)
     return duration;
 }
 
+bool AudioEngine::exportTrimmedAudio(const std::string& sourcePath, const std::string& destPath, double trimStartMs,
+                                     double trimEndMs)
+{
+    // Initialize decoder for source file
+    ma_decoder_config decCfg = ma_decoder_config_init(ma_format_f32, 2, m_sampleRate);
+    ma_decoder decoder;
+
+    if (ma_decoder_init_file(sourcePath.c_str(), &decCfg, &decoder) != MA_SUCCESS) {
+        std::cerr << "exportTrimmedAudio: Failed to open source file: " << sourcePath << std::endl;
+        return false;
+    }
+
+    // Get source file info
+    ma_uint64 totalFrames = 0;
+    ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames);
+    const ma_uint32 sampleRate = decoder.outputSampleRate;
+    const ma_uint32 channels = decoder.outputChannels;
+
+    // Calculate frame ranges from milliseconds
+    const ma_uint64 startFrame = static_cast<ma_uint64>((trimStartMs / 1000.0) * sampleRate);
+    ma_uint64 endFrame = static_cast<ma_uint64>((trimEndMs / 1000.0) * sampleRate);
+
+    // If endFrame is 0 or past total, use total frames
+    if (endFrame == 0 || endFrame > totalFrames) {
+        endFrame = totalFrames;
+    }
+
+    // Validate range
+    if (startFrame >= endFrame) {
+        std::cerr << "exportTrimmedAudio: Invalid trim range - start:" << startFrame << " end:" << endFrame
+                  << std::endl;
+        ma_decoder_uninit(&decoder);
+        return false;
+    }
+
+    const ma_uint64 framesToWrite = endFrame - startFrame;
+
+    // Seek to start position
+    if (ma_decoder_seek_to_pcm_frame(&decoder, startFrame) != MA_SUCCESS) {
+        std::cerr << "exportTrimmedAudio: Failed to seek to frame: " << startFrame << std::endl;
+        ma_decoder_uninit(&decoder);
+        return false;
+    }
+
+    // Initialize encoder for destination file
+    ma_encoder encoder;
+    ma_encoder_config encCfg = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, channels, sampleRate);
+
+    if (ma_encoder_init_file(destPath.c_str(), &encCfg, &encoder) != MA_SUCCESS) {
+        std::cerr << "exportTrimmedAudio: Failed to create output file: " << destPath << std::endl;
+        ma_decoder_uninit(&decoder);
+        return false;
+    }
+
+    // Read and write in chunks
+    constexpr ma_uint32 kChunkFrames = 4096;
+    std::vector<float> buffer(static_cast<size_t>(kChunkFrames) * channels);
+
+    ma_uint64 framesWritten = 0;
+    while (framesWritten < framesToWrite) {
+        const ma_uint64 framesRemaining = framesToWrite - framesWritten;
+        const ma_uint32 framesToRead =
+            static_cast<ma_uint32>(std::min(static_cast<ma_uint64>(kChunkFrames), framesRemaining));
+
+        ma_uint64 framesRead = 0;
+        ma_result res = ma_decoder_read_pcm_frames(&decoder, buffer.data(), framesToRead, &framesRead);
+
+        if (framesRead == 0 || res != MA_SUCCESS) {
+            break; // End of file or error
+        }
+
+        ma_encoder_write_pcm_frames(&encoder, buffer.data(), framesRead, nullptr);
+        framesWritten += framesRead;
+    }
+
+    // Cleanup
+    ma_encoder_uninit(&encoder);
+    ma_decoder_uninit(&decoder);
+
+    std::cout << "exportTrimmedAudio: Exported " << framesWritten << " frames to " << destPath << std::endl;
+    return true;
+}
+
 // ------------------------------------------------------------
 // Recording
 // ------------------------------------------------------------

@@ -768,11 +768,44 @@ bool SoundboardService::addClipWithSettings(int boardId, const QString& filePath
         return false;
     }
 
+    QString finalPath = localPath;
+
+    // If trimming is specified, export the trimmed audio to a new file
+    const bool needsTrim = (trimStartMs > 0.0 || (trimEndMs > 0.0 && trimEndMs > trimStartMs));
+    if (needsTrim && m_audioEngine) {
+        // Generate a unique trimmed file path
+        QFileInfo origInfo(localPath);
+        QString trimmedDir = origInfo.absolutePath();
+        QString trimmedName = origInfo.baseName() + "_trimmed.wav";
+        QString trimmedPath = QDir(trimmedDir).filePath(trimmedName);
+
+        // Make sure we don't overwrite existing files
+        int counter = 1;
+        while (QFile::exists(trimmedPath)) {
+            trimmedName = origInfo.baseName() + QString("_trimmed_%1.wav").arg(counter++);
+            trimmedPath = QDir(trimmedDir).filePath(trimmedName);
+        }
+
+        qDebug() << "Exporting trimmed audio:" << trimStartMs << "ms to" << trimEndMs << "ms -> " << trimmedPath;
+
+        if (m_audioEngine->exportTrimmedAudio(localPath.toStdString(), trimmedPath.toStdString(), trimStartMs,
+                                              trimEndMs)) {
+            finalPath = trimmedPath;
+            qDebug() << "Trimmed audio exported successfully";
+
+            // Delete the original recording file since we have the trimmed version
+            QFile::remove(localPath);
+        } else {
+            qWarning() << "Failed to export trimmed audio, using original file";
+        }
+    }
+
     Clip draft;
-    draft.filePath = localPath;
+    draft.filePath = finalPath;
     draft.title = baseTitle;
-    draft.trimStartMs = trimStartMs;
-    draft.trimEndMs = trimEndMs;
+    // No need to store trim values since the file is already trimmed
+    draft.trimStartMs = 0.0;
+    draft.trimEndMs = 0.0;
 
     return addClipToBoard(boardId, draft);
 }
