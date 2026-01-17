@@ -2084,6 +2084,25 @@ Rectangle {
                     property string recordingError: ""
                     // Final recorded duration (updated after recording stops)
                     property real finalRecordedDuration: 0
+                    // Preview playback position in seconds (for playhead indicator)
+                    property real previewPlaybackTime: 0
+                    
+                    // Timer to poll preview playback position
+                    Timer {
+                        id: previewPlayheadTimer
+                        interval: 50  // Update every 50ms for smooth animation
+                        repeat: true
+                        running: soundboardService?.isRecordingPreviewPlaying ?? false
+                        onTriggered: {
+                            let posMs = soundboardService?.getPreviewPlaybackPositionMs() ?? 0;
+                            recordingTab.previewPlaybackTime = posMs / 1000.0;
+                        }
+                        onRunningChanged: {
+                            if (!running) {
+                                recordingTab.previewPlaybackTime = 0;
+                            }
+                        }
+                    }
 
                     // Initialize input device dropdown when tab becomes visible
                     onVisibleChanged: {
@@ -2518,8 +2537,16 @@ Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 90
 
-                            // Use final duration after recording, or live recording duration during recording
-                            currentTime: (soundboardService?.isRecording ?? false) ? (soundboardService?.recordingDuration ?? 0) : 0
+                            // Show playhead during recording or preview playback
+                            currentTime: {
+                                if (soundboardService?.isRecording ?? false) {
+                                    return soundboardService?.recordingDuration ?? 0;
+                                }
+                                if (soundboardService?.isRecordingPreviewPlaying ?? false) {
+                                    return recordingTab.previewPlaybackTime;
+                                }
+                                return 0;
+                            }
                             totalDuration: {
                                 // After recording: use accurate file duration
                                 if (recordingTab.finalRecordedDuration > 0) {

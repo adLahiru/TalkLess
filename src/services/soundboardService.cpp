@@ -2843,6 +2843,13 @@ bool SoundboardService::isRecordingPreviewPlaying() const
     return m_recordingPreviewPlaying;
 }
 
+double SoundboardService::getPreviewPlaybackPositionMs() const
+{
+    if (!m_audioEngine || !m_recordingPreviewPlaying)
+        return 0.0;
+    return m_audioEngine->getClipPlaybackPositionMs(kPreviewSlot);
+}
+
 QVariantList SoundboardService::listBoardsForDropdown() const
 {
     QVariantList out;

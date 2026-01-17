@@ -255,6 +255,7 @@ public:
     Q_INVOKABLE bool playLastRecordingPreviewTrimmed(double trimStartMs, double trimEndMs);
     Q_INVOKABLE void stopLastRecordingPreview();
     Q_INVOKABLE bool isRecordingPreviewPlaying() const;
+    Q_INVOKABLE double getPreviewPlaybackPositionMs() const;
 
     // ---- Hotkey (active only) ----
     int findActiveClipIdByHotkey(const QString& hotkey) const;
