@@ -68,6 +68,7 @@ public:
         bool recordWithInputDevice READ recordWithInputDevice WRITE setRecordWithInputDevice NOTIFY settingsChanged)
     Q_PROPERTY(bool recordWithClipboard READ recordWithClipboard WRITE setRecordWithClipboard NOTIFY settingsChanged)
     Q_PROPERTY(QString selectedRecordingDeviceId READ selectedRecordingDeviceId NOTIFY settingsChanged)
+    Q_PROPERTY(bool isRecordingPreviewPlaying READ isRecordingPreviewPlaying NOTIFY recordingStateChanged)
 
     // ---- Index / Settings ----
     double masterGainDb() const { return m_state.settings.masterGainDb; }
@@ -251,6 +252,7 @@ public:
     // ---- Recording preview (NO soundboard add) ----
     Q_INVOKABLE QVariantList listBoardsForDropdown() const;
     Q_INVOKABLE bool playLastRecordingPreview();
+    Q_INVOKABLE bool playLastRecordingPreviewTrimmed(double trimStartMs, double trimEndMs);
     Q_INVOKABLE void stopLastRecordingPreview();
     Q_INVOKABLE bool isRecordingPreviewPlaying() const;
 
@@ -297,9 +299,9 @@ private:
 
 private:
     // Reserve last engine slot for recording preview so it never collides with normal clip slots.
-    static constexpr int kEngineSlotsTotal = 16;
-    static constexpr int kPreviewSlot = 15;     // MUST match AudioEngine::MAX_CLIPS-1
-    static constexpr int kClipSlotsUsable = 15; // 0..14 used by normal clips
+    static constexpr int kEngineSlotsTotal = 8; // AudioEngine::MAX_CLIPS
+    static constexpr int kPreviewSlot = 7;      // Last slot reserved for preview (must be < MAX_CLIPS)
+    static constexpr int kClipSlotsUsable = 7;  // 0..6 used by normal clips, 7 reserved for preview
 
     StorageRepository m_repo;
 

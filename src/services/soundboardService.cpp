@@ -118,6 +118,18 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
     // 7) Setup AudioEngine callbacks
     if (m_audioEngine) {
         m_audioEngine->setClipFinishedCallback([this](int slotId) {
+            // Handle preview slot finishing
+            if (slotId == kPreviewSlot) {
+                QMetaObject::invokeMethod(
+                    this,
+                    [this]() {
+                        m_recordingPreviewPlaying = false;
+                        emit recordingStateChanged();
+                    },
+                    Qt::QueuedConnection);
+                return;
+            }
+
             const int finishedClipId = m_slotToClipId.value(slotId, -1);
             if (finishedClipId != -1) {
                 QMetaObject::invokeMethod(
@@ -2779,6 +2791,40 @@ bool SoundboardService::playLastRecordingPreview()
     }
 
     return success;
+}
+
+bool SoundboardService::playLastRecordingPreviewTrimmed(double trimStartMs, double trimEndMs)
+{
+    if (!m_audioEngine || m_lastRecordingPath.isEmpty())
+        return false;
+
+    if (!QFileInfo::exists(m_lastRecordingPath))
+        return false;
+
+    // Stop any existing preview
+    m_audioEngine->stopClip(kPreviewSlot);
+    m_audioEngine->unloadClip(kPreviewSlot);
+
+    // Load the recording
+    auto result = m_audioEngine->loadClip(kPreviewSlot, m_lastRecordingPath.toStdString());
+    const double duration = result.second;
+
+    if (duration <= 0.0) {
+        m_recordingPreviewPlaying = false;
+        emit recordingStateChanged();
+        return false;
+    }
+
+    // Apply gain, trim bounds and seek to start position
+    m_audioEngine->setClipGain(kPreviewSlot, 0.0f); // 0 dB = unity gain
+    m_audioEngine->setClipTrim(kPreviewSlot, trimStartMs, trimEndMs);
+    m_audioEngine->setClipStartPosition(kPreviewSlot, trimStartMs);
+    m_audioEngine->setClipLoop(kPreviewSlot, false);
+    m_audioEngine->playClip(kPreviewSlot);
+
+    m_recordingPreviewPlaying = true;
+    emit recordingStateChanged();
+    return true;
 }
 
 void SoundboardService::stopLastRecordingPreview()

@@ -2539,6 +2539,52 @@ Rectangle {
                                 waveformTrim.trimEnd = pos;
                             }
                         }
+
+                        // Preview trimmed audio button
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 36
+                            radius: 8
+                            color: (soundboardService?.isRecordingPreviewPlaying ?? false) ? Colors.error : Colors.accent
+                            visible: !(soundboardService?.isRecording ?? false) && (soundboardService?.lastRecordingPath ?? "") !== ""
+                            
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: 8
+                                
+                                Text {
+                                    text: (soundboardService?.isRecordingPreviewPlaying ?? false) ? "■" : "▶"
+                                    color: Colors.textOnPrimary
+                                    font.pixelSize: 14
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                
+                                Text {
+                                    text: (soundboardService?.isRecordingPreviewPlaying ?? false) ? "Stop Preview" : "Preview Trim"
+                                    color: Colors.textOnPrimary
+                                    font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                                    font.pixelSize: 13
+                                    font.weight: Font.DemiBold
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (soundboardService?.isRecordingPreviewPlaying) {
+                                        soundboardService.stopLastRecordingPreview();
+                                    } else {
+                                        // Calculate trim times from normalized positions
+                                        let durationMs = recordingTab.finalRecordedDuration * 1000.0;
+                                        let startMs = waveformTrim.trimStart * durationMs;
+                                        let endMs = waveformTrim.trimEnd * durationMs;
+                                        soundboardService.playLastRecordingPreviewTrimmed(startMs, endMs);
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     Item {

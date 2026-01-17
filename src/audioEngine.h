@@ -19,25 +19,26 @@ public:
     // ------------------------------------------------------------
     // Types
     // ------------------------------------------------------------
-    struct AudioDeviceInfo {
+    struct AudioDeviceInfo
+    {
         std::string name;
-        std::string id;     // using name as ID (matches your UI behavior)
+        std::string id; // using name as ID (matches your UI behavior)
         bool isDefault = false;
         ma_device_id deviceId{};
     };
 
     using ClipFinishedCallback = std::function<void(int)>;
-    using ClipErrorCallback    = std::function<void(int)>;
-    using ClipLoopedCallback   = std::function<void(int)>;
+    using ClipErrorCallback = std::function<void(int)>;
+    using ClipLoopedCallback = std::function<void(int)>;
 
     // ------------------------------------------------------------
     // Constants
     // ------------------------------------------------------------
-    static constexpr ma_uint32 DEFAULT_SAMPLE_RATE     = 48000;
-    static constexpr ma_uint32 DEFAULT_BUFFER_SIZE     = 512;
-    static constexpr ma_uint32 DEFAULT_BUFFER_PERIODS  = 3;
-    static constexpr ma_uint32 DEFAULT_CHANNELS        = 2;
-    static constexpr int       MAX_CLIPS               = 8;
+    static constexpr ma_uint32 DEFAULT_SAMPLE_RATE = 96000;
+    static constexpr ma_uint32 DEFAULT_BUFFER_SIZE = 512;
+    static constexpr ma_uint32 DEFAULT_BUFFER_PERIODS = 3;
+    static constexpr ma_uint32 DEFAULT_CHANNELS = 2;
+    static constexpr int MAX_CLIPS = 8;
 
     // ------------------------------------------------------------
     // CTOR/DTOR
@@ -151,7 +152,7 @@ public:
 
     void setClipTrim(int slotId, double startMs, double endMs);
     void seekClip(int slotId, double positionMs);
-    void setClipStartPosition(int slotId, double positionMs);  // Sets position BEFORE playClip is called
+    void setClipStartPosition(int slotId, double positionMs); // Sets position BEFORE playClip is called
 
     bool isClipPlaying(int slotId) const;
     bool isClipPaused(int slotId) const;
@@ -181,7 +182,8 @@ private:
         Stopping
     };
 
-    struct ClipSlot {
+    struct ClipSlot
+    {
         std::atomic<ClipState> state{ClipState::Stopped};
         std::atomic<float> gain{1.0f};
         std::atomic<bool> loop{false};
@@ -251,8 +253,8 @@ private:
     static void computeBalanceMultipliers(float balance, float& micMul, float& clipMul);
 
     // rb sizing
-    ma_uint32 getRingBufferSize() const;     // clip ringbuffers
-    ma_uint32 getRecInputRbSize() const;     // recording input rb
+    ma_uint32 getRingBufferSize() const; // clip ringbuffers
+    ma_uint32 getRecInputRbSize() const; // recording input rb
 
     // file writer (legacy; you are using encoder thread now)
     static bool writeWavFile(const std::string& path, const std::vector<float>& samples, int sampleRate, int channels);
@@ -290,9 +292,9 @@ private:
     // these point to the value members above when initialized.
     // ------------------------------------------------------------
     ma_context* context = nullptr;
-    ma_device* playbackDevice = nullptr;      // main output
-    ma_device* captureDevice  = nullptr;      // main input
-    ma_device* monitorDevice  = nullptr;
+    ma_device* playbackDevice = nullptr; // main output
+    ma_device* captureDevice = nullptr;  // main input
+    ma_device* monitorDevice = nullptr;
     ma_device* recordingInputDevice = nullptr;
 
     // ------------------------------------------------------------
@@ -322,6 +324,13 @@ private:
     void* recordingInputRbData = nullptr;
     std::atomic<int> recordingInputCaptureChannels{0};
 
+    // High-pass filter state for recording (removes rumble, hum, plosives)
+    // Simple 1-pole high-pass filter per channel
+    static constexpr float kRecordingHPFCutoff = 80.0F; // 80Hz cutoff
+    float recordingHPFStateL = 0.0F;                    // Left channel filter state
+    float recordingHPFStateR = 0.0F;                    // Right channel filter state
+    float recordingHPFAlpha = 0.0F;                     // Filter coefficient (computed from sample rate)
+
     // ------------------------------------------------------------
     // Recording main mix (writer thread drains this rb)
     // ------------------------------------------------------------
@@ -337,7 +346,7 @@ private:
     std::atomic<bool> recordingWriteOk{false};
     std::string recordingOutputPath;
     int recordingChannels = 2;
-    
+
     // Recording source selection flags
     std::atomic<bool> recordMicEnabled{true};       // include mic input in recording
     std::atomic<bool> recordPlaybackEnabled{false}; // include soundboard clips in recording
@@ -350,8 +359,8 @@ private:
     // ------------------------------------------------------------
     // Mixer parameters
     // ------------------------------------------------------------
-    std::atomic<bool>  micEnabled{true};
-    std::atomic<bool>  micPassthroughEnabled{false};
+    std::atomic<bool> micEnabled{true};
+    std::atomic<bool> micPassthroughEnabled{false};
 
     std::atomic<float> micGainDB{0.0f};
     std::atomic<float> micGain{1.0f};
