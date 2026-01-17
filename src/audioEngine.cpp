@@ -1162,20 +1162,23 @@ void AudioEngine::processPlaybackAudio(void* output, ma_uint32 frameCount, ma_ui
 
     if (micOn) {
         for (ma_uint32 f = 0; f < frameCount; ++f) {
-            const float mono = micMono[f] * micMul;
+            // Use full mic gain (without balance) for recording
+            const float monoFull = micMono[f];
+            // Apply balance multiplier only for live playback monitoring
+            const float monoBalanced = monoFull * micMul;
 
-            // to playback only if passthrough
+            // to playback only if passthrough (use balanced audio)
             if (passthrough) {
                 const ma_uint32 o = f * playbackChannels;
                 for (ma_uint32 ch = 0; ch < playbackChannels; ++ch)
-                    out[o + ch] += mono;
+                    out[o + ch] += monoBalanced;
             }
 
-            // to recording only when mic recording is enabled
+            // to recording only when mic recording is enabled (use full gain audio)
             if (recActive && recordMic) {
                 const ma_uint32 o = f * playbackChannels;
                 for (ma_uint32 ch = 0; ch < playbackChannels; ++ch)
-                    recTempScratch[o + ch] += mono;
+                    recTempScratch[o + ch] += monoFull;
             }
         }
     }
