@@ -51,11 +51,7 @@ Rectangle {
             route: "engine"
             iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_play.svg"
         }
-        ListElement {
-            title: "Macros & Automation"
-            route: "macros"
-            iconSource: "qrc:/qt/qml/TalkLess/resources/icons/sidebar/ic_nav_macros.svg"
-        }
+
         ListElement {
             title: "Application Settings"
             route: "settings"
@@ -416,7 +412,7 @@ Rectangle {
                                 anchors.topMargin: -4
                                 z: 10
                                 border.width: 2
-                                border.color: boardRow.active ? "#D214FD" : "#AAFFFFFF"
+                                border.color: boardRow.active ? Colors.gradientPrimaryEnd : "#AAFFFFFF"
                                 color: collapsedCheckboxMouse.containsMouse ? "#333333" : (boardRow.active ? "#2A2A2A" : "#1A1A1A")
 
                                 // Checkmark icon when active
@@ -425,7 +421,7 @@ Rectangle {
                                     text: "✓"
                                     font.pixelSize: 11
                                     font.bold: true
-                                    color: "#D214FD"
+                                    color: Colors.gradientPrimaryEnd
                                     visible: boardRow.active
                                 }
 

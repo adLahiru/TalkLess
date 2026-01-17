@@ -659,7 +659,7 @@ Rectangle {
                         }
                         GradientStop {
                             position: 1.0
-                            color: createSoundboardBtnArea.containsMouse ? Colors.secondary : "#D214FD"
+                            color: createSoundboardBtnArea.containsMouse ? Colors.secondary : Colors.gradientPrimaryEnd
                         }
                     }
 
@@ -1052,7 +1052,7 @@ Rectangle {
                             }
                             GradientStop {
                                 position: 1.0
-                                color: addMouseArea.containsMouse ? Colors.secondary : "#D214FD"
+                                color: addMouseArea.containsMouse ? Colors.secondary : Colors.gradientPrimaryEnd
                             }
                         }
 
@@ -1770,7 +1770,7 @@ Rectangle {
                                 }
                                 GradientStop {
                                     position: 1.0
-                                    color: addSbBtnMouse.containsMouse ? Colors.secondary : "#D214FD"
+                                    color: addSbBtnMouse.containsMouse ? Colors.secondary : Colors.gradientPrimaryEnd
                                 }
                             }
 
@@ -4047,11 +4047,11 @@ Rectangle {
                                 orientation: Gradient.Horizontal
                                 GradientStop {
                                     position: 0.0
-                                    color: uploadSaveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6"
+                                    color: uploadSaveBtnArea.containsMouse ? Colors.primaryLight : Colors.primary
                                 }
                                 GradientStop {
                                     position: 1.0
-                                    color: uploadSaveBtnArea.containsMouse ? "#E040FB" : "#D214FD"
+                                    color: uploadSaveBtnArea.containsMouse ? Colors.secondary : Colors.gradientPrimaryEnd
                                 }
                             }
 

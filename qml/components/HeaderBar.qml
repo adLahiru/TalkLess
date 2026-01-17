@@ -133,11 +133,11 @@ Rectangle {
                         orientation: Gradient.Horizontal
                         GradientStop {
                             position: 0.0
-                            color: "#3E66FF"
+                            color: Colors.gradientPrimaryStart
                         }
                         GradientStop {
                             position: 1.0
-                            color: "#B44CFF"
+                            color: Colors.gradientPrimaryEnd
                         }
                     }
                     opacity: 0.3

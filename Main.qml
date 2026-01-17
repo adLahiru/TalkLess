@@ -284,14 +284,11 @@ ApplicationWindow {
                     case "engine":
                         contentStack.currentIndex = 1;
                         break;
-                    case "macros":
+                    case "settings":
                         contentStack.currentIndex = 2;
                         break;
-                    case "settings":
-                        contentStack.currentIndex = 3;
-                        break;
                     case "stats":
-                        contentStack.currentIndex = 4;
+                        contentStack.currentIndex = 3;
                         break;
                     }
                 }
@@ -422,17 +419,7 @@ ApplicationWindow {
                         Layout.fillHeight: true
                     }
 
-                    // Macros & Automation (placeholder)
-                    Rectangle {
-                        color: Colors.background
-                        radius: 10
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Macros & Automation"
-                            color: Colors.textSecondary
-                            font.pixelSize: 32
-                        }
-                    }
+
 
                     // Application Settings
                     ApplicationSettingsView {}
