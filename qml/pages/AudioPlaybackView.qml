@@ -80,7 +80,7 @@ Item {
 
                         // Gradient background for selected tab
                         gradient: tabItem.isSelected ? selectedGradient : null
-                        color: tabItem.isSelected ? "transparent" : "transparent"
+                        color: tabItem.isSelected ? "white" : "transparent"
 
                         Gradient {
                             id: selectedGradient

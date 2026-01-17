@@ -1529,7 +1529,6 @@ Rectangle {
 
                                             background: Rectangle {
                                                 radius: 8
-                                                color: "transparent"
 
                                                 gradient: Gradient {
                                                     orientation: Gradient.Horizontal
@@ -1575,7 +1574,6 @@ Rectangle {
 
                                             background: Rectangle {
                                                 radius: 8
-                                                color: "transparent"
 
                                                 gradient: Gradient {
                                                     orientation: Gradient.Horizontal
