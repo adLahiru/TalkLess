@@ -38,6 +38,7 @@ public:
     Q_INVOKABLE void resetSystem(int id);
 
     Q_INVOKABLE void reassignPreference(int id);
+    Q_INVOKABLE void reassignClip(int boardId, int clipId);
     Q_INVOKABLE void deletePreference(int id);
 
     Q_INVOKABLE void undoHotkeyChanges();
@@ -82,9 +83,10 @@ private:
     QHash<QString, QHotkey*> m_clipRegistered;
 
     // Capture state
-    enum class CaptureTarget { None, System, Preference };
+    enum class CaptureTarget { None, System, Preference, Clip };
     CaptureTarget m_target = CaptureTarget::None;
     int m_targetId = -1;
+    int m_targetBoardId = -1; // For Clip target
 
     // Id generator for preference hotkeys
     int m_nextPrefId = 1000;

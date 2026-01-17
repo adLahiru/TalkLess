@@ -1597,6 +1597,52 @@ Rectangle {
                                                 }
                                             }
                                         }
+
+                                        Button {
+                                            id: soundboardHotkeyButton
+                                            text: "Clips Hotkeys"
+                                            width: 200
+                                            height: parent.height
+                                            // Manual active state management to avoid binding loops
+                                            property bool isActive: hotkeysContent.tabIndex === 3
+
+                                            onClicked: hotkeysContent.tabIndex = 3
+
+                                            contentItem: Text {
+                                                text: soundboardHotkeyButton.text
+                                                color: soundboardHotkeyButton.isActive ? Colors.textOnPrimary : Colors.textSecondary
+                                                font.pixelSize: 15
+                                                font.weight: Font.Medium
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
+
+                                            background: Rectangle {
+                                                radius: 8
+                                                color: "transparent"
+
+                                                gradient: Gradient {
+                                                    orientation: Gradient.Horizontal
+                                                    GradientStop {
+                                                        position: 0.0
+                                                        color: Colors.gradientPrimaryStart
+                                                    }
+                                                    GradientStop {
+                                                        position: 1.0
+                                                        color: Colors.gradientPrimaryEnd
+                                                    }
+                                                }
+
+                                                // turn gradient on/off
+                                                opacity: soundboardHotkeyButton.isActive ? 1.0 : 0.0
+
+                                                Behavior on opacity {
+                                                    NumberAnimation {
+                                                        duration: 150
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
 
@@ -1609,7 +1655,15 @@ Rectangle {
                             Loader {
                                 id: hotkeysTableLoader
                                 width: parent.width
-                                sourceComponent: hotkeysContent.tabIndex === 0 ? systemView : prefView
+                                sourceComponent: {
+                                    if (hotkeysContent.tabIndex === 0)
+                                        return systemView
+                                    else if (hotkeysContent.tabIndex === 1)
+                                        return prefView
+                                    else if (hotkeysContent.tabIndex === 3)
+                                        return soundboardView
+                                    return systemView // fallback
+                                }
                             }
                         }
 
@@ -1654,6 +1708,111 @@ Rectangle {
                                 onSecondaryClicked: {
                                     if (hotkeyManager)
                                         hotkeyManager.deletePreference(id);
+                                }
+                            }
+                        }
+
+                        Component {
+                            id: soundboardView
+                            Column {
+                                width: hotkeysContent.width - 56
+                                spacing: 20
+
+                                // Soundboard Selector
+                                RowLayout {
+                                    width: parent.width
+                                    spacing: 15
+                                    Text {
+                                        text: "Selected Soundboard:"
+                                        color: Colors.textSecondary
+                                        font.pixelSize: 14
+                                    }
+                                    
+                                    DropdownSelector {
+                                        id: clipHotkeyBoardSelector
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 200
+                                        placeholder: "Select Soundboard"
+                                        
+                                        property int selectedBoardId: -1
+                                        
+                                        // Load boards
+                                        model: soundboardService?.listBoardsForDropdown() ?? []
+                                        
+                                        onItemSelected: function(id, name) {
+                                            selectedBoardId = parseInt(id)
+                                            clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(selectedBoardId)
+                                        }
+
+                                        Component.onCompleted: {
+                                            if (soundboardService) {
+                                                // Try active board
+                                                var activeId = soundboardService.activeBoardId
+                                                if (activeId !== -1) {
+                                                    selectedId = activeId.toString()
+                                                    selectedBoardId = activeId
+                                                    clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(activeId)
+                                                } else {
+                                                    // select first
+                                                    if (model && model.length > 0) {
+                                                        var first = model[0]
+                                                        selectedId = first.id.toString()
+                                                        selectedBoardId = first.id
+                                                        clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(first.id)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        Connections {
+                                            target: soundboardService
+                                            function onBoardsChanged() {
+                                                clipHotkeyBoardSelector.model = soundboardService.listBoardsForDropdown()
+                                            }
+                                        }
+                                    }
+                                }
+
+                                HotkeysTable {
+                                    id: clipsHotkeyTable
+                                    width: parent.width
+                                    title: "Clips Hotkeys"
+                                    model: [] 
+                                    
+                                    showHeader: true
+                                    showWarning: false
+                                    primaryText: "Reassign"
+                                    secondaryText: "Unbind"
+
+                                    onPrimaryClicked: {
+                                        if (clipHotkeyBoardSelector.selectedBoardId !== -1)
+                                            hotkeyManager.reassignClip(clipHotkeyBoardSelector.selectedBoardId, id)
+                                    }
+                                    
+                                    onSecondaryClicked: {
+                                        if (clipHotkeyBoardSelector.selectedBoardId !== -1) {
+                                             var boardId = clipHotkeyBoardSelector.selectedBoardId
+                                             var data = soundboardService.getClipData(boardId, id)
+                                             if (data) {
+                                                 soundboardService.updateClipInBoard(boardId, id, data["title"], "", data["tags"])
+                                                 clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(boardId)
+                                             }
+                                        }
+                                    }
+                                    
+                                    Connections {
+                                        target: soundboardService
+                                        function onActiveClipsChanged() {
+                                            if (clipHotkeyBoardSelector.selectedBoardId !== -1) {
+                                                clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(clipHotkeyBoardSelector.selectedBoardId)
+                                            }
+                                        }
+                                        function onClipUpdated(boardId, clipId) {
+                                            if (boardId === clipHotkeyBoardSelector.selectedBoardId) {
+                                                 clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(boardId)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

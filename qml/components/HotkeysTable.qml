@@ -1,5 +1,3 @@
-pragma ComponentBehavior: Bound
-
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import "../styles"
@@ -24,13 +22,8 @@ Item {
     property string primaryText: "Reassign"
     property string secondaryText: "Reset" // or "Delete"
 
-    // role names from C++ model
-    property string idRole: "id"
-    property string nameRole: "title"
-    property string hotkeyRole: "hotkey"
-
-    signal primaryClicked(string id)
-    signal secondaryClicked(string id)
+    signal primaryClicked(int id)
+    signal secondaryClicked(int id)
 
     implicitHeight: titleLabel.implicitHeight + (showHeader ? (headerRect.height + 14) : 0) + list.contentHeight + (showWarning ? (warningRow.implicitHeight + 14) : 0) + 10
 
@@ -107,10 +100,15 @@ Item {
 
         delegate: Rectangle {
             id: delegateRoot
-            required property int index
-            required property var model
+            
+            // Access model data - works for both C++ models and JS arrays
+            // For C++ QAbstractListModel: model.roleName
+            // For JS array: modelData.property
+            property int itemId: model.id !== undefined ? model.id : (modelData ? modelData.id : -1)
+            property string itemTitle: model.title !== undefined ? model.title : (modelData ? modelData.title : "")
+            property string itemHotkey: model.hotkey !== undefined ? model.hotkey : (modelData ? modelData.hotkey : "")
 
-            width: ListView.view.width
+            width: ListView.view ? ListView.view.width : parent.width
             height: 62
             radius: 12
             color: Colors.surfaceLight
@@ -127,7 +125,7 @@ Item {
 
                 Text {
                     width: root.col1Width
-                    text: delegateRoot.model[root.nameRole]
+                    text: delegateRoot.itemTitle || ""
                     color: Colors.textPrimary
                     font.pixelSize: 14
                     elide: Text.ElideRight
@@ -136,9 +134,10 @@ Item {
 
                 Text {
                     width: root.col2Width
-                    text: delegateRoot.model[root.hotkeyRole]
-                    color: Colors.textSecondary
+                    text: delegateRoot.itemHotkey || "Not assigned"
+                    color: delegateRoot.itemHotkey ? Colors.textSecondary : Colors.textTertiary
                     font.pixelSize: 14
+                    font.italic: !delegateRoot.itemHotkey
                     elide: Text.ElideRight
                     anchors.verticalCenter: parent.verticalCenter
                 }
@@ -156,7 +155,7 @@ Item {
                     Button {
                         id: primaryButton
                         text: root.primaryText
-                        onClicked: root.primaryClicked(delegateRoot.model[root.idRole])
+                        onClicked: root.primaryClicked(delegateRoot.itemId)
 
                         contentItem: Text {
                             text: primaryButton.text
@@ -186,7 +185,7 @@ Item {
                     Button {
                         id: secondaryButton
                         text: root.secondaryText
-                        onClicked: root.secondaryClicked(delegateRoot.model[root.idRole])
+                        onClicked: root.secondaryClicked(delegateRoot.itemId)
 
                         contentItem: Text {
                             text: secondaryButton.text

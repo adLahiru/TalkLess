@@ -2702,7 +2702,6 @@ QVariantList SoundboardService::getClipWaveformPeaks(int clipId, int numBars) co
 }
 
 void SoundboardService::setRecordWithInputDevice(bool enabled)
-
 {
     if (m_recordWithInputDevice != enabled) {
         m_recordWithInputDevice = enabled;
@@ -3825,4 +3824,38 @@ void SoundboardService::cacheActiveBoardWaveforms()
         }
         // qDebug() << "Background waveform caching complete for" << clipIds.size() << "clips.";
     });
+}
+
+QVariantList SoundboardService::getClipsForBoardVariant(int boardId) const
+{
+    QVariantList list;
+
+    auto clipsToVariant = [&](const QVector<Clip>& clips) {
+        for (const auto& clip : clips) {
+            QVariantMap m;
+            m["id"] = clip.id;
+            m["title"] = clip.title;
+            m["hotkey"] = clip.hotkey;
+            list.append(m);
+        }
+    };
+
+    // First check active boards (memory cache)
+    if (m_activeBoards.contains(boardId)) {
+        clipsToVariant(m_activeBoards[boardId].clips);
+        return list;
+    }
+
+    // Then check all boards (load from disk)
+    for (const auto& b : m_state.soundboards) {
+        if (b.id == boardId) {
+             auto loaded = m_repo.loadBoard(boardId);
+             if (loaded) {
+                 clipsToVariant(loaded->clips);
+             }
+             break;
+        }
+    }
+    
+    return list;
 }

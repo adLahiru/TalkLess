@@ -334,6 +334,18 @@ void HotkeyManager::resetSystem(int id) {
     }
 }
 
+void HotkeyManager::reassignClip(int boardId, int clipId) {
+    if (!m_soundboardService) return;
+
+    QVariantMap data = m_soundboardService->getClipData(boardId, clipId);
+    QString title = data.value("title", "Clip").toString();
+
+    m_target = CaptureTarget::Clip;
+    m_targetId = clipId;
+    m_targetBoardId = boardId;
+    emit requestCapture(QString("Reassign: %1").arg(title));
+}
+
 void HotkeyManager::reassignPreference(int id) {
     const auto* it = m_pref.findById(id);
     if (!it) return;
@@ -418,10 +430,19 @@ void HotkeyManager::applyCapturedHotkey(const QString& hotkeyText) {
         emit showMessage(QString("Conflict: already used by '%1'").arg(conflict));
         return;
     }
+    
+    // Check clip conflicts
+    if (m_clipRegistered.contains(portableKey)) {
+        // If we are reassigning a clip, and IT OWNS this hotkey, it's fine.
+        // But we don't track which clip owns which hotkey in m_clipRegistered (just QHotkey*).
+        // Simplest check: just warn.
+        emit showMessage("Conflict: already used by an active clip");
+        return;
+    }
 
     if (m_target == CaptureTarget::System) {
         m_system.setHotkeyById(m_targetId, hotkeyText);
-    } else {
+    } else if (m_target == CaptureTarget::Preference) {
         m_pref.setHotkeyById(m_targetId, hotkeyText);
         
         // For preference hotkeys (soundboards), also save to service immediately
@@ -435,6 +456,15 @@ void HotkeyManager::applyCapturedHotkey(const QString& hotkeyText) {
                 }
             }
         }
+    } else if (m_target == CaptureTarget::Clip) {
+         if (m_soundboardService) {
+             QVariantMap data = m_soundboardService->getClipData(m_targetBoardId, m_targetId);
+             if (!data.isEmpty()) {
+                 QString title = data["title"].toString();
+                 QStringList tags = data["tags"].toStringList();
+                 m_soundboardService->updateClipInBoard(m_targetBoardId, m_targetId, title, hotkeyText, tags);
+             }
+         }
     }
 
     rebuildRegistrations();
@@ -442,11 +472,13 @@ void HotkeyManager::applyCapturedHotkey(const QString& hotkeyText) {
 
     m_target = CaptureTarget::None;
     m_targetId = -1;
+    m_targetBoardId = -1;
 }
 
 void HotkeyManager::cancelCapture() {
     m_target = CaptureTarget::None;
     m_targetId = -1;
+    m_targetBoardId = -1;
 }
 void HotkeyManager::resetAllHotkeys() {
     loadDefaults();

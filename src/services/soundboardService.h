@@ -169,6 +169,7 @@ public:
     Q_INVOKABLE bool canPaste() const;
     QVector<Clip> getClipsForBoard(int boardId) const;
     QVector<Clip> getActiveClips() const;
+    Q_INVOKABLE QVariantList getClipsForBoardVariant(int boardId) const;
     Q_INVOKABLE QVariantMap getClipData(int boardId, int clipId) const;
 
     // Cross-soundboard clip operations
