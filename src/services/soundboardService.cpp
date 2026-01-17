@@ -26,6 +26,25 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
     // 1) Load index (might not exist) - BEFORE starting audio to apply saved devices
     m_state = m_repo.loadIndex();
 
+    // Migration: If nextClipId is 1 but boards exist, calculate from max existing clip ID
+    // This handles upgrading from old per-board IDs to global unique IDs
+    if (m_state.nextClipId == 1 && !m_state.soundboards.isEmpty()) {
+        int maxClipId = 0;
+        for (const auto& boardInfo : m_state.soundboards) {
+            auto board = m_repo.loadBoard(boardInfo.id);
+            if (board) {
+                for (const auto& clip : board->clips) {
+                    maxClipId = std::max(maxClipId, clip.id);
+                }
+            }
+        }
+        if (maxClipId > 0) {
+            m_state.nextClipId = maxClipId + 1;
+            m_indexDirty = true;
+            qDebug() << "Migrated nextClipId to" << m_state.nextClipId << "(max existing ID was" << maxClipId << ")";
+        }
+    }
+
     // 2) First launch: no boards -> create one
     if (m_state.soundboards.isEmpty()) {
         int id = m_repo.createBoard("Default"); // creates board_1.json and updates index
@@ -629,9 +648,6 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
     // If adding to an active board, we can batch and save once
     if (m_activeBoards.contains(boardId)) {
         Soundboard& board = m_activeBoards[boardId];
-        int maxId = 0;
-        for (const auto& x : board.clips)
-            maxId = std::max(maxId, x.id);
 
         for (const QString& filePath : filePaths) {
             QString localPath = filePath;
@@ -653,7 +669,7 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
                 continue;
             }
 
-            c.id = ++maxId;
+            c.id = m_state.nextClipId++;
             c.isPlaying = false;
             c.locked = false;
 
@@ -674,9 +690,6 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
         return false;
 
     Soundboard b = *loaded;
-    int maxId = 0;
-    for (const auto& x : b.clips)
-        maxId = std::max(maxId, x.id);
 
     for (const QString& filePath : filePaths) {
         QString localPath = filePath;
@@ -698,7 +711,7 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
             continue;
         }
 
-        c.id = ++maxId;
+        c.id = m_state.nextClipId++;
         c.isPlaying = false;
         c.locked = false;
 
@@ -709,7 +722,8 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
         b.clips.push_back(c);
     }
 
-    // Save the updated board to repository
+    // Save the updated board to repository (save index first to persist nextClipId)
+    m_repo.saveIndex(m_state);
     const bool ok = m_repo.saveBoard(b);
     if (ok) {
         m_state = m_repo.loadIndex();
@@ -915,11 +929,8 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
         c.isPlaying = false;
         c.locked = false;
 
-        // generate clip id (simple)
-        int maxId = 0;
-        for (const auto& x : board.clips)
-            maxId = std::max(maxId, x.id);
-        c.id = maxId + 1;
+        // generate globally unique clip id
+        c.id = m_state.nextClipId++;
 
         // Get duration
         if (m_audioEngine) {
@@ -971,10 +982,8 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
     c.isPlaying = false;
     c.locked = false;
 
-    int maxId = 0;
-    for (const auto& x : b.clips)
-        maxId = std::max(maxId, x.id);
-    c.id = maxId + 1;
+    // generate globally unique clip id
+    c.id = m_state.nextClipId++;
 
     // Get duration
     if (m_audioEngine) {
@@ -990,7 +999,8 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
 
     b.clips.push_back(c);
 
-    // Save the updated board to repository
+    // Save the updated board to repository (save index first to persist nextClipId)
+    m_repo.saveIndex(m_state);
     const bool ok = m_repo.saveBoard(b);
     if (ok) {
         m_state = m_repo.loadIndex();
@@ -3849,13 +3859,13 @@ QVariantList SoundboardService::getClipsForBoardVariant(int boardId) const
     // Then check all boards (load from disk)
     for (const auto& b : m_state.soundboards) {
         if (b.id == boardId) {
-             auto loaded = m_repo.loadBoard(boardId);
-             if (loaded) {
-                 clipsToVariant(loaded->clips);
-             }
-             break;
+            auto loaded = m_repo.loadBoard(boardId);
+            if (loaded) {
+                clipsToVariant(loaded->clips);
+            }
+            break;
         }
     }
-    
+
     return list;
 }

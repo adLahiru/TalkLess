@@ -51,7 +51,7 @@ QtObject {
 
     // Assets
     property url bannerImage: currentTheme === "light" ? "qrc:/qt/qml/TalkLess/resources/images/background_light.png" : "qrc:/qt/qml/TalkLess/resources/images/background.png"
-    property url splashImage: currentTheme === "light" ? "qrc:/qt/qml/TalkLess/resources/images/Splash_Screen_light.png" : "qrc:/qt/qml/TalkLess/resources/images/splashScreen.png"
+    property url splashImage: currentTheme === "light" ? "qrc:/qt/qml/TalkLess/resources/images/splashScreen_light.png" : "qrc:/qt/qml/TalkLess/resources/images/splashScreen.png"
 
     // Special Tokens
     property color shadow: currentTheme === "light" ? "rgba(0,0,0,0.06)" : "rgba(0,0,0,0.4)"

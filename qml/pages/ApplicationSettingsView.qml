@@ -629,7 +629,7 @@ Rectangle {
                     // Advanced Audio Settings Section
                     ColumnLayout {
                         id: advancedAudioSection
-                        width: fill.parent.width
+                        width: parent.width
                         x: 40
                         y: microphoneContent.y + microphoneContent.height + 40  // More top margin
                         spacing: 20
@@ -1619,7 +1619,6 @@ Rectangle {
 
                                             background: Rectangle {
                                                 radius: 8
-                                                color: "transparent"
 
                                                 gradient: Gradient {
                                                     orientation: Gradient.Horizontal
