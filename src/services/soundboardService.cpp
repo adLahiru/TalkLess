@@ -3816,8 +3816,8 @@ void SoundboardService::cacheActiveBoardWaveforms()
     if (clipIds.isEmpty())
         return;
 
-    // Run in background
-    QtConcurrent::run([this, clipIds]() {
+    // Run in background (discard QFuture - fire and forget)
+    (void)QtConcurrent::run([this, clipIds]() {
         for (int clipId : clipIds) {
             // Check if already cached
             bool cached = false;
