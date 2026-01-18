@@ -2121,6 +2121,15 @@ Rectangle {
                     onVisibleChanged: {
                         if (!visible) {
                             recordingNameInput.focus = false;
+                            // Clear recording state when navigating away
+                            recordingTab.recordingPeaks = [];
+                            recordingTab.recordingError = "";
+                            recordingTab.finalRecordedDuration = 0;
+                            recordingTab.previewPlaybackTime = 0;
+                            // Cancel any pending recording and delete temp file
+                            if (soundboardService) {
+                                soundboardService.cancelPendingRecording();
+                            }
                         }
                         if (visible && inputDeviceDropdown.model.length === 0) {
                             const list = soundboardService.getInputDevices();
