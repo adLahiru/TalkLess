@@ -3428,7 +3428,8 @@ void SoundboardService::setMicPassthroughEnabled(bool enabled)
     }
     m_audioEngine->setMicPassthroughEnabled(enabled);
     m_state.settings.micPassthroughEnabled = enabled;
-    m_indexDirty = true; // Mark as dirty instead of immediate save
+    // Save immediately to ensure setting persists
+    m_repo.saveIndex(m_state);
     qDebug() << "Mic passthrough" << (enabled ? "enabled" : "disabled");
     emit settingsChanged();
 }
@@ -3448,7 +3449,8 @@ void SoundboardService::setMicEnabled(bool enabled)
     }
     m_audioEngine->setMicEnabled(enabled);
     m_state.settings.micEnabled = enabled;
-    m_indexDirty = true; // Mark as dirty instead of immediate save
+    // Save immediately to ensure setting persists
+    m_repo.saveIndex(m_state);
     qDebug() << "Mic capture" << (enabled ? "enabled" : "disabled");
     emit settingsChanged();
 }
