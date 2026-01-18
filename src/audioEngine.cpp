@@ -14,6 +14,26 @@
 #include <iostream>
 #include <thread>
 
+#ifdef _WIN32
+#include <windows.h>
+
+// Helper function to convert UTF-8 string to wide string for Windows file APIs
+static std::wstring utf8ToWide(const std::string& utf8)
+{
+    if (utf8.empty())
+        return std::wstring();
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+    if (wlen <= 0)
+        return std::wstring();
+    std::wstring wstr(wlen, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, &wstr[0], wlen);
+    // Remove trailing null if present
+    if (!wstr.empty() && wstr.back() == L'\0')
+        wstr.pop_back();
+    return wstr;
+}
+#endif
+
 // ------------------------------------------------------------
 // Local helper
 // ------------------------------------------------------------
@@ -1453,7 +1473,12 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, engine->m_sampleRate);
     ma_decoder dec;
+#ifdef _WIN32
+    std::wstring wpath = utf8ToWide(filepath);
+    if (ma_decoder_init_file_w(wpath.c_str(), &cfg, &dec) != MA_SUCCESS) {
+#else
     if (ma_decoder_init_file(filepath.c_str(), &cfg, &dec) != MA_SUCCESS) {
+#endif
         slot->state.store(ClipState::Stopped, std::memory_order_release);
         std::lock_guard<std::mutex> lock(engine->callbackMutex);
         if (engine->clipErrorCallback)
@@ -1668,7 +1693,13 @@ std::pair<double, double> AudioEngine::loadClip(int slotId, const std::string& f
     double endSec = -1.0;
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, m_sampleRate);
     ma_decoder dec;
-    if (ma_decoder_init_file(filepath.c_str(), &cfg, &dec) == MA_SUCCESS) {
+#ifdef _WIN32
+    std::wstring wpath = utf8ToWide(filepath);
+    ma_result initResult = ma_decoder_init_file_w(wpath.c_str(), &cfg, &dec);
+#else
+    ma_result initResult = ma_decoder_init_file(filepath.c_str(), &cfg, &dec);
+#endif
+    if (initResult == MA_SUCCESS) {
         ma_uint64 totalFrames = 0;
         if (ma_decoder_get_length_in_pcm_frames(&dec, &totalFrames) == MA_SUCCESS && dec.outputSampleRate > 0 &&
             totalFrames > 0) {
@@ -1883,7 +1914,12 @@ double AudioEngine::getFileDuration(const std::string& filepath)
     ma_decoder dec;
     double duration = -1.0;
 
+#ifdef _WIN32
+    std::wstring wpath = utf8ToWide(filepath);
+    if (ma_decoder_init_file_w(wpath.c_str(), &cfg, &dec) == MA_SUCCESS) {
+#else
     if (ma_decoder_init_file(filepath.c_str(), &cfg, &dec) == MA_SUCCESS) {
+#endif
         ma_uint64 totalFrames = 0;
         if (ma_decoder_get_length_in_pcm_frames(&dec, &totalFrames) == MA_SUCCESS && dec.outputSampleRate > 0) {
             duration = (double)totalFrames / (double)dec.outputSampleRate;
@@ -1900,7 +1936,12 @@ bool AudioEngine::exportTrimmedAudio(const std::string& sourcePath, const std::s
     ma_decoder_config decCfg = ma_decoder_config_init(ma_format_f32, 2, m_sampleRate);
     ma_decoder decoder;
 
+#ifdef _WIN32
+    std::wstring wsourcePath = utf8ToWide(sourcePath);
+    if (ma_decoder_init_file_w(wsourcePath.c_str(), &decCfg, &decoder) != MA_SUCCESS) {
+#else
     if (ma_decoder_init_file(sourcePath.c_str(), &decCfg, &decoder) != MA_SUCCESS) {
+#endif
         std::cerr << "exportTrimmedAudio: Failed to open source file: " << sourcePath << std::endl;
         return false;
     }

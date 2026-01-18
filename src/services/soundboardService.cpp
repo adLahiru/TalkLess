@@ -21,6 +21,38 @@
 
 #include <cmath>
 
+// Helper function to sanitize file paths, especially for Windows where file:// URL
+// conversion can leave a leading slash before drive letters (e.g., "/C:/path" -> "C:/path")
+static QString sanitizeFilePath(const QString& path)
+{
+    QString result = path;
+    
+    // Convert file:// URL to local path if needed
+    if (result.startsWith("file:")) {
+        result = QUrl(result).toLocalFile();
+    }
+    
+#ifdef Q_OS_WIN
+    // On Windows, QUrl::toLocalFile() may return "/C:/path" which is invalid
+    // We need to remove the leading slash before drive letters
+    // Pattern: "/X:/" or "/X:\" where X is a drive letter
+    if (result.length() >= 3 && result.startsWith('/')) {
+        QChar secondChar = result.at(1);
+        QChar thirdChar = result.at(2);
+        if (secondChar.isLetter() && thirdChar == ':') {
+            result = result.mid(1);  // Remove leading slash
+        }
+    }
+#endif
+    
+    // Remove any duplicate leading slashes (e.g., "//Users" -> "/Users")
+    while (result.startsWith("//")) {
+        result = result.mid(1);
+    }
+    
+    return result;
+}
+
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
     // 1) Load index (might not exist) - BEFORE starting audio to apply saved devices
@@ -2234,7 +2266,7 @@ void SoundboardService::playClip(int clipId)
     // Ensure it's stopped so loadClip() can succeed reliably
     m_audioEngine->stopClip(slotId);
 
-    const std::string filePath = clip->filePath.toStdString();
+    const std::string filePath = sanitizeFilePath(clip->filePath).toUtf8().constData();
     auto [startSec, endSec] = m_audioEngine->loadClip(slotId, filePath);
     if (startSec == endSec) {
         qWarning() << "Failed to load clip:" << clip->filePath;
@@ -2314,7 +2346,7 @@ void SoundboardService::playClipFromPosition(int clipId, double positionMs)
     }
 
     // Load the clip (this resets seekPosMs to -1, but we'll set it after)
-    const std::string filePath = clip->filePath.toStdString();
+    const std::string filePath = sanitizeFilePath(clip->filePath).toUtf8().constData();
     auto [startSec, endSec] = m_audioEngine->loadClip(slotId, filePath);
     if (startSec == endSec) {
         qWarning() << "Failed to load clip:" << clip->filePath;
