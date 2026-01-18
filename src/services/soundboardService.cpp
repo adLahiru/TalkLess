@@ -170,6 +170,8 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
                     this,
                     [this]() {
                         m_recordingPreviewPlaying = false;
+                        m_filePreviewPlaying = false;  // Also reset file preview state
+                        m_filePreviewPath.clear();
                         emit recordingStateChanged();
                     },
                     Qt::QueuedConnection);

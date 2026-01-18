@@ -4122,6 +4122,7 @@ Rectangle {
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
+                        visible: fileDropArea.droppedFilePath !== ""
 
                         Text {
                             text: "Trim Audio"
@@ -4136,7 +4137,12 @@ Rectangle {
                             id: uploadWaveform
                             Layout.fillWidth: true
                             Layout.preferredHeight: 60
-                            currentTime: 0
+                            currentTime: {
+                                if (soundboardService?.isFilePreviewPlaying ?? false) {
+                                    return uploadTab.uploadPreviewPlaybackTime / 1000.0;
+                                }
+                                return 0;
+                            }
                             totalDuration: fileDropArea.fileDuration
 
                             property real trimStartMs: 0
