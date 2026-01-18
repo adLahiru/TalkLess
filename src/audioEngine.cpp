@@ -1451,13 +1451,16 @@ void AudioEngine::processRecordingInput(const void* input, ma_uint32 frameCount,
     void* pWrite = nullptr;
     ma_uint32 toWrite = frameCount;
 
+    // Apply mic gain to recording input for consistent levels
+    const float micG = micGain.load(std::memory_order_relaxed);
+
     if (ma_pcm_rb_acquire_write(&recordingInputRb, &toWrite, &pWrite) == MA_SUCCESS && toWrite > 0 && pWrite) {
         float* dst = static_cast<float*>(pWrite);
         for (ma_uint32 f = 0; f < toWrite; ++f) {
             float mono = 0.0f;
             for (ma_uint32 ch = 0; ch < captureChannels; ++ch)
                 mono += in[f * captureChannels + ch];
-            mono /= (float)captureChannels;
+            mono = (mono / (float)captureChannels) * micG;  // Apply mic gain
             dst[f] = mono;
         }
         ma_pcm_rb_commit_write(&recordingInputRb, toWrite);
