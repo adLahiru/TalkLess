@@ -285,6 +285,7 @@ Item {
                         Layout.fillWidth: true
                         height: 48
                         radius: 6
+                        layer.enabled: true
 
                         gradient: Gradient {
                             orientation: Gradient.Horizontal

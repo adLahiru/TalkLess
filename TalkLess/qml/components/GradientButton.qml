@@ -36,6 +36,7 @@ Rectangle {
         anchors.fill: parent
         radius: parent.radius
         visible: root.isGradient
+        layer.enabled: true
         
         gradient: Gradient {
             orientation: Gradient.Horizontal

@@ -77,6 +77,7 @@ Rectangle {
                 required property string title
 
                 readonly property bool isSelected: tabItem.index === root.currentIndex
+                layer.enabled: true
 
                 // Gradient background for selected tab
                 gradient: tabItem.isSelected ? selectedGradient : null

@@ -72,6 +72,7 @@ Item {
                         Layout.preferredHeight: 40
                         Layout.preferredWidth: tabText.implicitWidth + 32
                         radius: 20
+                        layer.enabled: true
 
                         required property int index
                         required property string title

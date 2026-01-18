@@ -85,6 +85,7 @@ Rectangle {
                     anchors.fill: parent
                     radius: parent.radius
                     visible: tabItem.isSelected
+                    layer.enabled: true
                     
                     gradient: Gradient {
                         orientation: Gradient.Horizontal

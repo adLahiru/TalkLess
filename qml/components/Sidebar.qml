@@ -151,6 +151,7 @@ Rectangle {
                     anchors.fill: parent
                     radius: 12
                     visible: rowItem.isSelected && root.isCollapsed
+                    layer.enabled: true
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
                         GradientStop {
@@ -169,6 +170,7 @@ Rectangle {
                     anchors.fill: parent
                     radius: 16
                     visible: rowItem.isSelected && !root.isCollapsed
+                    layer.enabled: true
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
                         GradientStop {
