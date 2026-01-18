@@ -811,34 +811,42 @@ bool SoundboardService::addClipWithSettings(int boardId, const QString& filePath
 
     QString finalPath = localPath;
 
-    // If trimming is specified, export the trimmed audio to a new file
+    // If trimming is specified, export the trimmed audio to a new file in managed storage
     const bool needsTrim = (trimStartMs > 0.0 || (trimEndMs > 0.0 && trimEndMs > trimStartMs));
     if (needsTrim && m_audioEngine) {
-        // Generate a unique trimmed file path
-        QFileInfo origInfo(localPath);
-        QString trimmedDir = origInfo.absolutePath();
-        QString trimmedName = origInfo.baseName() + "_trimmed.wav";
-        QString trimmedPath = QDir(trimmedDir).filePath(trimmedName);
-
-        // Make sure we don't overwrite existing files
-        int counter = 1;
-        while (QFile::exists(trimmedPath)) {
-            trimmedName = origInfo.baseName() + QString("_trimmed_%1.wav").arg(counter++);
-            trimmedPath = QDir(trimmedDir).filePath(trimmedName);
+        // Create managed audio folder
+        QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        if (root.isEmpty()) {
+            root = QDir::homePath() + "/.TalkLess";
         }
+        QString audioPath = QDir(root).filePath("audio");
+        QDir(audioPath).mkpath(".");
 
-        qDebug() << "Exporting trimmed audio:" << trimStartMs << "ms to" << trimEndMs << "ms -> " << trimmedPath;
+        // Generate a unique trimmed file path in managed storage
+        QFileInfo origInfo(localPath);
+        QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss_zzz");
+        QString trimmedName = QString("%1_trimmed_%2.wav").arg(origInfo.baseName(), timestamp);
+        QString trimmedPath = QDir(audioPath).filePath(trimmedName);
+
+        qDebug() << "Exporting trimmed audio to managed storage:" << trimStartMs << "ms to" << trimEndMs << "ms -> " << trimmedPath;
 
         if (m_audioEngine->exportTrimmedAudio(localPath.toStdString(), trimmedPath.toStdString(), trimStartMs,
                                               trimEndMs)) {
             finalPath = trimmedPath;
-            qDebug() << "Trimmed audio exported successfully";
+            qDebug() << "Trimmed audio exported successfully to managed storage";
 
-            // Delete the original recording file since we have the trimmed version
-            QFile::remove(localPath);
+            // Only delete the original if it's in managed storage (recordings)
+            if (isFileInManagedStorage(localPath)) {
+                QFile::remove(localPath);
+                qDebug() << "Deleted original recording file:" << localPath;
+            }
         } else {
             qWarning() << "Failed to export trimmed audio, using original file";
         }
+    } else if (!isFileInManagedStorage(localPath)) {
+        // No trimming needed - optionally copy to managed storage for consistency
+        // For now, we keep external files in their original location
+        // This allows users to manage their own audio files
     }
 
     Clip draft;
@@ -853,6 +861,8 @@ bool SoundboardService::addClipWithSettings(int boardId, const QString& filePath
 
 bool SoundboardService::deleteClip(int boardId, int clipId)
 {
+    QString filePathToCheck;
+
     // if deleting from an active board (in memory)
     if (m_activeBoards.contains(boardId)) {
         Soundboard& board = m_activeBoards[boardId];
@@ -861,6 +871,9 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
             if (board.clips[i].id == clipId) {
                 if (board.clips[i].locked)
                     return false; // can't delete locked clip
+
+                // Store file path before deleting
+                filePathToCheck = board.clips[i].filePath;
 
                 // STOP the clip if it's playing before deleting
                 if (m_audioEngine && m_clipIdToSlot.contains(clipId)) {
@@ -882,7 +895,26 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
         rebuildHotkeyIndex();
         emit activeClipsChanged();
         emit clipPlaybackStopped(clipId); // Notify UI that clip stopped
-        return saveActive();
+        bool saveOk = saveActive();
+
+        // After saving, check if the file should be deleted (only for managed files)
+        if (saveOk && !filePathToCheck.isEmpty() && isFileInManagedStorage(filePathToCheck)) {
+            // Count how many clips still use this file
+            int refCount = countClipsUsingFile(filePathToCheck);
+            if (refCount == 0) {
+                // No other clips use this file, safe to delete
+                QString sanitizedPath = sanitizeFilePath(filePathToCheck);
+                if (QFile::remove(sanitizedPath)) {
+                    qDebug() << "Deleted orphaned managed file:" << sanitizedPath;
+                } else {
+                    qWarning() << "Failed to delete orphaned managed file:" << sanitizedPath;
+                }
+            } else {
+                qDebug() << "File still used by" << refCount << "clips, not deleting:" << filePathToCheck;
+            }
+        }
+
+        return saveOk;
     }
 
     // inactive board: load -> modify -> save
@@ -894,6 +926,7 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
     bool found = false;
     for (int i = 0; i < b.clips.size(); ++i) {
         if (b.clips[i].id == clipId) {
+            filePathToCheck = b.clips[i].filePath;
             b.clips.removeAt(i);
             found = true;
             break;
@@ -907,6 +940,19 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
     if (ok) {
         m_state = m_repo.loadIndex();
         emit boardsChanged();
+
+        // After saving, check if the file should be deleted (only for managed files)
+        if (!filePathToCheck.isEmpty() && isFileInManagedStorage(filePathToCheck)) {
+            int refCount = countClipsUsingFile(filePathToCheck);
+            if (refCount == 0) {
+                QString sanitizedPath = sanitizeFilePath(filePathToCheck);
+                if (QFile::remove(sanitizedPath)) {
+                    qDebug() << "Deleted orphaned managed file:" << sanitizedPath;
+                } else {
+                    qWarning() << "Failed to delete orphaned managed file:" << sanitizedPath;
+                }
+            }
+        }
     }
     return ok;
 }
@@ -1959,6 +2005,26 @@ bool SoundboardService::renameBoard(int boardId, const QString& newName)
 
 bool SoundboardService::deleteBoard(int boardId)
 {
+    // Collect file paths from the board before deleting (for cleanup)
+    QStringList filesToCheck;
+    if (m_activeBoards.contains(boardId)) {
+        const Soundboard& board = m_activeBoards.value(boardId);
+        for (const auto& clip : board.clips) {
+            if (!clip.filePath.isEmpty() && isFileInManagedStorage(clip.filePath)) {
+                filesToCheck.append(clip.filePath);
+            }
+        }
+    } else {
+        auto loaded = m_repo.loadBoard(boardId);
+        if (loaded) {
+            for (const auto& clip : loaded->clips) {
+                if (!clip.filePath.isEmpty() && isFileInManagedStorage(clip.filePath)) {
+                    filesToCheck.append(clip.filePath);
+                }
+            }
+        }
+    }
+
     // If deleting an active board, deactivate it first
     if (m_activeBoards.contains(boardId)) {
         m_activeBoards.remove(boardId);
@@ -1972,6 +2038,21 @@ bool SoundboardService::deleteBoard(int boardId)
         m_state = m_repo.loadIndex();
         emit boardsChanged();
         emit activeBoardChanged();
+
+        // Clean up orphaned managed files
+        for (const QString& filePath : filesToCheck) {
+            int refCount = countClipsUsingFile(filePath);
+            if (refCount == 0) {
+                QString sanitizedPath = sanitizeFilePath(filePath);
+                if (QFile::remove(sanitizedPath)) {
+                    qDebug() << "Deleted orphaned managed file after board deletion:" << sanitizedPath;
+                } else {
+                    qWarning() << "Failed to delete orphaned managed file:" << sanitizedPath;
+                }
+            } else {
+                qDebug() << "File still used by" << refCount << "clips after board deletion:" << filePath;
+            }
+        }
     }
     return ok;
 }
@@ -2928,9 +3009,155 @@ bool SoundboardService::isRecordingPreviewPlaying() const
 
 double SoundboardService::getPreviewPlaybackPositionMs() const
 {
-    if (!m_audioEngine || !m_recordingPreviewPlaying)
+    if (!m_audioEngine || (!m_recordingPreviewPlaying && !m_filePreviewPlaying))
         return 0.0;
     return m_audioEngine->getClipPlaybackPositionMs(kPreviewSlot);
+}
+
+// ============================================================================
+// GENERIC FILE PREVIEW (for uploaded files)
+// ============================================================================
+
+bool SoundboardService::playFilePreviewTrimmed(const QString& filePath, double trimStartMs, double trimEndMs)
+{
+    if (!m_audioEngine || filePath.isEmpty())
+        return false;
+
+    QString sanitizedPath = sanitizeFilePath(filePath);
+    if (!QFileInfo::exists(sanitizedPath))
+        return false;
+
+    // Stop any existing preview
+    m_audioEngine->stopClip(kPreviewSlot);
+    m_audioEngine->unloadClip(kPreviewSlot);
+
+    // Load the file
+    auto result = m_audioEngine->loadClip(kPreviewSlot, sanitizedPath.toUtf8().constData());
+    const double duration = result.second;
+
+    if (duration <= 0.0) {
+        m_filePreviewPlaying = false;
+        emit recordingStateChanged();
+        return false;
+    }
+
+    // Apply gain, trim bounds and seek to start position
+    m_audioEngine->setClipGain(kPreviewSlot, 0.0f); // 0 dB = unity gain
+    m_audioEngine->setClipTrim(kPreviewSlot, trimStartMs, trimEndMs);
+    m_audioEngine->setClipStartPosition(kPreviewSlot, trimStartMs);
+    m_audioEngine->setClipLoop(kPreviewSlot, false);
+    m_audioEngine->setClipMonitorOnly(kPreviewSlot, true); // Preview only on monitor output
+    m_audioEngine->playClip(kPreviewSlot);
+
+    m_filePreviewPlaying = true;
+    m_filePreviewPath = sanitizedPath;
+    emit recordingStateChanged();
+    return true;
+}
+
+void SoundboardService::stopFilePreview()
+{
+    if (!m_audioEngine)
+        return;
+
+    m_audioEngine->stopClip(kPreviewSlot);
+    m_audioEngine->unloadClip(kPreviewSlot);
+    m_filePreviewPlaying = false;
+    m_filePreviewPath.clear();
+    emit recordingStateChanged();
+}
+
+bool SoundboardService::isFilePreviewPlaying() const
+{
+    return m_filePreviewPlaying;
+}
+
+// ============================================================================
+// FILE MANAGEMENT
+// ============================================================================
+
+QString SoundboardService::copyFileToManagedStorage(const QString& sourceFilePath)
+{
+    QString sanitizedSource = sanitizeFilePath(sourceFilePath);
+    if (!QFileInfo::exists(sanitizedSource)) {
+        qWarning() << "Source file does not exist:" << sanitizedSource;
+        return QString();
+    }
+
+    // Check if file is already in managed storage
+    if (isFileInManagedStorage(sanitizedSource)) {
+        return sanitizedSource; // Already managed, return as-is
+    }
+
+    // Create audio folder in AppData
+    QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (root.isEmpty()) {
+        root = QDir::homePath() + "/.TalkLess";
+    }
+    QDir base(root);
+    QString audioPath = base.filePath("audio");
+    QDir(audioPath).mkpath(".");
+
+    // Generate unique filename with timestamp
+    QFileInfo sourceInfo(sanitizedSource);
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss_zzz");
+    QString newFilename = QString("%1_%2.%3").arg(sourceInfo.baseName(), timestamp, sourceInfo.suffix());
+    QString destPath = QDir(audioPath).filePath(newFilename);
+
+    // Copy file
+    if (QFile::copy(sanitizedSource, destPath)) {
+        qDebug() << "Copied file to managed storage:" << destPath;
+        return destPath;
+    } else {
+        qWarning() << "Failed to copy file to managed storage:" << sanitizedSource << "->" << destPath;
+        return QString();
+    }
+}
+
+bool SoundboardService::isFileInManagedStorage(const QString& filePath) const
+{
+    QString sanitizedPath = sanitizeFilePath(filePath);
+    QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (root.isEmpty()) {
+        root = QDir::homePath() + "/.TalkLess";
+    }
+
+    // Check if file is in recordings or audio folder
+    QString recordingsPath = QDir(root).filePath("soundboards/recordings");
+    QString audioPath = QDir(root).filePath("audio");
+
+    return sanitizedPath.startsWith(recordingsPath) || sanitizedPath.startsWith(audioPath);
+}
+
+int SoundboardService::countClipsUsingFile(const QString& filePath) const
+{
+    QString sanitizedPath = sanitizeFilePath(filePath);
+    int count = 0;
+
+    // Search in all boards (active and inactive)
+    for (const auto& boardInfo : m_state.soundboards) {
+        if (m_activeBoards.contains(boardInfo.id)) {
+            // Active board - check in memory
+            const Soundboard& board = m_activeBoards.value(boardInfo.id);
+            for (const auto& clip : board.clips) {
+                if (sanitizeFilePath(clip.filePath) == sanitizedPath) {
+                    count++;
+                }
+            }
+        } else {
+            // Inactive board - load from disk
+            auto loaded = m_repo.loadBoard(boardInfo.id);
+            if (loaded) {
+                for (const auto& clip : loaded->clips) {
+                    if (sanitizeFilePath(clip.filePath) == sanitizedPath) {
+                        count++;
+                    }
+                }
+            }
+        }
+    }
+
+    return count;
 }
 
 QVariantList SoundboardService::listBoardsForDropdown() const

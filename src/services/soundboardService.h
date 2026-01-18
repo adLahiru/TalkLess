@@ -69,6 +69,7 @@ public:
     Q_PROPERTY(bool recordWithClipboard READ recordWithClipboard WRITE setRecordWithClipboard NOTIFY settingsChanged)
     Q_PROPERTY(QString selectedRecordingDeviceId READ selectedRecordingDeviceId NOTIFY settingsChanged)
     Q_PROPERTY(bool isRecordingPreviewPlaying READ isRecordingPreviewPlaying NOTIFY recordingStateChanged)
+    Q_PROPERTY(bool isFilePreviewPlaying READ isFilePreviewPlaying NOTIFY recordingStateChanged)
 
     // ---- Index / Settings ----
     double masterGainDb() const { return m_state.settings.masterGainDb; }
@@ -258,6 +259,16 @@ public:
     Q_INVOKABLE bool isRecordingPreviewPlaying() const;
     Q_INVOKABLE double getPreviewPlaybackPositionMs() const;
 
+    // ---- Generic file preview (for uploaded files) ----
+    Q_INVOKABLE bool playFilePreviewTrimmed(const QString& filePath, double trimStartMs, double trimEndMs);
+    Q_INVOKABLE void stopFilePreview();
+    Q_INVOKABLE bool isFilePreviewPlaying() const;
+
+    // ---- File management ----
+    Q_INVOKABLE QString copyFileToManagedStorage(const QString& sourceFilePath);
+    Q_INVOKABLE bool isFileInManagedStorage(const QString& filePath) const;
+    Q_INVOKABLE int countClipsUsingFile(const QString& filePath) const;
+
     // ---- Hotkey (active only) ----
     int findActiveClipIdByHotkey(const QString& hotkey) const;
 
@@ -323,6 +334,8 @@ private:
 
     // Recording state
     bool m_recordingPreviewPlaying = false;
+    bool m_filePreviewPlaying = false;       // For uploaded file preview
+    QString m_filePreviewPath;               // Currently previewing file path
     bool m_hasUnsavedRecording = false;
     QTimer* m_recordingTickTimer = nullptr;
     bool m_recordWithInputDevice = true;

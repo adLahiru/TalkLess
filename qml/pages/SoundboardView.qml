@@ -3827,14 +3827,38 @@ Rectangle {
 
                 // Add Tab Content (Tab 1)
                 ColumnLayout {
+                    id: uploadTab
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: 6
                     visible: rightSidebar.currentTabIndex === 1
 
+                    // Preview playback position tracking
+                    property real uploadPreviewPlaybackTime: 0
+
+                    // Timer to poll preview playback position
+                    Timer {
+                        id: uploadPreviewPlayheadTimer
+                        interval: 50
+                        repeat: true
+                        running: soundboardService?.isFilePreviewPlaying ?? false
+                        onTriggered: {
+                            uploadTab.uploadPreviewPlaybackTime = soundboardService?.getPreviewPlaybackPositionMs() ?? 0;
+                        }
+                        onRunningChanged: {
+                            if (!running) {
+                                uploadTab.uploadPreviewPlaybackTime = 0;
+                            }
+                        }
+                    }
+
                     onVisibleChanged: {
                         if (!visible) {
                             uploadAudioNameInput.focus = false;
+                            // Stop any preview when leaving tab
+                            if (soundboardService?.isFilePreviewPlaying) {
+                                soundboardService.stopFilePreview();
+                            }
                         }
                     }
 
@@ -3986,6 +4010,7 @@ Rectangle {
                         Layout.leftMargin: 5
                         Layout.rightMargin: 5
                         spacing: 8
+                        visible: fileDropArea.droppedFilePath !== ""
 
                         Text {
                             text: "Trim Audio"
@@ -4000,7 +4025,12 @@ Rectangle {
                             id: uploadWaveform
                             Layout.fillWidth: true
                             Layout.preferredHeight: 60
-                            currentTime: 0
+                            currentTime: {
+                                if (soundboardService?.isFilePreviewPlaying ?? false) {
+                                    return uploadTab.uploadPreviewPlaybackTime / 1000.0;
+                                }
+                                return 0;
+                            }
                             totalDuration: fileDropArea.fileDuration
 
                             property real trimStartMs: 0
@@ -4013,6 +4043,51 @@ Rectangle {
                             onTrimEndMoved: function (pos) {
                                 trimEnd = pos;  // Update visual position
                                 trimEndMs = pos * totalDuration * 1000.0;
+                            }
+                        }
+
+                        // Preview trimmed audio button
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 36
+                            radius: 8
+                            color: (soundboardService?.isFilePreviewPlaying ?? false) ? Colors.error : Colors.accent
+                            visible: fileDropArea.droppedFilePath !== ""
+
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: 8
+
+                                Text {
+                                    text: (soundboardService?.isFilePreviewPlaying ?? false) ? "■" : "▶"
+                                    color: Colors.textOnPrimary
+                                    font.pixelSize: 14
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+
+                                Text {
+                                    text: (soundboardService?.isFilePreviewPlaying ?? false) ? "Stop Preview" : "Preview Trim"
+                                    color: Colors.textOnPrimary
+                                    font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                                    font.pixelSize: 13
+                                    font.weight: Font.DemiBold
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (soundboardService?.isFilePreviewPlaying) {
+                                        soundboardService.stopFilePreview();
+                                    } else {
+                                        // Calculate trim times
+                                        let startMs = uploadWaveform.trimStartMs;
+                                        let endMs = uploadWaveform.trimEndMs;
+                                        soundboardService.playFilePreviewTrimmed(fileDropArea.droppedFilePath, startMs, endMs);
+                                    }
+                                }
                             }
                         }
                     }
