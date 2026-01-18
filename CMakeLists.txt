@@ -56,6 +56,9 @@ qt_add_executable(appTalkLess
     src/audioEngine.h
     src/audioEngine.cpp
     src/miniaudio_impl.cpp
+    src/miniaudio_vorbis.h
+    src/miniaudio_vorbis.cpp
+    src/stb_vorbis.c
 
     # Controllers
     src/controllers/hotkeymanager.h

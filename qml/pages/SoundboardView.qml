@@ -167,10 +167,41 @@ Rectangle {
         };
     }
 
+    // Get clip data from any active board (for playing clips that might be in a different board)
+    function getClipDataAnyBoard(clipId) {
+        if (clipId === -1)
+            return null;
+
+        const data = soundboardService.getClipDataAnyBoard(clipId);
+        if (!data || Object.keys(data).length === 0)
+            return null;
+
+        return {
+            clipId: data.id,
+            title: data.title,
+            filePath: data.filePath,
+            hotkey: data.hotkey,
+            imgPath: data.imgPath,
+            isPlaying: data.isPlaying,
+            isRepeat: data.isRepeat,
+            tags: data.tags || [],
+            clipVolume: data.volume,
+            clipSpeed: data.speed,
+            reproductionMode: data.reproductionMode,
+            stopOtherSounds: data.stopOtherSounds,
+            muteOtherSounds: data.muteOtherSounds,
+            muteMicDuringPlayback: data.muteMicDuringPlayback,
+            durationSec: data.durationSec,
+            trimStartMs: data.trimStartMs,
+            trimEndMs: data.trimEndMs
+        };
+    }
+
     // Update what's shown in the player card and editor
     function updateDisplayedClipData() {
         // 1. Player Card Logic (Priority: Playing Clip > Selected Clip)
-        let playerCardData = getClipDataById(playingClipId);
+        // Use getClipDataAnyBoard for playing clip since it might be in a different board
+        let playerCardData = getClipDataAnyBoard(playingClipId);
         if (!playerCardData) {
             playerCardData = getClipDataById(selectedClipId);
         }
@@ -1130,6 +1161,72 @@ Rectangle {
                 color: Colors.surfaceDark
                 radius: 12
 
+                // Full-area DropArea overlay for drag-and-drop - covers entire content area
+                DropArea {
+                    id: fullContentDropArea
+                    anchors.fill: parent
+                    z: 50  // Above Flickable but allows interaction with clips
+                    keys: ["text/uri-list"] // Standard for file drops
+
+                    onDropped: function (drop) {
+                        if (drop.hasUrls) {
+                            let urls = [];
+                            for (let i = 0; i < drop.urls.length; i++) {
+                                urls.push(drop.urls[i].toString());
+                            }
+
+                            const boardId = activeClipsModel.boardId;
+                            if (boardId !== -1) {
+                                const success = soundboardService.addClips(boardId, urls);
+                                if (success) {
+                                    activeClipsModel.reload();
+                                }
+                            }
+                            drop.accept();
+                        }
+                    }
+
+                    // Visual feedback for file dragging
+                    Rectangle {
+                        anchors.fill: parent
+                        color: Qt.rgba(Colors.success.r, Colors.success.g, Colors.success.b, 0.2)
+                        visible: parent.containsDrag
+                        border.color: Colors.success
+                        border.width: 3
+                        radius: 12
+
+                        ColumnLayout {
+                            anchors.centerIn: parent
+                            spacing: 10
+
+                            // Large plus icon
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: "+"
+                                color: Colors.success
+                                font.pixelSize: 64
+                                font.weight: Font.Light
+
+                                layer.enabled: true
+                                layer.effect: MultiEffect {
+                                    colorization: 1.0
+                                    colorizationColor: Colors.success
+                                    blurEnabled: true
+                                    blur: 0.5
+                                }
+                            }
+
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: "Drop audio files to add to soundboard"
+                                color: Colors.success
+                                font.pixelSize: 22
+                                font.weight: Font.DemiBold
+                            }
+                        }
+                    }
+                }
+
                 // Tile sizing properties - responsive layout with scale factor
                 readonly property real tileSpacing: 15
                 readonly property real tilePadding: 20
@@ -1170,71 +1267,6 @@ Rectangle {
                     contentHeight: clipsGrid.implicitHeight
                     clip: true
                     flickableDirection: Flickable.VerticalFlick
-
-                    // DropArea for adding new files via drag and drop
-                    DropArea {
-                        id: gridFileDropArea
-                        anchors.fill: parent
-                        keys: ["text/uri-list"] // Standard for file drops
-
-                        onDropped: function (drop) {
-                            if (drop.hasUrls) {
-                                let urls = [];
-                                for (let i = 0; i < drop.urls.length; i++) {
-                                    urls.push(drop.urls[i].toString());
-                                }
-
-                                const boardId = activeClipsModel.boardId;
-                                if (boardId !== -1) {
-                                    const success = soundboardService.addClips(boardId, urls);
-                                    if (success) {
-                                        activeClipsModel.reload();
-                                    }
-                                }
-                                drop.accept();
-                            }
-                        }
-
-                        // Visual feedback for file dragging
-                        Rectangle {
-                            anchors.fill: parent
-                            color: Qt.rgba(Colors.success.r, Colors.success.g, Colors.success.b, 0.2)
-                            visible: parent.containsDrag
-                            border.color: Colors.success
-                            border.width: 3
-                            radius: 12
-
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: 10
-
-                                // Large plus icon
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: "+"
-                                    color: Colors.success
-                                    font.pixelSize: 64
-                                    font.weight: Font.Light
-
-                                    layer.enabled: true
-                                    layer.effect: MultiEffect {
-                                        colorization: 1.0
-                                        colorizationColor: Colors.success
-                                        blurEnabled: true
-                                        blur: 0.5
-                                    }
-                                }
-
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: "Drop audio files to add to soundboard"
-                                    color: Colors.success
-                                    font.pixelSize: 22
-                                    font.weight: Font.DemiBold
-                                }
-                            }
-                        }
-                    }
 
                     // Background MouseArea for right-click context menu (Paste)
                     MouseArea {

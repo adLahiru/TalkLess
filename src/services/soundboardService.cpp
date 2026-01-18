@@ -565,6 +565,44 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
     return {};
 }
 
+QVariantMap SoundboardService::getClipDataAnyBoard(int clipId) const
+{
+    // Search all active boards for the clip
+    for (auto it = m_activeBoards.constBegin(); it != m_activeBoards.constEnd(); ++it) {
+        const Soundboard& board = it.value();
+        for (const auto& clip : board.clips) {
+            if (clip.id == clipId) {
+                QVariantMap map;
+                map["id"] = clip.id;
+                map["title"] = clip.title;
+                map["filePath"] = clip.filePath;
+                map["imgPath"] = clip.imgPath;
+                map["hotkey"] = clip.hotkey;
+                map["volume"] = clip.volume;
+                map["speed"] = clip.speed;
+                map["isPlaying"] = clip.isPlaying;
+                map["isRepeat"] = clip.isRepeat;
+                map["tags"] = clip.tags;
+                map["reproductionMode"] = clip.reproductionMode;
+                map["stopOtherSounds"] = clip.stopOtherSounds;
+                map["muteOtherSounds"] = clip.muteOtherSounds;
+                map["muteMicDuringPlayback"] = clip.muteMicDuringPlayback;
+                double duration = clip.durationSec;
+                if (duration <= 0.0 && m_audioEngine) {
+                    duration = m_audioEngine->getFileDuration(clip.filePath.toStdString());
+                }
+                map["durationSec"] = duration;
+                map["trimStartMs"] = clip.trimStartMs;
+                map["trimEndMs"] = clip.trimEndMs;
+                map["lastPlayedPosMs"] = clip.lastPlayedPosMs;
+                map["boardId"] = it.key();  // Include the board ID for reference
+                return map;
+            }
+        }
+    }
+    return {};
+}
+
 bool SoundboardService::setClipPlaying(int clipId, bool playing)
 {
     Clip* c = findActiveClipById(clipId);
@@ -1850,8 +1888,21 @@ bool SoundboardService::renameBoard(int boardId, const QString& newName)
     // If renaming an active board (in memory)
     if (m_activeBoards.contains(boardId)) {
         m_activeBoards[boardId].name = name;
-        // saveActive() will call emit activeBoardChanged, emit boardsChanged, and reload index
-        return saveActive();
+
+        // Also update m_state.soundboards so listBoards() returns the updated name
+        for (auto& sb : m_state.soundboards) {
+            if (sb.id == boardId) {
+                sb.name = name;
+                break;
+            }
+        }
+
+        // Mark as dirty for saving
+        saveActive();
+
+        // Notify UI of the change
+        emit boardsChanged();
+        return true;
     }
 
     // Otherwise load -> rename -> save

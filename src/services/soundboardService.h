@@ -169,6 +169,7 @@ public:
     QVector<Clip> getClipsForBoard(int boardId) const;
     QVector<Clip> getActiveClips() const;
     Q_INVOKABLE QVariantMap getClipData(int boardId, int clipId) const;
+    Q_INVOKABLE QVariantMap getClipDataAnyBoard(int clipId) const;  // Search all active boards
 
     // Cross-soundboard clip operations
     Q_INVOKABLE QVariantList getBoardsWithClipStatus(int clipId) const;
