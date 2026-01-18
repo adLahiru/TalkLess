@@ -629,7 +629,7 @@ Rectangle {
                     // Advanced Audio Settings Section
                     ColumnLayout {
                         id: advancedAudioSection
-                        width: fill.parent.width
+                        width: parent.width - 80  // Account for left and right margins
                         x: 40
                         y: microphoneContent.y + microphoneContent.height + 40  // More top margin
                         spacing: 20
