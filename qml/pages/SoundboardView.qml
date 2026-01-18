@@ -44,9 +44,15 @@ Rectangle {
     // Update soundboard count when model changes
     Connections {
         target: soundboardsModel
-        function onRowsInserted() { root.soundboardCount = soundboardsModel.rowCount(); }
-        function onRowsRemoved() { root.soundboardCount = soundboardsModel.rowCount(); }
-        function onModelReset() { root.soundboardCount = soundboardsModel.rowCount(); }
+        function onRowsInserted() {
+            root.soundboardCount = soundboardsModel.rowCount();
+        }
+        function onRowsRemoved() {
+            root.soundboardCount = soundboardsModel.rowCount();
+        }
+        function onModelReset() {
+            root.soundboardCount = soundboardsModel.rowCount();
+        }
     }
 
     // Active clips model - uses local if available, otherwise global clipsModel
@@ -2093,7 +2099,7 @@ Rectangle {
                     property real finalRecordedDuration: 0
                     // Preview playback position in seconds (for playhead indicator)
                     property real previewPlaybackTime: 0
-                    
+
                     // Timer to poll preview playback position
                     Timer {
                         id: previewPlayheadTimer
@@ -2581,18 +2587,18 @@ Rectangle {
                             radius: 8
                             color: (soundboardService?.isRecordingPreviewPlaying ?? false) ? Colors.error : Colors.accent
                             visible: !(soundboardService?.isRecording ?? false) && (soundboardService?.lastRecordingPath ?? "") !== ""
-                            
+
                             Row {
                                 anchors.centerIn: parent
                                 spacing: 8
-                                
+
                                 Text {
                                     text: (soundboardService?.isRecordingPreviewPlaying ?? false) ? "■" : "▶"
                                     color: Colors.textOnPrimary
                                     font.pixelSize: 14
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
-                                
+
                                 Text {
                                     text: (soundboardService?.isRecordingPreviewPlaying ?? false) ? "Stop Preview" : "Preview Trim"
                                     color: Colors.textOnPrimary
@@ -2602,7 +2608,7 @@ Rectangle {
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                             }
-                            
+
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
@@ -4182,7 +4188,7 @@ Rectangle {
                         repeat: true
                         onTriggered: {
                             if (soundboardService) {
-                                var out = soundboardService.getMonitorPeakLevel();
+                                var out = soundboardService.getMasterPeakLevel();
                                 var mic = soundboardService.getMicPeakLevel();
 
                                 // Defensive: handle undefined / NaN
@@ -4273,8 +4279,8 @@ Rectangle {
                                 Layout.fillHeight: true
                                 Layout.preferredWidth: 40
                                 orientation: Qt.Vertical
-                                from: 12
-                                to: -60
+                                from: -60
+                                to: 12
                                 onMoved: if (soundboardService)
                                     soundboardService.masterGainDb = value
                                 Binding on value {
@@ -4367,8 +4373,8 @@ Rectangle {
                                 Layout.fillHeight: true
                                 Layout.preferredWidth: 40
                                 orientation: Qt.Vertical
-                                from: 12
-                                to: -60
+                                from: -60
+                                to: 12
                                 onMoved: if (soundboardService)
                                     soundboardService.micGainDb = value
                                 Binding on value {
@@ -4393,7 +4399,7 @@ Rectangle {
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
                                         width: 32
-                                        height: micVerticalSlider.visualPosition * parent.height
+                                        height: (1.0 - micVerticalSlider.visualPosition) * parent.height
                                         radius: width / 2
                                         gradient: Gradient {
                                             GradientStop {
