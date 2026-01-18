@@ -77,13 +77,8 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
         }
     }
 
-    // 2) First launch: no boards -> create one
-    if (m_state.soundboards.isEmpty()) {
-        int id = m_repo.createBoard("Default"); // creates board_1.json and updates index
-        m_state = m_repo.loadIndex();
-        m_state.activeBoardIds.insert(id);
-        m_indexDirty = true; // Mark as dirty instead of immediate save
-    }
+    // 2) First launch: no boards -> do nothing (user creates boards manually)
+    // Removed auto-creation of default soundboard
 
     // 3) Activate all saved active boards
     if (m_state.activeBoardIds.isEmpty() && !m_state.soundboards.isEmpty()) {
@@ -1918,6 +1913,9 @@ int SoundboardService::createBoardWithArtwork(const QString& name, const QString
     m_state = m_repo.loadIndex();
     emit boardsChanged();
 
+    // Activate the newly created board so it's ready to use immediately
+    activate(id);
+
     return id;
 }
 
@@ -2069,6 +2067,15 @@ void SoundboardService::playClip(int clipId)
 
     Clip* clip = findActiveClipById(clipId);
     if (!clip) {
+        // Check if clip exists in an inactive board
+        int boardId = -1;
+        auto foundClip = findClipByIdAnyBoard(clipId, &boardId);
+        if (foundClip.has_value() && boardId >= 0 && !m_activeBoards.contains(boardId)) {
+            // Clip exists but board is not active
+            emit errorOccurred(tr("Activate soundboard before playing"));
+            qWarning() << "Cannot play clip" << clipId << "- soundboard" << boardId << "is not active";
+            return;
+        }
         qWarning() << "Clip not found:" << clipId;
         return;
     }

@@ -693,11 +693,18 @@ Rectangle {
                             return;
                         }
 
-                        // Create board with or without artwork
+                        // Create board with or without artwork and switch to it
+                        var newBoardId;
                         if (addSoundboardDialog.selectedArtworkPath !== "") {
-                            soundboardService.createBoardWithArtwork(name, addSoundboardDialog.selectedArtworkPath);
+                            newBoardId = soundboardService.createBoardWithArtwork(name, addSoundboardDialog.selectedArtworkPath);
                         } else {
-                            soundboardService.createBoard(name);
+                            newBoardId = soundboardService.createBoard(name);
+                        }
+
+                        // Switch to the newly created soundboard to make it active
+                        if (newBoardId >= 0 && clipsModel) {
+                            clipsModel.boardId = newBoardId;
+                            clipsModel.reload();
                         }
 
                         // Model automatically reloads when boardsChanged is emitted by the service
@@ -1805,8 +1812,8 @@ Rectangle {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.bottomMargin: 10
 
-                // Visible only when a clip is selected or playing
-                visible: root.displayedClipData !== null
+                // Visible only when a clip is selected or playing AND there are soundboards
+                visible: root.soundboardCount > 0 && root.displayedClipData !== null
 
                 // Bind to displayed clip data (prioritizes playing clip)
                 songName: (root.displayedClipData && root.displayedClipData.title) ? root.displayedClipData.title : "No clip selected"
