@@ -2851,11 +2851,12 @@ bool SoundboardService::playLastRecordingPreview()
     m_audioEngine->stopClip(kPreviewSlot);
     m_audioEngine->unloadClip(kPreviewSlot);
 
-    auto result = m_audioEngine->loadClip(kPreviewSlot, m_lastRecordingPath.toStdString());
+    auto result = m_audioEngine->loadClip(kPreviewSlot, sanitizeFilePath(m_lastRecordingPath).toUtf8().constData());
     const double endSec = result.second;
 
     const bool success = (endSec > 0.0);
     if (success) {
+        m_audioEngine->setClipMonitorOnly(kPreviewSlot, true); // Preview only on monitor output
         m_audioEngine->playClip(kPreviewSlot);
         m_recordingPreviewPlaying = true;
         emit recordingStateChanged();
@@ -2880,7 +2881,7 @@ bool SoundboardService::playLastRecordingPreviewTrimmed(double trimStartMs, doub
     m_audioEngine->unloadClip(kPreviewSlot);
 
     // Load the recording
-    auto result = m_audioEngine->loadClip(kPreviewSlot, m_lastRecordingPath.toStdString());
+    auto result = m_audioEngine->loadClip(kPreviewSlot, sanitizeFilePath(m_lastRecordingPath).toUtf8().constData());
     const double duration = result.second;
 
     if (duration <= 0.0) {
@@ -2894,6 +2895,7 @@ bool SoundboardService::playLastRecordingPreviewTrimmed(double trimStartMs, doub
     m_audioEngine->setClipTrim(kPreviewSlot, trimStartMs, trimEndMs);
     m_audioEngine->setClipStartPosition(kPreviewSlot, trimStartMs);
     m_audioEngine->setClipLoop(kPreviewSlot, false);
+    m_audioEngine->setClipMonitorOnly(kPreviewSlot, true); // Preview only on monitor output
     m_audioEngine->playClip(kPreviewSlot);
 
     m_recordingPreviewPlaying = true;

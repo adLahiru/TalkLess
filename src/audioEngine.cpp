@@ -1213,6 +1213,7 @@ void AudioEngine::processPlaybackAudio(void* output, ma_uint32 frameCount, ma_ui
             continue;
 
         const float clipGain = slot.gain.load(std::memory_order_relaxed) * clipMul;
+        const bool isMonitorOnly = slot.monitorOnly.load(std::memory_order_relaxed);
 
         void* pRead = nullptr;
         ma_uint32 availFrames = frameCount;
@@ -1221,33 +1222,36 @@ void AudioEngine::processPlaybackAudio(void* output, ma_uint32 frameCount, ma_ui
             pRead) {
             float* clip = static_cast<float*>(pRead); // stereo 2ch
 
-            if (playbackChannels == 2) {
-                for (ma_uint32 f = 0; f < availFrames; ++f) {
-                    const ma_uint32 o = f * 2;
-                    const float L = clip[f * 2] * clipGain;
-                    const float R = clip[f * 2 + 1] * clipGain;
+            // Only mix into main output if NOT monitor-only
+            if (!isMonitorOnly) {
+                if (playbackChannels == 2) {
+                    for (ma_uint32 f = 0; f < availFrames; ++f) {
+                        const ma_uint32 o = f * 2;
+                        const float L = clip[f * 2] * clipGain;
+                        const float R = clip[f * 2 + 1] * clipGain;
 
-                    out[o] += L;
-                    out[o + 1] += R;
+                        out[o] += L;
+                        out[o + 1] += R;
 
-                    // Only add clips to recording if recordClips is enabled
-                    if (recActive && recordClips) {
-                        recTempScratch[o] += L;
-                        recTempScratch[o + 1] += R;
-                    }
-                }
-            } else {
-                for (ma_uint32 f = 0; f < availFrames; ++f) {
-                    const float L = clip[f * 2] * clipGain;
-                    const float R = clip[f * 2 + 1] * clipGain;
-                    const float mono = (L + R) * 0.5f;
-
-                    const ma_uint32 o = f * playbackChannels;
-                    for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) {
-                        out[o + ch] += mono;
                         // Only add clips to recording if recordClips is enabled
-                        if (recActive && recordClips)
-                            recTempScratch[o + ch] += mono;
+                        if (recActive && recordClips) {
+                            recTempScratch[o] += L;
+                            recTempScratch[o + 1] += R;
+                        }
+                    }
+                } else {
+                    for (ma_uint32 f = 0; f < availFrames; ++f) {
+                        const float L = clip[f * 2] * clipGain;
+                        const float R = clip[f * 2 + 1] * clipGain;
+                        const float mono = (L + R) * 0.5f;
+
+                        const ma_uint32 o = f * playbackChannels;
+                        for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) {
+                            out[o + ch] += mono;
+                            // Only add clips to recording if recordClips is enabled
+                            if (recActive && recordClips)
+                                recTempScratch[o + ch] += mono;
+                        }
                     }
                 }
             }
@@ -1875,6 +1879,13 @@ void AudioEngine::setClipStartPosition(int slotId, double positionMs)
 
     long long frames = (long long)(diffMs * sr / 1000.0);
     clips[slotId].playbackFrameCount.store(frames, std::memory_order_relaxed);
+}
+
+void AudioEngine::setClipMonitorOnly(int slotId, bool monitorOnly)
+{
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return;
+    clips[slotId].monitorOnly.store(monitorOnly, std::memory_order_relaxed);
 }
 
 bool AudioEngine::isClipPlaying(int slotId) const

@@ -153,6 +153,7 @@ public:
     void setClipTrim(int slotId, double startMs, double endMs);
     void seekClip(int slotId, double positionMs);
     void setClipStartPosition(int slotId, double positionMs); // Sets position BEFORE playClip is called
+    void setClipMonitorOnly(int slotId, bool monitorOnly);    // If true, clip plays only on monitor output
 
     bool isClipPlaying(int slotId) const;
     bool isClipPaused(int slotId) const;
@@ -205,6 +206,9 @@ private:
         std::atomic<double> totalDurationMs{0.0};
 
         std::atomic<uint64_t> playToken{0};
+
+        // Monitor-only mode: if true, clip only plays on monitor output (not main)
+        std::atomic<bool> monitorOnly{false};
 
         std::string filePath;
 
