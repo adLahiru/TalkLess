@@ -4008,7 +4008,8 @@ Rectangle {
                                     }
 
                                     // Save the clip with the user-entered title (or auto-generated one)
-                                    const filePath = "file:///" + fileDropArea.droppedFilePath;
+                                    // droppedFilePath already contains the proper file:// URL
+                                    const filePath = fileDropArea.droppedFilePath;
                                     const title = uploadAudioNameInput.text;
 
                                     const success = soundboardService.addClipWithSettings(boardId, filePath, title, uploadWaveform.trimStartMs, uploadWaveform.trimEndMs);

@@ -257,14 +257,14 @@ Rectangle {
             root.isDragHovered = false;
             if (drop.hasUrls && drop.urls.length > 0) {
                 var fileUrl = drop.urls[0].toString();
-                // Remove file:// prefix if present
-                var filePath = fileUrl.replace(/^file:\/\//, "");
-                // Extract filename
-                var fileName = filePath.split("/").pop();
+                // Extract filename from the URL for display
+                var pathPart = fileUrl.replace(/^file:\/\//, "");
+                var fileName = pathPart.split("/").pop();
 
-                root.droppedFilePath = filePath;
+                // Store the original URL with file:// prefix
+                root.droppedFilePath = fileUrl;
                 root.droppedFileName = fileName;
-                root.fileDropped(filePath, fileName);
+                root.fileDropped(fileUrl, fileName);
             }
         }
     }
@@ -290,12 +290,14 @@ Rectangle {
         onAccepted: {
             if (selectedFile) {
                 var fileUrl = selectedFile.toString();
-                var filePath = fileUrl.replace(/^file:\/\//, "");
-                var fileName = filePath.split("/").pop();
+                // Extract filename from the URL for display
+                var pathPart = fileUrl.replace(/^file:\/\//, "");
+                var fileName = pathPart.split("/").pop();
 
-                root.droppedFilePath = filePath;
+                // Store the original URL with file:// prefix
+                root.droppedFilePath = fileUrl;
                 root.droppedFileName = fileName;
-                root.fileDropped(filePath, fileName);
+                root.fileDropped(fileUrl, fileName);
             }
         }
     }
