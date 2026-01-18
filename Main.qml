@@ -300,10 +300,11 @@ ApplicationWindow {
                 onSoundboardSelected: boardId => {
                     // Switch to soundboard view
                     contentStack.currentIndex = 0;
-                    // Don't activate the board - just view it
-                    // Activation should only happen via checkbox
+                    // Set the board ID (can be -1 if no boards exist)
                     clipsModel.boardId = boardId;
-                    clipsModel.reload();
+                    if (boardId >= 0) {
+                        clipsModel.reload();
+                    }
                 }
 
                 // Call internalSoundboardView's open dialog function

@@ -56,6 +56,29 @@ Rectangle {
     signal requestDetach
     signal requestDock
 
+    // Empty state detection - tracks whether soundboards exist
+    property bool hasSoundboards: soundboardsModel ? soundboardsModel.rowCount() > 0 : false
+
+    // Function to update hasSoundboards - called after model updates
+    function updateHasSoundboards() {
+        root.hasSoundboards = soundboardsModel ? soundboardsModel.rowCount() > 0 : false;
+        console.log("hasSoundboards updated:", root.hasSoundboards, "count:", soundboardsModel ? soundboardsModel.rowCount() : -1);
+    }
+
+    // Update hasSoundboards reactively when boards change
+    Connections {
+        target: soundboardService
+        function onBoardsChanged() {
+            // Use Qt.callLater to ensure model has finished updating before we check
+            Qt.callLater(root.updateHasSoundboards);
+        }
+    }
+
+    // Also check on component completion
+    Component.onCompleted: {
+        root.updateHasSoundboards();
+    }
+
     // =========================
     // PLAYBACK PROGRESS TIMER
     // =========================
@@ -717,10 +740,120 @@ Rectangle {
         }
     }
 
-    // Main 3-column layout
+    // ============================================
+    // Empty State View - shown when no soundboards exist
+    // ============================================
+    Rectangle {
+        id: emptyStateView
+        anchors.fill: parent
+        visible: !root.hasSoundboards
+        color: Colors.background
+        radius: 10
+
+        ColumnLayout {
+            anchors.centerIn: parent
+            spacing: 24
+            width: Math.min(400, parent.width * 0.6)
+
+            // Icon placeholder
+            Rectangle {
+                Layout.alignment: Qt.AlignHCenter
+                width: 100
+                height: 100
+                radius: 50
+                color: Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.15)
+                border.color: Colors.accent
+                border.width: 2
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "🎵"
+                    font.pixelSize: 48
+                }
+            }
+
+            // Main message
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                text: "No Soundboards"
+                color: Colors.textPrimary
+                font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                font.pixelSize: 28
+                font.weight: Font.DemiBold
+            }
+
+            // Secondary message
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.fillWidth: true
+                text: "Create your first soundboard to start organizing and playing your audio clips"
+                color: Colors.textSecondary
+                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                font.pixelSize: 14
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            // Spacer
+            Item { Layout.preferredHeight: 8 }
+
+            // Add Soundboard button - matching the style from banner
+            Rectangle {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredWidth: 200
+                Layout.preferredHeight: 48
+                radius: 12
+
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+                    GradientStop {
+                        position: 0.0
+                        color: emptyStateAddMouse.containsMouse ? Colors.primaryLight : Colors.primary
+                    }
+                    GradientStop {
+                        position: 1.0
+                        color: emptyStateAddMouse.containsMouse ? Colors.secondary : "#D214FD"
+                    }
+                }
+
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 8
+
+                    Text {
+                        text: "+"
+                        color: Colors.textOnPrimary
+                        font.pixelSize: 18
+                        font.weight: Font.Medium
+                    }
+
+                    Text {
+                        text: "Add Soundboard"
+                        color: Colors.textOnPrimary
+                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                        font.pixelSize: 15
+                        font.weight: Font.Medium
+                    }
+                }
+
+                MouseArea {
+                    id: emptyStateAddMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        addSoundboardDialog.open();
+                    }
+                }
+            }
+        }
+    }
+
+    // Main 3-column layout - hidden when no soundboards
     RowLayout {
         anchors.fill: parent
         spacing: 15
+        visible: root.hasSoundboards
 
         // LEFT COLUMN: Banner and Content Area
         ColumnLayout {
@@ -1363,6 +1496,14 @@ Rectangle {
                                     playbackProgress: progressUpdateTimer.clipProgressMap[clipWrapper.clipId] || 0.0
                                     filePath: clipWrapper.filePath
                                     currentBoardId: activeClipsModel.boardId
+                                    // Check if the current board is active (can play clips)
+                                    isBoardActive: soundboardService ? soundboardService.isBoardActive(activeClipsModel.boardId) : true
+
+                                    onInactiveBoardClicked: {
+                                        // Show toast notification when trying to play clip in inactive soundboard
+                                        errorNotificationText.text = "To play this clip, first activate this soundboard";
+                                        errorNotificationPopup.open();
+                                    }
 
                                     onClicked: {
                                         // Selecting the clip updates the sidebar

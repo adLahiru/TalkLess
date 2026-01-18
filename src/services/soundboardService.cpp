@@ -26,13 +26,8 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
     // 1) Load index (might not exist) - BEFORE starting audio to apply saved devices
     m_state = m_repo.loadIndex();
 
-    // 2) First launch: no boards -> create one
-    if (m_state.soundboards.isEmpty()) {
-        int id = m_repo.createBoard("Default"); // creates board_1.json and updates index
-        m_state = m_repo.loadIndex();
-        m_state.activeBoardIds.insert(id);
-        m_indexDirty = true; // Mark as dirty instead of immediate save
-    }
+    // 2) First launch with no boards is now allowed (user can have empty state)
+    // No automatic Default board creation - users create their own boards
 
     // 3) Activate all saved active boards
     if (m_state.activeBoardIds.isEmpty() && !m_state.soundboards.isEmpty()) {
@@ -1829,6 +1824,10 @@ int SoundboardService::createBoardWithArtwork(const QString& name, const QString
 
     // Reload index in memory and notify UI
     m_state = m_repo.loadIndex();
+
+    // Auto-activate the newly created board
+    activate(id);
+
     emit boardsChanged();
 
     return id;
@@ -1874,9 +1873,7 @@ bool SoundboardService::renameBoard(int boardId, const QString& newName)
 
 bool SoundboardService::deleteBoard(int boardId)
 {
-    // Don't allow deleting the last board
-    if (m_state.soundboards.size() <= 1)
-        return false;
+    // Allow deleting all boards - app can run with empty soundboards list
 
     // If deleting an active board, deactivate it first
     if (m_activeBoards.contains(boardId)) {

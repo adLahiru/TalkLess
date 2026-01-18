@@ -28,6 +28,7 @@ Item {
     property real playbackProgress: 0.0  // 0.0 to 1.0 for progress display
     property string filePath: ""  // File path for cross-soundboard operations
     property int currentBoardId: -1  // Current board ID to identify source board
+    property bool isBoardActive: true  // Whether the current board is active (can play clips)
 
     // hover state
     property bool tileHover: false
@@ -47,6 +48,7 @@ Item {
     signal deleteClicked
     signal editClicked
     signal webClicked
+    signal inactiveBoardClicked  // Emitted when clicking clip in inactive soundboard
 
     // =========================
     // Auto close timer
@@ -609,6 +611,12 @@ Item {
             }
 
             onClicked: function (mouse) {
+                // Check if board is active before playing
+                if (!root.isBoardActive) {
+                    root.inactiveBoardClicked();
+                    root.showActions = false;
+                    return;
+                }
                 root.clicked();
                 root.playClicked();
                 root.showActions = false;

@@ -856,8 +856,32 @@ Rectangle {
                     text: "Delete"
                     onClicked: () => {
                         console.log("Deleting board:", deleteConfirmDialog.boardIdToDelete);
-                        const result = soundboardService.deleteBoard(deleteConfirmDialog.boardIdToDelete);
+                        const boardToDelete = deleteConfirmDialog.boardIdToDelete;
+                        const wasSelectedBoard = (root.selectedBoardId === boardToDelete);
+                        
+                        const result = soundboardService.deleteBoard(boardToDelete);
                         console.log("Delete result:", result);
+                        
+                        if (result && wasSelectedBoard) {
+                            // Board was deleted - need to select another or show empty state
+                            // Wait for model to update, then select first available board
+                            Qt.callLater(function() {
+                                const count = soundboardsModel ? soundboardsModel.rowCount() : 0;
+                                if (count > 0) {
+                                    // Select the first remaining board
+                                    const firstBoardId = soundboardsModel.data(soundboardsModel.index(0, 0), 256); // IdRole = 256
+                                    if (firstBoardId !== undefined && firstBoardId >= 0) {
+                                        root.selectedBoardId = firstBoardId;
+                                        root.soundboardSelected(firstBoardId);
+                                    }
+                                } else {
+                                    // No more boards - clear selection
+                                    root.selectedBoardId = -1;
+                                    root.soundboardSelected(-1);
+                                }
+                            });
+                        }
+                        
                         // Model automatically reloads via boardsChanged signal
                         deleteConfirmDialog.close();
                     }
