@@ -93,7 +93,7 @@ ApplicationWindow {
     // Bind to apiClient state
     property bool isLoggedIn: apiClient.isLoggedIn
     property string userDisplayName: apiClient.displayName
-    
+
     // ---- Asset Loading State ----
     // Show loading splash while preloading audio clips and waveforms
     property bool isLoadingAssets: false
@@ -137,20 +137,20 @@ ApplicationWindow {
         function onSessionInvalid() {
             console.log("[Main] No valid session, showing login");
         }
-        
+
         function onLoginSuccess() {
             console.log("[Main] Login success, starting asset loading");
             mainWindow.startAssetLoading();
         }
     }
-    
+
     // Function to start asset preloading
     function startAssetLoading() {
         isLoadingAssets = true;
         loadingStatus = "Preparing your soundboard...";
         assetLoadingTimer.start();
     }
-    
+
     // Timer to perform asset loading in steps
     Timer {
         id: assetLoadingTimer
@@ -169,7 +169,7 @@ ApplicationWindow {
             waveformLoadingTimer.start();
         }
     }
-    
+
     Timer {
         id: waveformLoadingTimer
         interval: 200
@@ -183,7 +183,7 @@ ApplicationWindow {
             finishLoadingTimer.start();
         }
     }
-    
+
     Timer {
         id: finishLoadingTimer
         interval: 800  // Allow time for waveform caching
@@ -195,7 +195,7 @@ ApplicationWindow {
             hideSplashTimer.start();
         }
     }
-    
+
     Timer {
         id: hideSplashTimer
         interval: 300
@@ -303,6 +303,16 @@ ApplicationWindow {
                     clipsModel.reload();
                 }
 
+                // Sync sidebar selection when clipsModel board changes
+                Connections {
+                    target: clipsModel
+                    function onBoardIdChanged() {
+                        if (sidebar.selectedBoardId !== clipsModel.boardId) {
+                            sidebar.selectedBoardId = clipsModel.boardId;
+                        }
+                    }
+                }
+
                 // Call internalSoundboardView's open dialog function
                 onAddSoundboardClicked: {
                     contentStack.currentIndex = 0; // Ensure soundboard view is visible
@@ -355,6 +365,14 @@ ApplicationWindow {
                                 if (currentBoardId >= 0) {
                                     mainWindow.dockBoard(currentBoardId);
                                 }
+                            }
+                            onRequestOpenBoard: boardId => {
+                                console.log("Main Window switching to board:", boardId);
+                                if (clipsModel.boardId !== boardId) {
+                                    clipsModel.boardId = boardId;
+                                    clipsModel.reload();
+                                }
+                                sidebar.selectedBoardId = boardId;
                             }
                         }
 
@@ -419,8 +437,6 @@ ApplicationWindow {
                         Layout.fillHeight: true
                     }
 
-
-
                     // Application Settings
                     ApplicationSettingsView {}
 
@@ -447,7 +463,7 @@ ApplicationWindow {
         z: 950  // Above main content, below toast
         visible: isLoggedIn && isLoadingAssets
         color: Colors.background
-        
+
         // Splash background image
         Image {
             anchors.fill: parent
@@ -455,12 +471,12 @@ ApplicationWindow {
             fillMode: Image.PreserveAspectCrop
             opacity: 0.3
         }
-        
+
         // Center loading content
         Column {
             anchors.centerIn: parent
             spacing: 24
-            
+
             // App Logo/Title
             Text {
                 text: "TalkLess"
@@ -469,7 +485,7 @@ ApplicationWindow {
                 color: Colors.textPrimary
                 anchors.horizontalCenter: parent.horizontalCenter
             }
-            
+
             // Loading spinner
             BusyIndicator {
                 id: loadingSpinner
@@ -478,7 +494,7 @@ ApplicationWindow {
                 width: 48
                 height: 48
             }
-            
+
             // Loading status text
             Text {
                 text: mainWindow.loadingStatus
@@ -487,11 +503,14 @@ ApplicationWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
             }
         }
-        
+
         // Fade in animation
         opacity: visible ? 1 : 0
         Behavior on opacity {
-            NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
+            NumberAnimation {
+                duration: 200
+                easing.type: Easing.OutQuad
+            }
         }
     }
 

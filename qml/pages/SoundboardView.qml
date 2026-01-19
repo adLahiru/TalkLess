@@ -70,6 +70,7 @@ Rectangle {
         }
     }
 
+    signal requestOpenBoard(int boardId)
     signal requestDetach
     signal requestDock
 
@@ -2652,7 +2653,7 @@ Rectangle {
                     DropdownSelector {
                         id: recordingBoardDropdown
                         Layout.fillWidth: true
-                        placeholder: "Select Soundboard"
+                        placeholder: activeClipsModel.boardName !== "" ? activeClipsModel.boardName : "Select Soundboard"
                         selectedId: ""     // keep as string for your dropdown component
                         model: []
                         visible: !(soundboardService?.isRecording ?? false) && (soundboardService?.lastRecordingPath ?? "") !== ""
@@ -2674,13 +2675,22 @@ Rectangle {
                         onAboutToOpen: refreshBoards()
                     }
 
-                    // If user changes boards elsewhere, keep default synced (only when user hasn't picked manually)
+                    // If user changes boards elsewhere, keep default synced
                     Connections {
                         target: activeClipsModel
                         function onBoardIdChanged() {
-                            if (recordingBoardDropdown.selectedId === "" || recordingBoardDropdown.selectedId === "-1") {
+                            // Always sync dropdown with currently displayed board
+                            if (activeClipsModel.boardId >= 0) {
                                 recordingBoardDropdown.selectedId = String(activeClipsModel.boardId);
                             }
+                        }
+                    }
+
+                    // Refresh dropdown list when boards are added/removed
+                    Connections {
+                        target: soundboardService
+                        function onBoardsChanged() {
+                            recordingBoardDropdown.refreshBoards();
                         }
                     }
 
@@ -2833,7 +2843,16 @@ Rectangle {
 
                                     if (success) {
                                         console.log("Clip added successfully");
-                                        activeClipsModel.reload();
+
+                                        // Switch to the target board if we saved to a different one
+                                        if (activeClipsModel.boardId !== boardId) {
+                                            console.log("Requesting switch to board:", boardId);
+                                            root.requestOpenBoard(boardId);
+                                        } else {
+                                            console.log("Reloading current board");
+                                            activeClipsModel.reload();
+                                        }
+
                                         recordingNameInput.text = "";
                                         rightSidebar.currentTabIndex = 0;
                                     } else {

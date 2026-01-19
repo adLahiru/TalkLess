@@ -44,11 +44,9 @@ bool FFmpegDecoder::open(const std::string& filePath, uint32_t targetSampleRate,
     m_outChannels = targetChannels;
 
     // Open input file
-    m_formatCtx = avformat_alloc_context();
-    if (!m_formatCtx) {
-        std::cerr << "[FFmpegDecoder] Failed to allocate format context\n";
-        return false;
-    }
+    m_formatCtx = nullptr;
+    // avformat_open_input will allocate the context
+
 
     int ret = avformat_open_input(&m_formatCtx, filePath.c_str(), nullptr, nullptr);
     if (ret < 0) {
