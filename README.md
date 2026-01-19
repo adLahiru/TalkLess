@@ -2,6 +2,9 @@
 
 A professional QML-based desktop application for audio management.
 
+[Google Sheet](https://docs.google.com/spreadsheets/d/1yLLl4yFHamAfShAAs_-jl8tXqywzu6mH7ha1gYALAAk/edit?usp=sharing)
+[Figma Design](https://www.figma.com/design/0H4klE3fXFLfGp2vxHqfAj/Talkless?node-id=0-1&t=Rj7MLONXbXxTxcjj-1)
+
 ## Project Structure
 
 ```
