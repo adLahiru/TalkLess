@@ -349,6 +349,8 @@ bool FFmpegDecoder::canDecode(const std::string& filePath) {
 
 #else // TALKLESS_HAS_FFMPEG == 0
 
+#include <iostream>
+
 // Stub implementations when FFmpeg is not available
 FFmpegDecoder::FFmpegDecoder() = default;
 FFmpegDecoder::~FFmpegDecoder() = default;
