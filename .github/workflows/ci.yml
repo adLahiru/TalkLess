@@ -83,7 +83,7 @@ jobs:
           version: ${{ env.QT_VERSION }}
           host: 'windows'
           target: 'desktop'
-          arch: 'win64_msvc2019_64'
+          arch: 'win64_msvc2022_64'
           modules: 'qtmultimedia qtshadertools'
           cache: true
           set-env: true
