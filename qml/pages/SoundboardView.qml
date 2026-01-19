@@ -3844,42 +3844,68 @@ Rectangle {
                     }
                 }
 
-                // Add Tab Content (Tab 1)
-                ColumnLayout {
-                    id: uploadTab
+                // Add Tab Content (Tab 1) - Wrapped in Item for loading overlay
+                Item {
+                    id: uploadTabContainer
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    spacing: 6
                     visible: rightSidebar.currentTabIndex === 1
 
-                    // Preview playback position tracking
-                    property real uploadPreviewPlaybackTime: 0
+                    // Waveform loading state
+                    property bool isLoadingWaveform: false
+                    property string pendingWaveformPath: ""
 
-                    // Timer to poll preview playback position
+                    // Timer to defer waveform loading (allows UI to update first)
                     Timer {
-                        id: uploadPreviewPlayheadTimer
-                        interval: 50
-                        repeat: true
-                        running: soundboardService?.isFilePreviewPlaying ?? false
+                        id: uploadWaveformLoadTimer
+                        interval: 50  // Small delay to let UI render loading state
+                        repeat: false
                         onTriggered: {
-                            uploadTab.uploadPreviewPlaybackTime = soundboardService?.getPreviewPlaybackPositionMs() ?? 0;
-                        }
-                        onRunningChanged: {
-                            if (!running) {
-                                uploadTab.uploadPreviewPlaybackTime = 0;
+                            if (uploadTabContainer.pendingWaveformPath !== "") {
+                                console.log("Loading waveform for:", uploadTabContainer.pendingWaveformPath);
+                                const peaks = soundboardService.getWaveformPeaks(uploadTabContainer.pendingWaveformPath, 60);
+                                if (peaks && peaks.length > 0) {
+                                    uploadWaveform.waveformData = peaks;
+                                }
+                                uploadTabContainer.pendingWaveformPath = "";
+                                uploadTabContainer.isLoadingWaveform = false;
                             }
                         }
                     }
 
-                    onVisibleChanged: {
-                        if (!visible) {
-                            uploadAudioNameInput.focus = false;
-                            // Stop any preview when leaving tab
-                            if (soundboardService?.isFilePreviewPlaying) {
-                                soundboardService.stopFilePreview();
+                    ColumnLayout {
+                        id: uploadTab
+                        anchors.fill: parent
+                        spacing: 6
+
+                        // Preview playback position tracking
+                        property real uploadPreviewPlaybackTime: 0
+
+                        // Timer to poll preview playback position
+                        Timer {
+                            id: uploadPreviewPlayheadTimer
+                            interval: 50
+                            repeat: true
+                            running: soundboardService?.isFilePreviewPlaying ?? false
+                            onTriggered: {
+                                uploadTab.uploadPreviewPlaybackTime = soundboardService?.getPreviewPlaybackPositionMs() ?? 0;
+                            }
+                            onRunningChanged: {
+                                if (!running) {
+                                    uploadTab.uploadPreviewPlaybackTime = 0;
+                                }
                             }
                         }
-                    }
+
+                        onVisibleChanged: {
+                            if (!visible) {
+                                uploadAudioNameInput.focus = false;
+                                // Stop any preview when leaving tab
+                                if (soundboardService?.isFilePreviewPlaying) {
+                                    soundboardService.stopFilePreview();
+                                }
+                            }
+                        }
 
                     // Name Audio File Section
                     ColumnLayout {
@@ -4009,11 +4035,10 @@ Rectangle {
                             fileDuration = soundboardService.getFileDuration(filePath);
                             console.log("File duration detected:", fileDuration);
 
-                            // Get waveform data (60 bars to match visual design)
-                            const peaks = soundboardService.getWaveformPeaks(filePath, 60);
-                            if (peaks && peaks.length > 0) {
-                                uploadWaveform.waveformData = peaks;
-                            }
+                            // Defer waveform loading to avoid UI freeze
+                            uploadTabContainer.isLoadingWaveform = true;
+                            uploadTabContainer.pendingWaveformPath = filePath;
+                            uploadWaveformLoadTimer.start();
                         }
 
                         onFileCleared: {
@@ -4250,6 +4275,74 @@ Rectangle {
                     Item {
                         Layout.fillHeight: true
                     }
+                }
+
+                // Loading overlay for waveform processing
+                Rectangle {
+                    id: waveformLoadingOverlay
+                    anchors.fill: parent
+                    color: Qt.rgba(0, 0, 0, 0.7)
+                    visible: uploadTabContainer.isLoadingWaveform
+                    z: 100
+
+                    // Block mouse events while loading
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                    }
+
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 16
+
+                        // Spinner animation
+                        Rectangle {
+                            id: spinnerContainer
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: 48
+                            height: 48
+                            color: "transparent"
+
+                            Rectangle {
+                                id: spinnerArc
+                                anchors.centerIn: parent
+                                width: 40
+                                height: 40
+                                radius: width / 2
+                                color: "transparent"
+                                border.width: 4
+                                border.color: Colors.accent
+
+                                // Create spinning effect with rotation
+                                RotationAnimator on rotation {
+                                    from: 0
+                                    to: 360
+                                    duration: 1000
+                                    loops: Animation.Infinite
+                                    running: waveformLoadingOverlay.visible
+                                }
+
+                                // Gradient mask to create arc effect
+                                Rectangle {
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    anchors.bottom: parent.verticalCenter
+                                    width: parent.width / 2 + 4
+                                    color: Qt.rgba(0, 0, 0, 0.7)
+                                }
+                            }
+                        }
+
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "Loading waveform..."
+                            color: Colors.textOnPrimary
+                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                            font.pixelSize: 14
+                            font.weight: Font.Medium
+                        }
+                    }
+                }
                 }
 
                 // Teleprompter Tab Content (Tab 3)
