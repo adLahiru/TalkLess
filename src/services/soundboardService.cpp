@@ -21,6 +21,8 @@
 
 #include <cmath>
 
+#include "ffmpeg_decoder.h"
+
 // Helper function to sanitize file paths, especially for Windows where file:// URL
 // conversion can leave a leading slash before drive letters (e.g., "/C:/path" -> "C:/path")
 static QString sanitizeFilePath(const QString& path)
@@ -2710,20 +2712,37 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
         return result;
     }
 
-    // Use miniaudio to read the file peaks
-    // Create a decoder to read the audio file
+    // Try miniaudio first, then fallback to FFmpeg for unsupported formats (like Opus)
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, 48000);
     ma_decoder decoder;
+    bool usingMiniaudio = false;
+    FFmpegDecoder ffmpegDec;
 
-    if (ma_decoder_init_file(localPath.toUtf8().constData(), &cfg, &decoder) != MA_SUCCESS) {
-        return result;
+    if (ma_decoder_init_file(localPath.toUtf8().constData(), &cfg, &decoder) == MA_SUCCESS) {
+        usingMiniaudio = true;
+    } else {
+        // Try FFmpeg as fallback (for Opus, etc.)
+        qDebug() << "getWaveformPeaks: miniaudio failed, trying FFmpeg for:" << localPath;
+        if (!ffmpegDec.open(localPath.toStdString(), 48000, 2)) {
+            qDebug() << "getWaveformPeaks: Both miniaudio and FFmpeg failed for:" << localPath;
+            return result;
+        }
+        qDebug() << "getWaveformPeaks: FFmpeg decoder opened successfully";
     }
 
     // Get total frames
     ma_uint64 totalFrames = 0;
-    if (ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames) != MA_SUCCESS || totalFrames == 0) {
-        ma_decoder_uninit(&decoder);
-        return result;
+    if (usingMiniaudio) {
+        if (ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames) != MA_SUCCESS || totalFrames == 0) {
+            ma_decoder_uninit(&decoder);
+            return result;
+        }
+    } else {
+        totalFrames = ffmpegDec.getLengthInPcmFrames();
+        if (totalFrames == 0) {
+            ffmpegDec.close();
+            return result;
+        }
     }
 
     // Calculate frames per bar
@@ -2742,7 +2761,15 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
     for (int bar = 0; bar < numBars; ++bar) {
         // Seek to the start of this bar's segment
         ma_uint64 startFrame = (ma_uint64)bar * framesPerBar;
-        if (ma_decoder_seek_to_pcm_frame(&decoder, startFrame) != MA_SUCCESS) {
+        bool seekOk = false;
+        
+        if (usingMiniaudio) {
+            seekOk = (ma_decoder_seek_to_pcm_frame(&decoder, startFrame) == MA_SUCCESS);
+        } else {
+            seekOk = ffmpegDec.seekToPcmFrame(startFrame);
+        }
+        
+        if (!seekOk) {
             peaks.append(0.1f);
             continue;
         }
@@ -2754,9 +2781,16 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
             ma_uint64 framesToRead = std::min((ma_uint64)kBufferSize, framesRemaining);
             ma_uint64 framesRead = 0;
 
-            if (ma_decoder_read_pcm_frames(&decoder, buffer, framesToRead, &framesRead) != MA_SUCCESS ||
-                framesRead == 0) {
-                break;
+            if (usingMiniaudio) {
+                if (ma_decoder_read_pcm_frames(&decoder, buffer, framesToRead, &framesRead) != MA_SUCCESS ||
+                    framesRead == 0) {
+                    break;
+                }
+            } else {
+                framesRead = ffmpegDec.readPcmFrames(buffer, framesToRead);
+                if (framesRead == 0) {
+                    break;
+                }
             }
 
             // Find max amplitude in this chunk (stereo - 2 channels)
@@ -2774,7 +2808,12 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
             globalMaxPeak = maxPeak;
     }
 
-    ma_decoder_uninit(&decoder);
+    // Clean up
+    if (usingMiniaudio) {
+        ma_decoder_uninit(&decoder);
+    } else {
+        ffmpegDec.close();
+    }
 
     // Normalize peaks to 0.1 - 1.0 range
     for (int i = 0; i < peaks.size(); ++i) {

@@ -56,6 +56,8 @@ qt_add_executable(appTalkLess
     src/audioEngine.h
     src/audioEngine.cpp
     src/miniaudio_impl.cpp
+    src/ffmpeg_decoder.h
+    src/ffmpeg_decoder.cpp
 
     # Controllers
     src/controllers/hotkeymanager.h
@@ -224,40 +226,71 @@ target_link_libraries(appTalkLess PRIVATE
 )
 
 # ----------------------------
-# FFmpeg (optional)
+# FFmpeg (optional, via vcpkg)
 # ----------------------------
 option(TALKLESS_ENABLE_FFMPEG "Enable FFmpeg integration" ON)
-set(FFMPEG_ROOT "${CMAKE_SOURCE_DIR}/lib/ffmpeg" CACHE PATH "FFmpeg root (include/, lib/ or bin/)")
 
 if(TALKLESS_ENABLE_FFMPEG)
-    set(_ffmpeg_lib_paths
-        "${FFMPEG_ROOT}/lib"
-        "${FFMPEG_ROOT}/lib64"
-        "${FFMPEG_ROOT}/bin"
-    )
+    # Try vcpkg installed location first
+    set(_vcpkg_ffmpeg_include "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/include")
+    set(_vcpkg_ffmpeg_lib "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/lib")
+    
+    # Also try FFMPEG_ROOT if specified
+    set(FFMPEG_ROOT "" CACHE PATH "FFmpeg root (optional, uses vcpkg by default)")
+    
+    # Build search paths
+    set(_ffmpeg_include_paths ${_vcpkg_ffmpeg_include})
+    set(_ffmpeg_lib_paths ${_vcpkg_ffmpeg_lib})
+    
+    if(FFMPEG_ROOT)
+        list(PREPEND _ffmpeg_include_paths "${FFMPEG_ROOT}/include")
+        list(PREPEND _ffmpeg_lib_paths "${FFMPEG_ROOT}/lib" "${FFMPEG_ROOT}/lib64" "${FFMPEG_ROOT}/bin")
+    endif()
 
     find_library(FFMPEG_AVFORMAT_LIB   NAMES avformat   libavformat   PATHS ${_ffmpeg_lib_paths} NO_DEFAULT_PATH)
     find_library(FFMPEG_AVCODEC_LIB    NAMES avcodec    libavcodec    PATHS ${_ffmpeg_lib_paths} NO_DEFAULT_PATH)
     find_library(FFMPEG_AVUTIL_LIB     NAMES avutil     libavutil     PATHS ${_ffmpeg_lib_paths} NO_DEFAULT_PATH)
     find_library(FFMPEG_SWRESAMPLE_LIB NAMES swresample libswresample PATHS ${_ffmpeg_lib_paths} NO_DEFAULT_PATH)
 
-    if(FFMPEG_AVFORMAT_LIB AND FFMPEG_AVCODEC_LIB AND FFMPEG_AVUTIL_LIB AND FFMPEG_SWRESAMPLE_LIB
-       AND EXISTS "${FFMPEG_ROOT}/include")
-        target_include_directories(appTalkLess PRIVATE "${FFMPEG_ROOT}/include")
-        target_link_libraries(appTalkLess PRIVATE
-            ${FFMPEG_AVFORMAT_LIB}
-            ${FFMPEG_AVCODEC_LIB}
-            ${FFMPEG_AVUTIL_LIB}
-            ${FFMPEG_SWRESAMPLE_LIB}
-        )
-        target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_FFMPEG=1)
+    # Check if we found everything
+    if(FFMPEG_AVFORMAT_LIB AND FFMPEG_AVCODEC_LIB AND FFMPEG_AVUTIL_LIB AND FFMPEG_SWRESAMPLE_LIB)
+        # Find include directory
+        foreach(_inc_path ${_ffmpeg_include_paths})
+            if(EXISTS "${_inc_path}/libavcodec/avcodec.h")
+                set(FFMPEG_INCLUDE_DIR "${_inc_path}")
+                break()
+            endif()
+        endforeach()
+        
+        if(FFMPEG_INCLUDE_DIR)
+            message(STATUS "Found FFmpeg:")
+            message(STATUS "  Include: ${FFMPEG_INCLUDE_DIR}")
+            message(STATUS "  avformat: ${FFMPEG_AVFORMAT_LIB}")
+            message(STATUS "  avcodec: ${FFMPEG_AVCODEC_LIB}")
+            message(STATUS "  avutil: ${FFMPEG_AVUTIL_LIB}")
+            message(STATUS "  swresample: ${FFMPEG_SWRESAMPLE_LIB}")
+            
+            target_include_directories(appTalkLess PRIVATE "${FFMPEG_INCLUDE_DIR}")
+            target_link_libraries(appTalkLess PRIVATE
+                ${FFMPEG_AVFORMAT_LIB}
+                ${FFMPEG_AVCODEC_LIB}
+                ${FFMPEG_AVUTIL_LIB}
+                ${FFMPEG_SWRESAMPLE_LIB}
+            )
+            target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_FFMPEG=1)
+        else()
+            message(WARNING "FFmpeg headers not found. Continuing without FFmpeg support.")
+            target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_FFMPEG=0)
+        endif()
     else()
         message(WARNING
-            "FFmpeg not found under FFMPEG_ROOT='${FFMPEG_ROOT}'. Continuing without FFmpeg. "
-            "Either fix the path/put MSVC .lib files in lib/ or configure with -DTALKLESS_ENABLE_FFMPEG=OFF."
+            "FFmpeg libraries not found. Searched in: ${_ffmpeg_lib_paths}. "
+            "Continuing without FFmpeg. For Opus/OGG support, ensure FFmpeg is installed via vcpkg."
         )
         target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_FFMPEG=0)
     endif()
+else()
+    target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_FFMPEG=0)
 endif()
 
 # ----------------------------

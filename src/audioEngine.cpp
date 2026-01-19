@@ -14,6 +14,8 @@
 #include <iostream>
 #include <thread>
 
+#include "ffmpeg_decoder.h"
+
 #ifdef _WIN32
 #include <windows.h>
 
@@ -1480,26 +1482,54 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, engine->m_sampleRate);
     ma_decoder dec;
+    bool usingMiniaudio = false;
+    FFmpegDecoder ffmpegDec;
+
 #ifdef _WIN32
     std::wstring wpath = utf8ToWide(filepath);
-    if (ma_decoder_init_file_w(wpath.c_str(), &cfg, &dec) != MA_SUCCESS) {
+    if (ma_decoder_init_file_w(wpath.c_str(), &cfg, &dec) == MA_SUCCESS) {
+        usingMiniaudio = true;
+    }
 #else
-    if (ma_decoder_init_file(filepath.c_str(), &cfg, &dec) != MA_SUCCESS) {
+    if (ma_decoder_init_file(filepath.c_str(), &cfg, &dec) == MA_SUCCESS) {
+        usingMiniaudio = true;
+    }
 #endif
-        slot->state.store(ClipState::Stopped, std::memory_order_release);
-        std::lock_guard<std::mutex> lock(engine->callbackMutex);
-        if (engine->clipErrorCallback)
-            engine->clipErrorCallback(slotId);
-        return;
+
+    // If miniaudio failed, try FFmpeg as fallback (for Opus, etc.)
+    if (!usingMiniaudio) {
+        std::cout << "[AudioEngine] miniaudio failed for: " << filepath << ", trying FFmpeg...\n";
+        if (ffmpegDec.open(filepath, engine->m_sampleRate, 2)) {
+            std::cout << "[AudioEngine] FFmpeg decoder opened successfully\n";
+        } else {
+            std::cerr << "[AudioEngine] Both miniaudio and FFmpeg failed for: " << filepath << "\n";
+            slot->state.store(ClipState::Stopped, std::memory_order_release);
+            std::lock_guard<std::mutex> lock(engine->callbackMutex);
+            if (engine->clipErrorCallback)
+                engine->clipErrorCallback(slotId);
+            return;
+        }
     }
 
-    slot->sampleRate.store((int)dec.outputSampleRate, std::memory_order_relaxed);
-    slot->channels.store((int)dec.outputChannels, std::memory_order_relaxed);
+    // Set sample rate and channels based on which decoder is being used
+    if (usingMiniaudio) {
+        slot->sampleRate.store((int)dec.outputSampleRate, std::memory_order_relaxed);
+        slot->channels.store((int)dec.outputChannels, std::memory_order_relaxed);
+    } else {
+        slot->sampleRate.store((int)ffmpegDec.getSampleRate(), std::memory_order_relaxed);
+        slot->channels.store((int)ffmpegDec.getChannels(), std::memory_order_relaxed);
+    }
+
+    const uint32_t decoderSampleRate = usingMiniaudio ? dec.outputSampleRate : ffmpegDec.getSampleRate();
 
     double startMs = slot->trimStartMs.load(std::memory_order_relaxed);
     if (startMs > 0.0) {
-        ma_uint64 startFrame = (ma_uint64)((startMs / 1000.0) * dec.outputSampleRate);
-        ma_decoder_seek_to_pcm_frame(&dec, startFrame);
+        ma_uint64 startFrame = (ma_uint64)((startMs / 1000.0) * decoderSampleRate);
+        if (usingMiniaudio) {
+            ma_decoder_seek_to_pcm_frame(&dec, startFrame);
+        } else {
+            ffmpegDec.seekToPcmFrame(startFrame);
+        }
     }
 
     constexpr ma_uint32 kFrames = 1024;
@@ -1521,13 +1551,26 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 
         double seekMs = slot->seekPosMs.exchange(-1.0, std::memory_order_relaxed);
         if (seekMs >= 0.0) {
-            ma_uint64 target = (ma_uint64)((seekMs / 1000.0) * dec.outputSampleRate);
-            ma_decoder_seek_to_pcm_frame(&dec, target);
+            ma_uint64 target = (ma_uint64)((seekMs / 1000.0) * decoderSampleRate);
+            if (usingMiniaudio) {
+                ma_decoder_seek_to_pcm_frame(&dec, target);
+            } else {
+                ffmpegDec.seekToPcmFrame(target);
+            }
         }
 
         ma_uint64 framesRead = 0;
-        ma_result rr = ma_decoder_read_pcm_frames(&dec, buf, kFrames, &framesRead);
-        if (rr != MA_SUCCESS && rr != MA_AT_END)
+        bool readError = false;
+
+        if (usingMiniaudio) {
+            ma_result rr = ma_decoder_read_pcm_frames(&dec, buf, kFrames, &framesRead);
+            if (rr != MA_SUCCESS && rr != MA_AT_END)
+                readError = true;
+        } else {
+            framesRead = ffmpegDec.readPcmFrames(buf, kFrames);
+        }
+
+        if (readError)
             break;
 
         if (framesRead == 0) {
@@ -1541,8 +1584,12 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
                     break;
 
                 double sMs = slot->trimStartMs.load(std::memory_order_relaxed);
-                ma_uint64 sFrame = (ma_uint64)((sMs / 1000.0) * dec.outputSampleRate);
-                ma_decoder_seek_to_pcm_frame(&dec, sFrame);
+                ma_uint64 sFrame = (ma_uint64)((sMs / 1000.0) * decoderSampleRate);
+                if (usingMiniaudio) {
+                    ma_decoder_seek_to_pcm_frame(&dec, sFrame);
+                } else {
+                    ffmpegDec.seekToPcmFrame(sFrame);
+                }
 
                 slot->playbackFrameCount.store(0, std::memory_order_relaxed);
 
@@ -1560,8 +1607,12 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
         double endMs = slot->trimEndMs.load(std::memory_order_relaxed);
         if (endMs > 0.0) {
             ma_uint64 curFrame = 0;
-            ma_decoder_get_cursor_in_pcm_frames(&dec, &curFrame);
-            ma_uint64 endFrame = (ma_uint64)((endMs / 1000.0) * dec.outputSampleRate);
+            if (usingMiniaudio) {
+                ma_decoder_get_cursor_in_pcm_frames(&dec, &curFrame);
+            } else {
+                curFrame = ffmpegDec.getCursorInPcmFrames();
+            }
+            ma_uint64 endFrame = (ma_uint64)((endMs / 1000.0) * decoderSampleRate);
             if (curFrame >= endFrame) {
                 if (slot->loop.load(std::memory_order_relaxed)) {
                     while (slot->queuedMainFrames.load(std::memory_order_relaxed) > 0) {
@@ -1573,8 +1624,12 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
                         break;
 
                     double sMs = slot->trimStartMs.load(std::memory_order_relaxed);
-                    ma_uint64 sFrame = (ma_uint64)((sMs / 1000.0) * dec.outputSampleRate);
-                    ma_decoder_seek_to_pcm_frame(&dec, sFrame);
+                    ma_uint64 sFrame = (ma_uint64)((sMs / 1000.0) * decoderSampleRate);
+                    if (usingMiniaudio) {
+                        ma_decoder_seek_to_pcm_frame(&dec, sFrame);
+                    } else {
+                        ffmpegDec.seekToPcmFrame(sFrame);
+                    }
 
                     slot->playbackFrameCount.store(0, std::memory_order_relaxed);
 
@@ -1630,7 +1685,12 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
         }
     }
 
-    ma_decoder_uninit(&dec);
+    // Clean up decoder
+    if (usingMiniaudio) {
+        ma_decoder_uninit(&dec);
+    } else {
+        ffmpegDec.close();
+    }
 
     if (naturalEnd) {
         slot->state.store(ClipState::Draining, std::memory_order_release);
@@ -1696,10 +1756,12 @@ std::pair<double, double> AudioEngine::loadClip(int slotId, const std::string& f
     slot.seekPosMs.store(-1.0, std::memory_order_relaxed);
     slot.playbackFrameCount.store(0, std::memory_order_relaxed);
 
-    // duration
+    // duration - try miniaudio first, then FFmpeg as fallback
     double endSec = -1.0;
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, m_sampleRate);
     ma_decoder dec;
+    bool gotDuration = false;
+
 #ifdef _WIN32
     std::wstring wpath = utf8ToWide(filepath);
     ma_result initResult = ma_decoder_init_file_w(wpath.c_str(), &cfg, &dec);
@@ -1712,9 +1774,27 @@ std::pair<double, double> AudioEngine::loadClip(int slotId, const std::string& f
             totalFrames > 0) {
             endSec = (double)totalFrames / (double)dec.outputSampleRate;
             slot.totalDurationMs.store(endSec * 1000.0, std::memory_order_relaxed);
+            gotDuration = true;
         }
         ma_decoder_uninit(&dec);
-    } else {
+    }
+
+    // If miniaudio failed, try FFmpeg (for Opus, etc.)
+    if (!gotDuration) {
+        FFmpegDecoder ffmpegDec;
+        if (ffmpegDec.open(filepath, m_sampleRate, 2)) {
+            uint64_t totalFrames = ffmpegDec.getLengthInPcmFrames();
+            if (totalFrames > 0) {
+                endSec = (double)totalFrames / (double)ffmpegDec.getSampleRate();
+                slot.totalDurationMs.store(endSec * 1000.0, std::memory_order_relaxed);
+                gotDuration = true;
+                std::cout << "[AudioEngine] loadClip: Got duration from FFmpeg: " << endSec << "s\n";
+            }
+            ffmpegDec.close();
+        }
+    }
+
+    if (!gotDuration) {
         return {0.0, 0.0};
     }
 
