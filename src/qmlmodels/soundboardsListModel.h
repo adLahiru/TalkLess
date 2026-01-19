@@ -35,6 +35,7 @@ public:
     Q_INVOKABLE bool activateById(int boardId);
     Q_INVOKABLE bool toggleActiveById(int boardId);  // Toggle active state (for checkbox behavior)
     Q_INVOKABLE int rowForId(int boardId) const;
+    Q_INVOKABLE int getIdAt(int row) const;
 
 
 private slots:

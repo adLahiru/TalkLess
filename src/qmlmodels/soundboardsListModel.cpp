@@ -218,3 +218,10 @@ int SoundboardsListModel::rowForId(int boardId) const
     }
     return -1;
 }
+
+int SoundboardsListModel::getIdAt(int row) const
+{
+    if (row < 0 || row >= m_cache.size())
+        return -1;
+    return m_cache[row].id;
+}

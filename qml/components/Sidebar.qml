@@ -854,8 +854,24 @@ Rectangle {
                     text: "Delete"
                     onClicked: () => {
                         console.log("Deleting board:", deleteConfirmDialog.boardIdToDelete);
+
+                        // Check if we are deleting the currently active/selected board
+                        const wasSelected = (root.selectedBoardId === deleteConfirmDialog.boardIdToDelete);
+
                         const result = soundboardService.deleteBoard(deleteConfirmDialog.boardIdToDelete);
                         console.log("Delete result:", result);
+
+                        // If we deleted the selected board, try to select the first available one
+                        if (result && wasSelected) {
+                            // getIdAt is a helper we added to SoundboardsListModel
+                            const firstId = soundboardsModel.getIdAt(0);
+                            console.log("Deleted selected board. Switching to first available:", firstId);
+
+                            // Update selection
+                            root.selectedBoardId = firstId;
+                            root.soundboardSelected(firstId);
+                        }
+
                         // Model automatically reloads via boardsChanged signal
                         deleteConfirmDialog.close();
                     }
