@@ -257,8 +257,10 @@ Rectangle {
             root.isDragHovered = false;
             if (drop.hasUrls && drop.urls.length > 0) {
                 var fileUrl = drop.urls[0].toString();
-                // Remove file:// prefix if present
-                var filePath = fileUrl.replace(/^file:\/\//, "");
+                // Replace file:/// or file:// prefix and decode URI components (spaces, special chars)
+                var cleanPath = fileUrl.replace(/^(file:\/{2,3})/, "");
+                var filePath = decodeURIComponent(cleanPath);
+
                 // Extract filename
                 var fileName = filePath.split("/").pop();
 

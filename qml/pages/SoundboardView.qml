@@ -3931,57 +3931,57 @@ Rectangle {
                     }
 
                     // Assign to Slot Section
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 5
-                        Layout.rightMargin: 5
-                        spacing: 8
+                    // ColumnLayout {
+                    //     Layout.fillWidth: true
+                    //     Layout.leftMargin: 5
+                    //     Layout.rightMargin: 5
+                    //     spacing: 8
 
-                        Text {
-                            text: "Assign to Slot"
-                            color: Colors.textOnPrimary
-                            font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                            font.pixelSize: 14
-                            font.weight: Font.DemiBold
-                        }
+                    //     Text {
+                    //         text: "Assign to Slot"
+                    //         color: Colors.textOnPrimary
+                    //         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                    //         font.pixelSize: 14
+                    //         font.weight: Font.DemiBold
+                    //     }
 
-                        // Dropdown selector
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 44
-                            color: Colors.surfaceDark
-                            radius: 8
-                            border.color: Colors.border
-                            border.width: 1
+                    //     // Dropdown selector
+                    //     Rectangle {
+                    //         Layout.fillWidth: true
+                    //         Layout.preferredHeight: 44
+                    //         color: Colors.surfaceDark
+                    //         radius: 8
+                    //         border.color: Colors.border
+                    //         border.width: 1
 
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 15
-                                anchors.rightMargin: 15
+                    //         RowLayout {
+                    //             anchors.fill: parent
+                    //             anchors.leftMargin: 15
+                    //             anchors.rightMargin: 15
 
-                                Text {
-                                    text: "Select Available Slot"
-                                    color: Colors.textSecondary
-                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                    font.pixelSize: 13
-                                    Layout.fillWidth: true
-                                }
+                    //             Text {
+                    //                 text: "Select Available Slot"
+                    //                 color: Colors.textSecondary
+                    //                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                    //                 font.pixelSize: 13
+                    //                 Layout.fillWidth: true
+                    //             }
 
-                                // Dropdown arrow
-                                Text {
-                                    text: "▼"
-                                    color: Colors.textSecondary
-                                    font.pixelSize: 10
-                                }
-                            }
+                    //             // Dropdown arrow
+                    //             Text {
+                    //                 text: "▼"
+                    //                 color: Colors.textSecondary
+                    //                 font.pixelSize: 10
+                    //             }
+                    //         }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Slot dropdown clicked")
-                            }
-                        }
-                    }
+                    //         MouseArea {
+                    //             anchors.fill: parent
+                    //             cursorShape: Qt.PointingHandCursor
+                    //             onClicked: console.log("Slot dropdown clicked")
+                    //         }
+                    //     }
+                    // }
 
                     // Spacer
                     Item {
@@ -4008,11 +4008,22 @@ Rectangle {
                             // Get duration for trim preview
                             fileDuration = soundboardService.getFileDuration(filePath);
                             console.log("File duration detected:", fileDuration);
+
+                            // Get waveform data (60 bars to match visual design)
+                            const peaks = soundboardService.getWaveformPeaks(filePath, 60);
+                            if (peaks && peaks.length > 0) {
+                                uploadWaveform.waveformData = peaks;
+                            }
                         }
 
                         onFileCleared: {
                             console.log("File cleared");
                             fileDuration = 0;
+                            uploadAudioNameInput.text = "";
+                            uploadWaveform.waveformData = [];
+                            if (soundboardService?.isFilePreviewPlaying) {
+                                soundboardService.stopFilePreview();
+                            }
                         }
 
                         property real fileDuration: 0
@@ -4144,7 +4155,15 @@ Rectangle {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: console.log("Upload Cancel clicked")
+                                onClicked: {
+                                    console.log("Upload Cancel clicked");
+                                    fileDropArea.droppedFilePath = "";
+                                    fileDropArea.droppedFileName = "";
+                                    uploadAudioNameInput.text = "";
+                                    if (soundboardService?.isFilePreviewPlaying) {
+                                        soundboardService.stopFilePreview();
+                                    }
+                                }
                             }
 
                             Behavior on color {

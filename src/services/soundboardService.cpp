@@ -649,10 +649,7 @@ bool SoundboardService::addClip(int boardId, const QString& filePath)
     if (filePath.isEmpty())
         return false;
 
-    QString localPath = filePath;
-    if (localPath.startsWith("file:")) {
-        localPath = QUrl(localPath).toLocalFile();
-    }
+    QString localPath = sanitizeFilePath(filePath);
 
     Clip draft;
     draft.filePath = localPath;
@@ -681,10 +678,7 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
         Soundboard& board = m_activeBoards[boardId];
 
         for (const QString& filePath : filePaths) {
-            QString localPath = filePath;
-            if (localPath.startsWith("file:")) {
-                localPath = QUrl(localPath).toLocalFile();
-            }
+            QString localPath = sanitizeFilePath(filePath);
             if (localPath.isEmpty())
                 continue;
 
@@ -723,10 +717,7 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
     Soundboard b = *loaded;
 
     for (const QString& filePath : filePaths) {
-        QString localPath = filePath;
-        if (localPath.startsWith("file:")) {
-            localPath = QUrl(localPath).toLocalFile();
-        }
+        QString localPath = sanitizeFilePath(filePath);
         if (localPath.isEmpty())
             continue;
 
@@ -768,10 +759,7 @@ bool SoundboardService::addClipWithTitle(int boardId, const QString& filePath, c
     if (filePath.isEmpty())
         return false;
 
-    QString localPath = filePath;
-    if (localPath.startsWith("file:")) {
-        localPath = QUrl(localPath).toLocalFile();
-    }
+    QString localPath = sanitizeFilePath(filePath);
 
     // Determine base title: use provided title or fall back to filename
     QString baseTitle = title.trimmed().isEmpty() ? QFileInfo(localPath).baseName() : title.trimmed();
@@ -797,10 +785,7 @@ bool SoundboardService::addClipWithSettings(int boardId, const QString& filePath
     if (filePath.isEmpty())
         return false;
 
-    QString localPath = filePath;
-    if (localPath.startsWith("file:")) {
-        localPath = QUrl(localPath).toLocalFile();
-    }
+    QString localPath = sanitizeFilePath(filePath);
 
     // Determine base title: use provided title or fall back to filename
     QString baseTitle = title.trimmed().isEmpty() ? QFileInfo(localPath).baseName() : title.trimmed();
@@ -967,14 +952,7 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
         return false;
 
     // Sanitize file path - convert file:// URL to local path and fix double slashes
-    QString sanitizedPath = draft.filePath;
-    if (sanitizedPath.startsWith("file:")) {
-        sanitizedPath = QUrl(sanitizedPath).toLocalFile();
-    }
-    // Remove any duplicate leading slashes (e.g., "//Users" -> "/Users")
-    while (sanitizedPath.startsWith("//")) {
-        sanitizedPath = sanitizedPath.mid(1);
-    }
+    QString sanitizedPath = sanitizeFilePath(draft.filePath);
 
     // if adding to an active board (in memory)
     if (m_activeBoards.contains(boardId)) {
@@ -2700,10 +2678,7 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
     }
 
     // Convert file URL to local path if necessary
-    QString localPath = filePath;
-    if (localPath.startsWith("file:///")) {
-        localPath = QUrl(filePath).toLocalFile();
-    }
+    QString localPath = sanitizeFilePath(filePath);
 
     qDebug() << "getWaveformPeaks: Checking path:" << localPath;
 
@@ -3382,12 +3357,8 @@ double SoundboardService::getFileDuration(const QString& filePath) const
     if (!m_audioEngine)
         return 0.0;
 
-    QString path = filePath;
-    if (path.startsWith("file:")) {
-        path = QUrl(filePath).toLocalFile();
-    }
-
-    return m_audioEngine->getFileDuration(path.toStdString());
+    QString sanitizedPath = sanitizeFilePath(filePath);
+    return m_audioEngine->getFileDuration(sanitizedPath.toStdString());
 }
 
 QVariantList SoundboardService::playingClipIDs() const
