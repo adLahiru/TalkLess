@@ -1196,12 +1196,7 @@ void AudioEngine::processPlaybackAudio(void* output, ma_uint32 frameCount, ma_ui
                     out[o + ch] += monoBalanced;
             }
 
-            // to recording only when mic recording is enabled (use full gain audio)
-            if (recActive && recordMic) {
-                const ma_uint32 o = f * playbackChannels;
-                for (ma_uint32 ch = 0; ch < playbackChannels; ++ch)
-                    recTempScratch[o + ch] += monoFull;
-            }
+            // NOTE: Main microphone is NOT recorded - only recording input device is used
         }
     }
 
@@ -1265,7 +1260,7 @@ void AudioEngine::processPlaybackAudio(void* output, ma_uint32 frameCount, ma_ui
     }
 
     // --------------------------------------------------------
-    // Recording-input device mono rb (record-only)
+    // Recording-input device mono rb (always recorded when active)
     // --------------------------------------------------------
     if (recActive && recordingInputEnabled.load(std::memory_order_relaxed)) {
         void* pRead = nullptr;
@@ -2114,6 +2109,10 @@ bool AudioEngine::exportTrimmedAudio(const std::string& sourcePath, const std::s
 // ------------------------------------------------------------
 // Recording
 // ------------------------------------------------------------
+// Recording sources:
+// - Recording Input Device: Always recorded when enabled and active
+// - Clips/Soundboard Playback: Optional, controlled by recordPlayback parameter
+// - Main Microphone Input: NOT recorded (recordMic parameter is ignored)
 bool AudioEngine::startRecording(const std::string& outputPath, bool recordMic, bool recordPlayback)
 {
     if (recording.load(std::memory_order_relaxed))
@@ -2122,8 +2121,9 @@ bool AudioEngine::startRecording(const std::string& outputPath, bool recordMic, 
         return false;
 
     // Store recording source settings
-    recordMicEnabled.store(recordMic, std::memory_order_relaxed);
-    recordPlaybackEnabled.store(recordPlayback, std::memory_order_relaxed);
+    // NOTE: recordMic is ignored - main mic is never recorded, only recording input device
+    recordMicEnabled.store(false, std::memory_order_relaxed);  // Main mic never recorded
+    recordPlaybackEnabled.store(recordPlayback, std::memory_order_relaxed);  // Clips optional
 
     // Ensure main devices running so playback callback executes
     if (!deviceRunning.load(std::memory_order_relaxed)) {
