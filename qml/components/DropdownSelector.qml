@@ -268,8 +268,27 @@ Rectangle {
             }
 
             ScrollBar.vertical: ScrollBar {
-                active: flickable.contentHeight > flickable.height
-                policy: flickable.contentHeight > flickable.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                id: verticalScrollBar
+                anchors.right: parent.right
+                anchors.rightMargin: 2
+                visible: flickable.contentHeight > flickable.height
+                active: true
+                policy: ScrollBar.AlwaysOn
+                
+                contentItem: Rectangle {
+                    implicitWidth: 6
+                    implicitHeight: 100
+                    radius: 3
+                    color: verticalScrollBar.pressed ? "#888888" : (verticalScrollBar.hovered ? "#777777" : "#555555")
+                    opacity: 0.8
+                }
+                
+                background: Rectangle {
+                    implicitWidth: 6
+                    radius: 3
+                    color: "#2A2A2A"
+                    opacity: 0.3
+                }
             }
         }
 
