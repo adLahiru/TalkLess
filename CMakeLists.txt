@@ -226,31 +226,62 @@ target_link_libraries(appTalkLess PRIVATE
 )
 
 # ----------------------------
-# FFmpeg (optional, via vcpkg)
+# FFmpeg (optional, via vcpkg, Homebrew, or system)
 # ----------------------------
 option(TALKLESS_ENABLE_FFMPEG "Enable FFmpeg integration" ON)
 
 if(TALKLESS_ENABLE_FFMPEG)
-    # Try vcpkg installed location first
-    set(_vcpkg_ffmpeg_include "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/include")
-    set(_vcpkg_ffmpeg_lib "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/lib")
-    
     # Also try FFMPEG_ROOT if specified
-    set(FFMPEG_ROOT "" CACHE PATH "FFmpeg root (optional, uses vcpkg by default)")
+    set(FFMPEG_ROOT "" CACHE PATH "FFmpeg root (optional, auto-detected by default)")
     
-    # Build search paths
-    set(_ffmpeg_include_paths ${_vcpkg_ffmpeg_include})
-    set(_ffmpeg_lib_paths ${_vcpkg_ffmpeg_lib})
+    # Build search paths based on platform
+    set(_ffmpeg_include_paths "")
+    set(_ffmpeg_lib_paths "")
     
+    # User-specified path first
     if(FFMPEG_ROOT)
-        list(PREPEND _ffmpeg_include_paths "${FFMPEG_ROOT}/include")
-        list(PREPEND _ffmpeg_lib_paths "${FFMPEG_ROOT}/lib" "${FFMPEG_ROOT}/lib64" "${FFMPEG_ROOT}/bin")
+        list(APPEND _ffmpeg_include_paths "${FFMPEG_ROOT}/include")
+        list(APPEND _ffmpeg_lib_paths "${FFMPEG_ROOT}/lib" "${FFMPEG_ROOT}/lib64" "${FFMPEG_ROOT}/bin")
+    endif()
+    
+    if(WIN32)
+        # Windows: vcpkg paths
+        list(APPEND _ffmpeg_include_paths "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/include")
+        list(APPEND _ffmpeg_lib_paths "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/lib")
+    elseif(APPLE)
+        # macOS: Homebrew paths (Apple Silicon and Intel)
+        list(APPEND _ffmpeg_include_paths
+            "/opt/homebrew/include"          # Apple Silicon (M1/M2/M3)
+            "/usr/local/include"             # Intel Macs
+            "${CMAKE_SOURCE_DIR}/vcpkg_installed/arm64-osx/include"
+            "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-osx/include"
+        )
+        list(APPEND _ffmpeg_lib_paths
+            "/opt/homebrew/lib"              # Apple Silicon (M1/M2/M3)
+            "/usr/local/lib"                 # Intel Macs
+            "${CMAKE_SOURCE_DIR}/vcpkg_installed/arm64-osx/lib"
+            "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-osx/lib"
+        )
+    else()
+        # Linux: System paths and vcpkg
+        list(APPEND _ffmpeg_include_paths
+            "/usr/include"
+            "/usr/local/include"
+            "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-linux/include"
+        )
+        list(APPEND _ffmpeg_lib_paths
+            "/usr/lib"
+            "/usr/lib64"
+            "/usr/local/lib"
+            "/usr/local/lib64"
+            "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-linux/lib"
+        )
     endif()
 
-    find_library(FFMPEG_AVFORMAT_LIB   NAMES avformat   libavformat   PATHS ${_ffmpeg_lib_paths} NO_DEFAULT_PATH)
-    find_library(FFMPEG_AVCODEC_LIB    NAMES avcodec    libavcodec    PATHS ${_ffmpeg_lib_paths} NO_DEFAULT_PATH)
-    find_library(FFMPEG_AVUTIL_LIB     NAMES avutil     libavutil     PATHS ${_ffmpeg_lib_paths} NO_DEFAULT_PATH)
-    find_library(FFMPEG_SWRESAMPLE_LIB NAMES swresample libswresample PATHS ${_ffmpeg_lib_paths} NO_DEFAULT_PATH)
+    find_library(FFMPEG_AVFORMAT_LIB   NAMES avformat   libavformat   PATHS ${_ffmpeg_lib_paths})
+    find_library(FFMPEG_AVCODEC_LIB    NAMES avcodec    libavcodec    PATHS ${_ffmpeg_lib_paths})
+    find_library(FFMPEG_AVUTIL_LIB     NAMES avutil     libavutil     PATHS ${_ffmpeg_lib_paths})
+    find_library(FFMPEG_SWRESAMPLE_LIB NAMES swresample libswresample PATHS ${_ffmpeg_lib_paths})
 
     # Check if we found everything
     if(FFMPEG_AVFORMAT_LIB AND FFMPEG_AVCODEC_LIB AND FFMPEG_AVUTIL_LIB AND FFMPEG_SWRESAMPLE_LIB)
