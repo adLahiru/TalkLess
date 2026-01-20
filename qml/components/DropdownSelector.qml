@@ -133,7 +133,8 @@ Rectangle {
         y: root.openUpward ? -height - 4 : parent.height + 4
         x: 0
         width: parent.width
-        height: Math.min(itemColumn.implicitHeight + 16, 300)
+        // Use larger max height (400px) to show more devices, with scrolling for overflow
+        height: Math.min(itemColumn.implicitHeight + 16, 400)
         padding: 8
         modal: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside

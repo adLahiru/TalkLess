@@ -10,7 +10,7 @@ Rectangle {
     id: root
 
     // Properties
-    property string acceptedFormats: "*.wav *.mp3 *.ogg *.flac *.aac *.m4a"
+    property string acceptedFormats: "*.wav *.mp3 *.ogg *.opus *.flac *.aac *.m4a"
     property string droppedFilePath: ""
     property string droppedFileName: ""
     property bool hasFile: droppedFilePath !== ""
@@ -255,7 +255,7 @@ Rectangle {
     FileDialog {
         id: fileDialog
         title: "Select Audio File"
-        nameFilters: ["Audio files (*.wav *.mp3 *.ogg *.flac *.aac *.m4a)", "All files (*)"]
+        nameFilters: ["Audio files (*.wav *.mp3 *.ogg *.opus *.flac *.aac *.m4a)", "All files (*)"]
 
         onAccepted: {
             if (selectedFile) {
