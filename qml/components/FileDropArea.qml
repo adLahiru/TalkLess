@@ -203,39 +203,7 @@ Rectangle {
             elide: Text.ElideMiddle
         }
 
-        // Clear button
-        Rectangle {
-            Layout.alignment: Qt.AlignHCenter
-            Layout.preferredWidth: 60
-            Layout.preferredHeight: 24
-            color: clearBtnArea.containsMouse ? "#4A4A4A" : "#3A3A3A"
-            radius: 4
 
-            Text {
-                anchors.centerIn: parent
-                text: "Clear"
-                color: "#FFFFFF"
-                font.pixelSize: 11
-            }
-
-            MouseArea {
-                id: clearBtnArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    root.droppedFilePath = "";
-                    root.droppedFileName = "";
-                    root.fileCleared();
-                }
-            }
-
-            Behavior on color {
-                ColorAnimation {
-                    duration: 150
-                }
-            }
-        }
     }
 
     // Drop area for drag & drop
