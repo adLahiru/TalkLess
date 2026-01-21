@@ -1987,6 +1987,9 @@ bool SoundboardService::renameBoard(int boardId, const QString& newName)
 
 bool SoundboardService::deleteBoard(int boardId)
 {
+    // Stop all clips playing from this board before deleting
+    stopClipsForBoard(boardId);
+    
     // Collect file paths from the board before deleting (for cleanup)
     QStringList filesToCheck;
     if (m_activeBoards.contains(boardId)) {
@@ -3277,6 +3280,55 @@ void SoundboardService::stopAllClips()
     emit activeClipsChanged();
     qDebug() << "Stopped all clips";
 }
+
+void SoundboardService::stopClipsForBoard(int boardId)
+{
+    if (!m_audioEngine) {
+        return;
+    }
+
+    // Check if the board exists in active boards
+    if (!m_activeBoards.contains(boardId)) {
+        return;
+    }
+
+    const Soundboard& board = m_activeBoards.value(boardId);
+    
+    // Track if any clip we're stopping was muting the mic
+    bool anyClipWasMutingMic = false;
+    
+    // Stop all clips that belong to this board
+    for (const auto& clip : board.clips) {
+        int clipId = clip.id;
+        
+        if (m_clipIdToSlot.contains(clipId)) {
+            int slotId = m_clipIdToSlot.value(clipId);
+            m_audioEngine->stopClip(slotId);
+            m_audioEngine->unloadClip(slotId);
+            m_clipIdToSlot.remove(clipId);
+            m_slotToClipId.remove(slotId);
+            
+            // Check if this clip was muting the mic before removing
+            if (m_clipsThatMutedMic.contains(clipId)) {
+                anyClipWasMutingMic = true;
+                m_clipsThatMutedMic.remove(clipId);
+            }
+            
+            emit clipPlaybackStopped(clipId);
+        }
+    }
+    
+    // Restore mic only if we stopped clips that were muting it AND no other clips are still muting
+    if (anyClipWasMutingMic && m_clipsThatMutedMic.isEmpty() && m_audioEngine) {
+        m_audioEngine->setMicEnabled(true);
+        qDebug() << "Mic restored after stopping clips for board" << boardId;
+        emit settingsChanged();
+    }
+    
+    emit activeClipsChanged();
+    qDebug() << "Stopped all clips for board" << boardId;
+}
+
 
 bool SoundboardService::isClipPlaying(int clipId) const
 {

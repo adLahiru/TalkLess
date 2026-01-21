@@ -302,6 +302,16 @@ Rectangle {
                                                 soundboardService.setMicEnabled(isOn);
                                         }
 
+                                        // Listen for backend changes to update the toggle
+                                        Connections {
+                                            target: soundboardService
+                                            function onSettingsChanged() {
+                                                if (soundboardService) {
+                                                    alwaysOnToggle.isOn = soundboardService.micEnabled;
+                                                }
+                                            }
+                                        }
+
                                         Rectangle {
                                             width: 22
                                             height: 22
@@ -1649,7 +1659,10 @@ Rectangle {
                                 }
 
                                 // Item {Layout.fillWidth: true}
-                                Item { width: parent.width; height: 1 } // push right-side buttons
+                                Item {
+                                    width: parent.width
+                                    height: 1
+                                } // push right-side buttons
 
                             }
 
@@ -1659,12 +1672,12 @@ Rectangle {
                                 width: parent.width
                                 sourceComponent: {
                                     if (hotkeysContent.tabIndex === 0)
-                                        return systemView
+                                        return systemView;
                                     else if (hotkeysContent.tabIndex === 1)
-                                        return prefView
+                                        return prefView;
                                     else if (hotkeysContent.tabIndex === 3)
-                                        return soundboardView
-                                    return systemView // fallback
+                                        return soundboardView;
+                                    return systemView; // fallback
                                 }
                             }
                         }
@@ -1729,47 +1742,47 @@ Rectangle {
                                         color: Colors.textSecondary
                                         font.pixelSize: 14
                                     }
-                                    
+
                                     DropdownSelector {
                                         id: clipHotkeyBoardSelector
                                         Layout.fillWidth: true
                                         Layout.minimumWidth: 200
                                         placeholder: "Select Soundboard"
-                                        
+
                                         property int selectedBoardId: -1
-                                        
+
                                         // Load boards
                                         model: soundboardService?.listBoardsForDropdown() ?? []
-                                        
-                                        onItemSelected: function(id, name) {
-                                            selectedBoardId = parseInt(id)
-                                            clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(selectedBoardId)
+
+                                        onItemSelected: function (id, name) {
+                                            selectedBoardId = parseInt(id);
+                                            clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(selectedBoardId);
                                         }
 
                                         Component.onCompleted: {
                                             if (soundboardService) {
                                                 // Try active board
-                                                var activeId = soundboardService.activeBoardId
+                                                var activeId = soundboardService.activeBoardId;
                                                 if (activeId !== -1) {
-                                                    selectedId = activeId.toString()
-                                                    selectedBoardId = activeId
-                                                    clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(activeId)
+                                                    selectedId = activeId.toString();
+                                                    selectedBoardId = activeId;
+                                                    clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(activeId);
                                                 } else {
                                                     // select first
                                                     if (model && model.length > 0) {
-                                                        var first = model[0]
-                                                        selectedId = first.id.toString()
-                                                        selectedBoardId = first.id
-                                                        clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(first.id)
+                                                        var first = model[0];
+                                                        selectedId = first.id.toString();
+                                                        selectedBoardId = first.id;
+                                                        clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(first.id);
                                                     }
                                                 }
                                             }
                                         }
-                                        
+
                                         Connections {
                                             target: soundboardService
                                             function onBoardsChanged() {
-                                                clipHotkeyBoardSelector.model = soundboardService.listBoardsForDropdown()
+                                                clipHotkeyBoardSelector.model = soundboardService.listBoardsForDropdown();
                                             }
                                         }
                                     }
@@ -1779,8 +1792,8 @@ Rectangle {
                                     id: clipsHotkeyTable
                                     width: parent.width
                                     title: "Clips Hotkeys"
-                                    model: [] 
-                                    
+                                    model: []
+
                                     showHeader: true
                                     showWarning: false
                                     primaryText: "Reassign"
@@ -1788,30 +1801,30 @@ Rectangle {
 
                                     onPrimaryClicked: {
                                         if (clipHotkeyBoardSelector.selectedBoardId !== -1)
-                                            hotkeyManager.reassignClip(clipHotkeyBoardSelector.selectedBoardId, id)
+                                            hotkeyManager.reassignClip(clipHotkeyBoardSelector.selectedBoardId, id);
                                     }
-                                    
+
                                     onSecondaryClicked: {
                                         if (clipHotkeyBoardSelector.selectedBoardId !== -1) {
-                                             var boardId = clipHotkeyBoardSelector.selectedBoardId
-                                             var data = soundboardService.getClipData(boardId, id)
-                                             if (data) {
-                                                 soundboardService.updateClipInBoard(boardId, id, data["title"], "", data["tags"])
-                                                 clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(boardId)
-                                             }
+                                            var boardId = clipHotkeyBoardSelector.selectedBoardId;
+                                            var data = soundboardService.getClipData(boardId, id);
+                                            if (data) {
+                                                soundboardService.updateClipInBoard(boardId, id, data["title"], "", data["tags"]);
+                                                clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(boardId);
+                                            }
                                         }
                                     }
-                                    
+
                                     Connections {
                                         target: soundboardService
                                         function onActiveClipsChanged() {
                                             if (clipHotkeyBoardSelector.selectedBoardId !== -1) {
-                                                clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(clipHotkeyBoardSelector.selectedBoardId)
+                                                clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(clipHotkeyBoardSelector.selectedBoardId);
                                             }
                                         }
                                         function onClipUpdated(boardId, clipId) {
                                             if (boardId === clipHotkeyBoardSelector.selectedBoardId) {
-                                                 clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(boardId)
+                                                clipsHotkeyTable.model = soundboardService.getClipsForBoardVariant(boardId);
                                             }
                                         }
                                     }
