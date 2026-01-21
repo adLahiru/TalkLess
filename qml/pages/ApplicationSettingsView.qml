@@ -225,13 +225,13 @@ Rectangle {
                         width: parent.width - 40
                         x: 20
                         y: 20
-                        height: 380
+                        height: 480
                         spacing: 20
 
                         // Left Panel: Input Device & Mic Capture
                         Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 380
+                            Layout.preferredHeight: 480
                             color: Colors.panelBg
                             radius: 16
 
@@ -378,13 +378,94 @@ Rectangle {
                                         onClicked: console.log("Test mic clicked")
                                     }
                                 }
+
+                                // Noise Cancellation Section
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    Layout.topMargin: 8
+
+                                    Text {
+                                        text: "Noise Cancellation"
+                                        color: Colors.textPrimary
+                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                        font.pixelSize: Typography.fontSizeMedium
+                                        font.weight: Font.Medium
+                                    }
+
+                                    Text {
+                                        text: "Reduce background noise from your microphone"
+                                        color: Colors.textSecondary
+                                        font.pixelSize: Typography.fontSizeSmall
+                                    }
+
+                                    // Noise Cancellation Level Selector
+                                    RowLayout {
+                                        id: noiseLevelSelector
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        property var levelNames: soundboardService?.getNoiseSuppressionLevelNames() ?? ["Off", "Low", "Moderate", "High", "Very High"]
+                                        property int currentLevel: soundboardService?.noiseSuppressionLevel ?? 2
+
+                                        // Update when settings change
+                                        Connections {
+                                            target: soundboardService
+                                            function onSettingsChanged() {
+                                                noiseLevelSelector.currentLevel = soundboardService?.noiseSuppressionLevel ?? 2;
+                                            }
+                                        }
+
+                                        Repeater {
+                                            model: noiseLevelSelector.levelNames
+
+                                            Rectangle {
+                                                Layout.fillWidth: true
+                                                height: 36
+                                                radius: 8
+
+                                                property bool isActive: index === noiseLevelSelector.currentLevel
+
+                                                color: isActive ? Colors.accent : Colors.surface
+                                                border.width: isActive ? 2 : 1
+                                                border.color: isActive ? Colors.accentLight : Colors.border
+
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: modelData
+                                                    color: parent.isActive ? Colors.textOnAccent : Colors.textPrimary
+                                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                                    font.pixelSize: Typography.fontSizeSmall
+                                                    font.weight: parent.isActive ? Font.DemiBold : Font.Normal
+                                                }
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        console.log("Noise cancellation level set to:", index, modelData);
+                                                        soundboardService.setNoiseSuppressionLevel(index);
+                                                    }
+                                                }
+
+                                                Behavior on color {
+                                                    ColorAnimation { duration: 150 }
+                                                }
+
+                                                Behavior on border.width {
+                                                    NumberAnimation { duration: 150 }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
                         // Right Panel: Mixer Controls
                         Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 380
+                            Layout.preferredHeight: 480
                             color: Colors.surface
                             radius: Theme.radiusLarge
 

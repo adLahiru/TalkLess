@@ -55,6 +55,10 @@ AudioEngine::AudioEngine()
     captureDevice = nullptr;
     monitorDevice = nullptr;
     recordingInputDevice = nullptr;
+
+    // Initialize noise suppressor with default sample rate and moderate level
+    m_noiseSuppressor = std::make_unique<NoiseSuppressor>(48000, NoiseSuppressionLevel::Moderate);
+    m_noiseSuppressor->init();
 }
 
 AudioEngine::AudioEngine(void* parent) : AudioEngine()
@@ -140,6 +144,11 @@ void AudioEngine::setAudioConfig(ma_uint32 sampleRate, ma_uint32 bufferSize, ma_
     m_bufferSizeFrames = bufferSize;
     m_bufferPeriods = periods;
     m_channels = channels;
+
+    // Update noise suppressor sample rate
+    if (m_noiseSuppressor) {
+        m_noiseSuppressor->setSampleRate(sampleRate);
+    }
 
     std::cout << "[AudioEngine] Configured: SR=" << m_sampleRate << ", BufferSize=" << m_bufferSizeFrames
               << ", Periods=" << m_bufferPeriods << ", Channels=" << m_channels << "\n";
@@ -1007,6 +1016,30 @@ float AudioEngine::getMicSoundboardBalance() const
     return micSoundboardBalance.load(std::memory_order_relaxed);
 }
 
+// Noise Suppression
+void AudioEngine::setNoiseSuppressionLevel(int level)
+{
+    // Clamp to valid range [0, 4]
+    level = std::max(0, std::min(4, level));
+    m_noiseSuppressionLevel.store(level, std::memory_order_relaxed);
+
+    if (m_noiseSuppressor) {
+        m_noiseSuppressor->setSuppressionLevel(static_cast<NoiseSuppressionLevel>(level));
+    }
+
+    std::cout << "[AudioEngine] Noise suppression level set to " << level << "\n";
+}
+
+int AudioEngine::getNoiseSuppressionLevel() const
+{
+    return m_noiseSuppressionLevel.load(std::memory_order_relaxed);
+}
+
+bool AudioEngine::isNoiseSuppressionEnabled() const
+{
+    return m_noiseSuppressionLevel.load(std::memory_order_relaxed) > 0;
+}
+
 // Peaks
 float AudioEngine::getMicPeakLevel() const
 {
@@ -1110,8 +1143,17 @@ void AudioEngine::processCaptureInput(const void* input, ma_uint32 frameCount, m
             mono = 0.0f;
         }
 
-        peak = std::max(peak, std::abs(mono));
         dst[f] = mono;
+    }
+
+    // Apply noise suppression to the mono buffer (in-place)
+    if (m_noiseSuppressor && m_noiseSuppressor->isEnabled() && micOn) {
+        m_noiseSuppressor->process(dst, framesToWrite);
+    }
+
+    // Calculate peak after noise suppression
+    for (ma_uint32 f = 0; f < framesToWrite; ++f) {
+        peak = std::max(peak, std::abs(dst[f]));
     }
 
     ma_pcm_rb_commit_write(&captureRb, framesToWrite);

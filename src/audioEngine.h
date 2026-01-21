@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -12,6 +13,7 @@
 // DO NOT put MINIAUDIO_IMPLEMENTATION in a header.
 // Define it in exactly one .cpp (e.g., audioEngine.cpp).
 #include "miniaudio.h"
+#include "noiseSuppressor.h"
 
 class AudioEngine
 {
@@ -121,6 +123,11 @@ public:
 
     void setMicSoundboardBalance(float balance);
     float getMicSoundboardBalance() const;
+
+    // Noise suppression controls
+    void setNoiseSuppressionLevel(int level); // 0=Off, 1=Low, 2=Moderate, 3=High, 4=VeryHigh
+    int getNoiseSuppressionLevel() const;
+    bool isNoiseSuppressionEnabled() const;
 
     // Peak meters
     float getMicPeakLevel() const;
@@ -385,6 +392,12 @@ private:
     std::atomic<float> micPeakLevel{0.0f};
     std::atomic<float> masterPeakLevel{0.0f};
     std::atomic<float> monitorPeakLevel{0.0f};
+
+    // ------------------------------------------------------------
+    // Noise Suppression
+    // ------------------------------------------------------------
+    std::unique_ptr<NoiseSuppressor> m_noiseSuppressor;
+    std::atomic<int> m_noiseSuppressionLevel{2}; // 0=Off, 1=Low, 2=Moderate, 3=High, 4=VeryHigh
 
     // ------------------------------------------------------------
     // Clips

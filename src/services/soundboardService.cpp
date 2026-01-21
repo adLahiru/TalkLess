@@ -116,6 +116,7 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
         m_audioEngine->setMicEnabled(m_state.settings.micEnabled);
         m_audioEngine->setMicPassthroughEnabled(m_state.settings.micPassthroughEnabled);
         m_audioEngine->setMicSoundboardBalance(m_state.settings.micSoundboardBalance);
+        m_audioEngine->setNoiseSuppressionLevel(m_state.settings.noiseSuppressionLevel);
 
         m_recordingTickTimer = new QTimer(this);
         m_recordingTickTimer->setInterval(100); // 10 updates/sec (smooth timer)
@@ -3752,6 +3753,32 @@ bool SoundboardService::isMicEnabled() const
         return true;
     }
     return m_audioEngine->isMicEnabled();
+}
+
+void SoundboardService::setNoiseSuppressionLevel(int level)
+{
+    // Clamp to valid range [0, 4]
+    level = qBound(0, level, 4);
+
+    if (m_state.settings.noiseSuppressionLevel == level) {
+        return;
+    }
+
+    m_state.settings.noiseSuppressionLevel = level;
+
+    if (m_audioEngine) {
+        m_audioEngine->setNoiseSuppressionLevel(level);
+    }
+
+    // Save immediately to ensure setting persists
+    m_repo.saveIndex(m_state);
+    qDebug() << "Noise suppression level set to" << level;
+    emit settingsChanged();
+}
+
+QStringList SoundboardService::getNoiseSuppressionLevelNames() const
+{
+    return QStringList() << "Off" << "Low" << "Moderate" << "High" << "Very High";
 }
 
 // ============================================================================

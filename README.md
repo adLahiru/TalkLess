@@ -48,6 +48,31 @@ Built with:
 2. Configure with Qt 6.10.1 MinGW 64-bit
 3. Build and Run
 
+### Optional: SpeexDSP for Noise Cancellation
+
+To enable real-time noise cancellation for microphone input, install the SpeexDSP library:
+
+**Windows (vcpkg):**
+```bash
+vcpkg install speexdsp:x64-windows
+```
+
+**macOS (Homebrew):**
+```bash
+brew install speexdsp
+```
+
+**Linux:**
+```bash
+# Ubuntu/Debian
+sudo apt install libspeexdsp-dev
+
+# Fedora
+sudo dnf install speexdsp-devel
+```
+
+If the library is not found, the application will compile without noise cancellation support.
+
 ## Architecture
 
 This project follows the MVC (Model-View-Controller) pattern:

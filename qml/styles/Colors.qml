@@ -43,6 +43,7 @@ QtObject {
     property color textSecondary: currentTheme === "light" ? "#475569" : "#94A3B8"
     property color textTertiary: currentTheme === "light" ? "#64748B" : "#64748B"
     property color textDisabled: currentTheme === "light" ? "#94A3B8" : "#334155"
+    property color textOnAccent: "#FFFFFF"
 
     // Borders - Subtle & Refined
     property color border: currentTheme === "light" ? "#E2E8F0" : "#27272A"

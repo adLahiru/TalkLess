@@ -54,6 +54,9 @@ public:
         float micSoundboardBalance READ getMicSoundboardBalance WRITE setMicSoundboardBalance NOTIFY settingsChanged)
     Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
 
+    // Noise cancellation
+    Q_PROPERTY(int noiseSuppressionLevel READ noiseSuppressionLevel WRITE setNoiseSuppressionLevel NOTIFY settingsChanged)
+
     // Audio buffer settings
     Q_PROPERTY(int bufferSizeFrames READ bufferSizeFrames WRITE setBufferSizeFrames NOTIFY settingsChanged)
     Q_PROPERTY(int bufferPeriods READ bufferPeriods WRITE setBufferPeriods NOTIFY settingsChanged)
@@ -214,6 +217,11 @@ public:
     Q_INVOKABLE void setMicEnabled(bool enabled);
     Q_INVOKABLE bool isMicEnabled() const;
     Q_INVOKABLE double getFileDuration(const QString& filePath) const;
+
+    // Noise cancellation controls
+    int noiseSuppressionLevel() const { return m_state.settings.noiseSuppressionLevel; }
+    Q_INVOKABLE void setNoiseSuppressionLevel(int level);
+    Q_INVOKABLE QStringList getNoiseSuppressionLevelNames() const;
 
     // ---- Recording ----
     Q_INVOKABLE bool startRecording();

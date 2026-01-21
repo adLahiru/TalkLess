@@ -21,6 +21,10 @@ struct AppSettings
     bool micPassthroughEnabled = true;
     float micSoundboardBalance = 0.5f;
 
+    // Noise cancellation settings (WebRTC APM)
+    // Level: 0=Off, 1=Low, 2=Moderate, 3=High, 4=VeryHigh
+    int noiseSuppressionLevel = 2; // Default to Moderate
+
     // Audio buffer settings
     int bufferSizeFrames = 1024;    // Period size in frames (512, 1024, 2048, 4096)
     int bufferPeriods = 3;          // Number of periods (2, 3, 4)
