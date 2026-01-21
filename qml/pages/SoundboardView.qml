@@ -4024,12 +4024,10 @@ Rectangle {
 
                         onFileDropped: function (filePath, fileName) {
                             console.log("File dropped:", fileName, filePath);
-                            // Auto-fill the name input if empty
-                            if (uploadAudioNameInput.text === "") {
-                                // Remove extension from filename
-                                var nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
-                                uploadAudioNameInput.text = nameWithoutExt;
-                            }
+                            // Always auto-fill the name input with the new file's name
+                            // Remove extension from filename
+                            var nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
+                            uploadAudioNameInput.text = nameWithoutExt;
 
                             // Get duration for trim preview
                             fileDuration = soundboardService.getFileDuration(filePath);
