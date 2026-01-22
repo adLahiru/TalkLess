@@ -4345,26 +4345,237 @@ Rectangle {
 
                 // Teleprompter Tab Content (Tab 3)
                 ColumnLayout {
+                    id: teleprompterTab
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: 12
                     visible: rightSidebar.currentTabIndex === 3
 
+                    // Property to store teleprompter text
+                    property string teleprompterText: ""
+
+                    // Header
                     Text {
                         text: "Teleprompter"
                         color: Colors.textOnPrimary
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
+                        Layout.leftMargin: 5
                     }
 
-                    Text {
-                        text: "Teleprompter content will appear here"
-                        color: Colors.textSecondary
-                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                        font.pixelSize: 12
+                    // Main text area container
+                    Rectangle {
+                        id: teleprompterContainer
+                        Layout.fillWidth: true
+                        // Dynamic height based on content, with min/max constraints
+                        // +24 for RowLayout margins (12px top + 12px bottom)
+                        Layout.preferredHeight: {
+                            var contentHeight = teleprompterTextEdit.implicitHeight + 24;
+                            return Math.min(420, Math.max(140, contentHeight));
+                        }
+                        Layout.minimumHeight: 140
+                        Layout.maximumHeight: 420
+                        Layout.leftMargin: 5
+                        Layout.rightMargin: 5
+                        color: Colors.surfaceDark
+                        radius: 12
+                        border.color: Colors.border
+                        border.width: 1
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 10
+
+                            // Upload icon (left side)
+                            Rectangle {
+                                Layout.preferredWidth: 24
+                                Layout.preferredHeight: 24
+                                Layout.alignment: Qt.AlignTop
+                                color: "transparent"
+
+                                Image {
+                                    id: uploadIconImg
+                                    anchors.fill: parent
+                                    source: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_upload.svg"
+                                    sourceSize: Qt.size(24, 24)
+                                    fillMode: Image.PreserveAspectFit
+                                    visible: false
+                                }
+
+                                MultiEffect {
+                                    anchors.fill: uploadIconImg
+                                    source: uploadIconImg
+                                    colorization: 1.0
+                                    colorizationColor: Colors.currentTheme === "light" ? "#000000" : "#FFFFFF"
+                                    opacity: uploadIconArea.containsMouse ? 1.0 : 0.6
+                                }
+
+                                MouseArea {
+                                    id: uploadIconArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        teleprompterFileDialog.open();
+                                    }
+                                }
+                            }
+
+                            // Scrollable text area
+                            Flickable {
+                                id: teleprompterFlickable
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                contentWidth: width
+                                contentHeight: teleprompterTextEdit.implicitHeight
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+
+                                TextEdit {
+                                    id: teleprompterTextEdit
+                                    width: teleprompterFlickable.width
+                                    text: teleprompterTab.teleprompterText
+                                    color: Colors.textPrimary
+                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                    font.pixelSize: 12
+                                    wrapMode: TextEdit.Wrap
+                                    selectByMouse: true
+                                    selectionColor: Colors.accent
+
+                                    onTextChanged: {
+                                        teleprompterTab.teleprompterText = text;
+                                    }
+
+                                    // Placeholder text
+                                    Text {
+                                        anchors.fill: parent
+                                        text: "Enter your script here..."
+                                        color: Colors.textDisabled
+                                        font: parent.font
+                                        visible: !parent.text && !parent.activeFocus
+                                    }
+                                }
+
+                                ScrollBar.vertical: ScrollBar {
+                                    policy: ScrollBar.AsNeeded
+                                }
+                            }
+
+                            // Microphone icon (right side)
+                            Rectangle {
+                                Layout.preferredWidth: 24
+                                Layout.preferredHeight: 24
+                                Layout.alignment: Qt.AlignTop
+                                color: "transparent"
+
+                                Image {
+                                    id: micIconImg
+                                    anchors.fill: parent
+                                    source: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_mic_outline.svg"
+                                    sourceSize: Qt.size(24, 24)
+                                    fillMode: Image.PreserveAspectFit
+                                    visible: false
+                                }
+
+                                MultiEffect {
+                                    anchors.fill: micIconImg
+                                    source: micIconImg
+                                    colorization: 1.0
+                                    colorizationColor: Colors.currentTheme === "light" ? "#000000" : "#FFFFFF"
+                                    opacity: micIconArea.containsMouse ? 1.0 : 0.6
+                                }
+
+                                MouseArea {
+                                    id: micIconArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        console.log("Microphone clicked - speech-to-text placeholder");
+                                    }
+                                }
+                            }
+                        }
                     }
 
+                    // Spacer
+                    Item {
+                        Layout.preferredHeight: 8
+                    }
+
+                    // Download button
+                    Rectangle {
+                        Layout.preferredWidth: 100
+                        Layout.preferredHeight: 36
+                        Layout.leftMargin: 5
+                        color: downloadBtnArea.containsMouse ? "#4A4A4A" : "#3A3A3A"
+                        radius: 8
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Download"
+                            color: Colors.textOnPrimary
+                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                            font.pixelSize: 13
+                            font.weight: Font.Medium
+                        }
+
+                        MouseArea {
+                            id: downloadBtnArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                teleprompterSaveDialog.open();
+                            }
+                        }
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 150
+                            }
+                        }
+                    }
+
+                    // File dialog for importing text
+                    FileDialog {
+                        id: teleprompterFileDialog
+                        title: "Import Text File"
+                        nameFilters: ["Text files (*.txt)", "All files (*)"]
+                        fileMode: FileDialog.OpenFile
+
+                        onAccepted: {
+                            if (selectedFile) {
+                                var fileUrl = selectedFile.toString();
+                                var filePath = fileUrl.replace(/^file:\/\//, "");
+                                // Read file content via service (placeholder - would need backend support)
+                                console.log("Import from:", filePath);
+                            }
+                        }
+                    }
+
+                    // File dialog for saving text
+                    FileDialog {
+                        id: teleprompterSaveDialog
+                        title: "Save Teleprompter Text"
+                        nameFilters: ["Text files (*.txt)"]
+                        fileMode: FileDialog.SaveFile
+                        defaultSuffix: "txt"
+
+                        onAccepted: {
+                            if (selectedFile) {
+                                var fileUrl = selectedFile.toString();
+                                var filePath = fileUrl.replace(/^file:\/\//, "");
+                                // Save file content via service (placeholder - would need backend support)
+                                console.log("Save to:", filePath);
+                                console.log("Content:", teleprompterTab.teleprompterText);
+                            }
+                        }
+                    }
+
+                    // Fill remaining space
                     Item {
                         Layout.fillHeight: true
                     }

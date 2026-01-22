@@ -108,6 +108,9 @@ set(TALKLESS_RESOURCES
     resources/icons/panel/ic_tab_prompt.svg
     resources/icons/panel/ic_clipboard.svg
     resources/icons/panel/ic_scissors.svg
+    resources/icons/panel/ic_upload.svg
+    resources/icons/panel/ic_download.svg
+    resources/icons/panel/ic_mic_outline.svg
 
     resources/icons/actions/ic_mic.svg
     resources/icons/actions/ic_mic_test.svg
