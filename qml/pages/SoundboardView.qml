@@ -158,7 +158,8 @@ Rectangle {
             muteMicDuringPlayback: data.muteMicDuringPlayback,
             durationSec: data.durationSec,
             trimStartMs: data.trimStartMs,
-            trimEndMs: data.trimEndMs
+            trimEndMs: data.trimEndMs,
+            teleprompterText: data.teleprompterText || ""
         };
     }
 
@@ -3857,9 +3858,13 @@ Rectangle {
                     id: clipTeleprompterPopup
 
                     onSaved: function(clipId, text) {
-                        console.log("Teleprompter saved for clip", clipId, ":", text);
-                        // TODO: Save teleprompter text to clip data via service
-                        // soundboardService.setClipTeleprompterText(clipId, text);
+                        soundboardService.setClipTeleprompterText(
+                            activeClipsModel.boardId,
+                            clipId,
+                            text
+                        );
+                        activeClipsModel.reload();
+                        console.log("Teleprompter saved for clip", clipId);
                     }
 
                     onCancelled: {
@@ -4377,8 +4382,27 @@ Rectangle {
                     spacing: 12
                     visible: rightSidebar.currentTabIndex === 3
 
-                    // Property to store teleprompter text
-                    property string teleprompterText: ""
+                    // Refresh counter to force binding re-evaluation
+                    property int refreshCounter: 0
+
+                    // Property to store teleprompter text (bound to selected clip)
+                    property string teleprompterText: {
+                        // Depend on refreshCounter to force re-evaluation
+                        var _ = teleprompterTab.refreshCounter;
+                        if (root.selectedClipId !== -1) {
+                            var data = root.getClipDataById(root.selectedClipId);
+                            return data ? (data.teleprompterText || "") : "";
+                        }
+                        return "";
+                    }
+
+                    // Connect to model changes to refresh
+                    Connections {
+                        target: activeClipsModel
+                        function onClipsChanged() {
+                            teleprompterTab.refreshCounter++;
+                        }
+                    }
 
                     // Header
                     Text {
@@ -4467,20 +4491,17 @@ Rectangle {
                                     font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                     font.pixelSize: 12
                                     wrapMode: TextEdit.Wrap
+                                    readOnly: true
                                     selectByMouse: true
                                     selectionColor: Colors.accent
-
-                                    onTextChanged: {
-                                        teleprompterTab.teleprompterText = text;
-                                    }
 
                                     // Placeholder text
                                     Text {
                                         anchors.fill: parent
-                                        text: "Enter your script here..."
+                                        text: "Script here ..."
                                         color: Colors.textDisabled
                                         font: parent.font
-                                        visible: !parent.text && !parent.activeFocus
+                                        visible: !parent.text
                                     }
                                 }
 

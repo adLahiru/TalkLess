@@ -122,6 +122,9 @@ static QJsonObject clipToJson(const Clip& c)
         sharedBoardIdsArr.append(boardId);
     o["sharedBoardIds"] = sharedBoardIdsArr;
 
+    // Teleprompter text
+    o["teleprompterText"] = c.teleprompterText;
+
     // runtime-only (do not save): isPlaying, locked
     return o;
 }
@@ -158,6 +161,9 @@ static Clip clipFromJson(const QJsonObject& o)
     const auto sharedBoardIdsArr = o.value("sharedBoardIds").toArray();
     for (const auto& v : sharedBoardIdsArr)
         c.sharedBoardIds.push_back(v.toInt());
+
+    // Teleprompter text
+    c.teleprompterText = o.value("teleprompterText").toString();
 
     // runtime defaults
     c.isPlaying = false;

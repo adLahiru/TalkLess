@@ -1,6 +1,7 @@
 #include "soundboardService.h"
 
 #include "audioEngine.h"
+#include "ffmpeg_decoder.h"
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
@@ -21,19 +22,17 @@
 
 #include <cmath>
 
-#include "ffmpeg_decoder.h"
-
 // Helper function to sanitize file paths, especially for Windows where file:// URL
 // conversion can leave a leading slash before drive letters (e.g., "/C:/path" -> "C:/path")
 static QString sanitizeFilePath(const QString& path)
 {
     QString result = path;
-    
+
     // Convert file:// URL to local path if needed
     if (result.startsWith("file:")) {
         result = QUrl(result).toLocalFile();
     }
-    
+
 #ifdef Q_OS_WIN
     // On Windows, QUrl::toLocalFile() may return "/C:/path" which is invalid
     // We need to remove the leading slash before drive letters
@@ -42,16 +41,16 @@ static QString sanitizeFilePath(const QString& path)
         QChar secondChar = result.at(1);
         QChar thirdChar = result.at(2);
         if (secondChar.isLetter() && thirdChar == ':') {
-            result = result.mid(1);  // Remove leading slash
+            result = result.mid(1); // Remove leading slash
         }
     }
 #endif
-    
+
     // Remove any duplicate leading slashes (e.g., "//Users" -> "/Users")
     while (result.startsWith("//")) {
         result = result.mid(1);
     }
-    
+
     return result;
 }
 
@@ -173,7 +172,7 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
                     this,
                     [this]() {
                         m_recordingPreviewPlaying = false;
-                        m_filePreviewPlaying = false;  // Also reset file preview state
+                        m_filePreviewPlaying = false; // Also reset file preview state
                         m_filePreviewPath.clear();
                         emit recordingStateChanged();
                     },
@@ -597,6 +596,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
                     map["trimStartMs"] = c.trimStartMs;
                     map["trimEndMs"] = c.trimEndMs;
                     map["lastPlayedPosMs"] = c.lastPlayedPosMs; // For resuming playback
+                    map["teleprompterText"] = c.teleprompterText;
                     return map;
                 }
             }
@@ -627,6 +627,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
         map["trimStartMs"] = clip->trimStartMs;
         map["trimEndMs"] = clip->trimEndMs;
         map["lastPlayedPosMs"] = clip->lastPlayedPosMs; // For resuming playback
+        map["teleprompterText"] = clip->teleprompterText;
         return map;
     }
 
@@ -818,7 +819,8 @@ bool SoundboardService::addClipWithSettings(int boardId, const QString& filePath
         QString trimmedName = QString("%1_trimmed_%2.wav").arg(origInfo.baseName(), timestamp);
         QString trimmedPath = QDir(audioPath).filePath(trimmedName);
 
-        qDebug() << "Exporting trimmed audio to managed storage:" << trimStartMs << "ms to" << trimEndMs << "ms -> " << trimmedPath;
+        qDebug() << "Exporting trimmed audio to managed storage:" << trimStartMs << "ms to" << trimEndMs << "ms -> "
+                 << trimmedPath;
 
         if (m_audioEngine->exportTrimmedAudio(localPath.toStdString(), trimmedPath.toStdString(), trimStartMs,
                                               trimEndMs)) {
@@ -1540,6 +1542,43 @@ void SoundboardService::setClipTrim(int boardId, int clipId, double startMs, dou
     }
 }
 
+bool SoundboardService::setClipTeleprompterText(int boardId, int clipId, const QString& text)
+{
+    // Active board update
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (auto& c : board.clips) {
+            if (c.id != clipId)
+                continue;
+
+            c.teleprompterText = text;
+            emit activeClipsChanged();
+            emit clipUpdated(boardId, clipId);
+            return saveActive();
+        }
+        return false;
+    }
+
+    // Inactive board update
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded)
+        return false;
+
+    Soundboard b = *loaded;
+    for (auto& c : b.clips) {
+        if (c.id == clipId) {
+            c.teleprompterText = text;
+            const bool ok = m_repo.saveBoard(b);
+            if (ok) {
+                m_state = m_repo.loadIndex();
+                emit boardsChanged();
+            }
+            return ok;
+        }
+    }
+    return false;
+}
+
 void SoundboardService::seekClip(int boardId, int clipId, double positionMs)
 {
     // Active board update
@@ -1990,7 +2029,7 @@ bool SoundboardService::deleteBoard(int boardId)
 {
     // Stop all clips playing from this board before deleting
     stopClipsForBoard(boardId);
-    
+
     // Collect file paths from the board before deleting (for cleanup)
     QStringList filesToCheck;
     if (m_activeBoards.contains(boardId)) {
@@ -2741,13 +2780,13 @@ QVariantList SoundboardService::getWaveformPeaks(const QString& filePath, int nu
         // Seek to the start of this bar's segment
         ma_uint64 startFrame = (ma_uint64)bar * framesPerBar;
         bool seekOk = false;
-        
+
         if (usingMiniaudio) {
             seekOk = (ma_decoder_seek_to_pcm_frame(&decoder, startFrame) == MA_SUCCESS);
         } else {
             seekOk = ffmpegDec.seekToPcmFrame(startFrame);
         }
-        
+
         if (!seekOk) {
             peaks.append(0.1f);
             continue;
@@ -3294,42 +3333,41 @@ void SoundboardService::stopClipsForBoard(int boardId)
     }
 
     const Soundboard& board = m_activeBoards.value(boardId);
-    
+
     // Track if any clip we're stopping was muting the mic
     bool anyClipWasMutingMic = false;
-    
+
     // Stop all clips that belong to this board
     for (const auto& clip : board.clips) {
         int clipId = clip.id;
-        
+
         if (m_clipIdToSlot.contains(clipId)) {
             int slotId = m_clipIdToSlot.value(clipId);
             m_audioEngine->stopClip(slotId);
             m_audioEngine->unloadClip(slotId);
             m_clipIdToSlot.remove(clipId);
             m_slotToClipId.remove(slotId);
-            
+
             // Check if this clip was muting the mic before removing
             if (m_clipsThatMutedMic.contains(clipId)) {
                 anyClipWasMutingMic = true;
                 m_clipsThatMutedMic.remove(clipId);
             }
-            
+
             emit clipPlaybackStopped(clipId);
         }
     }
-    
+
     // Restore mic only if we stopped clips that were muting it AND no other clips are still muting
     if (anyClipWasMutingMic && m_clipsThatMutedMic.isEmpty() && m_audioEngine) {
         m_audioEngine->setMicEnabled(true);
         qDebug() << "Mic restored after stopping clips for board" << boardId;
         emit settingsChanged();
     }
-    
+
     emit activeClipsChanged();
     qDebug() << "Stopped all clips for board" << boardId;
 }
-
 
 bool SoundboardService::isClipPlaying(int clipId) const
 {

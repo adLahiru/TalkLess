@@ -55,7 +55,8 @@ public:
     Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
 
     // Noise cancellation
-    Q_PROPERTY(int noiseSuppressionLevel READ noiseSuppressionLevel WRITE setNoiseSuppressionLevel NOTIFY settingsChanged)
+    Q_PROPERTY(
+        int noiseSuppressionLevel READ noiseSuppressionLevel WRITE setNoiseSuppressionLevel NOTIFY settingsChanged)
 
     // Audio buffer settings
     Q_PROPERTY(int bufferSizeFrames READ bufferSizeFrames WRITE setBufferSizeFrames NOTIFY settingsChanged)
@@ -166,6 +167,7 @@ public:
     Q_INVOKABLE void setClipMuteOtherSounds(int boardId, int clipId, bool mute);
     Q_INVOKABLE void setClipMuteMicDuringPlayback(int boardId, int clipId, bool mute);
     Q_INVOKABLE void setClipTrim(int boardId, int clipId, double startMs, double endMs);
+    Q_INVOKABLE bool setClipTeleprompterText(int boardId, int clipId, const QString& text);
     Q_INVOKABLE void seekClip(int boardId, int clipId, double positionMs);
     Q_INVOKABLE bool moveClip(int boardId, int fromIndex, int toIndex);
     Q_INVOKABLE void copyClip(int clipId);
@@ -343,8 +345,8 @@ private:
 
     // Recording state
     bool m_recordingPreviewPlaying = false;
-    bool m_filePreviewPlaying = false;       // For uploaded file preview
-    QString m_filePreviewPath;               // Currently previewing file path
+    bool m_filePreviewPlaying = false; // For uploaded file preview
+    QString m_filePreviewPath;         // Currently previewing file path
     bool m_hasUnsavedRecording = false;
     QTimer* m_recordingTickTimer = nullptr;
     bool m_recordWithInputDevice = true;

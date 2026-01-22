@@ -106,6 +106,8 @@ QVariant ClipsListModel::data(const QModelIndex& index, int role) const
         return c.muteMicDuringPlayback;
     case DurationSecRole:
         return c.durationSec;
+    case TeleprompterTextRole:
+        return c.teleprompterText;
     default:
         return {};
     }
@@ -131,7 +133,8 @@ QHash<int, QByteArray> ClipsListModel::roleNames() const
         {      StopOtherSoundsRole,       "stopOtherSounds"},
         {      MuteOtherSoundsRole,       "muteOtherSounds"},
         {MuteMicDuringPlaybackRole, "muteMicDuringPlayback"},
-        {          DurationSecRole,           "durationSec"}
+        {          DurationSecRole,           "durationSec"},
+        {     TeleprompterTextRole,      "teleprompterText"}
     };
 }
 

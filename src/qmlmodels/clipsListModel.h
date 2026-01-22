@@ -33,7 +33,8 @@ public:
         StopOtherSoundsRole,
         MuteOtherSoundsRole,
         MuteMicDuringPlaybackRole,
-        DurationSecRole
+        DurationSecRole,
+        TeleprompterTextRole
     };
 
     explicit ClipsListModel(QObject* parent = nullptr);
