@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Window
 import "../styles"
 
 Rectangle {
@@ -15,6 +16,23 @@ Rectangle {
     property string icon: ""
     property var model: []  // Array of objects with {id, name, isDefault}
     property bool openUpward: false  // When true, popup opens above the control
+
+    // Calculate maximum popup height based on available window space
+    readonly property real maxPopupHeight: {
+        var win = Window.window;
+        if (!win) return 300;
+
+        // Map the dropdown's position to window coordinates
+        var globalPos = root.mapToItem(null, 0, 0);
+        var spaceBelow = win.height - globalPos.y - root.height - 20; // 20px margin from bottom
+        var spaceAbove = globalPos.y - 20; // 20px margin from top
+
+        // Use appropriate space based on openUpward
+        var availableSpace = openUpward ? spaceAbove : spaceBelow;
+
+        // Clamp between reasonable min (100) and max (500) limits
+        return Math.max(100, Math.min(availableSpace, 500));
+    }
 
     signal itemSelected(string id, string name)
     signal aboutToOpen
@@ -133,8 +151,8 @@ Rectangle {
         y: root.openUpward ? -height - 4 : parent.height + 4
         x: 0
         width: parent.width
-        // Use larger max height (400px) to show more devices, with scrolling for overflow
-        height: Math.min(itemColumn.implicitHeight + 16, 400)
+        // Use dynamic max height based on available window space
+        height: Math.min(itemColumn.implicitHeight + 16, root.maxPopupHeight)
         padding: 8
         modal: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
