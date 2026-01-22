@@ -191,6 +191,7 @@ qt_add_qml_module(appTalkLess
         qml/components/DotMeter.qml
         qml/components/HotkeysTable.qml
         qml/components/HotkeyCapturePopup.qml
+        qml/components/TeleprompterPopup.qml
         qml/components/ClipTile.qml
         qml/components/AddAudioTile.qml
         qml/components/AudioClipPanel.qml

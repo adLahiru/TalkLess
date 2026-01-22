@@ -47,6 +47,7 @@ Item {
     signal deleteClicked
     signal editClicked
     signal webClicked
+    signal teleprompterClicked
 
     // =========================
     // Auto close timer
@@ -338,6 +339,51 @@ Item {
                 elide: Text.ElideRight
                 horizontalAlignment: Text.AlignHCenter
             }
+        }
+
+        // Teleprompter clipboard icon (top-right corner)
+        Rectangle {
+            id: clipboardIconContainer
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.rightMargin: 8 * root.scaleFactor
+            anchors.topMargin: 8 * root.scaleFactor
+            width: 24 * root.scaleFactor
+            height: 24 * root.scaleFactor
+            radius: 6 * root.scaleFactor
+            color: clipboardMA.containsMouse ? Colors.surfaceLight : Qt.rgba(0, 0, 0, 0.4)
+            visible: root.tileHover
+            z: 20
+
+            Image {
+                id: clipboardIcon
+                anchors.centerIn: parent
+                width: 14 * root.scaleFactor
+                height: 14 * root.scaleFactor
+                source: "qrc:/qt/qml/TalkLess/resources/icons/panel/ic_clipboard.svg"
+                sourceSize: Qt.size(14 * root.scaleFactor, 14 * root.scaleFactor)
+                visible: false
+            }
+
+            MultiEffect {
+                anchors.fill: clipboardIcon
+                source: clipboardIcon
+                colorization: 1.0
+                colorizationColor: "#FFFFFF"
+            }
+
+            MouseArea {
+                id: clipboardMA
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: function(mouse) {
+                    root.teleprompterClicked();
+                    mouse.accepted = true;
+                }
+            }
+
+            Behavior on color { ColorAnimation { duration: 150 } }
         }
 
         // Hotkey bar bg

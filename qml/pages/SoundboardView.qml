@@ -1504,6 +1504,12 @@ Rectangle {
                                         root.hotkeyEditingClipId = clipWrapper.clipId;
                                         clipHotkeyPopup.open();
                                     }
+                                    onTeleprompterClicked: {
+                                        clipTeleprompterPopup.clipId = clipWrapper.clipId;
+                                        clipTeleprompterPopup.clipTitle = clipTile.title;
+                                        clipTeleprompterPopup.teleprompterText = clipWrapper.teleprompterText || "";
+                                        clipTeleprompterPopup.open();
+                                    }
                                 }
 
                                 // Drag handler for reordering
@@ -3841,6 +3847,21 @@ Rectangle {
                     onCancelled: {
                         console.log("Hotkey capture cancelled");
                         root.hotkeyEditingClipId = -1;
+                    }
+                }
+
+                // Teleprompter Popup for clip-wise scripts
+                TeleprompterPopup {
+                    id: clipTeleprompterPopup
+
+                    onSaved: function(clipId, text) {
+                        console.log("Teleprompter saved for clip", clipId, ":", text);
+                        // TODO: Save teleprompter text to clip data via service
+                        // soundboardService.setClipTeleprompterText(clipId, text);
+                    }
+
+                    onCancelled: {
+                        console.log("Teleprompter cancelled");
                     }
                 }
 
