@@ -2188,6 +2188,8 @@ Rectangle {
                                 recordingTab.recordingPeaks = [];
                                 recordingTab.recordingError = "";
                                 recordingTab.finalRecordedDuration = 0;
+                                // Reset trim sliders to full range for new recording
+                                waveformTrim.resetTrimPositions();
                             }
                         }
                     }
@@ -4053,6 +4055,9 @@ Rectangle {
                             // Get duration for trim preview
                             fileDuration = soundboardService.getFileDuration(filePath);
                             console.log("File duration detected:", fileDuration);
+
+                            // Reset trim sliders to full range for new file
+                            uploadWaveform.resetTrimPositions();
 
                             // Defer waveform loading to avoid UI freeze
                             uploadTabContainer.isLoadingWaveform = true;

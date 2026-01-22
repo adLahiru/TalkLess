@@ -23,6 +23,12 @@ Item {
     signal trimEndMoved(real position)
     signal seekRequested(real position)
 
+    // Reset trim handles to full range (called when loading new audio)
+    function resetTrimPositions() {
+        trimStart = 0.0;
+        trimEnd = 1.0;
+    }
+
     // Generate mock waveform data
     function generateMockWaveform() {
         var data = [];
