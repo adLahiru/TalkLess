@@ -1353,19 +1353,18 @@ void AudioEngine::processPlaybackAudio(void* output, ma_uint32 frameCount, ma_ui
 
     // --------------------------------------------------------
     // Recording output (push to recordingRb, realtime-safe)
-    // Record the ACTUAL speaker output so it captures exactly what was heard
-    // This includes mic if passthrough is ON, clips if playing, etc.
+    // Record from recTempScratch which contains:
+    // - Recording input device audio (microphone)
+    // - Clips audio (if recordClips is enabled)
     // --------------------------------------------------------
     if (recActive && recordingRbData) {
-        // The 'out' buffer already has master gain and limiter applied
-        // Simply copy it to the recording buffer
         void* pWrite = nullptr;
         ma_uint32 framesToWrite = frameCount;
 
         if (ma_pcm_rb_acquire_write(&recordingRb, &framesToWrite, &pWrite) == MA_SUCCESS && framesToWrite > 0 &&
             pWrite) {
             const size_t samplesToCopy = (size_t)framesToWrite * (size_t)playbackChannels;
-            std::memcpy(pWrite, out, samplesToCopy * sizeof(float));
+            std::memcpy(pWrite, recTempScratch.data(), samplesToCopy * sizeof(float));
             ma_pcm_rb_commit_write(&recordingRb, framesToWrite);
             recordedFrames.fetch_add(framesToWrite, std::memory_order_relaxed);
         }
