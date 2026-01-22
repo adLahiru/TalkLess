@@ -7,6 +7,9 @@ import "../styles"
 Item {
     id: root
 
+    // Signal to request navigation to soundboard for simulation
+    signal startSimulationRequested()
+
     // Banner Area
     BackgroundBanner {
         id: banner
@@ -29,17 +32,13 @@ Item {
         anchors.bottomMargin: 20
         spacing: 20
 
-        // Custom Tab Selector
-        // We need a custom one that matches the specific visual style in the mockup
-        // The existing SettingsTabSelector is a bit different, but let's try to adapt a similar structure manually for now to match the screenshot exactly
-        // Tab Selector matching SettingsTabSelector style
+        // Tab Selector
         Rectangle {
             id: tabSelector
             Layout.fillWidth: true
             height: 56
             color: "transparent"
 
-            // Current selected index
             property int currentIndex: 1 // Default to Test Call Simulation
 
             ListModel {
@@ -48,7 +47,6 @@ Item {
                 ListElement { title: "Test Call Simulation" }
             }
 
-            // Gray background rectangle container
             Rectangle {
                 anchors.centerIn: tabRow
                 width: tabRow.width + 20
@@ -57,7 +55,6 @@ Item {
                 color: Colors.surfaceDark
             }
 
-            // Tab row
             RowLayout {
                 id: tabRow
                 anchors.left: parent.left
@@ -79,7 +76,6 @@ Item {
 
                         readonly property bool isSelected: tabItem.index === tabSelector.currentIndex
 
-                        // Gradient background for selected tab
                         gradient: tabItem.isSelected ? selectedGradient : null
                         color: tabItem.isSelected ? "white" : "transparent"
 
@@ -124,7 +120,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: tabSelector.currentIndex === 1
-            color: "#0D0D0D" // Very dark background
+            color: "#0D0D0D"
             radius: 12
             border.width: 1
             border.color: "#1A1A1C"
@@ -151,16 +147,13 @@ Item {
                     wrapMode: Text.WordWrap
                 }
 
-                Item {
-                    height: 10
-                    width: 1
-                } // Spacer
+                Item { height: 10; width: 1 }
 
                 // Start Simulation Button
                 Rectangle {
                     Layout.preferredWidth: 200
                     Layout.preferredHeight: 50
-                    color: "transparent"
+                    color: startSimMA.containsMouse ? Colors.surfaceLight : "transparent"
                     border.width: 1
                     border.color: Colors.textSecondary
                     radius: 4
@@ -170,7 +163,7 @@ Item {
                         spacing: 10
 
                         Text {
-                            text: "▶" // Play icon
+                            text: "▶"
                             color: Colors.white
                             font.pixelSize: 14
                         }
@@ -184,78 +177,91 @@ Item {
                     }
 
                     MouseArea {
+                        id: startSimMA
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: console.log("Start Simulation clicked")
+                        hoverEnabled: true
+                        onClicked: {
+                            soundboardService.startTestCallSimulation();
+                            root.startSimulationRequested();
+                        }
                     }
+
+                    Behavior on color { ColorAnimation { duration: 150 } }
                 }
 
-                Item {
-                    height: 10
-                    width: 1
-                } // Spacer
+                Item { height: 10; width: 1 }
 
-                // Checkboxes Row
-                RowLayout {
-                    spacing: 40
-
-                    // Record simulation
-                    RowLayout {
-                        spacing: 10
-
-                        Rectangle {
-                            width: 18
-                            height: 18
-                            radius: 4
-                            color: "#6366f1" // Checked purple
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "✓"
-                                color: "white"
-                                font.pixelSize: 12
-                            }
-                        }
-
-                        Text {
-                            text: "Record simulation"
-                            color: Colors.textSecondary
-                            font.pixelSize: 14
-                        }
-                    }
-
-                    // Save as .wav
-                    RowLayout {
-                        spacing: 10
-
-                        Text {
-                            text: "💾" // Icon placeholder
-                            color: Colors.textSecondary
-                        }
-
-                        Text {
-                            text: "[ Save as .wav ]"
-                            color: Colors.textSecondary
-                            font.pixelSize: 14
-                        }
-                    }
-                }
-
-                // Loop playback test
+                // Record simulation checkbox
                 RowLayout {
                     spacing: 10
 
                     Rectangle {
+                        id: recordCheckbox
                         width: 18
                         height: 18
                         radius: 4
-                        color: "#6366f1" // Checked purple
+                        color: recordCheckbox.checked ? "#6366f1" : "transparent"
+                        border.width: recordCheckbox.checked ? 0 : 1
+                        border.color: Colors.textSecondary
+
+                        property bool checked: true
 
                         Text {
                             anchors.centerIn: parent
                             text: "✓"
                             color: "white"
                             font.pixelSize: 12
+                            visible: recordCheckbox.checked
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: recordCheckbox.checked = !recordCheckbox.checked
+                        }
+                    }
+
+                    Text {
+                        text: "Record simulation"
+                        color: Colors.textSecondary
+                        font.pixelSize: 14
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: recordCheckbox.checked = !recordCheckbox.checked
+                        }
+                    }
+                }
+
+                // Loop playback test checkbox
+                RowLayout {
+                    spacing: 10
+
+                    Rectangle {
+                        id: loopCheckbox
+                        width: 18
+                        height: 18
+                        radius: 4
+                        color: loopCheckbox.checked ? "#6366f1" : "transparent"
+                        border.width: loopCheckbox.checked ? 0 : 1
+                        border.color: Colors.textSecondary
+
+                        property bool checked: true
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "✓"
+                            color: "white"
+                            font.pixelSize: 12
+                            visible: loopCheckbox.checked
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: loopCheckbox.checked = !loopCheckbox.checked
                         }
                     }
 
@@ -263,43 +269,107 @@ Item {
                         text: "Loop playback test"
                         color: Colors.textSecondary
                         font.pixelSize: 14
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: loopCheckbox.checked = !loopCheckbox.checked
+                        }
                     }
                 }
 
-                Item {
-                    height: 10
-                    width: 1
-                } // Spacer
+                Item { height: 10; width: 1 }
 
-                // Open last test link/button
+                // Action buttons row
                 RowLayout {
-                    spacing: 10
+                    spacing: 20
 
-                    Text {
-                        text: "📂"
-                        color: Colors.textSecondary
+                    // Play Last Recording button
+                    Rectangle {
+                        Layout.preferredWidth: 180
+                        Layout.preferredHeight: 40
+                        color: playLastMA.containsMouse ? Colors.surfaceLight : Colors.surfaceDark
+                        radius: 8
+                        border.width: 1
+                        border.color: Colors.border
+
+                        RowLayout {
+                            anchors.centerIn: parent
+                            spacing: 8
+
+                            Text {
+                                text: "▶"
+                                color: Colors.accent
+                                font.pixelSize: 14
+                            }
+
+                            Text {
+                                text: "Play Last Recording"
+                                color: Colors.textPrimary
+                                font.pixelSize: 13
+                            }
+                        }
+
+                        MouseArea {
+                            id: playLastMA
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
+                            onClicked: {
+                                soundboardService.playLastTestCallRecording();
+                            }
+                        }
+
+                        Behavior on color { ColorAnimation { duration: 150 } }
                     }
 
-                    Text {
-                        text: "[ Open last test ]"
-                        color: Colors.textSecondary
-                        font.pixelSize: 14
-                    }
+                    // Open Recordings Folder button
+                    Rectangle {
+                        Layout.preferredWidth: 200
+                        Layout.preferredHeight: 40
+                        color: openFolderMA.containsMouse ? Colors.surfaceLight : Colors.surfaceDark
+                        radius: 8
+                        border.width: 1
+                        border.color: Colors.border
 
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
+                        RowLayout {
+                            anchors.centerIn: parent
+                            spacing: 8
+
+                            Text {
+                                text: "📂"
+                                font.pixelSize: 14
+                            }
+
+                            Text {
+                                text: "Open Recordings Folder"
+                                color: Colors.textPrimary
+                                font.pixelSize: 13
+                            }
+                        }
+
+                        MouseArea {
+                            id: openFolderMA
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
+                            onClicked: {
+                                soundboardService.openTestCallRecordingsFolder();
+                            }
+                        }
+
+                        Behavior on color { ColorAnimation { duration: 150 } }
                     }
                 }
 
-                // Vertical Spacer to push content up
+                // Vertical Spacer
                 Item {
                     Layout.fillHeight: true
                 }
             }
         }
 
-        // Spacer to push content up and keep tabs fixed at top
+        // Spacer for other tabs
         Item {
             visible: tabSelector.currentIndex !== 1
             Layout.fillHeight: true

@@ -239,6 +239,17 @@ public:
     Q_INVOKABLE QString consumePendingRecordingPath(); // returns path once, then clears it
     Q_INVOKABLE void cancelPendingRecording();         // stops + deletes file + clears state
 
+    // ---- Test Call Simulation ----
+    Q_PROPERTY(bool isTestCallSimulationActive READ isTestCallSimulationActive NOTIFY testCallSimulationChanged)
+    Q_INVOKABLE void startTestCallSimulation();
+    Q_INVOKABLE void stopTestCallSimulation();
+    bool isTestCallSimulationActive() const { return m_testCallSimulationActive; }
+    Q_INVOKABLE QString getTestCallRecordingsPath() const;
+    Q_INVOKABLE QString getLastTestCallRecordingPath() const;
+    Q_INVOKABLE bool playLastTestCallRecording();
+    Q_INVOKABLE void stopTestCallRecordingPlayback();
+    Q_INVOKABLE void openTestCallRecordingsFolder();
+
     // ---- Recording options ----
     Q_INVOKABLE float getRecordingPeakLevel() const;
     Q_INVOKABLE QVariantList getWaveformPeaks(const QString& filePath, int numBars = 100) const;
@@ -303,6 +314,7 @@ signals:
     void clipSelectionRequested(int clipId);
     void clipboardChanged();
     void recordingStateChanged();
+    void testCallSimulationChanged();
     void audioDevicesChanged();
 
     // Error notification for UI
@@ -353,6 +365,10 @@ private:
     bool m_recordWithClipboard = false;
     QString m_selectedRecordingDeviceId;               // Track the selected recording input device
     bool m_micPassthroughDisabledForRecording = false; // Track if we disabled passthrough for recording
+
+    // Test Call Simulation state
+    bool m_testCallSimulationActive = false;
+    QString m_lastTestCallRecordingPath;
 
     // Dirty flags to track unsaved changes
     bool m_indexDirty = false;

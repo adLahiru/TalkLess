@@ -4268,3 +4268,133 @@ QVariantList SoundboardService::getClipsForBoardVariant(int boardId) const
 
     return list;
 }
+
+// ===================== Test Call Simulation =====================
+
+QString SoundboardService::getTestCallRecordingsPath() const
+{
+    QString basePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString testCallPath = basePath + "/TestCalls";
+    QDir dir(testCallPath);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+    return testCallPath;
+}
+
+void SoundboardService::startTestCallSimulation()
+{
+    if (m_testCallSimulationActive) {
+        qDebug() << "Test call simulation already active";
+        return;
+    }
+
+    qDebug() << "Starting test call simulation...";
+
+    // Prepare recording file
+    QString recordingsPath = getTestCallRecordingsPath();
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    QString filePath = recordingsPath + "/testcall_" + timestamp + ".wav";
+
+    // Check if mic passthrough is enabled (Always-On Mic toggle)
+    // Only record mic input if the user has enabled mic passthrough
+    bool recordMicInput = isMicPassthroughEnabled();
+
+    // startRecording(outputPath, recordMic, recordPlayback)
+    // - recordMic: true only if Always-On Mic is enabled
+    // - recordPlayback: always true (we want to capture soundboard clips)
+    if (m_audioEngine) {
+        qDebug() << "Test call simulation - recordMic:" << recordMicInput << ", recordPlayback: true";
+        bool success = m_audioEngine->startRecording(filePath.toStdString(), recordMicInput, true);
+        if (success) {
+            m_testCallSimulationActive = true;
+            m_lastTestCallRecordingPath = filePath;
+            emit testCallSimulationChanged();
+            qDebug() << "Test call simulation started, recording to:" << filePath;
+        } else {
+            qWarning() << "Failed to start test call simulation recording";
+            emit errorOccurred("Failed to start test call simulation recording");
+        }
+    }
+}
+
+void SoundboardService::stopTestCallSimulation()
+{
+    if (!m_testCallSimulationActive) {
+        qDebug() << "No test call simulation active";
+        return;
+    }
+
+    qDebug() << "Stopping test call simulation...";
+
+    if (m_audioEngine) {
+        m_audioEngine->stopRecording();
+    }
+
+    m_testCallSimulationActive = false;
+    emit testCallSimulationChanged();
+    qDebug() << "Test call simulation stopped, recording saved to:" << m_lastTestCallRecordingPath;
+}
+
+QString SoundboardService::getLastTestCallRecordingPath() const
+{
+    // If we have a recent recording path, use it
+    if (!m_lastTestCallRecordingPath.isEmpty() && QFile::exists(m_lastTestCallRecordingPath)) {
+        return m_lastTestCallRecordingPath;
+    }
+
+    // Otherwise find the most recent recording in the folder
+    QString recordingsPath = getTestCallRecordingsPath();
+    QDir dir(recordingsPath);
+    QStringList filters;
+    filters << "testcall_*.wav";
+    QFileInfoList files = dir.entryInfoList(filters, QDir::Files, QDir::Time);
+
+    if (!files.isEmpty()) {
+        return files.first().absoluteFilePath();
+    }
+
+    return QString();
+}
+
+bool SoundboardService::playLastTestCallRecording()
+{
+    QString path = getLastTestCallRecordingPath();
+    if (path.isEmpty()) {
+        qDebug() << "No test call recording found to play";
+        emit errorOccurred("No test call recording found");
+        return false;
+    }
+
+    qDebug() << "Playing last test call recording:" << path;
+
+    // Use audio engine to play the file using preview slot
+    if (m_audioEngine) {
+        m_audioEngine->loadClip(kPreviewSlot, path.toStdString());
+        m_audioEngine->playClip(kPreviewSlot);
+        return true;
+    }
+
+    return false;
+}
+
+void SoundboardService::stopTestCallRecordingPlayback()
+{
+    if (m_audioEngine) {
+        m_audioEngine->stopClip(kPreviewSlot);
+    }
+}
+
+void SoundboardService::openTestCallRecordingsFolder()
+{
+    QString path = getTestCallRecordingsPath();
+    qDebug() << "Opening test call recordings folder:" << path;
+
+#ifdef Q_OS_MACOS
+    QProcess::startDetached("open", QStringList() << path);
+#elif defined(Q_OS_WIN)
+    QProcess::startDetached("explorer", QStringList() << QDir::toNativeSeparators(path));
+#elif defined(Q_OS_LINUX)
+    QProcess::startDetached("xdg-open", QStringList() << path);
+#endif
+}

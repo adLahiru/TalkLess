@@ -5,6 +5,8 @@
 
 #include "audioEngine.h"
 
+#include "ffmpeg_decoder.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -14,10 +16,8 @@
 #include <iostream>
 #include <thread>
 
-#include "ffmpeg_decoder.h"
-
 #ifdef _WIN32
-#include <windows.h>
+    #include <windows.h>
 
 // Helper function to convert UTF-8 string to wide string for Windows file APIs
 static std::wstring utf8ToWide(const std::string& utf8)
@@ -1353,29 +1353,19 @@ void AudioEngine::processPlaybackAudio(void* output, ma_uint32 frameCount, ma_ui
 
     // --------------------------------------------------------
     // Recording output (push to recordingRb, realtime-safe)
+    // Record the ACTUAL speaker output so it captures exactly what was heard
+    // This includes mic if passthrough is ON, clips if playing, etc.
     // --------------------------------------------------------
     if (recActive && recordingRbData) {
-        // Apply same mg + limiter to recorded mix
-        float rPeak = 0.0f;
-        for (ma_uint32 i = 0; i < totalSamples; ++i) {
-            float v = recTempScratch[i] * mg;
-            recTempScratch[i] = v;
-            rPeak = std::max(rPeak, std::abs(v));
-        }
-
-        if (rPeak > targetPeak && rPeak > 0.000001f) {
-            const float rLimiter = targetPeak / rPeak;
-            for (ma_uint32 i = 0; i < totalSamples; ++i)
-                recTempScratch[i] *= rLimiter;
-        }
-
+        // The 'out' buffer already has master gain and limiter applied
+        // Simply copy it to the recording buffer
         void* pWrite = nullptr;
         ma_uint32 framesToWrite = frameCount;
 
         if (ma_pcm_rb_acquire_write(&recordingRb, &framesToWrite, &pWrite) == MA_SUCCESS && framesToWrite > 0 &&
             pWrite) {
             const size_t samplesToCopy = (size_t)framesToWrite * (size_t)playbackChannels;
-            std::memcpy(pWrite, recTempScratch.data(), samplesToCopy * sizeof(float));
+            std::memcpy(pWrite, out, samplesToCopy * sizeof(float));
             ma_pcm_rb_commit_write(&recordingRb, framesToWrite);
             recordedFrames.fetch_add(framesToWrite, std::memory_order_relaxed);
         }
@@ -1499,7 +1489,7 @@ void AudioEngine::processRecordingInput(const void* input, ma_uint32 frameCount,
             float mono = 0.0f;
             for (ma_uint32 ch = 0; ch < captureChannels; ++ch)
                 mono += in[f * captureChannels + ch];
-            mono = (mono / (float)captureChannels) * micG;  // Apply mic gain
+            mono = (mono / (float)captureChannels) * micG; // Apply mic gain
             dst[f] = mono;
         }
         ma_pcm_rb_commit_write(&recordingInputRb, toWrite);
@@ -2163,9 +2153,9 @@ bool AudioEngine::startRecording(const std::string& outputPath, bool recordMic, 
         return false;
 
     // Store recording source settings
-    // NOTE: recordMic is ignored - main mic is never recorded, only recording input device
-    recordMicEnabled.store(false, std::memory_order_relaxed);  // Main mic never recorded
-    recordPlaybackEnabled.store(recordPlayback, std::memory_order_relaxed);  // Clips optional
+    // recordMic controls whether to include mic/recording input device
+    recordMicEnabled.store(recordMic, std::memory_order_relaxed);
+    recordPlaybackEnabled.store(recordPlayback, std::memory_order_relaxed); // Clips optional
 
     // Ensure main devices running so playback callback executes
     if (!deviceRunning.load(std::memory_order_relaxed)) {
@@ -2186,8 +2176,9 @@ bool AudioEngine::startRecording(const std::string& outputPath, bool recordMic, 
         return false;
     ma_pcm_rb_reset(&recordingRb);
 
-    // Start optional extra recording input device
-    if (recordingInputEnabled.load(std::memory_order_relaxed)) {
+    // Start optional extra recording input device ONLY if recordMic is true
+    // This respects the user's choice to include or exclude mic from the recording
+    if (recordMic && recordingInputEnabled.load(std::memory_order_relaxed)) {
         startRecordingInputDevice();
         ma_pcm_rb_reset(&recordingInputRb);
     }

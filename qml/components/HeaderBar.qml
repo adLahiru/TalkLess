@@ -35,6 +35,75 @@ Rectangle {
             anchors.rightMargin: 20
             spacing: 16
 
+            // TEST CALL SIMULATION RECORDING INDICATOR
+            // Shows in header when simulation is active
+            Rectangle {
+                id: recordingIndicator
+                visible: soundboardService.isTestCallSimulationActive
+                Layout.preferredWidth: recordingRow.width + 24
+                Layout.preferredHeight: 36
+                radius: 18
+                color: Colors.surfaceDark
+                border.width: 1
+                border.color: Colors.error
+
+                RowLayout {
+                    id: recordingRow
+                    anchors.centerIn: parent
+                    spacing: 10
+
+                    // Blinking recording dot
+                    Rectangle {
+                        width: 10
+                        height: 10
+                        radius: 5
+                        color: Colors.error
+
+                        SequentialAnimation on opacity {
+                            running: recordingIndicator.visible
+                            loops: Animation.Infinite
+                            NumberAnimation { to: 0.3; duration: 500 }
+                            NumberAnimation { to: 1.0; duration: 500 }
+                        }
+                    }
+
+                    Text {
+                        text: "Recording..."
+                        color: Colors.textPrimary
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
+                    }
+
+                    // Stop button
+                    Rectangle {
+                        width: 50
+                        height: 26
+                        radius: 13
+                        color: stopRecMA.containsMouse ? Colors.errorLight : Colors.error
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Stop"
+                            color: Colors.textOnPrimary
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                        }
+
+                        MouseArea {
+                            id: stopRecMA
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                soundboardService.stopTestCallSimulation();
+                            }
+                        }
+
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                    }
+                }
+            }
+
             // Spacer to push content to the right
             Item {
                 Layout.fillWidth: true

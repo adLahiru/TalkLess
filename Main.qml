@@ -433,8 +433,15 @@ ApplicationWindow {
 
                     // Audio Playback Engine
                     AudioPlaybackView {
+                        id: audioPlaybackView
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+
+                        onStartSimulationRequested: {
+                            // Navigate to Soundboard page when simulation starts
+                            contentStack.currentIndex = 0;
+                            sidebar.currentIndex = 0;
+                        }
                     }
 
                     // Application Settings
