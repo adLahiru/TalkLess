@@ -369,10 +369,197 @@ Item {
             }
         }
 
-        // Spacer for other tabs
-        Item {
-            visible: tabSelector.currentIndex !== 1
+        // Playback Dashboard Card
+        Rectangle {
+            id: playbackDashboardCard
+            Layout.fillWidth: true
             Layout.fillHeight: true
+            visible: tabSelector.currentIndex === 0
+            color: "#0D0D0D"
+            radius: 12
+            border.width: 1
+            border.color: "#1A1A1C"
+
+            // State for selected soundboard
+            property int selectedBoardId: -1
+            property string selectedBoardName: ""
+            property var clipsData: []
+
+            // Function to load clips for selected board
+            function loadClipsForBoard(boardId) {
+                if (boardId >= 0 && soundboardService) {
+                    clipsData = soundboardService.getClipsForBoardVariant(boardId);
+                } else {
+                    clipsData = [];
+                }
+            }
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 24
+                spacing: 16
+
+                // Header row with dropdown
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 16
+
+                    // Title
+                    Text {
+                        text: "Playback Dashboard"
+                        color: Colors.white
+                        font.pixelSize: 20
+                        font.weight: Font.Bold
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    // Select Soundboard dropdown
+                    Rectangle {
+                        id: soundboardDropdown
+                        Layout.preferredWidth: 200
+                        Layout.preferredHeight: 40
+                        radius: 8
+                        color: dropdownMa.containsMouse ? Colors.surfaceLight : Colors.surfaceDark
+                        border.width: 1
+                        border.color: Colors.border
+
+                        property bool isOpen: false
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            spacing: 8
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: playbackDashboardCard.selectedBoardName || "Select Soundboard"
+                                color: playbackDashboardCard.selectedBoardName ? Colors.textPrimary : Colors.textSecondary
+                                font.pixelSize: 14
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                text: soundboardDropdown.isOpen ? "▲" : "▼"
+                                color: Colors.textSecondary
+                                font.pixelSize: 10
+                            }
+                        }
+
+                        MouseArea {
+                            id: dropdownMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: soundboardDropdown.isOpen = !soundboardDropdown.isOpen
+                        }
+
+                        // Dropdown popup
+                        Rectangle {
+                            id: dropdownPopup
+                            anchors.top: parent.bottom
+                            anchors.left: parent.left
+                            anchors.topMargin: 4
+                            width: parent.width
+                            height: Math.min(boardsList.contentHeight + 8, 200)
+                            radius: 8
+                            color: Colors.surface
+                            border.width: 1
+                            border.color: Colors.border
+                            visible: soundboardDropdown.isOpen
+                            z: 100
+
+                            ListView {
+                                id: boardsList
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                clip: true
+                                model: soundboardService ? soundboardService.listBoardsForDropdown() : []
+
+                                delegate: Rectangle {
+                                    id: boardDelegate
+                                    width: boardsList.width
+                                    height: 36
+                                    radius: 6
+                                    color: boardItemMa.containsMouse ? Colors.surfaceLight : "transparent"
+
+                                    required property var modelData
+                                    required property int index
+
+                                    Text {
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 12
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: boardDelegate.modelData.name || ""
+                                        color: Colors.textPrimary
+                                        font.pixelSize: 13
+                                    }
+
+                                    MouseArea {
+                                        id: boardItemMa
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            playbackDashboardCard.selectedBoardId = boardDelegate.modelData.id;
+                                            playbackDashboardCard.selectedBoardName = boardDelegate.modelData.name;
+                                            playbackDashboardCard.loadClipsForBoard(boardDelegate.modelData.id);
+                                            soundboardDropdown.isOpen = false;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Clips list
+                ScrollView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+
+                    Column {
+                        id: clipsColumn
+                        width: parent.width
+                        spacing: 8
+
+                        // Empty state
+                        Text {
+                            visible: playbackDashboardCard.clipsData.length === 0
+                            text: playbackDashboardCard.selectedBoardId >= 0 
+                                ? "No clips in this soundboard" 
+                                : "Select a soundboard to view clips"
+                            color: Colors.textSecondary
+                            font.pixelSize: 14
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+
+                        // Clips repeater
+                        Repeater {
+                            id: clipsRepeater
+                            model: playbackDashboardCard.clipsData
+
+                            AudioPlaybackSlot {
+                                id: slotItem
+                                width: clipsColumn.width
+                                
+                                required property var modelData
+                                required property int index
+                                
+                                clipId: slotItem.modelData.id || -1
+                                clipTitle: slotItem.modelData.title || slotItem.modelData.filePath || "Untitled"
+                                hotkeyLabel: slotItem.modelData.hotkey || "F1"
+
+                                onSettingsClicked: {
+                                    console.log("Settings clicked for clip:", clipId);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

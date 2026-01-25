@@ -199,12 +199,14 @@ qt_add_qml_module(appTalkLess
         qml/components/FileDropArea.qml
         qml/components/TrimWaveform.qml
         qml/components/AudioPlayerCard.qml
+        qml/components/AudioPlaybackSlot.qml
         qml/pages/ApplicationSettingsView.qml
         qml/pages/AudioPlaybackView.qml
         qml/pages/SoundboardView.qml
         qml/pages/AuthView.qml
         qml/pages/LoginPage.qml
         qml/pages/SignupPage.qml
+        qml/pages/StatisticsReportingView.qml
         qml/styles/Colors.qml
         qml/styles/Typography.qml
         qml/styles/Theme.qml

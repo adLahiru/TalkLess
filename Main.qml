@@ -447,17 +447,8 @@ ApplicationWindow {
                     // Application Settings
                     ApplicationSettingsView {}
 
-                    // Statistics & Reporting (placeholder)
-                    Rectangle {
-                        color: Colors.background
-                        radius: 10
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Statistics & Reporting"
-                            color: Colors.textSecondary
-                            font.pixelSize: 32
-                        }
-                    }
+                    // Statistics & Reporting
+                    StatisticsReportingView {}
                 }
             }
         }
