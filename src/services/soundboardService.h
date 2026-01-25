@@ -24,6 +24,7 @@ class SoundboardService : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QVariantList activeBoardIds READ activeBoardIdsList NOTIFY activeBoardChanged)
+    Q_PROPERTY(QVariantList boardsDropdownList READ listBoardsForDropdown NOTIFY boardsChanged) // For dropdowns
     // Legacy single-board support (returns first active or -1)
     Q_PROPERTY(int activeBoardId READ activeBoardId NOTIFY activeBoardChanged)
     Q_PROPERTY(QString activeBoardName READ activeBoardName NOTIFY activeBoardChanged)

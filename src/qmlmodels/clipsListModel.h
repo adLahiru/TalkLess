@@ -13,6 +13,8 @@ class ClipsListModel : public QAbstractListModel
     Q_PROPERTY(int boardId READ boardId WRITE setBoardId NOTIFY boardIdChanged)
     Q_PROPERTY(QString boardName READ boardName NOTIFY boardNameChanged)
     Q_PROPERTY(int count READ count NOTIFY clipsChanged)
+    Q_PROPERTY(bool autoLoadActive READ autoLoadActive WRITE setAutoLoadActive NOTIFY autoLoadActiveChanged)
+
 
 public:
     enum Roles {
@@ -56,6 +58,9 @@ public:
 
     int count() const { return m_cache.size(); }
 
+    bool autoLoadActive() const { return m_autoLoadActive; }
+    void setAutoLoadActive(bool active);
+
     // Invokable methods for QML
     Q_INVOKABLE void reload();
     Q_INVOKABLE void loadActiveBoard(); // Load clips from the currently active board
@@ -70,6 +75,7 @@ signals:
     void boardIdChanged();
     void boardNameChanged();
     void clipsChanged();
+    void autoLoadActiveChanged();
 
 private slots:
     void onActiveClipsChanged();
@@ -77,5 +83,6 @@ private slots:
 private:
     SoundboardService* m_service = nullptr;
     int m_boardId = -1;
+    bool m_autoLoadActive = true;
     QVector<Clip> m_cache;
 };

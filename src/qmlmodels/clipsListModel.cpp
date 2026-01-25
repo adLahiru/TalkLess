@@ -21,15 +21,30 @@ void ClipsListModel::setService(SoundboardService* service)
         connect(m_service, &SoundboardService::activeBoardChanged, this, &ClipsListModel::onActiveClipsChanged);
 
         // If no board ID is set, load the active board
-        if (m_boardId < 0) {
+        if (m_boardId < 0 && m_autoLoadActive) {
             loadActiveBoard();
         } else {
+            // Even if we don't load active board, we might need to clear or reload specific board
             reload();
         }
     } else {
         beginResetModel();
         m_cache.clear();
         endResetModel();
+    }
+}
+
+void ClipsListModel::setAutoLoadActive(bool active)
+{
+    if (m_autoLoadActive == active)
+        return;
+
+    m_autoLoadActive = active;
+    emit autoLoadActiveChanged();
+
+    // If we just enabled it and we have no board, load active
+    if (m_autoLoadActive && m_boardId < 0 && m_service) {
+        loadActiveBoard();
     }
 }
 
@@ -147,9 +162,12 @@ void ClipsListModel::reload()
 
     if (m_boardId >= 0) {
         m_cache = m_service->getClipsForBoard(m_boardId);
-    } else {
-        // If no board ID specified, use active board
+    } else if (m_autoLoadActive) {
+        // If no board ID specified and auto-load is on, use active board
         m_cache = m_service->getActiveClips();
+    } else {
+        // Otherwise clear
+        m_cache.clear();
     }
 
     endResetModel();

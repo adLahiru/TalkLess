@@ -3,12 +3,21 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../components"
 import "../styles"
+import TalkLess.Models 1.0
 
 Item {
     id: root
 
     // Signal to request navigation to soundboard for simulation
-    signal startSimulationRequested()
+    signal startSimulationRequested
+
+    // Local model for the dashboard
+    ClipsListModel {
+        id: dashboardClipsModel
+        service: soundboardService
+        boardId: -1 // Explicitly start with no board selected
+        autoLoadActive: false // Don't auto-load the active board from service
+    }
 
     // Banner Area
     BackgroundBanner {
@@ -43,8 +52,12 @@ Item {
 
             ListModel {
                 id: tabModel
-                ListElement { title: "Playback Dashboard" }
-                ListElement { title: "Test Call Simulation" }
+                ListElement {
+                    title: "Playback Dashboard"
+                }
+                ListElement {
+                    title: "Test Call Simulation"
+                }
             }
 
             Rectangle {
@@ -82,8 +95,14 @@ Item {
                         Gradient {
                             id: selectedGradient
                             orientation: Gradient.Horizontal
-                            GradientStop { position: 0.0; color: Colors.gradientPrimaryStart }
-                            GradientStop { position: 1.0; color: Colors.gradientPrimaryEnd }
+                            GradientStop {
+                                position: 0.0
+                                color: Colors.gradientPrimaryStart
+                            }
+                            GradientStop {
+                                position: 1.0
+                                color: Colors.gradientPrimaryEnd
+                            }
                         }
 
                         Text {
@@ -102,14 +121,20 @@ Item {
                             hoverEnabled: true
                             onClicked: tabSelector.currentIndex = tabItem.index
                             onEntered: {
-                                if (!tabItem.isSelected) tabText.opacity = 0.9
+                                if (!tabItem.isSelected)
+                                    tabText.opacity = 0.9;
                             }
                             onExited: {
-                                if (!tabItem.isSelected) tabText.opacity = 0.7
+                                if (!tabItem.isSelected)
+                                    tabText.opacity = 0.7;
                             }
                         }
-                        
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: 150
+                            }
+                        }
                     }
                 }
             }
@@ -120,10 +145,10 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: tabSelector.currentIndex === 1
-            color: "#0D0D0D"
+            color: Colors.surface
             radius: 12
             border.width: 1
-            border.color: "#1A1A1C"
+            border.color: Colors.border
 
             ColumnLayout {
                 anchors.fill: parent
@@ -133,7 +158,7 @@ Item {
                 // Title
                 Text {
                     text: "Test Call Simulation"
-                    color: Colors.white
+                    color: Colors.textPrimary
                     font.pixelSize: 20
                     font.weight: Font.Bold
                 }
@@ -147,7 +172,10 @@ Item {
                     wrapMode: Text.WordWrap
                 }
 
-                Item { height: 10; width: 1 }
+                Item {
+                    height: 10
+                    width: 1
+                }
 
                 // Start Simulation Button
                 Rectangle {
@@ -164,13 +192,13 @@ Item {
 
                         Text {
                             text: "▶"
-                            color: Colors.white
+                            color: Colors.textPrimary
                             font.pixelSize: 14
                         }
 
                         Text {
                             text: "Start Simulation"
-                            color: Colors.white
+                            color: Colors.textPrimary
                             font.pixelSize: 15
                             font.weight: Font.Medium
                         }
@@ -187,10 +215,17 @@ Item {
                         }
                     }
 
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: 150
+                        }
+                    }
                 }
 
-                Item { height: 10; width: 1 }
+                Item {
+                    height: 10
+                    width: 1
+                }
 
                 // Record simulation checkbox
                 RowLayout {
@@ -201,7 +236,7 @@ Item {
                         width: 18
                         height: 18
                         radius: 4
-                        color: recordCheckbox.checked ? "#6366f1" : "transparent"
+                        color: recordCheckbox.checked ? Colors.accent : "transparent"
                         border.width: recordCheckbox.checked ? 0 : 1
                         border.color: Colors.textSecondary
 
@@ -210,7 +245,7 @@ Item {
                         Text {
                             anchors.centerIn: parent
                             text: "✓"
-                            color: "white"
+                            color: Colors.textOnAccent
                             font.pixelSize: 12
                             visible: recordCheckbox.checked
                         }
@@ -244,7 +279,7 @@ Item {
                         width: 18
                         height: 18
                         radius: 4
-                        color: loopCheckbox.checked ? "#6366f1" : "transparent"
+                        color: loopCheckbox.checked ? Colors.accent : "transparent"
                         border.width: loopCheckbox.checked ? 0 : 1
                         border.color: Colors.textSecondary
 
@@ -253,7 +288,7 @@ Item {
                         Text {
                             anchors.centerIn: parent
                             text: "✓"
-                            color: "white"
+                            color: Colors.textOnAccent
                             font.pixelSize: 12
                             visible: loopCheckbox.checked
                         }
@@ -278,7 +313,10 @@ Item {
                     }
                 }
 
-                Item { height: 10; width: 1 }
+                Item {
+                    height: 10
+                    width: 1
+                }
 
                 // Action buttons row
                 RowLayout {
@@ -320,7 +358,11 @@ Item {
                             }
                         }
 
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 150
+                            }
+                        }
                     }
 
                     // Open Recordings Folder button
@@ -358,7 +400,11 @@ Item {
                             }
                         }
 
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 150
+                            }
+                        }
                     }
                 }
 
@@ -375,30 +421,14 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: tabSelector.currentIndex === 0
-            color: "#0D0D0D"
+            color: Colors.surface
             radius: 12
             border.width: 1
-            border.color: "#1A1A1C"
+            border.color: Colors.border
 
             // State for selected soundboard
             property int selectedBoardId: -1
             property string selectedBoardName: ""
-            property var clipsData: []
-
-            // Function to load clips for selected board
-            function loadClipsForBoard(boardId) {
-                console.log("loadClipsForBoard called with boardId:", boardId);
-                if (boardId >= 0 && soundboardService) {
-                    clipsData = soundboardService.getClipsForBoardVariant(boardId);
-                    console.log("Loaded clips count:", clipsData.length);
-                    for (var i = 0; i < clipsData.length; i++) {
-                        console.log("Clip", i, ":", JSON.stringify(clipsData[i]));
-                    }
-                } else {
-                    console.log("Skipping load - invalid boardId or no service");
-                    clipsData = [];
-                }
-            }
 
             ColumnLayout {
                 anchors.fill: parent
@@ -409,16 +439,19 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 16
+                    z: 50 // Ensure dropdowns appear above content below
 
                     // Title
                     Text {
                         text: "Playback Dashboard"
-                        color: Colors.white
+                        color: Colors.textPrimary
                         font.pixelSize: 20
                         font.weight: Font.Bold
                     }
 
-                    Item { Layout.fillWidth: true }
+                    Item {
+                        Layout.fillWidth: true
+                    }
 
                     // Select Soundboard dropdown
                     Rectangle {
@@ -426,7 +459,7 @@ Item {
                         Layout.preferredWidth: 200
                         Layout.preferredHeight: 40
                         radius: 8
-                        color: dropdownMa.containsMouse ? Colors.surfaceLight : Colors.surfaceDark
+                        color: dropdownMa.containsMouse ? Colors.surfaceLight : Colors.background
                         border.width: 1
                         border.color: Colors.border
 
@@ -474,14 +507,14 @@ Item {
                             border.width: 1
                             border.color: Colors.border
                             visible: soundboardDropdown.isOpen
-                            z: 100
+                            z: 100 // High Z to appear above other elements
 
                             ListView {
                                 id: boardsList
                                 anchors.fill: parent
                                 anchors.margins: 4
                                 clip: true
-                                model: soundboardService ? soundboardService.listBoardsForDropdown() : []
+                                model: soundboardService ? soundboardService.boardsDropdownList : []
 
                                 delegate: Rectangle {
                                     id: boardDelegate
@@ -510,7 +543,7 @@ Item {
                                         onClicked: {
                                             playbackDashboardCard.selectedBoardId = boardDelegate.modelData.id;
                                             playbackDashboardCard.selectedBoardName = boardDelegate.modelData.name;
-                                            playbackDashboardCard.loadClipsForBoard(boardDelegate.modelData.id);
+                                            dashboardClipsModel.boardId = boardDelegate.modelData.id;
                                             soundboardDropdown.isOpen = false;
                                         }
                                     }
@@ -533,10 +566,8 @@ Item {
 
                         // Empty state
                         Text {
-                            visible: playbackDashboardCard.clipsData.length === 0
-                            text: playbackDashboardCard.selectedBoardId >= 0 
-                                ? "No clips in this soundboard" 
-                                : "Select a soundboard to view clips"
+                            visible: dashboardClipsModel.count === 0
+                            text: playbackDashboardCard.selectedBoardId >= 0 ? "No clips in this soundboard" : "Select a soundboard to view clips"
                             color: Colors.textSecondary
                             font.pixelSize: 14
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -545,18 +576,16 @@ Item {
                         // Clips repeater
                         Repeater {
                             id: clipsRepeater
-                            model: playbackDashboardCard.clipsData
+                            model: dashboardClipsModel
 
                             AudioPlaybackSlot {
                                 id: slotItem
                                 width: clipsColumn.width
-                                
-                                required property var modelData
-                                required property int index
-                                
-                                clipId: slotItem.modelData.id || -1
-                                clipTitle: slotItem.modelData.title || slotItem.modelData.filePath || "Untitled"
-                                hotkeyLabel: slotItem.modelData.hotkey || "F1"
+
+                                clipId: model.clipId || -1
+                                clipTitle: model.clipTitle || model.filePath || "Untitled"
+                                hotkeyLabel: model.hotkey || "F1"
+                                iconSource: model.imgPath || ""
 
                                 onSettingsClicked: {
                                     console.log("Settings clicked for clip:", clipId);

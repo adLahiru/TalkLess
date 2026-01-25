@@ -30,10 +30,10 @@ Rectangle {
         // Convert to dB: 20 * log10(amplitude)
         var dB = 20 * Math.log10(linearAmplitude);
 
-        // Map dB range [-60, 0] to [0, 1]
-        // -60 dB = 0.0 (minimum), 0 dB = 1.0 (maximum)
+        // Map dB range [-60, 20] to [0, 1]
+        // -60 dB = 0.0 (minimum), 20 dB = 1.0 (maximum)
         var minDB = -60.0;
-        var maxDB = 0.0;
+        var maxDB = 20.0;
         var normalized = (dB - minDB) / (maxDB - minDB);
 
         // Clamp to [0, 1]
@@ -506,7 +506,7 @@ Rectangle {
                                             id: micLevelSlider
                                             Layout.fillWidth: true
                                             from: -60
-                                            to: 0
+                                            to: 20
                                             value: soundboardService?.micGainDb ?? 0
                                             unit: "dB"
 
@@ -1470,7 +1470,7 @@ Rectangle {
                                             id: masterVolumeSlider
                                             anchors.fill: parent
                                             from: -60
-                                            to: 0
+                                            to: 20
                                             stepSize: 1
                                             value: soundboardService?.masterGainDb ?? 0
 

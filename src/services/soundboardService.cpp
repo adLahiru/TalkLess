@@ -4246,6 +4246,21 @@ QVariantList SoundboardService::getClipsForBoardVariant(int boardId) const
             m["title"] = clip.title;
             m["hotkey"] = clip.hotkey;
             m["filePath"] = clip.filePath;
+            m["imgPath"] = clip.imgPath;
+            m["volume"] = clip.volume;
+            m["speed"] = clip.speed;
+            m["isPlaying"] = clip.isPlaying;
+            m["isRepeat"] = clip.isRepeat;
+            m["tags"] = clip.tags;
+            m["reproductionMode"] = clip.reproductionMode;
+            m["stopOtherSounds"] = clip.stopOtherSounds;
+            m["muteOtherSounds"] = clip.muteOtherSounds;
+            m["muteMicDuringPlayback"] = clip.muteMicDuringPlayback;
+            m["durationSec"] = clip.durationSec;
+            m["trimStartMs"] = clip.trimStartMs;
+            m["trimEndMs"] = clip.trimEndMs;
+            m["lastPlayedPosMs"] = clip.lastPlayedPosMs;
+            m["teleprompterText"] = clip.teleprompterText;
             list.append(m);
         }
     };
