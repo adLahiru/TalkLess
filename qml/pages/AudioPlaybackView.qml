@@ -387,9 +387,15 @@ Item {
 
             // Function to load clips for selected board
             function loadClipsForBoard(boardId) {
+                console.log("loadClipsForBoard called with boardId:", boardId);
                 if (boardId >= 0 && soundboardService) {
                     clipsData = soundboardService.getClipsForBoardVariant(boardId);
+                    console.log("Loaded clips count:", clipsData.length);
+                    for (var i = 0; i < clipsData.length; i++) {
+                        console.log("Clip", i, ":", JSON.stringify(clipsData[i]));
+                    }
                 } else {
+                    console.log("Skipping load - invalid boardId or no service");
                     clipsData = [];
                 }
             }

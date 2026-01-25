@@ -4245,6 +4245,7 @@ QVariantList SoundboardService::getClipsForBoardVariant(int boardId) const
             m["id"] = clip.id;
             m["title"] = clip.title;
             m["hotkey"] = clip.hotkey;
+            m["filePath"] = clip.filePath;
             list.append(m);
         }
     };
