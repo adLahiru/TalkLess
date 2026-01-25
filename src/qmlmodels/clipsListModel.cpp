@@ -42,9 +42,9 @@ void ClipsListModel::setAutoLoadActive(bool active)
     m_autoLoadActive = active;
     emit autoLoadActiveChanged();
 
-    // If we just enabled it and we have no board, load active
-    if (m_autoLoadActive && m_boardId < 0 && m_service) {
-        loadActiveBoard();
+    // Reload to apply the new auto-load state (loads active if true, clears if false)
+    if (m_boardId < 0 && m_service) {
+        reload();
     }
 }
 

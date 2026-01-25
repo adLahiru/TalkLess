@@ -1,9 +1,9 @@
-import QtQuick
+﻿import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "../components"
 import "../styles"
-import TalkLess.Models 1.0
+import TalkLess.Models
 
 Item {
     id: root
@@ -420,6 +420,7 @@ Item {
             id: playbackDashboardCard
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.minimumWidth: 900
             visible: tabSelector.currentIndex === 0
             color: Colors.surface
             radius: 12
@@ -554,44 +555,64 @@ Item {
                 }
 
                 // Clips list
-                ScrollView {
+                ListView {
+                    id: clipsListView
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
+                    spacing: 8
+                    model: dashboardClipsModel
 
-                    Column {
-                        id: clipsColumn
-                        width: parent.width
-                        spacing: 8
+                    // Track which clip is currently expanded (only one at a time)
+                    property int expandedClipId: -1
 
-                        // Empty state
-                        Text {
-                            visible: dashboardClipsModel.count === 0
-                            text: playbackDashboardCard.selectedBoardId >= 0 ? "No clips in this soundboard" : "Select a soundboard to view clips"
-                            color: Colors.textSecondary
-                            font.pixelSize: 14
-                            anchors.horizontalCenter: parent.horizontalCenter
-                        }
+                    // Optimize list performance
+                    cacheBuffer: 1000
+                    displayMarginBeginning: 100
+                    displayMarginEnd: 100
 
-                        // Clips repeater
-                        Repeater {
-                            id: clipsRepeater
-                            model: dashboardClipsModel
+                    delegate: AudioPlaybackSlot {
+                        width: clipsListView.width - (clipsListView.leftMargin + clipsListView.rightMargin)
 
-                            AudioPlaybackSlot {
-                                id: slotItem
-                                width: clipsColumn.width
+                        // Direct model role access
+                        clipId: model.clipId || -1
+                        clipTitle: model.clipTitle || model.filePath || "Untitled"
+                        hotkeyLabel: model.hotkey || ""
+                        iconSource: model.imgPath || "qrc:/assets/icons/sound.svg"
 
-                                clipId: model.clipId || -1
-                                clipTitle: model.clipTitle || model.filePath || "Untitled"
-                                hotkeyLabel: model.hotkey || "F1"
-                                iconSource: model.imgPath || ""
+                        // Accordion behavior: only this clip is expanded if its ID matches
+                        expanded: clipId === clipsListView.expandedClipId
 
-                                onSettingsClicked: {
-                                    console.log("Settings clicked for clip:", clipId);
-                                }
+                        // When expanded state changes, update the list's tracker
+                        onExpandedChanged: {
+                            if (expanded) {
+                                clipsListView.expandedClipId = clipId;
+                            } else if (clipId === clipsListView.expandedClipId) {
+                                clipsListView.expandedClipId = -1;
                             }
                         }
+
+                        onSettingsClicked: {
+                            console.log("Settings clicked for clip:", clipId);
+                        }
+                    }
+
+                    // Custom scrollbar
+                    ScrollBar.vertical: ScrollBar {
+                        parent: clipsListView.parent
+                        anchors.top: clipsListView.top
+                        anchors.right: clipsListView.right
+                        anchors.bottom: clipsListView.bottom
+                        active: clipsListView.moving || clipsListView.flicking
+                    }
+
+                    // Empty state centered in list
+                    Text {
+                        anchors.centerIn: parent
+                        visible: clipsListView.count === 0
+                        text: playbackDashboardCard.selectedBoardId >= 0 ? "No clips in this soundboard" : "Select a soundboard to view clips"
+                        color: Colors.textSecondary
+                        font.pixelSize: 14
                     }
                 }
             }
