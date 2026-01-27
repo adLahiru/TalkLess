@@ -1,4 +1,4 @@
-#include "hotkeyManager.h"
+#include "hotkeymanager.h"
 #include "hotkeyvalidator.h"
 #include "services/soundboardService.h"
 #include <QHotkey>

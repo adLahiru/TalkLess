@@ -8,6 +8,8 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <condition_variable>
+#include <cmath>
 
 // miniaudio implementation is in miniaudio_impl.cpp
 #include "miniaudio.h"
@@ -24,22 +26,33 @@
 class AudioEngine
 {
 public:
-    struct AudioDeviceInfo {
+    struct AudioDeviceInfo
+    {
         std::string name;
-        std::string id;      // for your UI you used name as id
+        std::string id; // for your UI you used name as id
         bool isDefault = false;
         ma_device_id deviceId{};
     };
 
     using ClipFinishedCallback = std::function<void(int slotId)>;
-    using ClipErrorCallback    = std::function<void(int slotId)>;
+    using ClipErrorCallback = std::function<void(int slotId)>;
+    using ClipLoopedCallback = std::function<void(int slotId)>;
 
     static constexpr int MAX_CLIPS = 16;
-    static constexpr ma_uint32 ENGINE_SR = 48000;
+    static constexpr ma_uint32 DEFAULT_SAMPLE_RATE = 48000;
+    static constexpr ma_uint32 DEFAULT_BUFFER_SIZE = 1024;
+    static constexpr ma_uint32 DEFAULT_BUFFER_PERIODS = 3;
+    static constexpr ma_uint32 DEFAULT_CHANNELS = 2;
 
     AudioEngine();
     explicit AudioEngine(void* parent);
     ~AudioEngine();
+
+    // ---------------------------
+    // Audio Configuration (call before startAudioDevice)
+    // ---------------------------
+    void setAudioConfig(ma_uint32 sampleRate, ma_uint32 bufferSize, ma_uint32 periods, ma_uint32 channels);
+    ma_uint32 getSampleRate() const { return m_sampleRate; }
 
     // ---------------------------
     // Devices (Main)
@@ -69,6 +82,12 @@ public:
     // ---------------------------
     // Device selection
     // ---------------------------
+    // Pre-select devices (use before starting, does not reinitialize)
+    bool preselectPlaybackDevice(const std::string& deviceId);
+    bool preselectCaptureDevice(const std::string& deviceId);
+    bool preselectMonitorPlaybackDevice(const std::string& deviceId);
+
+    // Set devices (use after starting, reinitializes device)
     bool setPlaybackDevice(const std::string& deviceId);
     bool setCaptureDevice(const std::string& deviceId);
     bool setMonitorPlaybackDevice(const std::string& deviceId);
@@ -80,33 +99,33 @@ public:
     // ---------------------------
     // Mixer controls
     // ---------------------------
-    void  setMicEnabled(bool enabled);
-    bool  isMicEnabled() const;
+    void setMicEnabled(bool enabled);
+    bool isMicEnabled() const;
 
-    void  setMicPassthroughEnabled(bool enabled);
-    bool  isMicPassthroughEnabled() const;
+    void setMicPassthroughEnabled(bool enabled);
+    bool isMicPassthroughEnabled() const;
 
-    void  setMicGainDB(float gainDB);
+    void setMicGainDB(float gainDB);
     float getMicGainDB() const;
 
-    void  setMicGainLinear(float linear);
+    void setMicGainLinear(float linear);
     float getMicGainLinear() const;
 
-    void  setMasterGainDB(float gainDB);
+    void setMasterGainDB(float gainDB);
     float getMasterGainDB() const;
 
-    void  setMasterGainLinear(float linear);
+    void setMasterGainLinear(float linear);
     float getMasterGainLinear() const;
 
     // Balance: 0.0 mic only, 0.5 both full, 1.0 clips only
-    void  setMicSoundboardBalance(float balance);
+    void setMicSoundboardBalance(float balance);
     float getMicSoundboardBalance() const;
 
     // Peaks
     float getMicPeakLevel() const;
     float getMasterPeakLevel() const;
     float getMonitorPeakLevel() const;
-    void  resetPeakLevels();
+    void resetPeakLevels();
 
     // ---------------------------
     // Clips API
@@ -135,7 +154,7 @@ public:
     // ---------------------------
     // Recording (WAV)
     // - Records: Mic (if enabled) + Clips + RecordingInputDevice (if enabled and not "-1")
-    // - Always outputs stereo 48kHz
+    // - Outputs using current playback channel count (usually stereo)
     // ---------------------------
     bool startRecording(const std::string& outputPath);
     bool stopRecording();
@@ -147,17 +166,25 @@ public:
     // ---------------------------
     void setClipFinishedCallback(ClipFinishedCallback callback);
     void setClipErrorCallback(ClipErrorCallback callback);
+    void setClipLoopedCallback(ClipLoopedCallback callback);
 
 private:
-    enum class ClipState { Stopped, Playing, Paused, Draining, Stopping };
+    enum class ClipState {
+        Stopped,
+        Playing,
+        Paused,
+        Draining,
+        Stopping
+    };
 
-    struct ClipSlot {
+    struct ClipSlot
+    {
         std::atomic<ClipState> state{ClipState::Stopped};
 
         std::string filePath;
 
         std::atomic<float> gain{1.0f};
-        std::atomic<bool>  loop{false};
+        std::atomic<bool> loop{false};
 
         std::atomic<double> trimStartMs{0.0};
         std::atomic<double> trimEndMs{0.0};
@@ -167,14 +194,16 @@ private:
         std::atomic<long long> playbackFrameCount{0};
         std::atomic<long long> queuedMainFrames{0};
 
-        std::atomic<int> sampleRate{(int)ENGINE_SR};
+        std::atomic<int> sampleRate{(int)DEFAULT_SAMPLE_RATE};
         std::atomic<int> channels{2};
         std::atomic<double> totalDurationMs{0.0};
 
+        std::atomic<uint64_t> playToken{0};
+
         // Ring buffers (float stereo)
-        void*     ringBufferMainData = nullptr;
-        void*     ringBufferMonData  = nullptr;
-        
+        void* ringBufferMainData = nullptr;
+        void* ringBufferMonData = nullptr;
+
         ma_pcm_rb ringBufferMain{};
         ma_pcm_rb ringBufferMon{};
 
@@ -201,14 +230,22 @@ private:
     // Context rebuild (hotplug refresh)
     bool rebuildContextAndDevices(bool restartRunning);
 
+    // Refresh device ID structs after context rebuild (lookup by string ID)
+    void refreshDeviceIdStructs();
+
     // DSP helpers
     static float dBToLinear(float db);
-    static void  computeBalanceMultipliers(float balance, float& micMul, float& clipMul);
+    static void computeBalanceMultipliers(float balance, float& micMul, float& clipMul);
+
+    // Realtime-safe recording ringbuffer helpers
+    bool initRecordingRingBuffer(ma_uint32 sampleRate, ma_uint32 channels);
+    void shutdownRecordingRingBuffer();
 
     // Main audio callback
     static void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
-    void processAudio(void* output, const void* input, ma_uint32 frameCount,
-                      ma_uint32 playbackChannels, ma_uint32 captureChannels);
+
+    void processAudio(void* output, const void* input, ma_uint32 frameCount, ma_uint32 playbackChannels,
+                      ma_uint32 captureChannels, ma_format captureFormat);
 
     // Monitor callback
     static void monitorCallback(ma_device* pDevice, void* pOutput, const void*, ma_uint32 frameCount);
@@ -219,7 +256,7 @@ private:
     void processRecordingInput(const void* input, ma_uint32 frameCount, ma_uint32 captureChannels);
 
     // Decoder thread
-    static void decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slotId);
+    static void decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slotId, uint64_t token);
 
     // WAV writer
     bool writeWavFile(const std::string& path, const std::vector<float>& samples, int sampleRate, int channels);
@@ -242,7 +279,7 @@ private:
     std::atomic<bool> recordingInputEnabled{false};
 
     // ring buffer for recording-input mono frames
-    void*     recordingInputRbData = nullptr;
+    void* recordingInputRbData = nullptr;
     ma_pcm_rb recordingInputRb{};
     std::atomic<int> recordingInputCaptureChannels{0};
 
@@ -282,18 +319,41 @@ private:
     // Clips
     ClipSlot clips[MAX_CLIPS];
 
-    static constexpr ma_uint32 RING_BUFFER_SIZE_IN_FRAMES = ENGINE_SR * 2; // ~2 seconds stereo
-    static constexpr ma_uint32 RECINPUT_RB_SIZE_FRAMES    = ENGINE_SR * 5; // 5 seconds mono
+    // Configurable audio parameters
+    ma_uint32 m_sampleRate = DEFAULT_SAMPLE_RATE;
+    ma_uint32 m_bufferSizeFrames = DEFAULT_BUFFER_SIZE;
+    ma_uint32 m_bufferPeriods = DEFAULT_BUFFER_PERIODS;
+    ma_uint32 m_channels = DEFAULT_CHANNELS;
+
+    // Ring buffer sizes (calculated from sample rate)
+    ma_uint32 getRingBufferSize() const { return m_sampleRate * 2; } // ~2 seconds stereo
+    ma_uint32 getRecInputRbSize() const { return m_sampleRate * 5; } // 5 seconds mono
 
     // Callbacks
     std::mutex callbackMutex;
     ClipFinishedCallback clipFinishedCallback;
     ClipErrorCallback clipErrorCallback;
+    ClipLoopedCallback clipLoopedCallback;
 
-    // Recording
+    // ------------------------------------------------------------
+    // Recording (realtime-safe)
+    // ------------------------------------------------------------
     std::atomic<bool> recording{false};
-    std::mutex recordingMutex;
-    std::vector<float> recordingBuffer; // float stereo interleaved
+
+    // New: ringbuffer for recording output (float interleaved)
+    ma_pcm_rb recordingRb{};
+    void* recordingRbData = nullptr;
+    ma_uint32 recordingRbFrames = 0;
+
+    std::thread recordingWriterThread;
+    std::atomic<bool> recordingWriterRunning{false};
+    std::atomic<bool> recordingWriteOk{false};
+
+    int recordingChannels = 2; // usually = device->playback.channels
     std::string recordingOutputPath;
     std::atomic<uint64_t> recordedFrames{0};
+
+    // Legacy (old method) - keep if other code uses it, but should not be used anymore
+    std::mutex recordingMutex;
+    std::vector<float> recordingBuffer; // legacy
 };

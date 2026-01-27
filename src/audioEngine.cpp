@@ -18,6 +18,44 @@ AudioEngine::AudioEngine(void* parent) : AudioEngine()
     (void)parent;
 }
 
+// ------------------------------------------------------------
+// Audio Configuration
+// ------------------------------------------------------------
+void AudioEngine::setAudioConfig(ma_uint32 sampleRate, ma_uint32 bufferSize, ma_uint32 periods, ma_uint32 channels)
+{
+    // Validate sample rate
+    if (sampleRate != 44100 && sampleRate != 48000 && sampleRate != 96000) {
+        std::cout << "[AudioEngine] Invalid sample rate: " << sampleRate << ", using default" << std::endl;
+        sampleRate = DEFAULT_SAMPLE_RATE;
+    }
+
+    // Validate buffer size
+    if (bufferSize != 256 && bufferSize != 512 && bufferSize != 1024 && bufferSize != 2048 && bufferSize != 4096) {
+        std::cout << "[AudioEngine] Invalid buffer size: " << bufferSize << ", using default" << std::endl;
+        bufferSize = DEFAULT_BUFFER_SIZE;
+    }
+
+    // Validate periods
+    if (periods < 2 || periods > 4) {
+        std::cout << "[AudioEngine] Invalid buffer periods: " << periods << ", using default" << std::endl;
+        periods = DEFAULT_BUFFER_PERIODS;
+    }
+
+    // Validate channels
+    if (channels != 1 && channels != 2) {
+        std::cout << "[AudioEngine] Invalid channels: " << channels << ", using default" << std::endl;
+        channels = DEFAULT_CHANNELS;
+    }
+
+    m_sampleRate = sampleRate;
+    m_bufferSizeFrames = bufferSize;
+    m_bufferPeriods = periods;
+    m_channels = channels;
+
+    std::cout << "[AudioEngine] Configured: SR=" << m_sampleRate << ", BufferSize=" << m_bufferSizeFrames
+              << ", Periods=" << m_bufferPeriods << ", Channels=" << m_channels << std::endl;
+}
+
 AudioEngine::~AudioEngine()
 {
     // stop recording-input device
@@ -56,11 +94,27 @@ AudioEngine::~AudioEngine()
         delete context;
         context = nullptr;
     }
+    
+    // stop recording writer if still running
+    recording.store(false, std::memory_order_release);
+    recordingWriterRunning.store(false, std::memory_order_release);
+    if (recordingWriterThread.joinable()) {
+        recordingWriterThread.join();
+    }
+    shutdownRecordingRingBuffer();
+
 }
 
 // ------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------
+static inline float softClip(float x)
+{
+    // Fast soft clipper: x/(1+|x|)  -> smoother than hard clamp, avoids harsh distortion
+    const float ax = std::fabs(x);
+    return x / (1.0f + ax);
+}
+
 float AudioEngine::dBToLinear(float db)
 {
     return std::pow(10.0f, db / 20.0f);
@@ -71,11 +125,11 @@ void AudioEngine::computeBalanceMultipliers(float balance, float& micMul, float&
     balance = std::max(0.0f, std::min(1.0f, balance));
 
     if (balance <= 0.5f) {
-        micMul  = 1.0f;
-        clipMul = balance * 2.0f;          // 0..1
+        micMul = 1.0f;
+        clipMul = balance * 2.0f; // 0..1
     } else {
         clipMul = 1.0f;
-        micMul  = (1.0f - balance) * 2.0f; // 1..0
+        micMul = (1.0f - balance) * 2.0f; // 1..0
     }
 }
 
@@ -97,46 +151,56 @@ bool AudioEngine::initContext()
 
 bool AudioEngine::applyDeviceSelection(ma_device_config& config)
 {
-    if (selectedPlaybackSet) config.playback.pDeviceID = &selectedPlaybackDeviceIdStruct;
-    if (selectedCaptureSet)  config.capture.pDeviceID  = &selectedCaptureDeviceIdStruct;
+    if (selectedPlaybackSet)
+        config.playback.pDeviceID = &selectedPlaybackDeviceIdStruct;
+    if (selectedCaptureSet)
+        config.capture.pDeviceID = &selectedCaptureDeviceIdStruct;
     return true;
 }
 
 bool AudioEngine::initDevice()
 {
-    if (device) return true;
-    if (!initContext()) return false;
+    if (device)
+        return true;
+    if (!initContext())
+        return false;
 
     device = new ma_device();
 
     // try a few configs for capture robustness
-    struct TryCfg { ma_format fmt; ma_uint32 ch; ma_uint32 sr; };
+    struct TryCfg
+    {
+        ma_format fmt;
+        ma_uint32 ch;
+        ma_uint32 sr;
+    };
     TryCfg tries[] = {
-        { ma_format_f32, 2, ENGINE_SR },
-        { ma_format_f32, 1, ENGINE_SR },
-        { ma_format_s16, 2, ENGINE_SR },
-        { ma_format_s16, 1, ENGINE_SR },
-        { ma_format_unknown, 0, 0 } // auto
+        {    ma_format_f32, 2, m_sampleRate},
+        {    ma_format_f32, 1, m_sampleRate},
+        {    ma_format_s16, 2, m_sampleRate},
+        {    ma_format_s16, 1, m_sampleRate},
+        {ma_format_unknown, 0,            0}  // auto
     };
 
     for (auto& t : tries) {
         ma_device_config cfg = ma_device_config_init(ma_device_type_duplex);
-        cfg.playback.format   = ma_format_f32;
-        cfg.playback.channels = 2;
-        cfg.capture.format    = t.fmt;
-        cfg.capture.channels  = t.ch;
-        cfg.sampleRate        = (t.sr == 0 ? ENGINE_SR : t.sr);
-        cfg.dataCallback      = &AudioEngine::audioCallback;
-        cfg.pUserData         = this;
-        
-        // Use larger buffer for better compatibility with virtual audio cables
-        // and to reduce crackling/popping
-        cfg.periodSizeInFrames = 1024;  // ~21ms at 48kHz
-        cfg.periods = 3;  // Triple buffering for stability
+        cfg.playback.format = ma_format_f32;
+        cfg.playback.channels = m_channels;
+        cfg.capture.format = t.fmt;
+        cfg.capture.channels = t.ch;
+        cfg.sampleRate = (t.sr == 0 ? m_sampleRate : t.sr);
+        cfg.dataCallback = &AudioEngine::audioCallback;
+        cfg.pUserData = this;
+
+        // Use configurable buffer settings
+        cfg.periodSizeInFrames = m_bufferSizeFrames;
+        cfg.periods = m_bufferPeriods;
 
         applyDeviceSelection(cfg);
 
         if (ma_device_init(context, &cfg, device) == MA_SUCCESS) {
+            std::cout << "[AudioEngine] Main device initialized: SR=" << m_sampleRate
+                      << ", Buffer=" << m_bufferSizeFrames << ", Periods=" << m_bufferPeriods << std::endl;
             return true;
         }
     }
@@ -148,16 +212,20 @@ bool AudioEngine::initDevice()
 
 bool AudioEngine::startAudioDevice()
 {
-    if (!device && !initDevice()) return false;
-    if (ma_device_start(device) != MA_SUCCESS) return false;
+    if (!device && !initDevice())
+        return false;
+    if (ma_device_start(device) != MA_SUCCESS)
+        return false;
     deviceRunning.store(true, std::memory_order_release);
     return true;
 }
 
 bool AudioEngine::stopAudioDevice()
 {
-    if (!device) return false;
-    if (ma_device_stop(device) != MA_SUCCESS) return false;
+    if (!device)
+        return false;
+    if (ma_device_stop(device) != MA_SUCCESS)
+        return false;
     deviceRunning.store(false, std::memory_order_release);
     return true;
 }
@@ -172,18 +240,20 @@ bool AudioEngine::isDeviceRunning() const
 // ------------------------------------------------------------
 bool AudioEngine::initMonitorDevice()
 {
-    if (monitorDevice) return true;
-    if (!initContext()) return false;
+    if (monitorDevice)
+        return true;
+    if (!initContext())
+        return false;
 
     monitorDevice = new ma_device();
     ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
-    cfg.playback.format   = ma_format_f32;
-    cfg.playback.channels = 2;
-    cfg.sampleRate        = ENGINE_SR;
-    cfg.dataCallback      = &AudioEngine::monitorCallback;
-    cfg.pUserData         = this;
-    cfg.periodSizeInFrames = 1024;  // ~21ms at 48kHz - helps with VB-Cable
-    cfg.periods            = 3;    // Triple buffering for stability
+    cfg.playback.format = ma_format_f32;
+    cfg.playback.channels = m_channels;
+    cfg.sampleRate = m_sampleRate;
+    cfg.dataCallback = &AudioEngine::monitorCallback;
+    cfg.pUserData = this;
+    cfg.periodSizeInFrames = m_bufferSizeFrames;
+    cfg.periods = m_bufferPeriods;
 
     if (selectedMonitorPlaybackSet) {
         cfg.playback.pDeviceID = &selectedMonitorPlaybackDeviceIdStruct;
@@ -199,15 +269,18 @@ bool AudioEngine::initMonitorDevice()
 
 bool AudioEngine::startMonitorDevice()
 {
-    if (!monitorDevice && !initMonitorDevice()) return false;
-    if (ma_device_start(monitorDevice) != MA_SUCCESS) return false;
+    if (!monitorDevice && !initMonitorDevice())
+        return false;
+    if (ma_device_start(monitorDevice) != MA_SUCCESS)
+        return false;
     monitorRunning.store(true, std::memory_order_release);
     return true;
 }
 
 bool AudioEngine::stopMonitorDevice()
 {
-    if (!monitorDevice) return false;
+    if (!monitorDevice)
+        return false;
     monitorRunning.store(false, std::memory_order_release);
     ma_device_stop(monitorDevice);
     return true;
@@ -223,19 +296,21 @@ bool AudioEngine::isMonitorRunning() const
 // ------------------------------------------------------------
 bool AudioEngine::initRecordingInputDevice()
 {
-    if (recordingInputDevice) return true;
-    if (!initContext()) return false;
+    if (recordingInputDevice)
+        return true;
+    if (!initContext())
+        return false;
 
     recordingInputDevice = new ma_device();
 
     ma_device_config cfg = ma_device_config_init(ma_device_type_capture);
-    cfg.capture.format   = ma_format_f32;
-    cfg.capture.channels = 2;        // we’ll accept mono too (device may override)
-    cfg.sampleRate       = ENGINE_SR;
-    cfg.dataCallback     = &AudioEngine::recordingInputCallback;
-    cfg.pUserData        = this;
-    cfg.periodSizeInFrames = 1024;  // ~21ms at 48kHz - helps with VB-Cable
-    cfg.periods            = 3;     // Triple buffering for stability
+    cfg.capture.format = ma_format_f32;
+    cfg.capture.channels = m_channels;
+    cfg.sampleRate = m_sampleRate;
+    cfg.dataCallback = &AudioEngine::recordingInputCallback;
+    cfg.pUserData = this;
+    cfg.periodSizeInFrames = m_bufferSizeFrames;
+    cfg.periods = m_bufferPeriods;
 
     if (selectedRecordingCaptureSet) {
         cfg.capture.pDeviceID = &selectedRecordingCaptureDeviceIdStruct;
@@ -249,12 +324,12 @@ bool AudioEngine::initRecordingInputDevice()
 
     // init mono ringbuffer if not
     if (!recordingInputRbData) {
-        const size_t bytes = RECINPUT_RB_SIZE_FRAMES * 1 * sizeof(float);
+        const size_t bytes = getRecInputRbSize() * 1 * sizeof(float);
         recordingInputRbData = std::malloc(bytes);
-        if (!recordingInputRbData) return false;
+        if (!recordingInputRbData)
+            return false;
 
-        ma_pcm_rb_init(ma_format_f32, 1, RECINPUT_RB_SIZE_FRAMES,
-                       recordingInputRbData, nullptr, &recordingInputRb);
+        ma_pcm_rb_init(ma_format_f32, 1, getRecInputRbSize(), recordingInputRbData, nullptr, &recordingInputRb);
     } else {
         ma_pcm_rb_reset(&recordingInputRb);
     }
@@ -265,15 +340,18 @@ bool AudioEngine::initRecordingInputDevice()
 
 bool AudioEngine::startRecordingInputDevice()
 {
-    if (!recordingInputDevice && !initRecordingInputDevice()) return false;
-    if (ma_device_start(recordingInputDevice) != MA_SUCCESS) return false;
+    if (!recordingInputDevice && !initRecordingInputDevice())
+        return false;
+    if (ma_device_start(recordingInputDevice) != MA_SUCCESS)
+        return false;
     recordingInputRunning.store(true, std::memory_order_release);
     return true;
 }
 
 bool AudioEngine::stopRecordingInputDevice()
 {
-    if (!recordingInputDevice) return false;
+    if (!recordingInputDevice)
+        return false;
     recordingInputRunning.store(false, std::memory_order_release);
     ma_device_stop(recordingInputDevice);
     return true;
@@ -315,7 +393,8 @@ bool AudioEngine::reinitializeRecordingInputDevice(bool restart)
         recordingInputDevice = nullptr;
     }
 
-    if (!initRecordingInputDevice()) return false;
+    if (!initRecordingInputDevice())
+        return false;
 
     if (restart || wasRunning) {
         return startRecordingInputDevice();
@@ -331,18 +410,23 @@ bool AudioEngine::rebuildContextAndDevices(bool restartRunning)
     static std::mutex m;
     std::lock_guard<std::mutex> lock(m);
 
-    const bool mainWasRunning    = deviceRunning.load(std::memory_order_acquire);
-    const bool monWasRunning     = monitorRunning.load(std::memory_order_acquire);
-    const bool recInWasRunning   = recordingInputRunning.load(std::memory_order_acquire);
+    std::cout << "[AudioEngine] Rebuilding context and devices..." << std::endl;
+
+    const bool mainWasRunning = deviceRunning.load(std::memory_order_acquire);
+    const bool monWasRunning = monitorRunning.load(std::memory_order_acquire);
+    const bool recInWasRunning = recordingInputRunning.load(std::memory_order_acquire);
 
     // stop devices
-    if (mainWasRunning) stopAudioDevice();
-    if (monWasRunning)  stopMonitorDevice();
-    if (recInWasRunning) stopRecordingInputDevice();
+    if (mainWasRunning)
+        stopAudioDevice();
+    if (monWasRunning)
+        stopMonitorDevice();
+    if (recInWasRunning)
+        stopRecordingInputDevice();
 
     std::this_thread::sleep_for(std::chrono::milliseconds(30));
 
-    // uninit devices (but keep selection IDs)
+    // uninit devices (but keep selection string IDs)
     if (device) {
         ma_device_uninit(device);
         delete device;
@@ -365,10 +449,16 @@ bool AudioEngine::rebuildContextAndDevices(bool restartRunning)
         delete context;
         context = nullptr;
     }
-    if (!initContext()) return false;
+    if (!initContext())
+        return false;
 
-    // reinit devices
-    if (!initDevice()) return false;
+    // CRITICAL: Refresh device ID structs after rebuilding context
+    // The ma_device_id structs become stale after context rebuild
+    refreshDeviceIdStructs();
+
+    // reinit devices with refreshed device ID structs
+    if (!initDevice())
+        return false;
     // monitor optional
     if (selectedMonitorPlaybackSet) {
         initMonitorDevice();
@@ -379,10 +469,15 @@ bool AudioEngine::rebuildContextAndDevices(bool restartRunning)
     }
 
     if (restartRunning) {
-        if (mainWasRunning) startAudioDevice();
-        if (monWasRunning)  startMonitorDevice();
-        if (recInWasRunning) startRecordingInputDevice();
+        if (mainWasRunning)
+            startAudioDevice();
+        if (monWasRunning)
+            startMonitorDevice();
+        if (recInWasRunning)
+            startRecordingInputDevice();
     }
+
+    std::cout << "[AudioEngine] Context and devices rebuilt successfully" << std::endl;
     return true;
 }
 
@@ -399,12 +494,94 @@ bool AudioEngine::refreshInputDevices()
 }
 
 // ------------------------------------------------------------
+// Refresh device ID structs after context rebuild
+// ------------------------------------------------------------
+void AudioEngine::refreshDeviceIdStructs()
+{
+    // After rebuilding context, the ma_device_id structs are stale.
+    // We need to re-lookup each device by its string ID.
+
+    if (selectedPlaybackSet && !selectedPlaybackDeviceId.empty()) {
+        auto devices = enumeratePlaybackDevices();
+        bool found = false;
+        for (const auto& d : devices) {
+            if (d.id == selectedPlaybackDeviceId || d.name == selectedPlaybackDeviceId) {
+                selectedPlaybackDeviceIdStruct = d.deviceId;
+                found = true;
+                std::cout << "[AudioEngine] Refreshed playback device struct: " << d.name << std::endl;
+                break;
+            }
+        }
+        if (!found) {
+            std::cout << "[AudioEngine] Previously selected playback device not found: " << selectedPlaybackDeviceId
+                      << std::endl;
+            selectedPlaybackSet = false; // Device no longer available
+        }
+    }
+
+    if (selectedCaptureSet && !selectedCaptureDeviceId.empty()) {
+        auto devices = enumerateCaptureDevices();
+        bool found = false;
+        for (const auto& d : devices) {
+            if (d.id == selectedCaptureDeviceId || d.name == selectedCaptureDeviceId) {
+                selectedCaptureDeviceIdStruct = d.deviceId;
+                found = true;
+                std::cout << "[AudioEngine] Refreshed capture device struct: " << d.name << std::endl;
+                break;
+            }
+        }
+        if (!found) {
+            std::cout << "[AudioEngine] Previously selected capture device not found: " << selectedCaptureDeviceId
+                      << std::endl;
+            selectedCaptureSet = false; // Device no longer available
+        }
+    }
+
+    if (selectedMonitorPlaybackSet && !selectedMonitorPlaybackDeviceId.empty()) {
+        auto devices = enumeratePlaybackDevices();
+        bool found = false;
+        for (const auto& d : devices) {
+            if (d.id == selectedMonitorPlaybackDeviceId || d.name == selectedMonitorPlaybackDeviceId) {
+                selectedMonitorPlaybackDeviceIdStruct = d.deviceId;
+                found = true;
+                std::cout << "[AudioEngine] Refreshed monitor device struct: " << d.name << std::endl;
+                break;
+            }
+        }
+        if (!found) {
+            std::cout << "[AudioEngine] Previously selected monitor device not found: "
+                      << selectedMonitorPlaybackDeviceId << std::endl;
+            selectedMonitorPlaybackSet = false; // Device no longer available
+        }
+    }
+
+    if (selectedRecordingCaptureSet && !selectedRecordingCaptureDeviceId.empty()) {
+        auto devices = enumerateCaptureDevices();
+        bool found = false;
+        for (const auto& d : devices) {
+            if (d.id == selectedRecordingCaptureDeviceId || d.name == selectedRecordingCaptureDeviceId) {
+                selectedRecordingCaptureDeviceIdStruct = d.deviceId;
+                found = true;
+                std::cout << "[AudioEngine] Refreshed recording input device struct: " << d.name << std::endl;
+                break;
+            }
+        }
+        if (!found) {
+            std::cout << "[AudioEngine] Previously selected recording input device not found: "
+                      << selectedRecordingCaptureDeviceId << std::endl;
+            selectedRecordingCaptureSet = false; // Device no longer available
+        }
+    }
+}
+
+// ------------------------------------------------------------
 // Enumeration
 // ------------------------------------------------------------
 std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumeratePlaybackDevices()
 {
     std::vector<AudioDeviceInfo> devices;
-    if (!initContext()) return devices;
+    if (!initContext())
+        return devices;
 
     ma_device_info* pPlaybackInfos = nullptr;
     ma_uint32 playbackCount = 0;
@@ -418,7 +595,7 @@ std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumeratePlaybackDevices(
     devices.reserve(playbackCount);
     for (ma_uint32 i = 0; i < playbackCount; ++i) {
         AudioDeviceInfo info;
-        info.name = pPlaybackInfos[i].name ? std::string(pPlaybackInfos[i].name) : std::string();
+        info.name = (pPlaybackInfos[i].name[0] != '\0') ? std::string(pPlaybackInfos[i].name) : std::string();
         info.id = info.name; // your UI uses name as ID
         info.isDefault = pPlaybackInfos[i].isDefault;
         info.deviceId = pPlaybackInfos[i].id;
@@ -430,7 +607,8 @@ std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumeratePlaybackDevices(
 std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumerateCaptureDevices()
 {
     std::vector<AudioDeviceInfo> devices;
-    if (!initContext()) return devices;
+    if (!initContext())
+        return devices;
 
     ma_device_info* pPlaybackInfos = nullptr;
     ma_uint32 playbackCount = 0;
@@ -444,7 +622,7 @@ std::vector<AudioEngine::AudioDeviceInfo> AudioEngine::enumerateCaptureDevices()
     devices.reserve(captureCount);
     for (ma_uint32 i = 0; i < captureCount; ++i) {
         AudioDeviceInfo info;
-        info.name = pCaptureInfos[i].name ? std::string(pCaptureInfos[i].name) : std::string();
+        info.name = (pCaptureInfos[i].name[0] != '\0') ? std::string(pCaptureInfos[i].name) : std::string();
         info.id = info.name;
         info.isDefault = pCaptureInfos[i].isDefault;
         info.deviceId = pCaptureInfos[i].id;
@@ -473,9 +651,11 @@ bool AudioEngine::reinitializeDevice(bool restart)
         device = nullptr;
     }
 
-    if (!initDevice()) return false;
+    if (!initDevice())
+        return false;
 
-    if (restart || wasRunning) return startAudioDevice();
+    if (restart || wasRunning)
+        return startAudioDevice();
     return true;
 }
 
@@ -496,23 +676,76 @@ bool AudioEngine::reinitializeMonitorDevice(bool restart)
         monitorDevice = nullptr;
     }
 
-    if (!initMonitorDevice()) return false;
+    if (!initMonitorDevice())
+        return false;
 
-    if (restart || wasRunning) return startMonitorDevice();
+    if (restart || wasRunning)
+        return startMonitorDevice();
     return true;
 }
 
+// ------------------------------------------------------------
+// Preselect devices (for use before starting audio)
+// These just set the internal selection without reinitializing
+// ------------------------------------------------------------
+bool AudioEngine::preselectPlaybackDevice(const std::string& deviceId)
+{
+    auto devices = enumeratePlaybackDevices();
+    for (const auto& d : devices) {
+        if (d.id == deviceId || d.name == deviceId) {
+            selectedPlaybackDeviceId = d.id;
+            selectedPlaybackDeviceIdStruct = d.deviceId;
+            selectedPlaybackSet = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioEngine::preselectCaptureDevice(const std::string& deviceId)
+{
+    auto devices = enumerateCaptureDevices();
+    for (const auto& d : devices) {
+        if (d.id == deviceId || d.name == deviceId) {
+            selectedCaptureDeviceId = d.id;
+            selectedCaptureDeviceIdStruct = d.deviceId;
+            selectedCaptureSet = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioEngine::preselectMonitorPlaybackDevice(const std::string& deviceId)
+{
+    auto devices = enumeratePlaybackDevices();
+    for (const auto& d : devices) {
+        if (d.id == deviceId || d.name == deviceId) {
+            selectedMonitorPlaybackDeviceId = d.id;
+            selectedMonitorPlaybackDeviceIdStruct = d.deviceId;
+            selectedMonitorPlaybackSet = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+// ------------------------------------------------------------
+// Set devices (reinitializes running device)
+// ------------------------------------------------------------
 bool AudioEngine::setPlaybackDevice(const std::string& deviceId)
 {
     auto devices = enumeratePlaybackDevices();
     for (const auto& d : devices) {
         if (d.id == deviceId || d.name == deviceId) {
-            selectedPlaybackDeviceId       = d.id;
+            selectedPlaybackDeviceId = d.id;
             selectedPlaybackDeviceIdStruct = d.deviceId;
-            selectedPlaybackSet            = true;
+            selectedPlaybackSet = true;
+            std::cout << "[AudioEngine] Switching playback device to: " << d.name << std::endl;
             return reinitializeDevice(true);
         }
     }
+    std::cerr << "[AudioEngine] Playback device not found: " << deviceId << std::endl;
     return false;
 }
 
@@ -521,12 +754,14 @@ bool AudioEngine::setCaptureDevice(const std::string& deviceId)
     auto devices = enumerateCaptureDevices();
     for (const auto& d : devices) {
         if (d.id == deviceId || d.name == deviceId) {
-            selectedCaptureDeviceId       = d.id;
+            selectedCaptureDeviceId = d.id;
             selectedCaptureDeviceIdStruct = d.deviceId;
-            selectedCaptureSet            = true;
+            selectedCaptureSet = true;
+            std::cout << "[AudioEngine] Switching capture device to: " << d.name << std::endl;
             return reinitializeDevice(true);
         }
     }
+    std::cerr << "[AudioEngine] Capture device not found: " << deviceId << std::endl;
     return false;
 }
 
@@ -535,12 +770,14 @@ bool AudioEngine::setMonitorPlaybackDevice(const std::string& deviceId)
     auto devices = enumeratePlaybackDevices();
     for (const auto& d : devices) {
         if (d.id == deviceId || d.name == deviceId) {
-            selectedMonitorPlaybackDeviceId       = d.id;
+            selectedMonitorPlaybackDeviceId = d.id;
             selectedMonitorPlaybackDeviceIdStruct = d.deviceId;
-            selectedMonitorPlaybackSet            = true;
+            selectedMonitorPlaybackSet = true;
+            std::cout << "[AudioEngine] Switching monitor playback device to: " << d.name << std::endl;
             return reinitializeMonitorDevice(true);
         }
     }
+    std::cerr << "[AudioEngine] Monitor playback device not found: " << deviceId << std::endl;
     return false;
 }
 
@@ -559,9 +796,9 @@ bool AudioEngine::setRecordingDevice(const std::string& deviceId)
     auto devices = enumerateCaptureDevices();
     for (const auto& d : devices) {
         if (d.id == deviceId || d.name == deviceId) {
-            selectedRecordingCaptureDeviceId       = d.id;
+            selectedRecordingCaptureDeviceId = d.id;
             selectedRecordingCaptureDeviceIdStruct = d.deviceId;
-            selectedRecordingCaptureSet            = true;
+            selectedRecordingCaptureSet = true;
             recordingInputEnabled.store(true, std::memory_order_release);
             return reinitializeRecordingInputDevice(true);
         }
@@ -605,7 +842,8 @@ float AudioEngine::getMicGainDB() const
 
 void AudioEngine::setMicGainLinear(float linear)
 {
-    if (linear < 0.0f) linear = 0.0f;
+    if (linear < 0.0f)
+        linear = 0.0f;
     micGain.store(linear, std::memory_order_relaxed);
     micGainDB.store(20.0f * std::log10(std::max(linear, 0.000001f)), std::memory_order_relaxed);
 }
@@ -628,7 +866,8 @@ float AudioEngine::getMasterGainDB() const
 
 void AudioEngine::setMasterGainLinear(float linear)
 {
-    if (linear < 0.0f) linear = 0.0f;
+    if (linear < 0.0f)
+        linear = 0.0f;
     masterGain.store(linear, std::memory_order_relaxed);
     masterGainDB.store(20.0f * std::log10(std::max(linear, 0.000001f)), std::memory_order_relaxed);
 }
@@ -650,9 +889,20 @@ float AudioEngine::getMicSoundboardBalance() const
 }
 
 // Peaks
-float AudioEngine::getMicPeakLevel() const { return micPeakLevel.load(std::memory_order_relaxed); }
-float AudioEngine::getMasterPeakLevel() const { return masterPeakLevel.load(std::memory_order_relaxed); }
-float AudioEngine::getMonitorPeakLevel() const { return monitorPeakLevel.load(std::memory_order_relaxed); }
+float AudioEngine::getMicPeakLevel() const
+{
+    return micPeakLevel.load(std::memory_order_relaxed);
+}
+
+float AudioEngine::getMasterPeakLevel() const
+{
+    return masterPeakLevel.load(std::memory_order_relaxed);
+}
+
+float AudioEngine::getMonitorPeakLevel() const
+{
+    return monitorPeakLevel.load(std::memory_order_relaxed);
+}
 
 void AudioEngine::resetPeakLevels()
 {
@@ -676,6 +926,12 @@ void AudioEngine::setClipErrorCallback(ClipErrorCallback cb)
     clipErrorCallback = std::move(cb);
 }
 
+void AudioEngine::setClipLoopedCallback(ClipLoopedCallback cb)
+{
+    std::lock_guard<std::mutex> lock(callbackMutex);
+    clipLoopedCallback = std::move(cb);
+}
+
 // ------------------------------------------------------------
 // Main callback + processing
 // ------------------------------------------------------------
@@ -683,20 +939,22 @@ void AudioEngine::audioCallback(ma_device* pDevice, void* pOutput, const void* p
 {
     auto* engine = static_cast<AudioEngine*>(pDevice->pUserData);
     if (engine && engine->deviceRunning.load(std::memory_order_acquire)) {
-        engine->processAudio(pOutput, pInput, frameCount, pDevice->playback.channels, pDevice->capture.channels);
+        engine->processAudio(pOutput, pInput, frameCount, pDevice->playback.channels, pDevice->capture.channels,
+                             pDevice->capture.format);
     } else if (pOutput) {
         std::memset(pOutput, 0, frameCount * pDevice->playback.channels * sizeof(float));
     }
 }
 
+// ------------------------------------------------------------
+// Main callback processing (FIXED: no constant attenuation, transparent limiter)
+// ------------------------------------------------------------
 void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameCount,
-                               ma_uint32 playbackChannels, ma_uint32 captureChannels)
+                               ma_uint32 playbackChannels, ma_uint32 captureChannels, ma_format captureFormat)
 {
     if (!output) return;
 
     float* out = static_cast<float*>(output);
-    const float* micIn = static_cast<const float*>(input);
-
     const ma_uint32 totalSamples = frameCount * playbackChannels;
     std::memset(out, 0, totalSamples * sizeof(float));
 
@@ -704,7 +962,7 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
     float micMul = 1.0f, clipMul = 1.0f;
     computeBalanceMultipliers(micSoundboardBalance.load(std::memory_order_relaxed), micMul, clipMul);
 
-    // Optional recording temp (stereo)
+    // Recording temp buffer (same channels as playback)
     const bool recActive = recording.load(std::memory_order_relaxed);
     thread_local std::vector<float> recTemp;
     if (recActive) {
@@ -712,22 +970,39 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
         std::fill(recTemp.begin(), recTemp.end(), 0.0f);
     }
 
-    // -------------------------
-    // Mic
-    // -------------------------
+    // --------------------------------------------------------
+    // Mic (handles f32 OR s16 capture)
+    // --------------------------------------------------------
     float micPeak = 0.0f;
     const bool passthrough = micPassthroughEnabled.load(std::memory_order_relaxed);
     const bool micOn = micEnabled.load(std::memory_order_relaxed);
     const float micG = micGain.load(std::memory_order_relaxed);
 
-    if (micIn && captureChannels > 0 && micOn) {
+    auto readCaptureSample = [&](ma_uint32 frame, ma_uint32 ch) -> float {
+        if (!input || captureChannels == 0) return 0.0f;
+
+        switch (captureFormat) {
+        case ma_format_f32: {
+            const float* in = static_cast<const float*>(input);
+            return in[frame * captureChannels + ch];
+        }
+        case ma_format_s16: {
+            const int16_t* in = static_cast<const int16_t*>(input);
+            return (float)in[frame * captureChannels + ch] / 32768.0f;
+        }
+        default:
+            return 0.0f;
+        }
+    };
+
+    if (input && captureChannels > 0 && micOn) {
         for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
             float mono = 0.0f;
             for (ma_uint32 ch = 0; ch < captureChannels; ++ch) {
-                mono += micIn[frame * captureChannels + ch];
+                mono += readCaptureSample(frame, ch);
             }
-            mono = (mono / (float)captureChannels) * micG * micMul;
 
+            mono = (mono / (float)captureChannels) * micG * micMul;
             micPeak = std::max(micPeak, std::abs(mono));
 
             // playback routing (only if passthrough ON)
@@ -738,7 +1013,7 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
                 }
             }
 
-            // recording always records mic when micEnabled==true (even if passthrough OFF)
+            // recording captures mic when micEnabled==true (even if passthrough OFF)
             if (recActive) {
                 const ma_uint32 o = frame * playbackChannels;
                 for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) {
@@ -747,14 +1022,13 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
             }
         }
 
-        // peak update
         float cur = micPeakLevel.load(std::memory_order_relaxed);
         if (micPeak > cur) micPeakLevel.store(micPeak, std::memory_order_relaxed);
     }
 
-    // -------------------------
+    // --------------------------------------------------------
     // Clips mixing (MAIN ring buffers)
-    // -------------------------
+    // --------------------------------------------------------
     for (int slotId = 0; slotId < MAX_CLIPS; ++slotId) {
         ClipSlot& slot = clips[slotId];
         auto st = slot.state.load(std::memory_order_relaxed);
@@ -764,25 +1038,32 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
 
         void* pRead = nullptr;
         ma_uint32 availFrames = frameCount;
-        if (ma_pcm_rb_acquire_read(&slot.ringBufferMain, &availFrames, &pRead) == MA_SUCCESS && availFrames > 0 && pRead) {
+
+        if (ma_pcm_rb_acquire_read(&slot.ringBufferMain, &availFrames, &pRead) == MA_SUCCESS &&
+            availFrames > 0 && pRead)
+        {
             float* clip = static_cast<float*>(pRead); // stereo (2ch)
 
             if (playbackChannels == 2) {
                 for (ma_uint32 f = 0; f < availFrames; ++f) {
                     const ma_uint32 o = f * 2;
-                    out[o]     += clip[f * 2]     * clipGain;
-                    out[o + 1] += clip[f * 2 + 1] * clipGain;
+
+                    const float L = clip[f * 2]     * clipGain;
+                    const float R = clip[f * 2 + 1] * clipGain;
+
+                    out[o]     += L;
+                    out[o + 1] += R;
 
                     if (recActive) {
-                        recTemp[o]     += clip[f * 2]     * clipGain;
-                        recTemp[o + 1] += clip[f * 2 + 1] * clipGain;
+                        recTemp[o]     += L;
+                        recTemp[o + 1] += R;
                     }
                 }
             } else {
                 for (ma_uint32 f = 0; f < availFrames; ++f) {
-                    float L = clip[f * 2]     * clipGain;
-                    float R = clip[f * 2 + 1] * clipGain;
-                    float mono = (L + R) * 0.5f;
+                    const float L = clip[f * 2]     * clipGain;
+                    const float R = clip[f * 2 + 1] * clipGain;
+                    const float mono = (L + R) * 0.5f;
 
                     const ma_uint32 o = f * playbackChannels;
                     for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) {
@@ -798,62 +1079,104 @@ void AudioEngine::processAudio(void* output, const void* input, ma_uint32 frameC
         }
     }
 
-    // -------------------------
-    // Recording-input device (optional)
-    // If "-1" => disabled => not recorded.
-    // -------------------------
+    // --------------------------------------------------------
+    // Recording-input device (optional): record-only, no playback
+    // --------------------------------------------------------
     if (recActive && recordingInputEnabled.load(std::memory_order_relaxed)) {
-        // ring buffer is mono frames
         void* pRead = nullptr;
         ma_uint32 want = frameCount;
+
         if (recordingInputRbData &&
-            ma_pcm_rb_acquire_read(&recordingInputRb, &want, &pRead) == MA_SUCCESS && want > 0 && pRead) {
+            ma_pcm_rb_acquire_read(&recordingInputRb, &want, &pRead) == MA_SUCCESS &&
+            want > 0 && pRead)
+        {
             float* mono = static_cast<float*>(pRead);
+
             for (ma_uint32 f = 0; f < want; ++f) {
                 const float s = mono[f];
                 const ma_uint32 o = f * playbackChannels;
                 for (ma_uint32 ch = 0; ch < playbackChannels; ++ch) {
-                    recTemp[o + ch] += s; // record only (not routed to playback)
+                    recTemp[o + ch] += s;
                 }
             }
+
             ma_pcm_rb_commit_read(&recordingInputRb, want);
         }
-        // if not enough frames, missing portion is silence (fine)
     }
 
-    // -------------------------
-    // Master gain + peak + limiter (playback)
-    // -------------------------
+    // --------------------------------------------------------
+    // Master gain + transparent limiter (NO constant loudness loss)
+    // --------------------------------------------------------
     const float mg = masterGain.load(std::memory_order_relaxed);
-    float outPeak = 0.0f;
 
+    // safety peak (leave tiny headroom)
+    constexpr float targetPeak = 0.95f;
+
+    float prePeak = 0.0f;
+
+    // Apply master gain and measure peak
     for (ma_uint32 i = 0; i < totalSamples; ++i) {
-        out[i] *= mg;
+        float v = out[i] * mg;
+        out[i] = v;
+        prePeak = std::max(prePeak, std::abs(v));
+    }
+
+    // Scale down whole block only if needed
+    float limiterGain = 1.0f;
+    if (prePeak > targetPeak && prePeak > 0.000001f) {
+        limiterGain = targetPeak / prePeak;
+        for (ma_uint32 i = 0; i < totalSamples; ++i) {
+            out[i] *= limiterGain;
+        }
+    }
+
+    // Peak meter (post)
+    float outPeak = 0.0f;
+    for (ma_uint32 i = 0; i < totalSamples; ++i) {
         outPeak = std::max(outPeak, std::abs(out[i]));
-        if (out[i] > 1.0f) out[i] = 1.0f;
-        if (out[i] < -1.0f) out[i] = -1.0f;
     }
 
     float cur = masterPeakLevel.load(std::memory_order_relaxed);
     if (outPeak > cur) masterPeakLevel.store(outPeak, std::memory_order_relaxed);
 
-    // -------------------------
-    // Write recording buffer (post-master, post-limiter)
-    // -------------------------
-    if (recActive) {
-        // apply master + limiter to recording too (matches what user hears)
+    // --------------------------------------------------------
+    // Recording output (REALTIME SAFE): write to ringbuffer only
+    // (same processing as output: master gain + limiter)
+    // --------------------------------------------------------
+    if (recActive && recordingRbData) {
+        float rPeak = 0.0f;
+
+        // Apply master gain to recorded mix and measure peak
         for (ma_uint32 i = 0; i < totalSamples; ++i) {
             float v = recTemp[i] * mg;
-            if (v > 1.0f) v = 1.0f;
-            if (v < -1.0f) v = -1.0f;
             recTemp[i] = v;
+            rPeak = std::max(rPeak, std::abs(v));
         }
 
-        std::lock_guard<std::mutex> lock(recordingMutex);
-        recordingBuffer.insert(recordingBuffer.end(), recTemp.begin(), recTemp.end());
-        recordedFrames.fetch_add(frameCount, std::memory_order_relaxed);
+        float rLimiter = 1.0f;
+        if (rPeak > targetPeak && rPeak > 0.000001f) {
+            rLimiter = targetPeak / rPeak;
+            for (ma_uint32 i = 0; i < totalSamples; ++i) {
+                recTemp[i] *= rLimiter;
+            }
+        }
+
+        void* pWrite = nullptr;
+        ma_uint32 framesToWrite = frameCount;
+
+        if (ma_pcm_rb_acquire_write(&recordingRb, &framesToWrite, &pWrite) == MA_SUCCESS &&
+            framesToWrite > 0 && pWrite)
+        {
+            const size_t samplesToCopy = (size_t)framesToWrite * (size_t)playbackChannels;
+            std::memcpy(pWrite, recTemp.data(), samplesToCopy * sizeof(float));
+            ma_pcm_rb_commit_write(&recordingRb, framesToWrite);
+
+            recordedFrames.fetch_add(framesToWrite, std::memory_order_relaxed);
+        }
+        // If rb full: drop frames (better than glitching playback)
     }
 }
+
 
 // ------------------------------------------------------------
 // Monitor callback + processing (clips only)
@@ -872,7 +1195,8 @@ void AudioEngine::monitorCallback(ma_device* pDevice, void* pOutput, const void*
 
 void AudioEngine::processMonitorAudio(void* output, ma_uint32 frameCount, ma_uint32 playbackChannels)
 {
-    if (!output) return;
+    if (!output)
+        return;
 
     float* out = static_cast<float*>(output);
     const ma_uint32 totalSamples = frameCount * playbackChannels;
@@ -887,24 +1211,26 @@ void AudioEngine::processMonitorAudio(void* output, ma_uint32 frameCount, ma_uin
     for (int slotId = 0; slotId < MAX_CLIPS; ++slotId) {
         ClipSlot& slot = clips[slotId];
         auto st = slot.state.load(std::memory_order_relaxed);
-        if (st != ClipState::Playing && st != ClipState::Draining) continue;
+        if (st != ClipState::Playing && st != ClipState::Draining)
+            continue;
 
         const float clipGain = slot.gain.load(std::memory_order_relaxed) * clipMul;
 
         void* pRead = nullptr;
         ma_uint32 availFrames = frameCount;
-        if (ma_pcm_rb_acquire_read(&slot.ringBufferMon, &availFrames, &pRead) == MA_SUCCESS && availFrames > 0 && pRead) {
+        if (ma_pcm_rb_acquire_read(&slot.ringBufferMon, &availFrames, &pRead) == MA_SUCCESS && availFrames > 0 &&
+            pRead) {
             float* clip = static_cast<float*>(pRead); // stereo
 
             if (playbackChannels == 2) {
                 for (ma_uint32 f = 0; f < availFrames; ++f) {
                     const ma_uint32 o = f * 2;
-                    out[o]     += clip[f * 2]     * clipGain;
+                    out[o] += clip[f * 2] * clipGain;
                     out[o + 1] += clip[f * 2 + 1] * clipGain;
                 }
             } else {
                 for (ma_uint32 f = 0; f < availFrames; ++f) {
-                    float L = clip[f * 2]     * clipGain;
+                    float L = clip[f * 2] * clipGain;
                     float R = clip[f * 2 + 1] * clipGain;
                     float mono = (L + R) * 0.5f;
 
@@ -922,12 +1248,15 @@ void AudioEngine::processMonitorAudio(void* output, ma_uint32 frameCount, ma_uin
     // limiter + peak
     for (ma_uint32 i = 0; i < totalSamples; ++i) {
         peak = std::max(peak, std::abs(out[i]));
-        if (out[i] > 1.0f) out[i] = 1.0f;
-        if (out[i] < -1.0f) out[i] = -1.0f;
+        if (out[i] > 1.0f)
+            out[i] = 1.0f;
+        if (out[i] < -1.0f)
+            out[i] = -1.0f;
     }
 
     float cur = monitorPeakLevel.load(std::memory_order_relaxed);
-    if (peak > cur) monitorPeakLevel.store(peak, std::memory_order_relaxed);
+    if (peak > cur)
+        monitorPeakLevel.store(peak, std::memory_order_relaxed);
 }
 
 // ------------------------------------------------------------
@@ -936,14 +1265,17 @@ void AudioEngine::processMonitorAudio(void* output, ma_uint32 frameCount, ma_uin
 void AudioEngine::recordingInputCallback(ma_device* pDevice, void*, const void* pInput, ma_uint32 frameCount)
 {
     auto* engine = static_cast<AudioEngine*>(pDevice->pUserData);
-    if (!engine || !engine->recordingInputRunning.load(std::memory_order_acquire)) return;
-    if (!pInput) return;
+    if (!engine || !engine->recordingInputRunning.load(std::memory_order_acquire))
+        return;
+    if (!pInput)
+        return;
     engine->processRecordingInput(pInput, frameCount, pDevice->capture.channels);
 }
 
 void AudioEngine::processRecordingInput(const void* input, ma_uint32 frameCount, ma_uint32 captureChannels)
 {
-    if (!recordingInputRbData) return;
+    if (!recordingInputRbData)
+        return;
 
     const float* in = static_cast<const float*>(input);
 
@@ -969,7 +1301,7 @@ void AudioEngine::processRecordingInput(const void* input, ma_uint32 frameCount,
 // ------------------------------------------------------------
 // Clips - Decoder thread
 // ------------------------------------------------------------
-void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slotId)
+void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slotId, uint64_t token)
 {
     const std::string filepath = slot->filePath;
     if (filepath.empty()) {
@@ -977,12 +1309,13 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
         return;
     }
 
-    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, ENGINE_SR);
+    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, engine->m_sampleRate);
     ma_decoder dec;
     if (ma_decoder_init_file(filepath.c_str(), &cfg, &dec) != MA_SUCCESS) {
         slot->state.store(ClipState::Stopped, std::memory_order_release);
         std::lock_guard<std::mutex> lock(engine->callbackMutex);
-        if (engine->clipErrorCallback) engine->clipErrorCallback(slotId);
+        if (engine->clipErrorCallback)
+            engine->clipErrorCallback(slotId);
         return;
     }
 
@@ -1003,14 +1336,17 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 
     while (true) {
         // stop
-        if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping) break;
+        if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping)
+            break;
 
         // pause holds decoder
         while (slot->state.load(std::memory_order_acquire) == ClipState::Paused) {
-            if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping) break;
+            if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping)
+                break;
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
-        if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping) break;
+        if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping)
+            break;
 
         // seek request
         double seekMs = slot->seekPosMs.exchange(-1.0, std::memory_order_relaxed);
@@ -1021,13 +1357,35 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 
         ma_uint64 framesRead = 0;
         ma_result rr = ma_decoder_read_pcm_frames(&dec, buf, kFrames, &framesRead);
-        if (rr != MA_SUCCESS && rr != MA_AT_END) break;
+        if (rr != MA_SUCCESS && rr != MA_AT_END)
+            break;
 
         if (framesRead == 0) {
             if (slot->loop.load(std::memory_order_relaxed)) {
+                // Wait for ring buffer to drain before looping (so audio plays completely)
+                while (slot->queuedMainFrames.load(std::memory_order_relaxed) > 0) {
+                    if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping)
+                        break;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                }
+
+                // Check if we were stopped while waiting
+                if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping)
+                    break;
+
                 double sMs = slot->trimStartMs.load(std::memory_order_relaxed);
                 ma_uint64 sFrame = (ma_uint64)((sMs / 1000.0) * dec.outputSampleRate);
                 ma_decoder_seek_to_pcm_frame(&dec, sFrame);
+
+                // Reset playback frame count to 0 so progress bar resets
+                slot->playbackFrameCount.store(0, std::memory_order_relaxed);
+
+                // Notify that clip looped
+                {
+                    std::lock_guard<std::mutex> lock(engine->callbackMutex);
+                    if (engine->clipLoopedCallback)
+                        engine->clipLoopedCallback(slotId);
+                }
                 continue;
             }
             naturalEnd = true;
@@ -1042,9 +1400,30 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
             ma_uint64 endFrame = (ma_uint64)((endMs / 1000.0) * dec.outputSampleRate);
             if (curFrame >= endFrame) {
                 if (slot->loop.load(std::memory_order_relaxed)) {
+                    // Wait for ring buffer to drain before looping (so audio plays completely)
+                    while (slot->queuedMainFrames.load(std::memory_order_relaxed) > 0) {
+                        if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping)
+                            break;
+                        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                    }
+
+                    // Check if we were stopped while waiting
+                    if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping)
+                        break;
+
                     double sMs = slot->trimStartMs.load(std::memory_order_relaxed);
                     ma_uint64 sFrame = (ma_uint64)((sMs / 1000.0) * dec.outputSampleRate);
                     ma_decoder_seek_to_pcm_frame(&dec, sFrame);
+
+                    // Reset playback frame count to 0 so progress bar resets
+                    slot->playbackFrameCount.store(0, std::memory_order_relaxed);
+
+                    // Notify that clip looped
+                    {
+                        std::lock_guard<std::mutex> lock(engine->callbackMutex);
+                        if (engine->clipLoopedCallback)
+                            engine->clipLoopedCallback(slotId);
+                    }
                 } else {
                     naturalEnd = true;
                     break;
@@ -1057,7 +1436,8 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 
         while (remaining > 0) {
             auto st = slot->state.load(std::memory_order_acquire);
-            if (st == ClipState::Stopping) break;
+            if (st == ClipState::Stopping)
+                break;
             if (st == ClipState::Paused) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
@@ -1066,7 +1446,8 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
             void* wMain = nullptr;
             ma_uint32 toWrite = remaining;
 
-            if (ma_pcm_rb_acquire_write(&slot->ringBufferMain, &toWrite, &wMain) == MA_SUCCESS && toWrite > 0 && wMain) {
+            if (ma_pcm_rb_acquire_write(&slot->ringBufferMain, &toWrite, &wMain) == MA_SUCCESS && toWrite > 0 &&
+                wMain) {
                 std::memcpy(wMain, cursor, toWrite * 2 * sizeof(float));
                 ma_pcm_rb_commit_write(&slot->ringBufferMain, toWrite);
                 slot->queuedMainFrames.fetch_add((long long)toWrite, std::memory_order_relaxed);
@@ -1074,7 +1455,8 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
                 // best-effort monitor
                 void* wMon = nullptr;
                 ma_uint32 toWriteMon = toWrite;
-                if (ma_pcm_rb_acquire_write(&slot->ringBufferMon, &toWriteMon, &wMon) == MA_SUCCESS && toWriteMon > 0 && wMon) {
+                if (ma_pcm_rb_acquire_write(&slot->ringBufferMon, &toWriteMon, &wMon) == MA_SUCCESS && toWriteMon > 0 &&
+                    wMon) {
                     const ma_uint32 n = std::min(toWriteMon, toWrite);
                     std::memcpy(wMon, cursor, n * 2 * sizeof(float));
                     ma_pcm_rb_commit_write(&slot->ringBufferMon, n);
@@ -1095,14 +1477,23 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 
         // wait drain
         while (slot->queuedMainFrames.load(std::memory_order_relaxed) > 0) {
-            if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping) break;
+            if (slot->state.load(std::memory_order_acquire) == ClipState::Stopping)
+                break;
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
 
         slot->state.store(ClipState::Stopped, std::memory_order_release);
 
-        std::lock_guard<std::mutex> lock(engine->callbackMutex);
-        if (engine->clipFinishedCallback) engine->clipFinishedCallback(slotId);
+        // ONLY fire finished callback if this thread is still the latest play of this slot
+        const bool stillCurrent = (slot->playToken.load(std::memory_order_acquire) == token);
+
+        const bool wasStopped = (slot->state.load(std::memory_order_acquire) == ClipState::Stopping);
+
+        if (stillCurrent && !wasStopped) {
+            std::lock_guard<std::mutex> lock(engine->callbackMutex);
+            if (engine->clipFinishedCallback)
+                engine->clipFinishedCallback(slotId);
+        }
         return;
     }
 
@@ -1114,25 +1505,28 @@ void AudioEngine::decoderThreadFunc(AudioEngine* engine, ClipSlot* slot, int slo
 // ------------------------------------------------------------
 std::pair<double, double> AudioEngine::loadClip(int slotId, const std::string& filepath)
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return {0.0, 0.0};
-    if (filepath.empty()) return {0.0, 0.0};
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return {0.0, 0.0};
+    if (filepath.empty())
+        return {0.0, 0.0};
 
     ClipSlot& slot = clips[slotId];
-    if (slot.state.load(std::memory_order_relaxed) != ClipState::Stopped) return {0.0, 0.0};
+    if (slot.state.load(std::memory_order_relaxed) != ClipState::Stopped)
+        return {0.0, 0.0};
 
-    const size_t bytes = RING_BUFFER_SIZE_IN_FRAMES * 2 * sizeof(float);
+    const size_t bytes = getRingBufferSize() * 2 * sizeof(float);
 
     if (!slot.ringBufferMainData) {
         slot.ringBufferMainData = std::malloc(bytes);
-        if (!slot.ringBufferMainData) return {0.0, 0.0};
-        ma_pcm_rb_init(ma_format_f32, 2, RING_BUFFER_SIZE_IN_FRAMES,
-                       slot.ringBufferMainData, nullptr, &slot.ringBufferMain);
+        if (!slot.ringBufferMainData)
+            return {0.0, 0.0};
+        ma_pcm_rb_init(ma_format_f32, 2, getRingBufferSize(), slot.ringBufferMainData, nullptr, &slot.ringBufferMain);
     }
     if (!slot.ringBufferMonData) {
         slot.ringBufferMonData = std::malloc(bytes);
-        if (!slot.ringBufferMonData) return {0.0, 0.0};
-        ma_pcm_rb_init(ma_format_f32, 2, RING_BUFFER_SIZE_IN_FRAMES,
-                       slot.ringBufferMonData, nullptr, &slot.ringBufferMon);
+        if (!slot.ringBufferMonData)
+            return {0.0, 0.0};
+        ma_pcm_rb_init(ma_format_f32, 2, getRingBufferSize(), slot.ringBufferMonData, nullptr, &slot.ringBufferMon);
     }
 
     ma_pcm_rb_reset(&slot.ringBufferMain);
@@ -1147,11 +1541,12 @@ std::pair<double, double> AudioEngine::loadClip(int slotId, const std::string& f
 
     // duration
     double endSec = -1.0;
-    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, ENGINE_SR);
+    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, m_sampleRate);
     ma_decoder dec;
     if (ma_decoder_init_file(filepath.c_str(), &cfg, &dec) == MA_SUCCESS) {
         ma_uint64 totalFrames = 0;
-        if (ma_decoder_get_length_in_pcm_frames(&dec, &totalFrames) == MA_SUCCESS && dec.outputSampleRate > 0 && totalFrames > 0) {
+        if (ma_decoder_get_length_in_pcm_frames(&dec, &totalFrames) == MA_SUCCESS && dec.outputSampleRate > 0 &&
+            totalFrames > 0) {
             endSec = (double)totalFrames / (double)dec.outputSampleRate;
             slot.totalDurationMs.store(endSec * 1000.0, std::memory_order_relaxed);
         }
@@ -1165,9 +1560,11 @@ std::pair<double, double> AudioEngine::loadClip(int slotId, const std::string& f
 
 void AudioEngine::playClip(int slotId)
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return;
     ClipSlot& slot = clips[slotId];
-    if (slot.filePath.empty()) return;
+    if (slot.filePath.empty())
+        return;
 
     // resume if paused
     if (slot.state.load(std::memory_order_acquire) == ClipState::Paused) {
@@ -1176,8 +1573,10 @@ void AudioEngine::playClip(int slotId)
     }
 
     // ensure at least one output running so it drains
-    if (!isDeviceRunning() && !isMonitorRunning()) return;
+    if (!isDeviceRunning() && !isMonitorRunning())
+        return;
 
+    // stop previous decoder thread if any
     if (slot.decoderThread.joinable()) {
         slot.state.store(ClipState::Stopping, std::memory_order_release);
         slot.decoderThread.join();
@@ -1191,13 +1590,19 @@ void AudioEngine::playClip(int slotId)
         slot.playbackFrameCount.store(0, std::memory_order_relaxed);
     }
 
+    // IMPORTANT: bump token so old threads/callbacks become stale
+    const uint64_t token = slot.playToken.fetch_add(1, std::memory_order_acq_rel) + 1;
+
     slot.state.store(ClipState::Playing, std::memory_order_release);
-    slot.decoderThread = std::thread(&AudioEngine::decoderThreadFunc, this, &slot, slotId);
+
+    // pass token into thread
+    slot.decoderThread = std::thread(&AudioEngine::decoderThreadFunc, this, &slot, slotId, token);
 }
 
 void AudioEngine::pauseClip(int slotId)
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return;
     auto st = clips[slotId].state.load(std::memory_order_acquire);
     if (st == ClipState::Playing || st == ClipState::Draining) {
         clips[slotId].state.store(ClipState::Paused, std::memory_order_release);
@@ -1206,7 +1611,8 @@ void AudioEngine::pauseClip(int slotId)
 
 void AudioEngine::resumeClip(int slotId)
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return;
     if (clips[slotId].state.load(std::memory_order_acquire) == ClipState::Paused) {
         clips[slotId].state.store(ClipState::Playing, std::memory_order_release);
     }
@@ -1214,7 +1620,8 @@ void AudioEngine::resumeClip(int slotId)
 
 void AudioEngine::stopClip(int slotId)
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return;
 
     ClipSlot& slot = clips[slotId];
     slot.state.store(ClipState::Stopping, std::memory_order_release);
@@ -1227,42 +1634,49 @@ void AudioEngine::stopClip(int slotId)
 
 void AudioEngine::setClipLoop(int slotId, bool loop)
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return;
     clips[slotId].loop.store(loop, std::memory_order_relaxed);
 }
 
 void AudioEngine::setClipGain(int slotId, float gainDB)
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return;
     clips[slotId].gain.store(dBToLinear(gainDB), std::memory_order_relaxed);
 }
 
 float AudioEngine::getClipGain(int slotId) const
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return 0.0f;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return 0.0f;
     float lin = clips[slotId].gain.load(std::memory_order_relaxed);
     return 20.0f * std::log10(std::max(lin, 0.000001f));
 }
 
 void AudioEngine::setClipTrim(int slotId, double startMs, double endMs)
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return;
     clips[slotId].trimStartMs.store(startMs, std::memory_order_relaxed);
     clips[slotId].trimEndMs.store(endMs, std::memory_order_relaxed);
 }
 
 void AudioEngine::seekClip(int slotId, double positionMs)
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return;
     clips[slotId].seekPosMs.store(positionMs, std::memory_order_relaxed);
 
     // update playbackFrameCount so UI reads correct position immediately
     double startMs = clips[slotId].trimStartMs.load(std::memory_order_relaxed);
     double diffMs = positionMs - startMs;
-    if (diffMs < 0) diffMs = 0;
+    if (diffMs < 0)
+        diffMs = 0;
 
     int sr = clips[slotId].sampleRate.load(std::memory_order_relaxed);
-    if (sr <= 0) sr = (int)ENGINE_SR;
+    if (sr <= 0)
+        sr = (int)m_sampleRate;
 
     long long frames = (long long)(diffMs * sr / 1000.0);
     clips[slotId].playbackFrameCount.store(frames, std::memory_order_relaxed);
@@ -1270,24 +1684,28 @@ void AudioEngine::seekClip(int slotId, double positionMs)
 
 bool AudioEngine::isClipPlaying(int slotId) const
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return false;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return false;
     auto st = clips[slotId].state.load(std::memory_order_relaxed);
     return (st == ClipState::Playing || st == ClipState::Draining || st == ClipState::Paused);
 }
 
 bool AudioEngine::isClipPaused(int slotId) const
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return false;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return false;
     return clips[slotId].state.load(std::memory_order_relaxed) == ClipState::Paused;
 }
 
 double AudioEngine::getClipPlaybackPositionMs(int slotId) const
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return 0.0;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return 0.0;
     const ClipSlot& slot = clips[slotId];
 
     int sr = slot.sampleRate.load(std::memory_order_relaxed);
-    if (sr <= 0) sr = (int)ENGINE_SR;
+    if (sr <= 0)
+        sr = (int)m_sampleRate;
 
     double frames = (double)slot.playbackFrameCount.load(std::memory_order_relaxed);
     double startMs = slot.trimStartMs.load(std::memory_order_relaxed);
@@ -1297,7 +1715,7 @@ double AudioEngine::getClipPlaybackPositionMs(int slotId) const
 
 double AudioEngine::getFileDuration(const std::string& filepath)
 {
-    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, ENGINE_SR);
+    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, m_sampleRate);
     ma_decoder dec;
     double duration = -1.0;
 
@@ -1313,7 +1731,8 @@ double AudioEngine::getFileDuration(const std::string& filepath)
 
 void AudioEngine::unloadClip(int slotId)
 {
-    if (slotId < 0 || slotId >= MAX_CLIPS) return;
+    if (slotId < 0 || slotId >= MAX_CLIPS)
+        return;
 
     stopClip(slotId);
     clips[slotId].filePath.clear();
@@ -1340,26 +1759,90 @@ bool AudioEngine::startRecording(const std::string& outputPath)
     if (recording.load(std::memory_order_relaxed)) return false;
     if (outputPath.empty()) return false;
 
-    // Ensure main device running
+    // Ensure main device running so callback executes
     if (!deviceRunning.load(std::memory_order_relaxed)) {
         if (!startAudioDevice()) return false;
     }
 
-    // If recording-input device is enabled, start it (it may be selected already).
+    // Determine channel count from active playback device
+    recordingChannels = (device ? (int)device->playback.channels : (int)m_channels);
+    if (recordingChannels <= 0) recordingChannels = 2;
+
+    recordingOutputPath = outputPath;
+    recordedFrames.store(0, std::memory_order_relaxed);
+    recordingWriteOk.store(false, std::memory_order_relaxed);
+
+    // Init realtime ringbuffer for recording output
+    if (!initRecordingRingBuffer(m_sampleRate, (ma_uint32)recordingChannels)) {
+        return false;
+    }
+    ma_pcm_rb_reset(&recordingRb);
+
+    // Start optional extra recording input device
     if (recordingInputEnabled.load(std::memory_order_relaxed)) {
-        // safe start
         startRecordingInputDevice();
         ma_pcm_rb_reset(&recordingInputRb);
     }
 
-    {
-        std::lock_guard<std::mutex> lock(recordingMutex);
-        recordingBuffer.clear();
-        recordingBuffer.reserve(ENGINE_SR * 2 * 60); // 60s stereo
-    }
+    // Start writer thread (non-realtime) - STREAM TO DISK (no huge RAM vector)
+    recordingWriterRunning.store(true, std::memory_order_release);
 
-    recordingOutputPath = outputPath;
-    recordedFrames.store(0, std::memory_order_relaxed);
+    recordingWriterThread = std::thread([this]() {
+        // WAV encoder (32-bit float for high quality - better for editing)
+        ma_encoder encoder;
+        ma_encoder_config ecfg = ma_encoder_config_init(
+            ma_encoding_format_wav,
+            ma_format_f32,  // Use 32-bit float for better quality
+            (ma_uint32)recordingChannels,
+            m_sampleRate
+        );
+
+        ma_result er = ma_encoder_init_file(recordingOutputPath.c_str(), &ecfg, &encoder);
+        if (er != MA_SUCCESS) {
+            recordingWriteOk.store(false, std::memory_order_release);
+            // Drain/discard while running (avoid blocking the audio thread forever)
+            while (recordingWriterRunning.load(std::memory_order_acquire)) {
+                void* pRead = nullptr;
+                ma_uint32 frames = 4096;
+                if (ma_pcm_rb_acquire_read(&recordingRb, &frames, &pRead) == MA_SUCCESS && frames > 0 && pRead) {
+                    ma_pcm_rb_commit_read(&recordingRb, frames);
+                } else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                }
+            }
+            return;
+        }
+
+        auto drainOnce = [&](ma_uint32 framesWanted) -> bool {
+            void* pRead = nullptr;
+            ma_uint32 frames = framesWanted;
+
+            if (ma_pcm_rb_acquire_read(&recordingRb, &frames, &pRead) == MA_SUCCESS && frames > 0 && pRead) {
+                // Write float data directly - no conversion needed
+                ma_encoder_write_pcm_frames(&encoder, pRead, frames, nullptr);
+                ma_pcm_rb_commit_read(&recordingRb, frames);
+                return true;
+            }
+            return false;
+        };
+
+        // Drain while running
+        while (recordingWriterRunning.load(std::memory_order_acquire)) {
+            if (!drainOnce(4096)) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+        }
+
+        // Final drain
+        while (drainOnce(4096)) {
+            // keep draining
+        }
+
+        ma_encoder_uninit(&encoder);
+        recordingWriteOk.store(true, std::memory_order_release);
+    });
+
+    // Enable recording for audio callback
     recording.store(true, std::memory_order_release);
     return true;
 }
@@ -1368,24 +1851,27 @@ bool AudioEngine::stopRecording()
 {
     if (!recording.load(std::memory_order_relaxed)) return false;
 
+    // Stop callback from pushing new frames
     recording.store(false, std::memory_order_release);
+
+    // Let current callback finish
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-    // stop recording input device if it was running (optional)
+    // Stop recording input device if it was running
     if (recordingInputRunning.load(std::memory_order_relaxed)) {
         stopRecordingInputDevice();
     }
 
-    std::vector<float> samples;
-    {
-        std::lock_guard<std::mutex> lock(recordingMutex);
-        samples = std::move(recordingBuffer);
-        recordingBuffer.clear();
+    // Stop writer thread and wait for WAV finalize
+    recordingWriterRunning.store(false, std::memory_order_release);
+    if (recordingWriterThread.joinable()) {
+        recordingWriterThread.join();
     }
 
-    if (samples.empty()) return false;
+    // Free recording ringbuffer
+    shutdownRecordingRingBuffer();
 
-    return writeWavFile(recordingOutputPath, samples, (int)ENGINE_SR, 2);
+    return recordingWriteOk.load(std::memory_order_acquire);
 }
 
 bool AudioEngine::isRecording() const
@@ -1396,7 +1882,48 @@ bool AudioEngine::isRecording() const
 float AudioEngine::getRecordingDuration() const
 {
     uint64_t frames = recordedFrames.load(std::memory_order_relaxed);
-    return (float)frames / (float)ENGINE_SR;
+    return (float)frames / (float)m_sampleRate;
+}
+
+// ------------------------------------------------------------
+// Recording ringbuffer (FIXED: bigger buffer for fewer dropouts)
+// ------------------------------------------------------------
+bool AudioEngine::initRecordingRingBuffer(ma_uint32 sampleRate, ma_uint32 channels)
+{
+    // Keep ~30 seconds in RAM (bigger = fewer dropouts if disk stalls)
+    const ma_uint32 seconds = 30;
+    const ma_uint32 frames = sampleRate * seconds;
+
+    // Recreate if already exists
+    shutdownRecordingRingBuffer();
+
+    const size_t bytes = (size_t)frames * (size_t)channels * sizeof(float);
+    recordingRbData = std::malloc(bytes);
+    if (!recordingRbData) {
+        recordingRbFrames = 0;
+        return false;
+    }
+
+    ma_result r = ma_pcm_rb_init(ma_format_f32, channels, frames, recordingRbData, nullptr, &recordingRb);
+    if (r != MA_SUCCESS) {
+        std::free(recordingRbData);
+        recordingRbData = nullptr;
+        recordingRbFrames = 0;
+        return false;
+    }
+
+    recordingRbFrames = frames;
+    return true;
+}
+
+void AudioEngine::shutdownRecordingRingBuffer()
+{
+    if (recordingRbData) {
+        ma_pcm_rb_uninit(&recordingRb);
+        std::free(recordingRbData);
+        recordingRbData = nullptr;
+        recordingRbFrames = 0;
+    }
 }
 
 // ------------------------------------------------------------
@@ -1404,10 +1931,12 @@ float AudioEngine::getRecordingDuration() const
 // ------------------------------------------------------------
 bool AudioEngine::writeWavFile(const std::string& path, const std::vector<float>& samples, int sampleRate, int channels)
 {
-    if (samples.empty() || path.empty()) return false;
+    if (samples.empty() || path.empty())
+        return false;
 
     FILE* file = fopen(path.c_str(), "wb");
-    if (!file) return false;
+    if (!file)
+        return false;
 
     const uint32_t dataSize = (uint32_t)(samples.size() * sizeof(int16_t));
     const uint32_t fileSize = 36 + dataSize;
@@ -1442,8 +1971,10 @@ bool AudioEngine::writeWavFile(const std::string& path, const std::vector<float>
     fwrite(&dataSize, 4, 1, file);
 
     for (float s : samples) {
-        if (s > 1.0f) s = 1.0f;
-        if (s < -1.0f) s = -1.0f;
+        if (s > 1.0f)
+            s = 1.0f;
+        if (s < -1.0f)
+            s = -1.0f;
         int16_t pcm = (int16_t)(s * 32767.0f);
         fwrite(&pcm, 2, 1, file);
     }

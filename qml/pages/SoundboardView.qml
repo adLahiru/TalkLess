@@ -19,6 +19,7 @@ Rectangle {
     property int playingClipId: -1   // Last started clip that is still playing
     property var displayedClipData: null // Data currently shown in the player card
     property int hotkeyEditingClipId: -1 // Track which clip's hotkey is being edited from a tile
+    property var pausedClipIds: ({}) // Track paused clips to keep showing progress
 
     // Drag and drop state for clip reordering
     property bool isDragging: false
@@ -29,8 +30,69 @@ Rectangle {
     property point dragPosition: Qt.point(0, 0)
 
     property bool isDetached: false
+
+    // Override board ID for detached windows - if set, this view shows that specific board
+    // instead of following the global clipsModel.boardId
+    property int overrideBoardId: -1
+
+    // Local clips model for detached windows (optional - if not set, uses global clipsModel)
+    property var localClipsModel: null
+
+    // Active clips model - uses local if available, otherwise global clipsModel
+    readonly property var activeClipsModel: localClipsModel ? localClipsModel : clipsModel
+
+    // Effective board ID - uses override if set, otherwise uses active model's boardId
+    readonly property int effectiveBoardId: overrideBoardId >= 0 ? overrideBoardId : (activeClipsModel ? activeClipsModel.boardId : -1)
+
     signal requestDetach
     signal requestDock
+
+    // =========================
+    // PLAYBACK PROGRESS TIMER
+    // =========================
+    // Timer that updates playback progress for all playing clips every 50ms
+    Timer {
+        id: progressUpdateTimer
+        interval: 50  // Update every 50ms for smooth progress
+        repeat: true
+        running: true  // Always run to check for playing clips
+
+        // Map of clipId -> progress (0.0 to 1.0)
+        property var clipProgressMap: ({})
+
+        onTriggered: {
+            if (!soundboardService)
+                return;
+
+            // Get all currently playing clip IDs
+            var playingIds = soundboardService.playingClipIDs();
+            var newMap = {};
+
+            // Add playing clips
+            for (var i = 0; i < playingIds.length; i++) {
+                var clipId = playingIds[i];
+                var progress = soundboardService.getClipPlaybackProgress(clipId);
+                newMap[clipId] = Math.max(0, Math.min(1, progress));
+            }
+
+            // Add paused clips
+
+            for (var pId in root.pausedClipIds) {
+                // Ensure it's not already added
+                if (newMap[pId] === undefined) {
+                    var pClipId = parseInt(pId);
+                    var pProgress = soundboardService.getClipPlaybackProgress(pClipId);
+
+                    newMap[pId] = Math.max(0, Math.min(1, pProgress));
+                }
+            }
+
+            // Only update if there are changes (avoid unnecessary re-renders)
+            if (JSON.stringify(clipProgressMap) !== JSON.stringify(newMap)) {
+                clipProgressMap = newMap;
+            }
+        }
+    }
 
     // Helper function to find clip data by ID in the model
     function getClipDataById(clipId) {
@@ -38,13 +100,14 @@ Rectangle {
             return null;
 
         // Use the new backend function for more reliable and efficient data retrieval
-        const data = soundboardService.getClipData(clipsModel.boardId, clipId);
+        const data = soundboardService.getClipData(activeClipsModel.boardId, clipId);
         if (!data || Object.keys(data).length === 0)
             return null;
 
         return {
             clipId: data.id,
             title: data.title,
+            filePath: data.filePath,
             hotkey: data.hotkey,
             imgPath: data.imgPath,
             isPlaying: data.isPlaying,
@@ -84,8 +147,6 @@ Rectangle {
         if (!data)
             return;
 
-        console.log("pushToEditor: Updating editor with clip", data.clipId, "mode:", data.reproductionMode, "volume:", data.clipVolume);
-
         clipEditorTab.editingClipName = data.title || "";
         clipEditorTab.editingClipHotkey = data.hotkey || "";
         clipEditorTab.editingClipTags = data.tags || [];
@@ -113,7 +174,22 @@ Rectangle {
         clipEditorTab.trimStartMs = data.trimStartMs || 0.0;
         clipEditorTab.trimEndMs = data.trimEndMs || 0.0;
 
-        clipTitleInput.text = data.title || "";
+        // Use title if available, otherwise extract filename from filePath
+        var displayTitle = data.title || "";
+        if (!displayTitle && data.filePath) {
+            // Extract filename without extension from file path
+            var pathParts = data.filePath.replace(/\\/g, '/').split('/');
+            var filename = pathParts[pathParts.length - 1];
+            // Remove extension
+            var dotIndex = filename.lastIndexOf('.');
+            if (dotIndex > 0) {
+                displayTitle = filename.substring(0, dotIndex);
+            } else {
+                displayTitle = filename;
+            }
+        }
+        clipEditorTab.displayComputedTitle = displayTitle;
+        clipTitleInput.text = displayTitle;
     }
 
     // Refresh when core IDs change
@@ -122,7 +198,7 @@ Rectangle {
 
     // Refresh editor when model data changes (e.g., after saving settings)
     Connections {
-        target: clipsModel
+        target: activeClipsModel
         function onClipsChanged() {
             // Re-fetch and push data to editor when model reloads
             if (root.selectedClipId !== -1) {
@@ -137,12 +213,11 @@ Rectangle {
         title: "Select Audio File"
         nameFilters: ["Audio files (*.mp3 *.wav *.ogg *.m4a)", "All files (*)"]
         onAccepted: {
-            console.log("File selected:", selectedFile);
-            const boardId = clipsModel.boardId;
+            const boardId = activeClipsModel.boardId;
             if (boardId >= 0) {
                 const success = soundboardService.addClip(boardId, selectedFile.toString());
                 if (success) {
-                    clipsModel.reload();
+                    activeClipsModel.reload();
                 }
             }
         }
@@ -157,14 +232,10 @@ Rectangle {
         title: "Select Background Image"
         nameFilters: ["Image files (*.png *.jpg *.jpeg *.gif *.webp *.bmp)", "All files (*)"]
         onAccepted: {
-            console.log("Image selected:", selectedFile, "for clip:", root.clipToEditImageId);
             if (root.clipToEditImageId >= 0) {
-                const success = clipsModel.updateClipImage(root.clipToEditImageId, selectedFile.toString());
+                const success = activeClipsModel.updateClipImage(root.clipToEditImageId, selectedFile.toString());
                 if (success) {
-                    console.log("Background image updated successfully");
-                    clipsModel.reload();  // Reload to show new image
-                } else {
-                    console.log("Failed to update background image");
+                    activeClipsModel.reload();  // Reload to show new image
                 }
                 root.clipToEditImageId = -1;
             }
@@ -189,7 +260,7 @@ Rectangle {
     }
 
     Connections {
-        target: clipsModel
+        target: activeClipsModel
         function onBoardIdChanged() {
             root.selectedClipId = -1;
             root.playingClipId = -1;
@@ -215,28 +286,50 @@ Rectangle {
 
         function onClipPlaybackStarted(clipId) {
             root.playingClipId = clipId;
+            // Remove from paused list if it was there
+            var pIds = Object.assign({}, root.pausedClipIds);
+            if (pIds[clipId]) {
+                delete pIds[clipId];
+                root.pausedClipIds = pIds; // Trigger change
+            }
             root.updateDisplayedClipData();
         }
 
-
         function onClipPlaybackPaused(clipId) {
+            // Add to paused list
+            var pIds = Object.assign({}, root.pausedClipIds);
+            pIds[clipId] = true;
+            root.pausedClipIds = pIds; // Trigger change
+
             // Update the UI when a clip is paused (but keep it as the displayed clip)
             root.updateDisplayedClipData();
         }
 
         function onClipPlaybackStopped(clipId) {
+            // Remove from paused list
+            var pIds = Object.assign({}, root.pausedClipIds);
+            if (pIds[clipId]) {
+                delete pIds[clipId];
+                root.pausedClipIds = pIds; // Trigger change
+            }
+
             if (root.playingClipId === clipId) {
                 // Find if any other clip is still playing
                 let foundPlaying = -1;
-                for (let i = 0; i < clipsModel.count; i++) {
-                    const index = clipsModel.index(i, 0);
-                    if (clipsModel.data(index, 263)) { // IsPlayingRole
-                        foundPlaying = clipsModel.data(index, 257); // IdRole
+                for (let i = 0; i < activeClipsModel.count; i++) {
+                    const index = activeClipsModel.index(i, 0);
+                    if (activeClipsModel.data(index, 263)) { // IsPlayingRole
+                        foundPlaying = activeClipsModel.data(index, 257); // IdRole
                         break;
                     }
                 }
                 root.playingClipId = foundPlaying;
             }
+            root.updateDisplayedClipData();
+        }
+
+        function onClipLooped(clipId) {
+            // Update the UI when a looping clip restarts - this helps reset progress display
             root.updateDisplayedClipData();
         }
     }
@@ -285,7 +378,7 @@ Rectangle {
                 // Dark overlay for text readability
                 Rectangle {
                     anchors.fill: parent
-                    color: "#000000"
+                    color: Colors.overlay
                     opacity: 0.3
                 }
 
@@ -312,7 +405,7 @@ Rectangle {
                                 width: 3
                                 height: 3
                                 radius: 1.5
-                                color: "#FFFFFF"
+                                color: Colors.primary
                             }
                         }
                     }
@@ -406,7 +499,7 @@ Rectangle {
 
                         // Main text
                         Text {
-                            text: clipsModel.boardName || "Soundboard"
+                            text: activeClipsModel?.boardName ?? "Soundboard"
                             color: Colors.textPrimary
                             font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                             font.pixelSize: 28
@@ -465,7 +558,6 @@ Rectangle {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                console.log("Add Soundboard clicked");
                                 soundboardService.createBoard("New Soundboard");
                                 soundboardsModel.reload();
                             }
@@ -490,10 +582,8 @@ Rectangle {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 if (root.isDetached) {
-                                    console.log("Docking Soundboard...");
                                     root.requestDock();
                                 } else {
-                                    console.log("Detaching Soundboard...");
                                     root.requestDetach();
                                 }
                             }
@@ -542,8 +632,8 @@ Rectangle {
                 // Base size range, scaled by slotSizeScale (0.5 to 1.5)
                 readonly property real baseMinTileWidth: 120
                 readonly property real baseMaxTileWidth: 180
-                readonly property real minTileWidth: baseMinTileWidth * soundboardService.slotSizeScale
-                readonly property real maxTileWidth: baseMaxTileWidth * soundboardService.slotSizeScale
+                readonly property real minTileWidth: baseMinTileWidth * (soundboardService?.slotSizeScale ?? 1.0)
+                readonly property real maxTileWidth: baseMaxTileWidth * (soundboardService?.slotSizeScale ?? 1.0)
 
                 // Calculate number of columns based on available width
                 // Default to 5 columns for normal displays, but adjust based on space
@@ -564,8 +654,8 @@ Rectangle {
                 readonly property real tileWidth: (width - tilePadding * 2 - tileSpacing * (columnsCount - 1)) / columnsCount
                 readonly property real tileHeight: tileWidth * 79 / 111  // 111:79 aspect ratio maintained
 
-                // Dummy clips data - REMOVED, now using real clipsModel
-                // The clipsModel is exposed from C++ and updated when a soundboard is selected
+                // Dummy clips data - REMOVED, now using real activeClipsModel
+                // The activeClipsModel is exposed from C++ and updated when a soundboard is selected
 
                 // Flickable area for scrolling
                 Flickable {
@@ -590,12 +680,11 @@ Rectangle {
                                     urls.push(drop.urls[i].toString());
                                 }
 
-                                const boardId = clipsModel.boardId;
+                                const boardId = activeClipsModel.boardId;
                                 if (boardId !== -1) {
-                                    console.log("Adding clips from drop:", urls);
                                     const success = soundboardService.addClips(boardId, urls);
                                     if (success) {
-                                        clipsModel.reload();
+                                        activeClipsModel.reload();
                                     }
                                 }
                                 drop.accept();
@@ -659,11 +748,11 @@ Rectangle {
                         id: boardContextMenu
                         MenuItem {
                             text: "Paste Clip"
-                            enabled: soundboardService.canPaste
+                            enabled: soundboardService?.canPaste ?? false
                             onTriggered: {
-                                const bId = clipsModel.boardId;
+                                const bId = activeClipsModel.boardId;
                                 if (bId !== -1 && soundboardService.pasteClip(bId)) {
-                                    clipsModel.reload();
+                                    activeClipsModel.reload();
                                 }
                             }
                         }
@@ -681,22 +770,22 @@ Rectangle {
                             var localPos = clipsGrid.mapFromItem(clipsFlickable, globalX, globalY);
                             var x = localPos.x;
                             var y = localPos.y;
-                            
+
                             // Calculate column and row
                             var tileWidthWithSpacing = contentArea.tileWidth + contentArea.tileSpacing;
                             var tileHeightWithSpacing = contentArea.tileHeight + contentArea.tileSpacing;
-                            
+
                             var col = Math.floor(x / tileWidthWithSpacing);
                             var row = Math.floor(y / tileHeightWithSpacing);
-                            
+
                             // Clamp to valid range
                             col = Math.max(0, Math.min(col, contentArea.columnsCount - 1));
-                            
+
                             // Calculate index (accounting for AddAudioTile at position 0)
                             var index = row * contentArea.columnsCount + col - 1; // -1 for AddAudioTile
-                            
+
                             // Clamp to valid clip range
-                            return Math.max(0, Math.min(index, clipsModel.count - 1));
+                            return Math.max(0, Math.min(index, activeClipsModel.count - 1));
                         }
 
                         // Add Audio Tile (first item)
@@ -706,16 +795,15 @@ Rectangle {
                             height: contentArea.tileHeight
                             enabled: true
                             onClicked: {
-                                console.log("Add Audio clicked - opening add audio panel");
                                 rightSidebar.currentTabIndex = 1;
-                                audioFileDialog.open()
+                                audioFileDialog.open();
                             }
                         }
 
-                        // Real Clip Tiles from clipsModel with drag-and-drop reordering
+                        // Real Clip Tiles from activeClipsModel with drag-and-drop reordering
                         Repeater {
                             id: clipsRepeater
-                            model: clipsModel
+                            model: activeClipsModel
 
                             Item {
                                 id: clipWrapper
@@ -742,9 +830,11 @@ Rectangle {
 
                                 // Visual offset when item is dragged over
                                 property real visualOffsetX: {
-                                    if (!root.isDragging) return 0;
-                                    if (clipWrapper.index === root.dragSourceIndex) return 0;
-                                    
+                                    if (!root.isDragging)
+                                        return 0;
+                                    if (clipWrapper.index === root.dragSourceIndex)
+                                        return 0;
+
                                     // Items between source and target shift to make room
                                     if (root.dragSourceIndex < root.dragTargetIndex) {
                                         // Dragging right - items in between shift left
@@ -776,7 +866,9 @@ Rectangle {
                                 // Fade out the source position when dragging
                                 opacity: clipWrapper.isBeingDragged ? 0.3 : 1.0
                                 Behavior on opacity {
-                                    NumberAnimation { duration: 150 }
+                                    NumberAnimation {
+                                        duration: 150
+                                    }
                                 }
 
                                 // For drag-drop visual feedback
@@ -794,7 +886,7 @@ Rectangle {
                                     y: 0
                                     radius: 2
                                     color: "#3B82F6"
-                                    
+
                                     // Glow effect
                                     Rectangle {
                                         anchors.centerIn: parent
@@ -809,8 +901,18 @@ Rectangle {
                                     SequentialAnimation on opacity {
                                         running: clipWrapper.isDropTargetLeft
                                         loops: Animation.Infinite
-                                        NumberAnimation { from: 1.0; to: 0.6; duration: 500; easing.type: Easing.InOutQuad }
-                                        NumberAnimation { from: 0.6; to: 1.0; duration: 500; easing.type: Easing.InOutQuad }
+                                        NumberAnimation {
+                                            from: 1.0
+                                            to: 0.6
+                                            duration: 500
+                                            easing.type: Easing.InOutQuad
+                                        }
+                                        NumberAnimation {
+                                            from: 0.6
+                                            to: 1.0
+                                            duration: 500
+                                            easing.type: Easing.InOutQuad
+                                        }
                                     }
                                 }
 
@@ -824,7 +926,7 @@ Rectangle {
                                     y: 0
                                     radius: 2
                                     color: "#3B82F6"
-                                    
+
                                     // Glow effect
                                     Rectangle {
                                         anchors.centerIn: parent
@@ -839,8 +941,18 @@ Rectangle {
                                     SequentialAnimation on opacity {
                                         running: clipWrapper.isDropTargetRight
                                         loops: Animation.Infinite
-                                        NumberAnimation { from: 1.0; to: 0.6; duration: 500; easing.type: Easing.InOutQuad }
-                                        NumberAnimation { from: 0.6; to: 1.0; duration: 500; easing.type: Easing.InOutQuad }
+                                        NumberAnimation {
+                                            from: 1.0
+                                            to: 0.6
+                                            duration: 500
+                                            easing.type: Easing.InOutQuad
+                                        }
+                                        NumberAnimation {
+                                            from: 0.6
+                                            to: 1.0
+                                            duration: 500
+                                            easing.type: Easing.InOutQuad
+                                        }
                                     }
                                 }
 
@@ -848,7 +960,23 @@ Rectangle {
                                     id: clipTile
                                     anchors.fill: parent
 
-                                    title: clipWrapper.clipTitle.length > 0 ? clipWrapper.clipTitle : ("Clip " + (clipWrapper.index + 1))
+                                    // Use title if available, otherwise extract filename from filePath
+                                    title: {
+                                        if (clipWrapper.clipTitle && clipWrapper.clipTitle.length > 0) {
+                                            return clipWrapper.clipTitle;
+                                        } else if (clipWrapper.filePath && clipWrapper.filePath.length > 0) {
+                                            // Extract filename without extension
+                                            var path = clipWrapper.filePath.replace(/\\/g, '/');
+                                            var parts = path.split('/');
+                                            var filename = parts[parts.length - 1];
+                                            var dotIndex = filename.lastIndexOf('.');
+                                            if (dotIndex > 0) {
+                                                return filename.substring(0, dotIndex);
+                                            }
+                                            return filename;
+                                        }
+                                        return "Clip " + (clipWrapper.index + 1);
+                                    }
                                     hotkeyText: clipWrapper.hotkey
                                     imageSource: {
                                         if (clipWrapper.imgPath.length === 0) {
@@ -860,26 +988,28 @@ Rectangle {
                                         }
                                     }
                                     isPlaying: clipWrapper.clipIsPlaying
+                                    clipId: clipWrapper.clipId
+                                    playbackProgress: progressUpdateTimer.clipProgressMap[clipWrapper.clipId] || 0.0
+                                    filePath: clipWrapper.filePath
+                                    currentBoardId: activeClipsModel.boardId
 
                                     onClicked: {
                                         // Selecting the clip updates the sidebar
-                                        console.log("ClipTile clicked - index:", clipWrapper.index, "clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle);
                                         soundboardService.setCurrentlySelectedClip(clipWrapper.clipId);
                                         soundboardService.playClip(clipWrapper.clipId);
                                     }
 
                                     onPlayClicked: {
-                                        console.log("ClipTile playClicked - clipId:", clipWrapper.clipId, "title:", clipWrapper.clipTitle, "filePath:", clipWrapper.filePath);
                                         soundboardService.playClip(clipWrapper.clipId);
                                     }
                                     onStopClicked: {
                                         soundboardService.stopClip(clipWrapper.clipId);
                                     }
                                     onDeleteClicked: {
-                                        if (soundboardService.deleteClip(clipsModel.boardId, clipWrapper.clipId)) {
+                                        if (soundboardService.deleteClip(activeClipsModel.boardId, clipWrapper.clipId)) {
                                             if (root.selectedClipId === clipWrapper.clipId)
                                                 root.selectedClipId = -1;
-                                            clipsModel.reload();
+                                            activeClipsModel.reload();
                                         }
                                     }
                                     onEditClicked: {
@@ -887,24 +1017,21 @@ Rectangle {
                                         rightSidebar.currentTabIndex = 0; // Focus the editor tab
                                     }
                                     onWebClicked: {
-                                        console.log("Web clicked for clip:", clipWrapper.clipId);
                                         // Open sharing URL?
                                     }
-                                    onCopyClicked: {
-                                        soundboardService.copyClip(clipWrapper.clipId);
+                                    onSendToClicked: {
+                                        // Popup opens automatically from ClipTile
                                     }
                                     onPasteClicked: {
-                                        if (soundboardService.pasteClip(clipsModel.boardId)) {
-                                            clipsModel.reload();
+                                        if (soundboardService.pasteClip(activeClipsModel.boardId)) {
+                                            activeClipsModel.reload();
                                         }
                                     }
                                     onEditBackgroundClicked: {
-                                        console.log("Edit background clicked:", clipWrapper.clipId, clipWrapper.clipTitle);
                                         root.clipToEditImageId = clipWrapper.clipId;
                                         imageFileDialog.open();
                                     }
                                     onHotkeyClicked: {
-                                        console.log("Hotkey clicked for clip:", clipWrapper.clipId);
                                         root.hotkeyEditingClipId = clipWrapper.clipId;
                                         clipHotkeyPopup.open();
                                     }
@@ -936,7 +1063,7 @@ Rectangle {
                                             clipWrapper.isBeingDragged = false;
                                             var finalDropIndex = root.dragTargetIndex;
                                             var sourceIndex = root.dragSourceIndex;
-                                            
+
                                             // Reset global drag state
                                             root.isDragging = false;
                                             root.dragSourceIndex = -1;
@@ -950,9 +1077,8 @@ Rectangle {
 
                                             // If dropped on a valid position, reorder
                                             if (finalDropIndex >= 0 && finalDropIndex !== sourceIndex) {
-                                                console.log("Moving clip from", sourceIndex, "to", finalDropIndex);
-                                                soundboardService.moveClip(clipsModel.boardId, sourceIndex, finalDropIndex);
-                                                clipsModel.reload();
+                                                soundboardService.moveClip(activeClipsModel.boardId, sourceIndex, finalDropIndex);
+                                                activeClipsModel.reload();
                                             }
                                         }
                                     }
@@ -963,13 +1089,13 @@ Rectangle {
                                             var pos = centroid.position;
                                             var globalPos = clipWrapper.mapToItem(clipsFlickable, pos.x, pos.y);
                                             root.dragPosition = Qt.point(globalPos.x, globalPos.y);
-                                            
+
                                             // Move the clipWrapper to follow the drag
                                             if (clipWrapper.parent === clipsFlickable) {
                                                 clipWrapper.x = globalPos.x - clipWrapper.width / 2;
                                                 clipWrapper.y = globalPos.y - clipWrapper.height / 2;
                                             }
-                                            
+
                                             // Calculate drop target
                                             var newTargetIndex = clipsGrid.getDropIndexFromPosition(globalPos.x, globalPos.y);
                                             if (newTargetIndex !== root.dragTargetIndex) {
@@ -985,7 +1111,7 @@ Rectangle {
                                     anchors.fill: parent
                                     enabled: root.isDragging && clipWrapper.index !== root.dragSourceIndex
 
-                                    onEntered: function(drag) {
+                                    onEntered: function (drag) {
                                         if (clipWrapper.index !== root.dragSourceIndex) {
                                             root.dragTargetIndex = clipWrapper.index;
                                         }
@@ -1009,7 +1135,7 @@ Rectangle {
                             parent: clipsFlickable
                             visible: root.isDragging
                             z: 1000
-                            
+
                             // Position at drag location
                             x: root.dragPosition.x - contentArea.tileWidth / 2
                             y: root.dragPosition.y - contentArea.tileHeight / 2
@@ -1043,7 +1169,7 @@ Rectangle {
                                         }
                                     }
                                     fillMode: Image.PreserveAspectCrop
-                                    
+
                                     // Rounded corners
                                     layer.enabled: true
                                     layer.effect: MultiEffect {
@@ -1068,7 +1194,7 @@ Rectangle {
                                     height: 30
                                     color: "#CC000000"
                                     radius: 12
-                                    
+
                                     // Only bottom corners rounded
                                     Rectangle {
                                         anchors.top: parent.top
@@ -1157,8 +1283,7 @@ Rectangle {
                 isPlaying: root.displayedClipData ? root.displayedClipData.isPlaying : false
 
                 // Waveform progress - bind totalTime from clip duration (in seconds)
-                totalTime: (root.displayedClipData && root.displayedClipData.durationSec > 0) 
-                           ? root.displayedClipData.durationSec : 210
+                totalTime: (root.displayedClipData && root.displayedClipData.durationSec > 0) ? root.displayedClipData.durationSec : 210
 
                 // currentTime is updated by the timer below
                 property real playbackPositionMs: 0
@@ -1172,7 +1297,7 @@ Rectangle {
                     running: audioPlayerCard.isPlaying && root.displayedClipData !== null
                     onTriggered: {
                         if (root.displayedClipData) {
-                            audioPlayerCard.playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
+                            audioPlayerCard.playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId);
                         }
                     }
                 }
@@ -1184,7 +1309,7 @@ Rectangle {
                 onIsPlayingChanged: {
                     if (root.displayedClipData) {
                         // Always sync position when state changes
-                        playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
+                        playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId);
                     }
                 }
 
@@ -1193,12 +1318,12 @@ Rectangle {
                     if (root.displayedClipData) {
                         if (lastClipId !== root.displayedClipData.clipId) {
                             // New clip - get current position from backend
-                            playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId)
-                            lastClipId = root.displayedClipData.clipId
+                            playbackPositionMs = soundboardService.getClipPlaybackPositionMs(root.displayedClipData.clipId);
+                            lastClipId = root.displayedClipData.clipId;
                         }
                     } else {
-                        playbackPositionMs = 0
-                        lastClipId = -1
+                        playbackPositionMs = 0;
+                        lastClipId = -1;
                     }
                 }
 
@@ -1213,21 +1338,20 @@ Rectangle {
                 }
                 onPauseClicked: {
                     if (root.displayedClipData) {
-                        soundboardService.stopClip(root.displayedClipData.clipId);
+                        soundboardService.playClip(root.displayedClipData.clipId);
                     }
                 }
 
                 // Navigate to previous/next clip in the list
                 onPreviousClicked: {
-                    console.log("Audio Player: Previous clicked");
-                    if (clipsModel.count === 0)
+                    if (activeClipsModel.count === 0)
                         return;
 
                     // Find current index and go to previous
                     let currentIndex = -1;
-                    for (let i = 0; i < clipsModel.count; i++) {
-                        const index = clipsModel.index(i, 0);
-                        const id = clipsModel.data(index, 257);
+                    for (let i = 0; i < activeClipsModel.count; i++) {
+                        const index = activeClipsModel.index(i, 0);
+                        const id = activeClipsModel.data(index, 257);
                         if (id === root.selectedClipId) {
                             currentIndex = i;
                             break;
@@ -1235,42 +1359,40 @@ Rectangle {
                     }
 
                     if (currentIndex > 0) {
-                        const prevIndex = clipsModel.index(currentIndex - 1, 0);
-                        root.selectedClipId = clipsModel.data(prevIndex, 257);
-                    } else if (currentIndex === 0 && clipsModel.count > 0) {
+                        const prevIndex = activeClipsModel.index(currentIndex - 1, 0);
+                        root.selectedClipId = activeClipsModel.data(prevIndex, 257);
+                    } else if (currentIndex === 0 && activeClipsModel.count > 0) {
                         // Wrap to last clip
-                        const lastIndex = clipsModel.index(clipsModel.count - 1, 0);
-                        root.selectedClipId = clipsModel.data(lastIndex, 257);
+                        const lastIndex = activeClipsModel.index(activeClipsModel.count - 1, 0);
+                        root.selectedClipId = activeClipsModel.data(lastIndex, 257);
                     }
                 }
                 onNextClicked: {
-                    console.log("Audio Player: Next clicked");
-                    if (clipsModel.count === 0)
+                    if (activeClipsModel.count === 0)
                         return;
 
                     // Find current index and go to next
                     let currentIndex = -1;
-                    for (let i = 0; i < clipsModel.count; i++) {
-                        const index = clipsModel.index(i, 0);
-                        const id = clipsModel.data(index, 257);
+                    for (let i = 0; i < activeClipsModel.count; i++) {
+                        const index = activeClipsModel.index(i, 0);
+                        const id = activeClipsModel.data(index, 257);
                         if (id === root.selectedClipId) {
                             currentIndex = i;
                             break;
                         }
                     }
 
-                    if (currentIndex >= 0 && currentIndex < clipsModel.count - 1) {
-                        const nextIndex = clipsModel.index(currentIndex + 1, 0);
-                        root.selectedClipId = clipsModel.data(nextIndex, 257);
-                    } else if (currentIndex === clipsModel.count - 1) {
+                    if (currentIndex >= 0 && currentIndex < activeClipsModel.count - 1) {
+                        const nextIndex = activeClipsModel.index(currentIndex + 1, 0);
+                        root.selectedClipId = activeClipsModel.data(nextIndex, 257);
+                    } else if (currentIndex === activeClipsModel.count - 1) {
                         // Wrap to first clip
-                        const firstIndex = clipsModel.index(0, 0);
-                        root.selectedClipId = clipsModel.data(firstIndex, 257);
+                        const firstIndex = activeClipsModel.index(0, 0);
+                        root.selectedClipId = activeClipsModel.data(firstIndex, 257);
                     }
                 }
-                isMuted: !soundboardService.isMicEnabled()
+                isMuted: !(soundboardService?.isMicEnabled() ?? true)
                 onMuteClicked: {
-                    console.log("Audio Player: Mute toggled, muted:", isMuted);
                     soundboardService.setMicEnabled(!isMuted);
                 }
             }
@@ -1279,7 +1401,9 @@ Rectangle {
         // RIGHT COLUMN: Modern Sidebar with Premium Styling
         Rectangle {
             id: rightSidebar
-            Layout.preferredWidth: 300
+            Layout.preferredWidth: 340
+            Layout.minimumWidth: 340
+            Layout.maximumWidth: 340
             Layout.fillHeight: true
             Layout.alignment: Qt.AlignRight
             Layout.topMargin: 0
@@ -1295,7 +1419,7 @@ Rectangle {
 
             // Tab state: 0=Editor, 1=Plus, 2=Record, 3=Teleprompter, 4=Speaker
             property int currentTabIndex: 0  // Default to Record tab
-            property var tabState: ["Clip Editor", "Add Audio", "Recording", "Teleprompter", "Speaker"]
+            property var tabState: ["Editor", "Add", "Record", "Prompter", "TTS"]
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 12
@@ -1324,7 +1448,7 @@ Rectangle {
 
                         // Current Tab Title
                         Text {
-                            text: tabState[currentTabIndex]
+                            text: rightSidebar.tabState[rightSidebar.currentTabIndex]
                             color: Colors.textPrimary
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 18
@@ -1375,6 +1499,9 @@ Rectangle {
                     spacing: 6
                     visible: rightSidebar.currentTabIndex === 2
 
+                    // Recording waveform peaks data (to be populated by recording)
+                    property var recordingPeaks: []
+
                     // ============================================================
                     // Name Audio File (SINGLE INPUT - fixed duplicate name issue)
                     // ============================================================
@@ -1397,7 +1524,9 @@ Rectangle {
                                 font.weight: Font.DemiBold
                             }
 
-                            Item { Layout.fillWidth: true }
+                            Item {
+                                Layout.fillWidth: true
+                            }
 
                             Rectangle {
                                 width: 24
@@ -1499,9 +1628,13 @@ Rectangle {
                             model: []
 
                             onAboutToOpen: {
-                                const list = soundboardService.getInputDevices()
-                                list.unshift({ id: "-1", name: "None", isDefault: false })
-                                model = list
+                                const list = soundboardService.getInputDevices();
+                                list.unshift({
+                                    id: "-1",
+                                    name: "None",
+                                    isDefault: false
+                                });
+                                model = list;
                             }
 
                             onItemSelected: function (id, name) {
@@ -1512,7 +1645,9 @@ Rectangle {
                     }
 
                     // Spacer
-                    Item { Layout.preferredHeight: 4 }
+                    Item {
+                        Layout.preferredHeight: 4
+                    }
 
                     // ============================================================
                     // Start/Stop Recording Button Section
@@ -1530,11 +1665,9 @@ Rectangle {
                             radius: 18
 
                             // Button color changes based on hover + recording state
-                            color: micButtonArea.containsMouse
-                                   ? (soundboardService.isRecording ? "#7F1D1D" : "#4A4A4A")
-                                   : (soundboardService.isRecording ? "#991B1B" : "#3A3A3A")
+                            color: micButtonArea.containsMouse ? ((soundboardService?.isRecording ?? false) ? "#7F1D1D" : "#4A4A4A") : ((soundboardService?.isRecording ?? false) ? "#991B1B" : "#3A3A3A")
 
-                            border.color: soundboardService.isRecording ? "#EF4444" : "#4A4A4A"
+                            border.color: (soundboardService?.isRecording ?? false) ? "#EF4444" : "#4A4A4A"
                             border.width: 1
 
                             // subtle pulse ring while recording
@@ -1547,13 +1680,19 @@ Rectangle {
                                 border.width: 2
                                 border.color: "#EF4444"
                                 opacity: 0.0
-                                visible: soundboardService.isRecording
+                                visible: soundboardService?.isRecording ?? false
 
                                 SequentialAnimation on opacity {
-                                    running: soundboardService.isRecording
+                                    running: soundboardService?.isRecording ?? false
                                     loops: Animation.Infinite
-                                    NumberAnimation { to: 0.35; duration: 450 }
-                                    NumberAnimation { to: 0.05; duration: 450 }
+                                    NumberAnimation {
+                                        to: 0.35
+                                        duration: 450
+                                    }
+                                    NumberAnimation {
+                                        to: 0.05
+                                        duration: 450
+                                    }
                                 }
                             }
 
@@ -1572,7 +1711,7 @@ Rectangle {
                                 anchors.fill: micIcon
                                 colorization: 1.0
                                 // blue when recording (or red if you prefer)
-                                colorizationColor: soundboardService.isRecording ? "#EF4444" : "#FFFFFF"
+                                colorizationColor: (soundboardService?.isRecording ?? false) ? "#EF4444" : "#FFFFFF"
                             }
 
                             MouseArea {
@@ -1581,31 +1720,51 @@ Rectangle {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    if (soundboardService.isRecording) {
-                                        soundboardService.stopRecording()
+                                    if (soundboardService?.isRecording ?? false) {
+                                        soundboardService.stopRecording();
                                     } else {
                                         // If your C++ startRecording needs a name/path, change this call accordingly.
                                         // Example: soundboardService.startRecording(recordingNameInput.text)
-                                        soundboardService.startRecording()
+                                        soundboardService.startRecording();
                                     }
                                 }
                             }
 
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Behavior on color {
+                                ColorAnimation {
+                                    duration: 150
+                                }
+                            }
                         }
 
                         Text {
-                            text: soundboardService.isRecording ? "Stop Recording" : "Start Recording"
+                            text: (soundboardService?.isRecording ?? false) ? "Stop Recording" : "Start Recording"
                             color: "#888888"
                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                             font.pixelSize: 10
                             font.weight: Font.Normal
                             Layout.alignment: Qt.AlignHCenter
                         }
+
+                        Text {
+                            visible: soundboardService?.isRecording ?? false
+                            text: {
+                                const t = soundboardService?.recordingDuration ?? 0;
+                                const mins = Math.floor(t / 60);
+                                const secs = Math.floor(t % 60);
+                                return mins + ":" + (secs < 10 ? "0" + secs : secs);
+                            }
+                            color: Colors.textSecondary
+                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                            font.pixelSize: 11
+                            Layout.alignment: Qt.AlignHCenter
+                        }
                     }
 
                     // Spacer
-                    Item { Layout.preferredHeight: 8 }
+                    Item {
+                        Layout.preferredHeight: 8
+                    }
 
                     // ============================================================
                     // Trim Audio Section
@@ -1652,16 +1811,76 @@ Rectangle {
                             }
                         }
 
-                        WaveformDisplay {
+                        TrimWaveform {
+                            id: waveformTrim
                             Layout.fillWidth: true
                             Layout.preferredHeight: 90
-                            currentTime: soundboardService.recordingDuration
-                            totalDuration: Math.max(soundboardService.recordingDuration, 10)
+
+                            currentTime: soundboardService?.recordingDuration ?? 0
+                            totalDuration: Math.max(soundboardService?.recordingDuration ?? 0, 10)
+
+                            // use real waveform after stop later (optional)
+                            waveformData: recordingTab.recordingPeaks.length > 0 ? recordingTab.recordingPeaks : waveformTrim.generateMockWaveform()
+
+                            onTrimStartMoved: function (pos) {
+                                waveformTrim.trimStart = pos;
+                            }
+                            onTrimEndMoved: function (pos) {
+                                waveformTrim.trimEnd = pos;
+                            }
+                        }
+                    }
+
+                    Item {
+                        Layout.preferredHeight: 1
+                    }
+
+                    Text {
+                        text: "Add To Soundboard"
+                        color: Colors.textPrimary
+                        font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                        font.pixelSize: 14
+                        font.weight: Font.DemiBold
+                    }
+
+                    DropdownSelector {
+                        id: recordingBoardDropdown
+                        Layout.fillWidth: true
+                        placeholder: "Select Soundboard"
+                        selectedId: ""     // keep as string for your dropdown component
+                        model: []
+
+                        function refreshBoards() {
+                            const boards = soundboardService.listBoardsForDropdown();
+                            model = boards.map(b => ({
+                                        id: String(b.id),
+                                        name: b.name
+                                    }));
+
+                            // default -> opened soundboard (activeClipsModel.boardId)
+                            if (selectedId === "" && activeClipsModel.boardId >= 0) {
+                                selectedId = String(activeClipsModel.boardId);
+                            }
+                        }
+
+                        Component.onCompleted: refreshBoards()
+                        onAboutToOpen: refreshBoards()
+                    }
+
+                    // If user changes boards elsewhere, keep default synced (only when user hasn't picked manually)
+                    Connections {
+                        target: activeClipsModel
+                        function onBoardIdChanged() {
+                            if (recordingBoardDropdown.selectedId === "" || recordingBoardDropdown.selectedId === "-1") {
+                                recordingBoardDropdown.selectedId = String(activeClipsModel.boardId);
+                            }
                         }
                     }
 
                     // Spacer
-                    Item { Layout.preferredHeight: 6 }
+                    Item {
+                        Layout.preferredHeight: 2
+                    }
 
                     // ============================================================
                     // Cancel and Save buttons
@@ -1672,7 +1891,9 @@ Rectangle {
                         Layout.rightMargin: 5
                         spacing: 8
 
-                        Item { Layout.fillWidth: true }
+                        Item {
+                            Layout.fillWidth: true
+                        }
 
                         // Cancel button
                         Rectangle {
@@ -1685,7 +1906,7 @@ Rectangle {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: "Cancel"
+                                text: "Rest"
                                 color: Colors.textPrimary
                                 font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                 font.pixelSize: 12
@@ -1699,11 +1920,15 @@ Rectangle {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     recordingNameInput.text = "";
-                                    rightSidebar.currentTabIndex = 0;
+                                    soundboardService.cancelPendingRecording(); // NEW: stops + deletes + clears
                                 }
                             }
 
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Behavior on color {
+                                ColorAnimation {
+                                    duration: 150
+                                }
+                            }
                         }
 
                         // Save button
@@ -1713,8 +1938,14 @@ Rectangle {
                             radius: 8
                             gradient: Gradient {
                                 orientation: Gradient.Horizontal
-                                GradientStop { position: 0.0; color: saveBtnArea.containsMouse ? "#4A9AF7" : "#3B82F6" }
-                                GradientStop { position: 1.0; color: saveBtnArea.containsMouse ? "#E040FB" : "#D214FD" }
+                                GradientStop {
+                                    position: 0.0
+                                    color: saveBtnArea.containsMouse ? Colors.accentLight : Colors.accent
+                                }
+                                GradientStop {
+                                    position: 1.0
+                                    color: saveBtnArea.containsMouse ? Colors.accentDark : Colors.accentMedium
+                                }
                             }
 
                             Text {
@@ -1733,23 +1964,59 @@ Rectangle {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     console.log("Save clicked");
-                                    const boardId = clipsModel.boardId;
 
-                                    if (boardId >= 0 && soundboardService.lastRecordingPath !== "") {
-                                        const title = recordingNameInput.text.trim() || "New Recording";
-                                        const success = soundboardService.addClipWithTitle(
-                                            boardId,
-                                            "file:///" + soundboardService.lastRecordingPath,
-                                            title
-                                        );
+                                    const boardId = parseInt(recordingBoardDropdown.selectedId);
+                                    if (isNaN(boardId) || boardId < 0) {
+                                        console.log("Cannot save: invalid board id", recordingBoardDropdown.selectedId);
+                                        return;
+                                    }
 
-                                        if (success) {
-                                            clipsModel.reload();
-                                            recordingNameInput.text = "";
-                                            rightSidebar.currentTabIndex = 0;
-                                        }
+                                    // stop recording if still recording
+                                    if (soundboardService?.isRecording ?? false) {
+                                        soundboardService.stopRecording();
+                                    }
+
+                                    // IMPORTANT: this returns the path ONCE and clears internal state
+                                    const localPath = soundboardService.consumePendingRecordingPath();
+                                    if (!localPath || localPath === "") {
+                                        console.log("Cannot save: no pending recording");
+                                        return;
+                                    }
+
+                                    const title = recordingNameInput.text.trim() || "New Recording";
+                                    // Use local path directly - C++ handles file:// prefix conversion
+                                    // DO NOT use Qt.resolvedUrl as it creates malformed URLs on Windows
+
+                                    // Convert normalized trim (0..1) to milliseconds
+                                    const durationSec = soundboardService.getFileDuration(localPath); // seconds
+                                    const durationMs = Math.max(0, durationSec * 1000.0);
+
+                                    let trimStartMs = waveformTrim.trimStart * durationMs;
+                                    let trimEndMs = waveformTrim.trimEnd * durationMs;
+
+                                    trimStartMs = Math.max(0, Math.min(trimStartMs, durationMs));
+                                    trimEndMs = Math.max(0, Math.min(trimEndMs, durationMs));
+
+                                    if (trimEndMs <= trimStartMs + 10) {
+                                        trimEndMs = Math.min(durationMs, trimStartMs + 10);
+                                    }
+
+                                    const noTrim = (waveformTrim.trimStart <= 0.0001 && waveformTrim.trimEnd >= 0.9999);
+                                    if (noTrim) {
+                                        trimStartMs = 0;
+                                        trimEndMs = 0; // your engine treats 0 as full length
+                                    }
+
+                                    console.log("Adding clip - boardId:", boardId, "path:", localPath, "title:", title);
+                                    const success = soundboardService.addClipWithSettings(boardId, localPath, title, trimStartMs, trimEndMs);
+
+                                    if (success) {
+                                        console.log("Clip added successfully");
+                                        activeClipsModel.reload();
+                                        recordingNameInput.text = "";
+                                        rightSidebar.currentTabIndex = 0;
                                     } else {
-                                        console.log("Cannot save: Board ID", boardId, "Recording Path", soundboardService.lastRecordingPath);
+                                        console.log("addClipWithSettings failed for path:", localPath);
                                     }
                                 }
                             }
@@ -1757,7 +2024,9 @@ Rectangle {
                     }
 
                     // Fill remaining space
-                    Item { Layout.fillHeight: true }
+                    Item {
+                        Layout.fillHeight: true
+                    }
                 }
 
                 // Settings Tab Content (Tab 0) - New Modern Clip Editor
@@ -1797,11 +2066,14 @@ Rectangle {
                         property real durationSec: 0.0
                         property real trimStartMs: 0.0
                         property real trimEndMs: 0.0
+                        property string displayComputedTitle: ""
+                        property bool isTitleEditing: false
 
                         // Update when selected clip changes
                         Connections {
                             target: root
                             function onSelectedClipIdChanged() {
+                                clipEditorTab.isTitleEditing = false;
                                 if (root.selectedClipId !== -1) {
                                     const data = root.getClipDataById(root.selectedClipId);
                                     if (data) {
@@ -1882,8 +2154,8 @@ Rectangle {
                                     Image {
                                         id: clipPreviewImage
                                         anchors.centerIn: parent
-                                        width: 100
-                                        height: 100
+                                        width: 150
+                                        height: 150
                                         fillMode: Image.PreserveAspectFit
                                         source: {
                                             const imgPath = clipEditorTab.editingClipImgPath;
@@ -1941,6 +2213,7 @@ Rectangle {
 
                                     // Upload/Edit button (top right)
                                     Rectangle {
+                                        id: editImageBtn
                                         anchors.top: parent.top
                                         anchors.right: parent.right
                                         anchors.topMargin: 8
@@ -1974,19 +2247,30 @@ Rectangle {
                             RowLayout {
                                 Layout.fillWidth: true
                                 Layout.alignment: Qt.AlignHCenter
+                                Layout.leftMargin: 20
+                                Layout.rightMargin: 20
                                 spacing: 8
 
                                 TextInput {
                                     id: clipTitleInput
-                                    Layout.preferredWidth: implicitWidth + 20
-                                    Layout.maximumWidth: 180
+                                    Layout.fillWidth: true
                                     horizontalAlignment: Text.AlignHCenter
-                                    color: Colors.textPrimary // was #FFFFFF
+                                    color: Colors.textPrimary
                                     font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
                                     font.pixelSize: 16
                                     font.weight: Font.DemiBold
                                     clip: true
                                     selectByMouse: true
+                                    wrapMode: TextInput.NoWrap
+                                    visible: clipEditorTab.isTitleEditing
+
+                                    onVisibleChanged: {
+                                        if (visible) {
+                                            forceActiveFocus();
+                                            // Select all text when entering edit mode? Optional.
+                                            // selectAll();
+                                        }
+                                    }
 
                                     onTextChanged: {
                                         if (text !== clipEditorTab.editingClipName) {
@@ -1994,31 +2278,50 @@ Rectangle {
                                         }
                                     }
 
-                                    // Auto-save on Enter key
+                                    // Save on Enter key
                                     Keys.onReturnPressed: {
                                         if (root.selectedClipId !== -1 && text.length > 0) {
-                                            clipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                            activeClipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
                                             clipEditorTab.editingClipName = text;
-                                            clipsModel.reload();
+                                            clipEditorTab.displayComputedTitle = text;
+                                            activeClipsModel.reload();
                                         }
-                                        focus = false; // Remove focus after saving
+                                        clipEditorTab.isTitleEditing = false;
                                     }
 
-                                    // Auto-save on focus loss
+                                    // Save on focus loss
                                     onActiveFocusChanged: {
-                                        if (!activeFocus && root.selectedClipId !== -1 && text.length > 0 && text !== clipEditorTab.editingClipName) {
-                                            clipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
-                                            clipEditorTab.editingClipName = text;
-                                            clipsModel.reload();
+                                        if (!activeFocus && visible) {
+                                            if (root.selectedClipId !== -1 && text.length > 0 && text !== clipEditorTab.editingClipName) {
+                                                activeClipsModel.updateClip(root.selectedClipId, text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                                clipEditorTab.editingClipName = text;
+                                                clipEditorTab.displayComputedTitle = text;
+                                                activeClipsModel.reload();
+                                            }
+                                            clipEditorTab.isTitleEditing = false;
                                         }
                                     }
+                                }
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "Enter title..."
-                                        color: Colors.textSecondary // was #666666
-                                        font: parent.font
-                                        visible: !parent.text && !parent.activeFocus
+                                // Read-only Title Display
+                                Text {
+                                    id: clipTitleDisplay
+                                    Layout.fillWidth: true
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: clipEditorTab.displayComputedTitle
+                                    color: Colors.textPrimary
+                                    font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
+                                    font.pixelSize: 16
+                                    font.weight: Font.DemiBold
+                                    wrapMode: Text.Wrap
+                                    visible: !clipEditorTab.isTitleEditing
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onDoubleClicked: {
+                                            clipTitleInput.text = clipEditorTab.displayComputedTitle;
+                                            clipEditorTab.isTitleEditing = true;
+                                        }
                                     }
                                 }
 
@@ -2040,7 +2343,10 @@ Rectangle {
                                     MouseArea {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: clipTitleInput.forceActiveFocus()
+                                        onClicked: {
+                                            clipTitleInput.text = clipEditorTab.displayComputedTitle;
+                                            clipEditorTab.isTitleEditing = true;
+                                        }
                                     }
                                 }
                             }
@@ -2119,156 +2425,6 @@ Rectangle {
                                 }
                             }
 
-        //                     // ===== PLAYBACK CONTROLS =====
-        //                     RowLayout {
-        //                         Layout.alignment: Qt.AlignHCenter
-        //                         spacing: 6
-
-        //                         // Previous button
-        //                         Rectangle {
-        //                             width: 28
-        //                             height: 28
-        //                             radius: 6
-        //                             color: prevBtnArea.containsMouse ? "#3A3A3A" : "transparent"
-
-        //                             Text {
-        //                                 anchors.centerIn: parent
-        //                                 text: "◀"
-        //                                 color: "#FFFFFF"
-        //                                 font.pixelSize: 10
-        //                             }
-
-        //                             MouseArea {
-        //                                 id: prevBtnArea
-        //                                 anchors.fill: parent
-        //                                 hoverEnabled: true
-        //                                 cursorShape: Qt.PointingHandCursor
-        //                                 onClicked: console.log("Previous clicked")
-        //                             }
-        //                         }
-
-        //                         // Skip backward button
-        //                         Rectangle {
-        //                             width: 28
-        //                             height: 28
-        //                             radius: 6
-        //                             color: skipBackArea.containsMouse ? "#3A3A3A" : "transparent"
-
-        //                             Text {
-        //                                 anchors.centerIn: parent
-        //                                 text: "⏮"
-        //                                 color: "#FFFFFF"
-        //                                 font.pixelSize: 12
-        //                             }
-
-        //                             MouseArea {
-        //                                 id: skipBackArea
-        //                                 anchors.fill: parent
-        //                                 hoverEnabled: true
-        //                                 cursorShape: Qt.PointingHandCursor
-        //                                 onClicked: console.log("Skip backward clicked")
-        //                             }
-        //                         }
-
-        //                         // Main Play Button (larger, gradient)
-        //                         Rectangle {
-        //                             width: 36
-        //                             height: 36
-        //                             radius: 18
-
-        //                             gradient: Gradient {
-        //                                 orientation: Gradient.Horizontal
-        //                                 GradientStop {
-        //                                     position: 0.0
-        //                                     color: "#3B82F6"
-        //                                 }
-        //                                 GradientStop {
-        //                                     position: 1.0
-        //                                     color: "#8B5CF6"
-        //                                 }
-        //                             }
-
-        //                             Text {
-        //                                 anchors.centerIn: parent
-        //                                 text: root.displayedClipData && root.displayedClipData.isPlaying ? "⏸" : "▶"
-        //                                 color: "#FFFFFF"
-        //                                 font.pixelSize: 14
-        //                             }
-
-        //                             MouseArea {
-        //                                 anchors.fill: parent
-        //                                 cursorShape: Qt.PointingHandCursor
-        //                                 onClicked: {
-        //                                     if (root.selectedClipId !== -1) {
-        //                                         if (soundboardService.isClipPlaying(root.selectedClipId)) {
-        //                                             soundboardService.stopClip(root.selectedClipId);
-        //                                         } else {
-        //                                             soundboardService.playClip(root.selectedClipId);
-        //                                         }
-        //                                     }
-        //                                 }
-        //                             }
-        //                         }
-
-        //                         // Skip forward button
-        //                         Rectangle {
-        //                             width: 28
-        //                             height: 28
-        //                             radius: 6
-        //                             color: skipFwdArea.containsMouse ? "#3A3A3A" : "transparent"
-
-        //                             Text {
-        //                                 anchors.centerIn: parent
-        //                                 text: "⏭"
-        //                                 color: "#FFFFFF"
-        //                                 font.pixelSize: 12
-        //                             }
-
-        //                             MouseArea {
-        //                                 id: skipFwdArea
-        //                                 anchors.fill: parent
-        //                                 hoverEnabled: true
-        //                                 cursorShape: Qt.PointingHandCursor
-        //                                 onClicked: console.log("Skip forward clicked")
-        //                             }
-        //                         }
-
-        //                         // Loop button - toggles repeat for selected clip
-        //                         Rectangle {
-        //                             width: 28
-        //                             height: 28
-        //                             radius: 6
-        //                             color: {
-        //                                 // Active when repeat is on
-        //                                 if (clipEditorTab.clipIsRepeat) {
-        //                                     return loopBtnArea.containsMouse ? "#7C3AED" : "#8B5CF6";
-        //                                 }
-        //                                 return loopBtnArea.containsMouse ? "#3A3A3A" : "transparent";
-        //                             }
-
-        //                             Text {
-        //                                 anchors.centerIn: parent
-        //                                 text: "🔁"
-        //                                 color: clipEditorTab.clipIsRepeat ? "#FFFFFF" : "#888888"
-        //                                 font.pixelSize: 12
-        //                             }
-
-        //                             MouseArea {
-        //                                 id: loopBtnArea
-        //                                 anchors.fill: parent
-        //                                 hoverEnabled: true
-        //                                 cursorShape: Qt.PointingHandCursor
-        //                                 onClicked: {
-        //                                     // Toggle repeat for selected clip
-        //                                     if (root.selectedClipId !== -1) {
-        //                                         clipEditorTab.clipIsRepeat = !clipEditorTab.clipIsRepeat;
-        //                                         clipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
-        //                                     }
-        //                                 }
-        //                             }
-        //                         }
-        //                     }
-
                             // ===== VOICE VOLUME SLIDER =====
                             ColumnLayout {
                                 Layout.fillWidth: true
@@ -2308,7 +2464,7 @@ Rectangle {
                                         clipEditorTab.clipVolume = value;
                                         // Real-time volume update - no need to save
                                         if (root.selectedClipId !== -1) {
-                                            clipsModel.setClipVolume(root.selectedClipId, Math.round(value));
+                                            activeClipsModel.setClipVolume(root.selectedClipId, Math.round(value));
                                         }
                                     }
 
@@ -2389,7 +2545,7 @@ Rectangle {
                                         clipEditorTab.clipSpeed = value;
                                         // Auto-save speed changes
                                         if (root.selectedClipId !== -1) {
-                                            clipsModel.updateClipAudioSettings(root.selectedClipId, Math.round(clipEditorTab.clipVolume), value);
+                                            activeClipsModel.updateClipAudioSettings(root.selectedClipId, Math.round(clipEditorTab.clipVolume), value);
                                         }
                                     }
 
@@ -2463,17 +2619,21 @@ Rectangle {
                                     trimEnd: (clipEditorTab.durationSec > 0 && clipEditorTab.trimEndMs > 0) ? (clipEditorTab.trimEndMs / 1000.0) / clipEditorTab.durationSec : 1.0
 
                                     onTrimStartMoved: function (pos) {
+                                        console.log("Trim start moved to:", pos, "selectedClipId:", root.selectedClipId, "durationSec:", clipEditorTab.durationSec);
                                         if (root.selectedClipId !== -1 && clipEditorTab.durationSec > 0) {
                                             var newStartMs = pos * clipEditorTab.durationSec * 1000.0;
+                                            console.log("Setting trim start:", newStartMs, "ms for clip:", root.selectedClipId, "on board:", activeClipsModel.boardId);
                                             clipEditorTab.trimStartMs = newStartMs;
-                                            soundboardService.setClipTrim(clipsModel.boardId, root.selectedClipId, newStartMs, clipEditorTab.trimEndMs);
+                                            soundboardService.setClipTrim(activeClipsModel.boardId, root.selectedClipId, newStartMs, clipEditorTab.trimEndMs);
                                         }
                                     }
                                     onTrimEndMoved: function (pos) {
+                                        console.log("Trim end moved to:", pos, "selectedClipId:", root.selectedClipId, "durationSec:", clipEditorTab.durationSec);
                                         if (root.selectedClipId !== -1 && clipEditorTab.durationSec > 0) {
                                             var newEndMs = pos * clipEditorTab.durationSec * 1000.0;
+                                            console.log("Setting trim end:", newEndMs, "ms for clip:", root.selectedClipId, "on board:", activeClipsModel.boardId);
                                             clipEditorTab.trimEndMs = newEndMs;
-                                            soundboardService.setClipTrim(clipsModel.boardId, root.selectedClipId, clipEditorTab.trimStartMs, newEndMs);
+                                            soundboardService.setClipTrim(activeClipsModel.boardId, root.selectedClipId, clipEditorTab.trimStartMs, newEndMs);
                                         }
                                     }
                                     onSeekRequested: function (pos) {
@@ -2481,8 +2641,8 @@ Rectangle {
                                             var seekMs = pos * clipEditorTab.durationSec * 1000.0;
 
                                             // If playing, seek audio
-                                            if (soundboardService.isClipPlaying(root.selectedClipId)) {
-                                                soundboardService.seekClip(clipsModel.boardId, root.selectedClipId, seekMs);
+                                            if (soundboardService?.isClipPlaying(root.selectedClipId) ?? false) {
+                                                soundboardService.seekClip(activeClipsModel.boardId, root.selectedClipId, seekMs);
                                             } else {
                                                 // If not playing, just update visual cursor
                                                 waveform.currentTime = seekMs / 1000.0;
@@ -2493,7 +2653,7 @@ Rectangle {
                                     Timer {
                                         id: playbackTimer
                                         interval: 50
-                                        running: root.selectedClipId !== -1 && soundboardService.isClipPlaying(root.selectedClipId)
+                                        running: root.selectedClipId !== -1 && (soundboardService?.isClipPlaying(root.selectedClipId) ?? false)
                                         repeat: true
                                         onTriggered: {
                                             waveform.currentTime = soundboardService.getClipPlaybackPositionMs(root.selectedClipId) / 1000.0;
@@ -2539,72 +2699,40 @@ Rectangle {
 
                                     // helper: pick correct svg for mode + theme
                                     function modeIconSource(mode) {
-                                        const base = "qrc:/qt/qml/TalkLess/resources/icons/reproduction/"
-                                        const suffix = isLightTheme ? "_light.svg" : "_dark.svg"
+                                        const base = "qrc:/qt/qml/TalkLess/resources/icons/reproduction/";
+                                        const suffix = isLightTheme ? "_light.svg" : "_dark.svg";
                                         switch (mode) {
-                                        case 0: return base + "overlay" + suffix
-                                        case 1: return base + "play-pause" + suffix
-                                        case 2: return base + "play-stop" + suffix
-                                        case 3: return base + "restart" + suffix
-                                        case 4: return base + "loop" + suffix
-                                        default: return ""
+                                        case 0:
+                                            return base + "overlay" + suffix;
+                                        case 1:
+                                            return base + "play-pause" + suffix;
+                                        case 2:
+                                            return base + "play-stop" + suffix;
+                                        case 3:
+                                            return base + "restart" + suffix;
+                                        case 4:
+                                            return base + "loop" + suffix;
+                                        default:
+                                            return "";
                                         }
                                     }
 
-                                    // reusable button
-                                    component ModeButton: Rectangle {
-                                        required property int mode
-                                        property bool selected: clipEditorTab.reproductionMode === mode
-
-                                        width: 36
-                                        height: 36
-                                        radius: 8
-                                        color: ma.containsMouse ? Colors.surfaceDark : Colors.surface
-                                        border.width: 1
-
-                                        Rectangle {
-                                            anchors.centerIn: parent
-                                            width: 28
-                                            height: 28
-                                            radius: 14
-                                            visible: parent.selected
-                                            color: "#00D9FF"
-                                        }
-
-                                        Image {
-                                            anchors.centerIn: parent
-                                            source: modeSelectorRow.modeIconSource(parent.mode)
-                                            width: 18
-                                            height: 18
-                                            sourceSize.width: width
-                                            sourceSize.height: height
-                                            fillMode: Image.PreserveAspectFit
-                                            smooth: true
-                                            mipmap: true
-                                        }
-
-                                        MouseArea {
-                                            id: ma
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                if (root.selectedClipId !== -1) {
-                                                    clipEditorTab.reproductionMode = parent.mode
-                                                    soundboardService.setClipReproductionMode(clipsModel.boardId, root.selectedClipId, parent.mode)
-                                                    console.log("Reproduction mode changed to:", parent.mode, "- SAVED!")
-                                                }
-                                            }
-                                        }
+                                    ModeButton {
+                                        mode: 0
                                     }
-
-                                    ModeButton { mode: 0 }
-                                    ModeButton { mode: 1 }
-                                    ModeButton { mode: 2 }
-                                    ModeButton { mode: 3 }
-                                    ModeButton { mode: 4 }
+                                    ModeButton {
+                                        mode: 1
+                                    }
+                                    ModeButton {
+                                        mode: 2
+                                    }
+                                    ModeButton {
+                                        mode: 3
+                                    }
+                                    ModeButton {
+                                        mode: 4
+                                    }
                                 }
-
 
                                 // Mode description text
                                 Text {
@@ -2654,16 +2782,16 @@ Rectangle {
                                     // Stop other sounds on play
                                     RowLayout {
                                         spacing: 8
-                                        // Disabled when mode is Play/Stop (mode 2) or Play/Pause (mode 1)
-                                        property bool isReadOnly: clipEditorTab.reproductionMode === 1 || clipEditorTab.reproductionMode === 2
+                                        // Disabled when mode is Overlay (0), Play/Pause (1), or Play/Stop (2)
+                                        property bool isReadOnly: clipEditorTab.reproductionMode === 0 || clipEditorTab.reproductionMode === 1 || clipEditorTab.reproductionMode === 2
                                         opacity: isReadOnly ? 0.5 : 1.0
 
                                         Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            // Force checked when mode is Play/Stop (mode 2), force unchecked when Play/Pause (mode 1)
-                                            property bool effectiveValue: clipEditorTab.reproductionMode === 2 ? true : (clipEditorTab.reproductionMode === 1 ? false : clipEditorTab.stopOtherSounds)
+                                            // Force checked when mode is Play/Stop (2), force unchecked when Overlay (0) or Play/Pause (1)
+                                            property bool effectiveValue: clipEditorTab.reproductionMode === 2 ? true : (clipEditorTab.reproductionMode === 0 || clipEditorTab.reproductionMode === 1 ? false : clipEditorTab.stopOtherSounds)
                                             color: effectiveValue ? Colors.gradientPrimaryStart : Colors.surfaceDark
                                             border.color: effectiveValue ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
@@ -2681,16 +2809,16 @@ Rectangle {
                                                 cursorShape: parent.parent.isReadOnly ? Qt.ForbiddenCursor : Qt.PointingHandCursor
                                                 enabled: !parent.parent.isReadOnly
                                                 onClicked: {
-                                                    if (root.selectedClipId !== -1) {
+                                                    if (root.selectedClipId !== -1 && soundboardService) {
                                                         clipEditorTab.stopOtherSounds = !clipEditorTab.stopOtherSounds;
-                                                        soundboardService.setClipStopOtherSounds(clipsModel.boardId, root.selectedClipId, clipEditorTab.stopOtherSounds);
+                                                        soundboardService.setClipStopOtherSounds(activeClipsModel.boardId, root.selectedClipId, clipEditorTab.stopOtherSounds);
                                                     }
                                                 }
                                             }
                                         }
 
                                         Text {
-                                            text: clipEditorTab.reproductionMode === 2 ? "Stop other sounds on play (auto)" : clipEditorTab.reproductionMode === 1 ? "Stop other sounds on play (disabled)" : "Stop other sounds on play"
+                                            text: clipEditorTab.reproductionMode === 2 ? "Stop other sounds on play (auto)" : clipEditorTab.reproductionMode === 1 ? "Stop other sounds on play (disabled)" : clipEditorTab.reproductionMode === 0 ? "Stop other sounds on play (disabled)" : "Stop other sounds on play"
                                             color: parent.isReadOnly ? Colors.textDisabled : Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
@@ -2700,18 +2828,23 @@ Rectangle {
                                     // Mute other sounds
                                     RowLayout {
                                         spacing: 8
+                                        // Disabled when mode is Overlay (0)
+                                        property bool isReadOnly: clipEditorTab.reproductionMode === 0
+                                        opacity: isReadOnly ? 0.5 : 1.0
 
                                         Rectangle {
                                             width: 18
                                             height: 18
                                             radius: 4
-                                            color: clipEditorTab.muteOtherSounds ? Colors.gradientPrimaryStart : Colors.surfaceDark
-                                            border.color: clipEditorTab.muteOtherSounds ? Colors.gradientPrimaryEnd : Colors.border
+                                            // Force unchecked when Overlay mode
+                                            property bool effectiveValue: clipEditorTab.reproductionMode === 0 ? false : clipEditorTab.muteOtherSounds
+                                            color: effectiveValue ? Colors.gradientPrimaryStart : Colors.surfaceDark
+                                            border.color: effectiveValue ? Colors.gradientPrimaryEnd : Colors.border
                                             border.width: 1
 
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: clipEditorTab.muteOtherSounds ? "✓" : ""
+                                                text: parent.effectiveValue ? "✓" : ""
                                                 color: Colors.textOnPrimary
                                                 font.pixelSize: 12
                                                 font.weight: Font.Bold
@@ -2719,14 +2852,16 @@ Rectangle {
 
                                             MouseArea {
                                                 anchors.fill: parent
-                                                cursorShape: Qt.PointingHandCursor
+                                                cursorShape: parent.parent.isReadOnly ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+                                                enabled: !parent.parent.isReadOnly
                                                 onClicked: {
-                                                    if (root.selectedClipId !== -1) {
+                                                    if (root.selectedClipId !== -1 && soundboardService) {
                                                         clipEditorTab.muteOtherSounds = !clipEditorTab.muteOtherSounds;
-                                                        soundboardService.setClipMuteOtherSounds(clipsModel.boardId, root.selectedClipId, clipEditorTab.muteOtherSounds);
+                                                        soundboardService.setClipMuteOtherSounds(activeClipsModel.boardId, root.selectedClipId, clipEditorTab.muteOtherSounds);
                                                         // If muteOtherSounds is enabled, also enable muteMicDuringPlayback
                                                         if (clipEditorTab.muteOtherSounds) {
                                                             clipEditorTab.muteMicDuringPlayback = true;
+                                                            soundboardService.setClipMuteMicDuringPlayback(activeClipsModel.boardId, root.selectedClipId, true);
                                                         }
                                                     }
                                                 }
@@ -2734,8 +2869,8 @@ Rectangle {
                                         }
 
                                         Text {
-                                            text: "Mute other sounds"
-                                            color: Colors.textPrimary
+                                            text: clipEditorTab.reproductionMode === 0 ? "Mute other sounds (disabled)" : "Mute other sounds"
+                                            color: parent.isReadOnly ? Colors.textDisabled : Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: 11
                                         }
@@ -2770,9 +2905,9 @@ Rectangle {
                                                 cursorShape: clipEditorTab.muteOtherSounds ? Qt.ForbiddenCursor : Qt.PointingHandCursor
                                                 enabled: !clipEditorTab.muteOtherSounds
                                                 onClicked: {
-                                                    if (root.selectedClipId !== -1) {
+                                                    if (root.selectedClipId !== -1 && soundboardService) {
                                                         clipEditorTab.muteMicDuringPlayback = !clipEditorTab.muteMicDuringPlayback;
-                                                        soundboardService.setClipMuteMicDuringPlayback(clipsModel.boardId, root.selectedClipId, clipEditorTab.muteMicDuringPlayback);
+                                                        soundboardService.setClipMuteMicDuringPlayback(activeClipsModel.boardId, root.selectedClipId, clipEditorTab.muteMicDuringPlayback);
                                                     }
                                                 }
                                             }
@@ -2849,9 +2984,9 @@ Rectangle {
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
                                                     // Toggle repeat - real-time update, saved immediately
-                                                    if (root.selectedClipId !== -1) {
+                                                    if (root.selectedClipId !== -1 && activeClipsModel) {
                                                         clipEditorTab.clipIsRepeat = !clipEditorTab.clipIsRepeat;
-                                                        clipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
+                                                        activeClipsModel.setClipRepeat(root.selectedClipId, clipEditorTab.clipIsRepeat);
                                                     }
                                                 }
                                             }
@@ -2905,8 +3040,8 @@ Rectangle {
                                                 clipEditorTab.editingClipTags.push(text.trim());
                                                 // Auto-save tags
                                                 if (root.selectedClipId !== -1) {
-                                                    clipsModel.updateClip(root.selectedClipId, clipTitleInput.text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
-                                                    clipsModel.reload();
+                                                    activeClipsModel.updateClip(root.selectedClipId, clipTitleInput.text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                                    activeClipsModel.reload();
                                                 }
                                                 text = "";
                                             }
@@ -2959,8 +3094,8 @@ Rectangle {
                                                     clipEditorTab.editingClipTagsChanged();
                                                     // Auto-save tags
                                                     if (root.selectedClipId !== -1) {
-                                                        clipsModel.updateClip(root.selectedClipId, clipTitleInput.text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
-                                                        clipsModel.reload();
+                                                        activeClipsModel.updateClip(root.selectedClipId, clipTitleInput.text, clipEditorTab.editingClipHotkey, clipEditorTab.editingClipTags);
+                                                        activeClipsModel.reload();
                                                     }
                                                 }
                                             }
@@ -2988,16 +3123,16 @@ Rectangle {
                             // Update immediately from tile click
                             const data = root.getClipDataById(root.hotkeyEditingClipId);
                             if (data) {
-                                clipsModel.updateClip(root.hotkeyEditingClipId, data.title, hotkeyText, data.tags);
-                                clipsModel.reload();
+                                activeClipsModel.updateClip(root.hotkeyEditingClipId, data.title, hotkeyText, data.tags);
+                                activeClipsModel.reload();
                             }
                             root.hotkeyEditingClipId = -1;
                         } else {
                             // Standard editor behavior - AUTO-SAVE hotkey
                             clipEditorTab.editingClipHotkey = hotkeyText;
                             if (root.selectedClipId !== -1) {
-                                clipsModel.updateClip(root.selectedClipId, clipTitleInput.text, hotkeyText, clipEditorTab.editingClipTags);
-                                clipsModel.reload();
+                                activeClipsModel.updateClip(root.selectedClipId, clipTitleInput.text, hotkeyText, clipEditorTab.editingClipTags);
+                                activeClipsModel.reload();
                             }
                         }
                     }
@@ -3189,16 +3324,16 @@ Rectangle {
                             Layout.preferredHeight: 60
                             currentTime: 0
                             totalDuration: fileDropArea.fileDuration
-                            trimStart: 0.0
-                            trimEnd: 1.0
 
                             property real trimStartMs: 0
                             property real trimEndMs: fileDropArea.fileDuration * 1000.0
 
                             onTrimStartMoved: function (pos) {
+                                trimStart = pos;  // Update visual position
                                 trimStartMs = pos * totalDuration * 1000.0;
                             }
                             onTrimEndMoved: function (pos) {
+                                trimEnd = pos;  // Update visual position
                                 trimEndMs = pos * totalDuration * 1000.0;
                             }
                         }
@@ -3288,7 +3423,7 @@ Rectangle {
                                     }
 
                                     // Get the board ID
-                                    const boardId = clipsModel.boardId;
+                                    const boardId = activeClipsModel.boardId;
                                     if (boardId < 0) {
                                         console.log("No board selected");
                                         return;
@@ -3303,7 +3438,7 @@ Rectangle {
                                     if (success) {
                                         console.log("Clip saved successfully with trim:", uploadWaveform.trimStartMs, uploadWaveform.trimEndMs);
                                         // Reload the clips model
-                                        clipsModel.reload();
+                                        activeClipsModel.reload();
 
                                         // Clear the form
                                         fileDropArea.droppedFilePath = "";
@@ -3355,29 +3490,381 @@ Rectangle {
 
                 // Speaker Tab Content (Tab 4)
                 ColumnLayout {
+                    id: speakerTabContent
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: 12
                     visible: rightSidebar.currentTabIndex === 4
 
+                    // --- Meters & Monitoring (Speaker Tab) ---
                     Text {
-                        text: "Audio Output"
+                        text: "Meters & Monitoring"
                         color: Colors.textOnPrimary
                         font.family: poppinsFont.status === FontLoader.Ready ? poppinsFont.name : "Arial"
-                        font.pixelSize: 14
+                        font.pixelSize: 22
                         font.weight: Font.DemiBold
+                        topPadding: 6
                     }
 
-                    Text {
-                        text: "Speaker and output settings here"
-                        color: Colors.textSecondary
-                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                        font.pixelSize: 12
+                    // Audio Monitoring Properties & Logic
+                    property real rmsLevel: 0.0
+                    property real micLevel: 0.0
+                    property real rmsDb: -60.0
+                    property real micDb: -60.0
+                    property bool volumeTooHigh: (rmsLevel >= 0.90)
+
+                    Timer {
+                        interval: 50
+                        running: rightSidebar.currentTabIndex === 4 && Qt.application.state === Qt.ApplicationActive
+                        repeat: true
+                        onTriggered: {
+                            if (soundboardService) {
+                                var out = soundboardService.getMonitorPeakLevel();
+                                var mic = soundboardService.getMicPeakLevel();
+
+                                // Defensive: handle undefined / NaN
+                                out = (out === undefined || isNaN(out)) ? 0.0 : out;
+                                mic = (mic === undefined || isNaN(mic)) ? 0.0 : mic;
+
+                                // Clamp to 0..1 (assuming service returns linear peak)
+                                rmsLevel = Math.max(0.0, Math.min(1.0, out));
+                                micLevel = Math.max(0.0, Math.min(1.0, mic));
+
+                                // Convert to dBFS (min clamp avoids -Inf)
+                                var outLin = Math.max(rmsLevel, 0.0001);
+                                var micLin = Math.max(micLevel, 0.0001);
+
+                                rmsDb = 20 * Math.log(outLin) / Math.LN10;
+                                micDb = 20 * Math.log(micLin) / Math.LN10;
+                            }
+                        }
                     }
 
-                    Item {
-                        Layout.fillHeight: true
+                    // Main meters row
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 220
+                        spacing: 16
+
+                        // Left segmented meter (Real-time Output Level)
+                        Item {
+                            Layout.preferredWidth: 40
+                            Layout.fillHeight: true
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 6
+                                color: "transparent"
+                                border.color: Qt.rgba(1, 1, 1, 0.10)
+                                border.width: 1
+                            }
+
+                            Column {
+                                id: outputMeterColumn
+                                anchors.centerIn: parent
+                                spacing: 4
+
+                                readonly property int segmentCount: 25
+
+                                // Map dBFS (-60..0) -> 0..1
+                                readonly property real minDb: -60.0
+                                readonly property real maxDb: 0.0
+                                readonly property real norm: Math.max(0.0, Math.min(1.0, (speakerTabContent.rmsDb - minDb) / (maxDb - minDb)))
+
+                                readonly property int activeCount: Math.round(norm * segmentCount)
+
+                                Repeater {
+                                    model: outputMeterColumn.segmentCount
+                                    delegate: Rectangle {
+                                        required property int index
+                                        width: 24
+                                        height: 5
+                                        radius: 2
+
+                                        property int idxFromBottom: (outputMeterColumn.segmentCount - 1) - index
+
+                                        color: {
+                                            var on = (idxFromBottom < outputMeterColumn.activeCount);
+                                            if (!on)
+                                                return Qt.rgba(1, 1, 1, 0.10);
+                                            if (idxFromBottom >= 14)
+                                                return "#FF3B30";  // red
+                                            if (idxFromBottom >= 10)
+                                                return "#FFD60A";  // yellow
+                                            return "#34C759";                           // green
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Center: Master Gain Slider (Vertical)
+                        ColumnLayout {
+                            Layout.fillHeight: true
+                            Layout.preferredWidth: 40
+                            spacing: 8
+
+                            Slider {
+                                id: masterVerticalSlider
+                                Layout.alignment: Qt.AlignHCenter
+                                Layout.fillHeight: true
+                                Layout.preferredWidth: 40
+                                orientation: Qt.Vertical
+                                from: 12
+                                to: -60
+                                onMoved: if (soundboardService) soundboardService.masterGainDb = value
+                                Binding on value {
+                                    value: soundboardService?.masterGainDb ?? 0
+                                    when: !masterVerticalSlider.pressed
+                                }
+
+                                background: Item {
+                                    implicitWidth: 46
+
+                                    // Track
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        width: 32
+                                        height: parent.height
+                                        radius: width / 2
+                                        color: Qt.rgba(1, 1, 1, 0.10)
+                                    }
+
+                                    // Fill (Gradient Red)
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.bottom: parent.bottom
+                                        width: 32
+                                        height: (1.0 - masterVerticalSlider.visualPosition) * parent.height
+                                        radius: width / 2
+                                        gradient: Gradient {
+                                            GradientStop {
+                                                position: 0.0
+                                                color: "#FF453A"
+                                            }
+                                            GradientStop {
+                                                position: 1.0
+                                                color: "#FF3B30"
+                                            }
+                                        }
+                                    }
+                                }
+
+                                handle: Rectangle {
+                                    // Bubble Handle
+                                    x: masterVerticalSlider.leftPadding + masterVerticalSlider.availableWidth / 2 - width / 2
+                                    y: masterVerticalSlider.topPadding + masterVerticalSlider.availableHeight * masterVerticalSlider.visualPosition - height / 2
+                                    width: 40
+                                    height: 40
+                                    radius: 20
+                                    color: Colors.accent // Purple bubble
+                                    border.color: "white"
+                                    border.width: 2
+
+                                    // Text inside bubble
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: Math.round(masterVerticalSlider.value) // + "db" (too small space)
+                                        color: "white"
+                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                        font.pixelSize: 11
+                                        font.weight: Font.Bold
+                                    }
+
+                                    // Shadow for gloss effect
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: "#80000000"
+                                        shadowBlur: 8
+                                        shadowVerticalOffset: 2
+                                    }
+                                }
+                            }
+
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: "RMS Volume"
+                                color: Colors.textOnPrimary
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 12
+                            }
+                        }
+
+                        // Right: Mic Gain Slider (Vertical)
+                        ColumnLayout {
+                            Layout.fillHeight: true
+                            Layout.preferredWidth: 40
+                            spacing: 8
+
+                            Slider {
+                                id: micVerticalSlider
+                                Layout.alignment: Qt.AlignHCenter
+                                Layout.fillHeight: true
+                                Layout.preferredWidth: 40
+                                orientation: Qt.Vertical
+                                from: 12
+                                to: -60
+                                onMoved: if (soundboardService) soundboardService.micGainDb = value
+                                Binding on value {
+                                    value: soundboardService?.micGainDb ?? 0
+                                    when: !micVerticalSlider.pressed
+                                }
+
+                                background: Item {
+                                    implicitWidth: 46
+
+                                    // Track
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        width: 32
+                                        height: parent.height
+                                        radius: width / 2
+                                        color: Qt.rgba(1, 1, 1, 0.10)
+                                    }
+
+                                    // Fill (Gradient Green)
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.bottom: parent.bottom
+                                        width: 32
+                                        height: micVerticalSlider.visualPosition * parent.height
+                                        radius: width / 2
+                                        gradient: Gradient {
+                                            GradientStop {
+                                                position: 0.0
+                                                color: "#34C759"
+                                            }
+                                            GradientStop {
+                                                position: 1.0
+                                                color: '#16662a'
+                                            }
+                                        }
+                                    }
+                                }
+
+                                handle: Rectangle {
+                                    // Bubble Handle
+                                    x: micVerticalSlider.leftPadding + micVerticalSlider.availableWidth / 2 - width / 2
+                                    y: micVerticalSlider.topPadding + micVerticalSlider.availableHeight * micVerticalSlider.visualPosition - height / 2
+                                    width: 40
+                                    height: 40
+                                    radius: 20
+                                    color: Colors.accent // Purple bubble
+                                    border.color: Colors.textPrimary
+                                    border.width: 2
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: Math.round(micVerticalSlider.value)  + "db"
+                                        color: "white"
+                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                        font.pixelSize: 11
+                                        font.weight: Font.Bold
+                                    }
+
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        shadowEnabled: true
+                                        shadowColor: "#80000000"
+                                        shadowBlur: 8
+                                        shadowVerticalOffset: 2
+                                    }
+                                }
+                            }
+
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: "Mic input"
+                                color: Colors.textOnPrimary
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 12
+                            }
+                        }
                     }
+
+                    // // Warning row
+                    // RowLayout {
+                    //     Layout.fillWidth: true
+                    //     spacing: 10
+                    //     visible: volumeTooHigh
+
+                    //     // simple warning icon
+                    //     Canvas {
+                    //         Layout.preferredWidth: 18
+                    //         Layout.preferredHeight: 18
+                    //         onPaint: {
+                    //             var ctx = getContext("2d");
+                    //             ctx.clearRect(0, 0, width, height);
+
+                    //             ctx.beginPath();
+                    //             ctx.moveTo(width / 2, 2);
+                    //             ctx.lineTo(width - 2, height - 2);
+                    //             ctx.lineTo(2, height - 2);
+                    //             ctx.closePath();
+                    //             ctx.fillStyle = "rgba(255, 214, 10, 0.95)";
+                    //             ctx.fill();
+
+                    //             ctx.fillStyle = "rgba(0,0,0,0.70)";
+                    //             ctx.fillRect(width / 2 - 1, 6, 2, 6);
+                    //             ctx.fillRect(width / 2 - 1, 13.5, 2, 2);
+                    //         }
+                    //     }
+
+                    //     Text {
+                    //         text: "Volume too high"
+                    //         color: Colors.textSecondary
+                    //         font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                    //         font.pixelSize: 12
+                    //     }
+                    // }
+                }
+            }
+        }
+    }
+
+    // reusable button
+    component ModeButton: Rectangle {
+        required property int mode
+        property bool selected: clipEditorTab.reproductionMode === mode
+
+        width: 36
+        height: 36
+        radius: 8
+        color: ma.containsMouse ? Colors.surfaceDark : Colors.surface
+        border.width: 1
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 28
+            height: 28
+            radius: 14
+            visible: parent.selected
+            color: Colors.gradientPrimaryStart
+        }
+
+        Image {
+            anchors.centerIn: parent
+            source: modeSelectorRow.modeIconSource(parent.mode)
+            width: 18
+            height: 18
+            sourceSize.width: width
+            sourceSize.height: height
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            mipmap: true
+        }
+
+        MouseArea {
+            id: ma
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+                if (root.selectedClipId !== -1) {
+                    clipEditorTab.reproductionMode = parent.mode;
+                    soundboardService.setClipReproductionMode(activeClipsModel.boardId, root.selectedClipId, parent.mode);
+                    console.log("Reproduction mode changed to:", parent.mode, "- SAVED!");
                 }
             }
         }

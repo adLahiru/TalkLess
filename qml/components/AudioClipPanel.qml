@@ -9,6 +9,7 @@ import "../styles"
 // Contains 5 tabs: Settings, Add, Record, Split, Audio
 Rectangle {
     id: root
+    property string clipName: "No Clip Selected"
     color: Colors.surface
     radius: 16
     border.color: Colors.border
@@ -105,9 +106,10 @@ Rectangle {
                 spacing: 12
 
                 Text {
-                    text: "Settings Tab"
-                    color: Colors.textSecondary
-                    font.pixelSize: Typography.fontSizeMedium
+                    text: root.clipName
+                    color: Colors.textPrimary
+                    font.pixelSize: Typography.fontSizeLarge
+                    font.weight: Font.Bold
                 }
                 Text {
                     text: "Configure clip settings here"

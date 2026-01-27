@@ -104,12 +104,12 @@ Item {
                 spacing: 2
 
                 Repeater {
-                    model: root.waveformData.length
+                    model: (root.waveformData && root.waveformData.length) ? root.waveformData.length : 0
 
                     Rectangle {
                         required property int index
-                        property real amplitude: root.waveformData[index] || 0.3
-                        property real normalizedPosition: index / root.waveformData.length
+                        property real amplitude: (root.waveformData && root.waveformData[index]) ? root.waveformData[index] : 0.3
+                        property real normalizedPosition: (root.waveformData && root.waveformData.length > 0) ? (index / root.waveformData.length) : 0
                         property real playProgress: root.totalDuration > 0 ? root.currentTime / root.totalDuration : 0
                         property bool isPlayed: normalizedPosition < playProgress
                         property bool isInTrimRegion: normalizedPosition >= root.trimStart && normalizedPosition <= root.trimEnd

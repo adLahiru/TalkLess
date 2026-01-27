@@ -48,9 +48,9 @@ HotkeyValidator::ValidationInfo HotkeyValidator::validate(const QString& hotkeyT
     }
 
     // Get key and modifiers from the sequence
-    int combined = sequence[0];
-    Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(combined & Qt::KeyboardModifierMask);
-    Qt::Key key = Qt::Key(combined & ~Qt::KeyboardModifierMask);
+    QKeyCombination keyComb = sequence[0];
+    Qt::KeyboardModifiers modifiers = keyComb.keyboardModifiers();
+    Qt::Key key = keyComb.key();
 
     // Check if it's just a modifier key alone (no actual key)
     if (key == Qt::Key_Control || key == Qt::Key_Shift || 
@@ -118,8 +118,8 @@ bool HotkeyValidator::containsDeadKey(const QKeySequence& sequence)
 {
     if (sequence.isEmpty()) return false;
     
-    int combined = sequence[0];
-    Qt::Key key = Qt::Key(combined & ~Qt::KeyboardModifierMask);
+    QKeyCombination keyComb = sequence[0];
+    Qt::Key key = keyComb.key();
     
     return s_deadKeys.contains(key);
 }
@@ -128,9 +128,9 @@ bool HotkeyValidator::containsShiftedNumber(const QKeySequence& sequence)
 {
     if (sequence.isEmpty()) return false;
     
-    int combined = sequence[0];
-    Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(combined & Qt::KeyboardModifierMask);
-    Qt::Key key = Qt::Key(combined & ~Qt::KeyboardModifierMask);
+    QKeyCombination keyComb = sequence[0];
+    Qt::KeyboardModifiers modifiers = keyComb.keyboardModifiers();
+    Qt::Key key = keyComb.key();
     
     // Check if Shift modifier is present
     if (!(modifiers & Qt::ShiftModifier)) {
@@ -154,9 +154,9 @@ bool HotkeyValidator::isSystemReserved(const QKeySequence& sequence)
 {
     if (sequence.isEmpty()) return false;
     
-    int combined = sequence[0];
-    Qt::KeyboardModifiers modifiers = Qt::KeyboardModifiers(combined & Qt::KeyboardModifierMask);
-    Qt::Key key = Qt::Key(combined & ~Qt::KeyboardModifierMask);
+    QKeyCombination keyComb = sequence[0];
+    Qt::KeyboardModifiers modifiers = keyComb.keyboardModifiers();
+    Qt::Key key = keyComb.key();
     
     // Windows reserved combinations
     // Alt+Tab, Alt+Esc, Ctrl+Alt+Del, Win+L, etc.

@@ -223,3 +223,4 @@ TAGS
 .uic/
 /.qmake.cache
 /.qmake.stash
+vcpkg/

@@ -25,6 +25,65 @@ Rectangle {
         mainLoader.active = true;
     }
 
+    // Store previous device lists to detect changes
+    property var previousInputDevices: []
+    property var previousOutputDevices: []
+
+    // Signal to notify dropdowns to refresh
+    signal deviceRefreshRequested
+
+    // Function to refresh device selections from backend
+    function refreshDeviceSelections() {
+        // Emit signal to refresh dropdowns inside the loader
+        deviceRefreshRequested();
+    }
+
+    // Function to check if device list has changed
+    function checkDeviceChanges() {
+        var currentInputDevices = soundboardService.getInputDevices();
+        var currentOutputDevices = soundboardService.getOutputDevices();
+
+        var inputChanged = JSON.stringify(currentInputDevices) !== JSON.stringify(previousInputDevices);
+        var outputChanged = JSON.stringify(currentOutputDevices) !== JSON.stringify(previousOutputDevices);
+
+        if (inputChanged || outputChanged) {
+            console.log("Audio devices changed, refreshing...");
+            previousInputDevices = currentInputDevices;
+            previousOutputDevices = currentOutputDevices;
+            refreshDeviceSelections();
+        }
+    }
+
+    // Refresh device selections when view becomes visible
+    onVisibleChanged: {
+        if (visible) {
+            refreshDeviceSelections();
+            // Store initial device lists
+            previousInputDevices = soundboardService.getInputDevices();
+            previousOutputDevices = soundboardService.getOutputDevices();
+        }
+    }
+
+    // Timer to periodically check for device changes (hotplug detection)
+    Timer {
+        id: devicePollTimer
+        interval: 2000  // Check every 2 seconds
+        running: root.visible  // Only run when settings view is visible
+        repeat: true
+        onTriggered: {
+            root.checkDeviceChanges();
+        }
+    }
+
+    // Connection to handle audioDevicesChanged signal from backend
+    Connections {
+        target: soundboardService
+        function onAudioDevicesChanged() {
+            console.log("Audio devices changed signal received");
+            root.refreshDeviceSelections();
+        }
+    }
+
     // Timer to update audio levels
     Timer {
         id: levelUpdateTimer
@@ -123,6 +182,13 @@ Rectangle {
                     contentHeight: advancedAudioSection.y + advancedAudioSection.height + 40
                     clip: true
 
+                    // Refresh device selections when this tab becomes active
+                    onVisibleChanged: {
+                        if (visible && StackLayout.isCurrentItem) {
+                            root.refreshDeviceSelections();
+                        }
+                    }
+
                     // Load fonts
                     FontLoader {
                         id: poppinsFont
@@ -170,10 +236,22 @@ Rectangle {
                                     icon: "🎤"
                                     placeholder: "Select Input Device"
 
-                                    selectedId: soundboardService.selectedCaptureDeviceId
+                                    selectedId: soundboardService?.selectedCaptureDeviceId ?? ""
 
                                     // initial can be empty; we’ll fill on open
                                     model: []
+
+                                    Component.onCompleted: {
+                                        model = soundboardService?.getInputDevices() ?? [];
+                                    }
+
+                                    Connections {
+                                        target: root
+                                        function onDeviceRefreshRequested() {
+                                            inputDeviceDropdown.model = soundboardService?.getInputDevices() ?? [];
+                                            inputDeviceDropdown.selectedId = soundboardService?.selectedCaptureDeviceId ?? "";
+                                        }
+                                    }
 
                                     onAboutToOpen: {
                                         model = soundboardService.getInputDevices();
@@ -198,9 +276,9 @@ Rectangle {
                                         radius: 14
                                         color: alwaysOnToggle.isOn ? Colors.success : Colors.surfaceLight
 
-                                        property bool isOn: soundboardService.micEnabled
+                                        property bool isOn: soundboardService?.micEnabled ?? false
                                         onIsOnChanged: {
-                                            if (isOn !== soundboardService.micEnabled)
+                                            if (soundboardService && isOn !== soundboardService.micEnabled)
                                                 soundboardService.setMicEnabled(isOn);
                                         }
 
@@ -318,11 +396,12 @@ Rectangle {
                                             Layout.fillWidth: true
                                             from: -60
                                             to: 0
-                                            value: soundboardService.micGainDb
+                                            value: soundboardService?.micGainDb ?? 0
                                             unit: "dB"
 
                                             onSliderMoved: function (newValue) {
-                                                soundboardService.setMicGainDb(newValue);
+                                                if (soundboardService)
+                                                    soundboardService.setMicGainDb(newValue);
                                             }
                                         }
                                     }
@@ -450,9 +529,9 @@ Rectangle {
                                         radius: 14
                                         color: outputToggle.isOn ? Colors.success : Colors.surfaceLight
 
-                                        property bool isOn: soundboardService.micPassthroughEnabled
+                                        property bool isOn: soundboardService?.micPassthroughEnabled ?? false
                                         onIsOnChanged: {
-                                            if (isOn !== soundboardService.micPassthroughEnabled)
+                                            if (soundboardService && isOn !== soundboardService.micPassthroughEnabled)
                                                 soundboardService.setMicPassthroughEnabled(isOn);
                                         }
 
@@ -511,8 +590,11 @@ Rectangle {
                                         Layout.fillWidth: true
                                         leftLabel: "0% mic"
                                         rightLabel: "100% soundboard"
-                                        value: soundboardService.micSoundboardBalance
-                                        onBalanceChanged: newValue => soundboardService.setMicSoundboardBalance(newValue)
+                                        value: soundboardService?.micSoundboardBalance ?? 0.5
+                                        onBalanceChanged: newValue => {
+                                            if (soundboardService)
+                                                soundboardService.setMicSoundboardBalance(newValue);
+                                        }
                                     }
 
                                     Text {
@@ -524,14 +606,13 @@ Rectangle {
                             }
                         }
                     }
-
                     // Advanced Audio Settings Section
                     ColumnLayout {
                         id: advancedAudioSection
-                        width: parent.width - 40
-                        x: 20
+                        width: fill.parent.width
+                        x: 40
                         y: microphoneContent.y + microphoneContent.height + 40  // More top margin
-                        spacing: 16
+                        spacing: 20
 
                         // Title
                         Text {
@@ -545,7 +626,7 @@ Rectangle {
                         // Row 1: Sample Rate and Channels
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 40
+                            spacing: 200
 
                             // Sample Rate
                             RowLayout {
@@ -564,7 +645,7 @@ Rectangle {
                                     Layout.preferredWidth: 200
                                     height: 40
                                     placeholder: "Select Sample Rate"
-                                    selectedId: soundboardService.sampleRate.toString()
+                                    selectedId: (soundboardService?.sampleRate ?? 48000).toString()
                                     model: [
                                         {
                                             id: "44100",
@@ -602,7 +683,7 @@ Rectangle {
                                     Layout.preferredWidth: 200
                                     height: 40
                                     placeholder: "Select Channels"
-                                    selectedId: soundboardService.audioChannels.toString()
+                                    selectedId: (soundboardService?.audioChannels ?? 2).toString()
                                     model: [
                                         {
                                             id: "1",
@@ -623,7 +704,7 @@ Rectangle {
                         // Row 2: Buffer Size
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 40
+                            spacing: 200
 
                             RowLayout {
                                 spacing: 12
@@ -641,7 +722,7 @@ Rectangle {
                                     Layout.preferredWidth: 200
                                     height: 40
                                     placeholder: "Select Buffer Size"
-                                    selectedId: soundboardService.bufferSizeFrames.toString()
+                                    selectedId: (soundboardService?.bufferSizeFrames ?? 1024).toString()
                                     model: [
                                         {
                                             id: "256",
@@ -687,7 +768,7 @@ Rectangle {
                                     Layout.preferredWidth: 200
                                     height: 40
                                     placeholder: "Select Periods"
-                                    selectedId: soundboardService.bufferPeriods.toString()
+                                    selectedId: (soundboardService?.bufferPeriods ?? 3).toString()
                                     model: [
                                         {
                                             id: "2",
@@ -708,16 +789,27 @@ Rectangle {
                                 }
                             }
                         }
-
-                        // Note about restarting
-                        Text {
+                        RowLayout {
                             Layout.fillWidth: true
-                            Layout.topMargin: 8
-                            text: "⚠ Changes require app restart to take effect"
-                            color: Colors.textSecondary
-                            font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                            font.pixelSize: 12
-                            font.italic: true
+                            spacing: 20
+                            // Note about restarting
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.topMargin: 8
+                                text: "⚠ Changes require app restart to take effect"
+                                color: Colors.textSecondary
+                                font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
+                                font.pixelSize: 12
+                                font.italic: true
+                            }
+
+                            Button {
+                                text: "Restart Now"
+                                Layout.preferredWidth: 120
+                                onClicked: {
+                                    soundboardService.restartApplication();
+                                }
+                            }
                         }
                     }
                 }
@@ -739,19 +831,23 @@ Rectangle {
                         RowLayout {
                             spacing: 24
                             Layout.fillWidth: true
+                            Layout.fillHeight: true
                             Layout.alignment: Qt.AlignTop
 
                             // Left Pane: Theme & Language
                             Rectangle {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: leftPaneColumn.implicitHeight + 40
+                                Layout.fillHeight: true
+                                Layout.alignment: Qt.AlignTop
                                 color: Colors.surface
                                 radius: 16
                                 border.color: Colors.surfaceHighlight
 
                                 ColumnLayout {
                                     id: leftPaneColumn
-                                    anchors.fill: parent
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
                                     anchors.margins: 20
                                     spacing: 20
 
@@ -777,8 +873,11 @@ Rectangle {
                                                     name: "Spanish"
                                                 }
                                             ]
-                                            selectedId: soundboardService.language
-                                            onItemSelected: id => soundboardService.setLanguage(id)
+                                            selectedId: soundboardService?.language ?? "English"
+                                            onItemSelected: id => {
+                                                if (soundboardService)
+                                                    soundboardService.setLanguage(id);
+                                            }
                                         }
                                     }
 
@@ -803,33 +902,43 @@ Rectangle {
                                                         value: "dark"
                                                     }
                                                 ]
-                                                delegate: RowLayout {
-                                                    spacing: 8
-                                                    Rectangle {
-                                                        width: 16
-                                                        height: 16
-                                                        radius: 8
-                                                        color: "transparent"
-                                                        border.color: Colors.textPrimary
-                                                        border.width: 1
+                                                delegate: Item {
+                                                    required property var modelData
+                                                    implicitWidth: themeOptionRow.implicitWidth
+                                                    implicitHeight: themeOptionRow.implicitHeight
+
+                                                    RowLayout {
+                                                        id: themeOptionRow
+                                                        spacing: 8
                                                         Rectangle {
-                                                            anchors.centerIn: parent
-                                                            width: 8
-                                                            height: 8
-                                                            radius: 4
-                                                            color: Colors.accent
-                                                            // Check case-insensitive to be safe, or direct match
-                                                            visible: soundboardService.theme.toLowerCase() === modelData.value
+                                                            width: 16
+                                                            height: 16
+                                                            radius: 8
+                                                            color: "transparent"
+                                                            border.color: Colors.textPrimary
+                                                            border.width: 1
+                                                            Rectangle {
+                                                                anchors.centerIn: parent
+                                                                width: 8
+                                                                height: 8
+                                                                radius: 4
+                                                                color: Colors.accent
+                                                                // Check case-insensitive to be safe, or direct match
+                                                                visible: (soundboardService?.theme ?? "dark").toLowerCase() === modelData.value
+                                                            }
                                                         }
-                                                    }
-                                                    Text {
-                                                        text: modelData.label
-                                                        color: Colors.textPrimary
-                                                        font.pixelSize: 14
+                                                        Text {
+                                                            text: modelData.label
+                                                            color: Colors.textPrimary
+                                                            font.pixelSize: 14
+                                                        }
                                                     }
                                                     MouseArea {
                                                         anchors.fill: parent
-                                                        onClicked: soundboardService.setTheme(modelData.value)
+                                                        onClicked: {
+                                                            if (soundboardService)
+                                                                soundboardService.setTheme(modelData.value);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -861,10 +970,13 @@ Rectangle {
                                                     radius: 16
                                                     color: modelData
                                                     border.color: Colors.textPrimary
-                                                    border.width: soundboardService.accentColor === modelData ? 2 : 0
+                                                    border.width: (soundboardService?.accentColor ?? "") === modelData ? 2 : 0
                                                     MouseArea {
                                                         anchors.fill: parent
-                                                        onClicked: soundboardService.setAccentColor(modelData)
+                                                        onClicked: {
+                                                            if (soundboardService)
+                                                                soundboardService.setAccentColor(modelData);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -894,8 +1006,11 @@ Rectangle {
                                                     verticalAlignment: Text.AlignVCenter
                                                     color: Colors.textPrimary
                                                     font.pixelSize: 13
-                                                    text: soundboardService.accentColor
-                                                    onEditingFinished: soundboardService.setAccentColor(text)
+                                                    text: soundboardService?.accentColor ?? "#3B82F6"
+                                                    onEditingFinished: {
+                                                        if (soundboardService)
+                                                            soundboardService.setAccentColor(text);
+                                                    }
                                                 }
                                             }
                                             Rectangle {
@@ -912,7 +1027,10 @@ Rectangle {
                                                 }
                                                 MouseArea {
                                                     anchors.fill: parent
-                                                    onClicked: soundboardService.setAccentColor(customColorInput.text)
+                                                    onClicked: {
+                                                        if (soundboardService)
+                                                            soundboardService.setAccentColor(customColorInput.text);
+                                                    }
                                                 }
                                             }
                                         }
@@ -923,14 +1041,17 @@ Rectangle {
                             // Right Pane: Slot Size & Preview
                             Rectangle {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: rightPaneColumn.implicitHeight + 40
+                                Layout.fillHeight: true
+                                Layout.alignment: Qt.AlignTop
                                 color: Colors.surface
                                 radius: 16
                                 border.color: Colors.surfaceHighlight
 
                                 ColumnLayout {
                                     id: rightPaneColumn
-                                    anchors.fill: parent
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
                                     anchors.margins: 20
                                     spacing: 24
 
@@ -955,9 +1076,10 @@ Rectangle {
                                                 from: 0.5
                                                 to: 1.5
                                                 stepSize: 0  // Continuous slider
-                                                value: soundboardService.slotSizeScale
+                                                value: soundboardService?.slotSizeScale ?? 1.0
                                                 onMoved: {
-                                                    soundboardService.setSlotSizeScale(value);
+                                                    if (soundboardService)
+                                                        soundboardService.setSlotSizeScale(value);
                                                 }
                                             }
                                             Text {
@@ -991,33 +1113,42 @@ Rectangle {
                                                     scale: 1.3
                                                 }
                                             ]
-                                            delegate: RowLayout {
+                                            delegate: Item {
                                                 required property var modelData
-                                                spacing: 10
-                                                Rectangle {
-                                                    width: 16
-                                                    height: 16
-                                                    radius: 8
-                                                    color: "transparent"
-                                                    border.color: Colors.textPrimary
-                                                    border.width: 1
+                                                implicitWidth: slotSizeOptionRow.implicitWidth
+                                                implicitHeight: slotSizeOptionRow.implicitHeight
+
+                                                RowLayout {
+                                                    id: slotSizeOptionRow
+                                                    spacing: 10
                                                     Rectangle {
-                                                        anchors.centerIn: parent
-                                                        width: 8
-                                                        height: 8
-                                                        radius: 4
-                                                        color: Colors.accent
-                                                        visible: Math.abs(soundboardService.slotSizeScale - modelData.scale) < 0.1
+                                                        width: 16
+                                                        height: 16
+                                                        radius: 8
+                                                        color: "transparent"
+                                                        border.color: Colors.textPrimary
+                                                        border.width: 1
+                                                        Rectangle {
+                                                            anchors.centerIn: parent
+                                                            width: 8
+                                                            height: 8
+                                                            radius: 4
+                                                            color: Colors.accent
+                                                            visible: Math.abs((soundboardService?.slotSizeScale ?? 1.0) - modelData.scale) < 0.1
+                                                        }
                                                     }
-                                                }
-                                                Text {
-                                                    text: modelData.name
-                                                    color: Colors.textPrimary
-                                                    font.pixelSize: 14
+                                                    Text {
+                                                        text: modelData.name
+                                                        color: Colors.textPrimary
+                                                        font.pixelSize: 14
+                                                    }
                                                 }
                                                 MouseArea {
                                                     anchors.fill: parent
-                                                    onClicked: soundboardService.setSlotSizeScale(modelData.scale)
+                                                    onClicked: {
+                                                        if (soundboardService)
+                                                            soundboardService.setSlotSizeScale(modelData.scale);
+                                                    }
                                                 }
                                             }
                                         }
@@ -1037,8 +1168,8 @@ Rectangle {
                                             id: previewTile
                                             readonly property real previewBaseWidth: 180
                                             readonly property real previewAspectRatio: 79 / 111
-                                            Layout.preferredWidth: previewBaseWidth * soundboardService.slotSizeScale
-                                            Layout.preferredHeight: previewBaseWidth * previewAspectRatio * soundboardService.slotSizeScale
+                                            Layout.preferredWidth: previewBaseWidth * (soundboardService?.slotSizeScale ?? 1.0)
+                                            Layout.preferredHeight: previewBaseWidth * previewAspectRatio * (soundboardService?.slotSizeScale ?? 1.0)
                                             title: "Morning"
                                             hotkeyText: "Alt+Shift+M"
                                             selected: false
@@ -1057,6 +1188,13 @@ Rectangle {
                     contentWidth: width
                     contentHeight: audioContent.height
                     clip: true
+
+                    // Refresh device selections when this tab becomes active
+                    onVisibleChanged: {
+                        if (visible && StackLayout.isCurrentItem) {
+                            root.refreshDeviceSelections();
+                        }
+                    }
 
                     Rectangle {
                         id: audioContent
@@ -1089,49 +1227,6 @@ Rectangle {
                                 anchors.margins: 22
                                 spacing: 22
 
-                                // // ---- Row 1: Mic Input ----
-                                // RowLayout {
-                                //     spacing: 18
-                                //     Layout.fillWidth: true
-
-                                //     Label {
-                                //         text: "Mic Input:"
-                                //         color: "#EDEDED"
-                                //         font.pixelSize: 14
-                                //         Layout.preferredWidth: 110
-                                //     }
-
-                                //     DropdownSelector {
-                                //         id: micInputDropdown
-                                //         Layout.preferredWidth: 280
-                                //         placeholder: "Select Input Device"
-                                //         model: soundboardService.getInputDevices()
-
-                                //         Component.onCompleted: {
-                                //             var devices = soundboardService.getInputDevices()
-                                //             for (var i = 0; i < devices.length; i++) {
-                                //                 if (devices[i].isDefault) {
-                                //                     selectedId = devices[i].id
-                                //                     selectedValue = devices[i].name
-                                //                     break
-                                //                 }
-                                //             }
-                                //         }
-
-                                //         onItemSelected: function(id, name) {
-                                //             console.log("Mic input selected:", name)
-                                //             soundboardService.setInputDevice(id)
-                                //         }
-                                //     }
-
-                                //     DotMeter {
-                                //         Layout.leftMargin: 10
-                                //         activeDots: 3
-                                //     }
-
-                                //     Item { Layout.fillWidth: true } // pushes items left
-                                // }
-
                                 // ---- Row 2: Speaker Output ----
                                 RowLayout {
                                     spacing: 18
@@ -1148,10 +1243,22 @@ Rectangle {
                                         id: speakerOutputDropdown
                                         Layout.preferredWidth: 280
                                         placeholder: "Select Output Device"
-                                        selectedId: soundboardService.selectedPlaybackDeviceId
+                                        selectedId: soundboardService?.selectedPlaybackDeviceId ?? ""
 
                                         // initial can be empty; we’ll fill on open
                                         model: []
+
+                                        Component.onCompleted: {
+                                            model = soundboardService?.getOutputDevices() ?? [];
+                                        }
+
+                                        Connections {
+                                            target: root
+                                            function onDeviceRefreshRequested() {
+                                                speakerOutputDropdown.model = soundboardService?.getOutputDevices() ?? [];
+                                                speakerOutputDropdown.selectedId = soundboardService?.selectedPlaybackDeviceId ?? "";
+                                            }
+                                        }
 
                                         onAboutToOpen: {
                                             model = soundboardService.getOutputDevices();
@@ -1190,9 +1297,21 @@ Rectangle {
                                         Layout.preferredWidth: 280
                                         placeholder: "Select Monitor Device"
 
-                                        selectedId: soundboardService.selectedMonitorDeviceId
+                                        selectedId: soundboardService?.selectedMonitorDeviceId ?? ""
 
                                         model: []
+
+                                        Component.onCompleted: {
+                                            model = soundboardService?.getOutputDevices() ?? [];
+                                        }
+
+                                        Connections {
+                                            target: root
+                                            function onDeviceRefreshRequested() {
+                                                secondOutputDropdown.model = soundboardService.getOutputDevices();
+                                                secondOutputDropdown.selectedId = soundboardService.selectedMonitorDeviceId;
+                                            }
+                                        }
 
                                         onAboutToOpen: {
                                             model = soundboardService.getOutputDevices();
@@ -1236,10 +1355,11 @@ Rectangle {
                                             from: -60
                                             to: 0
                                             stepSize: 1
-                                            value: soundboardService.masterGainDb
+                                            value: soundboardService?.masterGainDb ?? 0
 
                                             onMoved: {
-                                                soundboardService.setMasterGainDb(value);
+                                                if (soundboardService)
+                                                    soundboardService.setMasterGainDb(value);
                                             }
 
                                             handle: Rectangle {
@@ -1289,7 +1409,10 @@ Rectangle {
                                 Button {
                                     id: refreshButton
                                     text: "Refresh Devices"
-                                    onClicked: console.log("Refresh Devices clicked")
+                                    onClicked: {
+                                        soundboardService.refreshAudioDevices();
+                                        root.refreshDeviceSelections();
+                                    }
 
                                     background: Rectangle {
                                         color: parent.hovered ? Colors.surfaceLight : Colors.surface
@@ -1529,14 +1652,20 @@ Rectangle {
                             HotkeysTable {
                                 width: hotkeysContent.width - 56
                                 title: "System Hotkeys"
-                                model: hotkeyManager.systemHotkeysModel
+                                model: hotkeyManager?.systemHotkeysModel ?? null
                                 showHeader: false
                                 showWarning: true
                                 primaryText: "Reassign"
                                 secondaryText: "Reset"
 
-                                onPrimaryClicked: hotkeyManager.reassignSystem(id)
-                                onSecondaryClicked: hotkeyManager.resetSystem(id)
+                                onPrimaryClicked: {
+                                    if (hotkeyManager)
+                                        hotkeyManager.reassignSystem(id);
+                                }
+                                onSecondaryClicked: {
+                                    if (hotkeyManager)
+                                        hotkeyManager.resetSystem(id);
+                                }
                             }
                         }
 
@@ -1545,14 +1674,20 @@ Rectangle {
                             HotkeysTable {
                                 width: hotkeysContent.width - 56
                                 title: "Soundboard Hotkeys"
-                                model: hotkeyManager.preferenceHotkeysModel
+                                model: hotkeyManager?.preferenceHotkeysModel ?? null
                                 showHeader: true
                                 showWarning: false
                                 primaryText: "Reassign"
                                 secondaryText: "Delete"
 
-                                onPrimaryClicked: hotkeyManager.reassignPreference(id)
-                                onSecondaryClicked: hotkeyManager.deletePreference(id)
+                                onPrimaryClicked: {
+                                    if (hotkeyManager)
+                                        hotkeyManager.reassignPreference(id);
+                                }
+                                onSecondaryClicked: {
+                                    if (hotkeyManager)
+                                        hotkeyManager.deletePreference(id);
+                                }
                             }
                         }
                     }

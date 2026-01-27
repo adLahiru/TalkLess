@@ -110,6 +110,11 @@ static QJsonObject clipToJson(const Clip& c)
     o["muteOtherSounds"] = c.muteOtherSounds;
     o["muteMicDuringPlayback"] = c.muteMicDuringPlayback;
 
+    // Shared board IDs (for tracking which boards have this clip)
+    QJsonArray sharedBoardIdsArr;
+    for (const auto& boardId : c.sharedBoardIds) sharedBoardIdsArr.append(boardId);
+    o["sharedBoardIds"] = sharedBoardIdsArr;
+
     // runtime-only (do not save): isPlaying, locked
     return o;
 }
@@ -140,6 +145,10 @@ static Clip clipFromJson(const QJsonObject& o)
     c.stopOtherSounds = o.value("stopOtherSounds").toBool(false);
     c.muteOtherSounds = o.value("muteOtherSounds").toBool(false);
     c.muteMicDuringPlayback = o.value("muteMicDuringPlayback").toBool(false);
+
+    // Shared board IDs
+    const auto sharedBoardIdsArr = o.value("sharedBoardIds").toArray();
+    for (const auto& v : sharedBoardIdsArr) c.sharedBoardIds.push_back(v.toInt());
 
     // runtime defaults
     c.isPlaying = false;

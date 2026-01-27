@@ -2,25 +2,23 @@
 
 #include "audioEngine.h"
 
+#include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QDateTime>
 #include <QDebug>
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
-#include <QUrl>
-#include <QDateTime>
+#include <QProcess>
 #include <QStandardPaths>
-#include <QDir>
-
+#include <QUrl>
 
 SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audioEngine(std::make_unique<AudioEngine>())
 {
-    // Initialize audio engine
-    if (!m_audioEngine->startAudioDevice()) {
-        qWarning() << "Failed to start audio device";
-    }
-
-    // 1) Load index (might not exist)
+    // 1) Load index (might not exist) - BEFORE starting audio to apply saved devices
     m_state = m_repo.loadIndex();
 
     // 2) First launch: no boards -> create one
@@ -28,7 +26,7 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
         int id = m_repo.createBoard("Default"); // creates board_1.json and updates index
         m_state = m_repo.loadIndex();
         m_state.activeBoardIds.insert(id);
-        m_repo.saveIndex(m_state);
+        m_indexDirty = true; // Mark as dirty instead of immediate save
     }
 
     // 3) Activate all saved active boards
@@ -42,50 +40,97 @@ SoundboardService::SoundboardService(QObject* parent) : QObject(parent), m_audio
         }
     }
 
-    // 4) Apply saved audio settings
+    // 4) Pre-select saved audio devices BEFORE starting audio engine
+    //    This ensures we initialize with the correct devices from the start
     if (m_audioEngine) {
-        m_audioEngine->setMasterGainDB(static_cast<float>(m_state.settings.masterGainDb));
-        m_audioEngine->setMicGainDB(static_cast<float>(m_state.settings.micGainDb));
-
+        // Pre-select devices (just sets internal state without initializing)
         if (!m_state.settings.selectedCaptureDeviceId.isEmpty()) {
-            m_audioEngine->setCaptureDevice(m_state.settings.selectedCaptureDeviceId.toStdString());
+            qDebug() << "Pre-selecting saved capture device:" << m_state.settings.selectedCaptureDeviceId;
+            m_audioEngine->preselectCaptureDevice(m_state.settings.selectedCaptureDeviceId.toStdString());
         }
         if (!m_state.settings.selectedPlaybackDeviceId.isEmpty()) {
-            m_audioEngine->setPlaybackDevice(m_state.settings.selectedPlaybackDeviceId.toStdString());
+            qDebug() << "Pre-selecting saved playback device:" << m_state.settings.selectedPlaybackDeviceId;
+            m_audioEngine->preselectPlaybackDevice(m_state.settings.selectedPlaybackDeviceId.toStdString());
         }
         if (!m_state.settings.selectedMonitorDeviceId.isEmpty()) {
-            m_audioEngine->setMonitorPlaybackDevice(m_state.settings.selectedMonitorDeviceId.toStdString());
+            qDebug() << "Pre-selecting saved monitor device:" << m_state.settings.selectedMonitorDeviceId;
+            m_audioEngine->preselectMonitorPlaybackDevice(m_state.settings.selectedMonitorDeviceId.toStdString());
         }
 
+        // Apply other audio settings
+        m_audioEngine->setMasterGainDB(static_cast<float>(m_state.settings.masterGainDb));
+        m_audioEngine->setMicGainDB(static_cast<float>(m_state.settings.micGainDb));
         m_audioEngine->setMicEnabled(m_state.settings.micEnabled);
         m_audioEngine->setMicPassthroughEnabled(m_state.settings.micPassthroughEnabled);
         m_audioEngine->setMicSoundboardBalance(m_state.settings.micSoundboardBalance);
+
+        m_recordingTickTimer = new QTimer(this);
+        m_recordingTickTimer->setInterval(100); // 10 updates/sec (smooth timer)
+        connect(m_recordingTickTimer, &QTimer::timeout, this, [this]() {
+            if (isRecording()) {
+                emit recordingStateChanged(); // QML property recordingDuration will update
+            } else {
+                m_recordingTickTimer->stop();
+            }
+        });
 
         qDebug() << "Applied saved audio settings - Master:" << m_state.settings.masterGainDb
                  << "dB, Mic:" << m_state.settings.micGainDb << "dB";
     }
 
-    // 5) Setup AudioEngine callbacks
+    // 5) Apply audio configuration (sample rate, buffer size, periods, channels)
+    //    These settings require app restart to take effect
+    if (m_audioEngine) {
+        m_audioEngine->setAudioConfig(static_cast<ma_uint32>(m_state.settings.sampleRate),
+                                      static_cast<ma_uint32>(m_state.settings.bufferSizeFrames),
+                                      static_cast<ma_uint32>(m_state.settings.bufferPeriods),
+                                      static_cast<ma_uint32>(m_state.settings.channels));
+        qDebug() << "Applied audio config - SampleRate:" << m_state.settings.sampleRate
+                 << "Hz, Buffer:" << m_state.settings.bufferSizeFrames
+                 << "frames, Periods:" << m_state.settings.bufferPeriods << ", Channels:" << m_state.settings.channels;
+    }
+
+    // 6) Now start audio device with correct devices and config already configured
+    if (!m_audioEngine->startAudioDevice()) {
+        qWarning() << "Failed to start audio device";
+    }
+
+    // 7) Start monitor device if a monitor output was configured
+    if (!m_state.settings.selectedMonitorDeviceId.isEmpty()) {
+        if (!m_audioEngine->startMonitorDevice()) {
+            qWarning() << "Failed to start monitor device";
+        }
+    }
+
+    // 7) Setup AudioEngine callbacks
     if (m_audioEngine) {
         m_audioEngine->setClipFinishedCallback([this](int slotId) {
-            // Find which clipId was in this slot
-            int finishedClipId = -1;
-            for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it) {
-                if (it.value() == slotId) {
-                    finishedClipId = it.key();
-                    break;
-                }
-            }
-
+            const int finishedClipId = m_slotToClipId.value(slotId, -1);
             if (finishedClipId != -1) {
-                // Update state on the main thread
                 QMetaObject::invokeMethod(
                     this, [this, finishedClipId]() { finalizeClipPlayback(finishedClipId); }, Qt::QueuedConnection);
             }
         });
+
+        m_audioEngine->setClipLoopedCallback([this](int slotId) {
+            // Find which clipId was in this slot
+            int loopedClipId = -1;
+            for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it) {
+                if (it.value() == slotId) {
+                    loopedClipId = it.key();
+                    break;
+                }
+            }
+
+            if (loopedClipId != -1) {
+                // Emit signal on the main thread
+                QMetaObject::invokeMethod(
+                    this, [this, loopedClipId]() { emit clipLooped(loopedClipId); }, Qt::QueuedConnection);
+            }
+        });
     }
 
-    // 6) Notify UI
+    // 8) Notify UI
     emit boardsChanged();
     emit activeBoardChanged();
     emit activeClipsChanged();
@@ -100,6 +145,60 @@ SoundboardService::~SoundboardService()
         }
         m_audioEngine->stopAudioDevice();
     }
+}
+
+void SoundboardService::saveAllChanges()
+{
+    qDebug() << "Saving all changes on application close...";
+
+    // Save index if dirty
+    if (m_indexDirty) {
+        qDebug() << "Saving index...";
+        m_repo.saveIndex(m_state);
+        m_indexDirty = false;
+    }
+
+    // Save all dirty boards
+    if (!m_dirtyBoards.isEmpty()) {
+        qDebug() << "Saving" << m_dirtyBoards.size() << "dirty boards...";
+        for (int boardId : m_dirtyBoards) {
+            if (m_activeBoards.contains(boardId)) {
+                // Save active board
+                m_repo.saveBoard(m_activeBoards[boardId]);
+            } else {
+                // Load and save inactive board
+                auto loaded = m_repo.loadBoard(boardId);
+                if (loaded) {
+                    m_repo.saveBoard(*loaded);
+                }
+            }
+        }
+        m_dirtyBoards.clear();
+    }
+
+    qDebug() << "All changes saved successfully.";
+}
+
+void SoundboardService::restartApplication()
+{
+    qDebug() << "Restarting application...";
+
+    // 1) Save all changes before restarting
+    saveAllChanges();
+
+    // 2) Get the application path
+    QString appPath = QCoreApplication::applicationFilePath();
+    qDebug() << "Application path:" << appPath;
+
+    // 3) Start a new instance of the application
+    bool started = QProcess::startDetached(appPath, QStringList());
+    if (!started) {
+        qWarning() << "Failed to start new application instance";
+        return;
+    }
+
+    // 4) Quit the current instance
+    QCoreApplication::quit();
 }
 
 void SoundboardService::reloadIndex()
@@ -153,7 +252,7 @@ bool SoundboardService::toggleBoardActive(int boardId)
 void SoundboardService::setMasterGainDb(double db)
 {
     m_state.settings.masterGainDb = db;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
 
     // Apply to audio engine
     if (m_audioEngine) {
@@ -166,7 +265,7 @@ void SoundboardService::setMasterGainDb(double db)
 void SoundboardService::setMicGainDb(double db)
 {
     m_state.settings.micGainDb = db;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
 
     // Apply to audio engine
     if (m_audioEngine) {
@@ -201,7 +300,7 @@ bool SoundboardService::activate(int boardId)
 
     // Update index activeBoardIds
     m_state.activeBoardIds.insert(boardId);
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
 
     emit activeBoardChanged();
     emit activeClipsChanged();
@@ -215,14 +314,14 @@ bool SoundboardService::deactivate(int boardId)
         return true; // Already not active
     }
 
-    // Save the board before removing
-    m_repo.saveBoard(m_activeBoards[boardId]);
+    // Mark the board as dirty before removing
+    m_dirtyBoards.insert(boardId);
     m_activeBoards.remove(boardId);
     rebuildHotkeyIndex();
 
     // Update index activeBoardIds
     m_state.activeBoardIds.remove(boardId);
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
 
     emit activeBoardChanged();
     emit activeClipsChanged();
@@ -235,19 +334,13 @@ bool SoundboardService::saveActive()
     if (m_activeBoards.isEmpty())
         return false;
 
-    bool allOk = true;
+    // Mark all active boards as dirty
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
-        if (!m_repo.saveBoard(it.value())) {
-            allOk = false;
-        }
+        m_dirtyBoards.insert(it.key());
     }
-    
-    if (allOk) {
-        // reload index because clipCount/name might update
-        m_state = m_repo.loadIndex();
-        emit boardsChanged();
-    }
-    return allOk;
+
+    // Will be saved on application close
+    return true;
 }
 
 QString SoundboardService::normalizeHotkey(const QString& hotkey)
@@ -258,7 +351,7 @@ QString SoundboardService::normalizeHotkey(const QString& hotkey)
 void SoundboardService::rebuildHotkeyIndex()
 {
     m_hotkeyToClipId.clear();
-    
+
     // Build hotkey index from all active boards
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& c : it.value().clips) {
@@ -289,6 +382,40 @@ Clip* SoundboardService::findActiveClipById(int clipId)
         }
     }
     return nullptr;
+}
+
+std::optional<Clip> SoundboardService::findClipByIdAnyBoard(int clipId, int* outBoardId) const
+{
+    // First search in active boards (faster)
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        const Soundboard& board = it.value();
+        for (const auto& c : board.clips) {
+            if (c.id == clipId) {
+                if (outBoardId)
+                    *outBoardId = it.key();
+                return c;
+            }
+        }
+    }
+
+    // Search in inactive boards
+    for (const auto& boardInfo : m_state.soundboards) {
+        if (m_activeBoards.contains(boardInfo.id))
+            continue; // Already searched
+
+        auto loaded = m_repo.loadBoard(boardInfo.id);
+        if (loaded) {
+            for (const auto& c : loaded->clips) {
+                if (c.id == clipId) {
+                    if (outBoardId)
+                        *outBoardId = boardInfo.id;
+                    return c;
+                }
+            }
+        }
+    }
+
+    return std::nullopt;
 }
 
 QVector<Clip> SoundboardService::getActiveClips() const
@@ -339,7 +466,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
                     map["hotkey"] = c.hotkey;
                     map["volume"] = c.volume;
                     map["speed"] = c.speed;
-                    map["isPlaying"] = c.isPlaying;  // Use stored state, not audio engine state
+                    map["isPlaying"] = c.isPlaying; // Use stored state, not audio engine state
                     map["isRepeat"] = c.isRepeat;
                     map["tags"] = c.tags;
                     map["reproductionMode"] = c.reproductionMode;
@@ -353,7 +480,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
                     map["durationSec"] = duration;
                     map["trimStartMs"] = c.trimStartMs;
                     map["trimEndMs"] = c.trimEndMs;
-                    map["lastPlayedPosMs"] = c.lastPlayedPosMs;  // For resuming playback
+                    map["lastPlayedPosMs"] = c.lastPlayedPosMs; // For resuming playback
                     return map;
                 }
             }
@@ -369,7 +496,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
         map["hotkey"] = clip->hotkey;
         map["volume"] = clip->volume;
         map["speed"] = clip->speed;
-        map["isPlaying"] = clip->isPlaying;  // Use stored state, not audio engine state
+        map["isPlaying"] = clip->isPlaying; // Use stored state, not audio engine state
         map["isRepeat"] = clip->isRepeat;
         map["tags"] = clip->tags;
         map["reproductionMode"] = clip->reproductionMode;
@@ -383,7 +510,7 @@ QVariantMap SoundboardService::getClipData(int boardId, int clipId) const
         map["durationSec"] = duration;
         map["trimStartMs"] = clip->trimStartMs;
         map["trimEndMs"] = clip->trimEndMs;
-        map["lastPlayedPosMs"] = clip->lastPlayedPosMs;  // For resuming playback
+        map["lastPlayedPosMs"] = clip->lastPlayedPosMs; // For resuming playback
         return map;
     }
 
@@ -490,6 +617,7 @@ bool SoundboardService::addClips(int boardId, const QStringList& filePaths)
         b.clips.push_back(c);
     }
 
+    // Save the updated board to repository
     const bool ok = m_repo.saveBoard(b);
     if (ok) {
         m_state = m_repo.loadIndex();
@@ -545,7 +673,17 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
         for (int i = 0; i < board.clips.size(); ++i) {
             if (board.clips[i].id == clipId) {
                 if (board.clips[i].locked)
-                    return false; // can't delete playing
+                    return false; // can't delete locked clip
+
+                // STOP the clip if it's playing before deleting
+                if (m_audioEngine && m_clipIdToSlot.contains(clipId)) {
+                    int slotId = m_clipIdToSlot[clipId];
+                    m_audioEngine->stopClip(slotId);
+                    m_audioEngine->unloadClip(slotId);
+                    m_clipIdToSlot.remove(clipId);
+                    qDebug() << "Stopped and unloaded clip" << clipId << "before deletion";
+                }
+
                 board.clips.removeAt(i);
                 found = true;
                 break;
@@ -556,6 +694,7 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
 
         rebuildHotkeyIndex();
         emit activeClipsChanged();
+        emit clipPlaybackStopped(clipId); // Notify UI that clip stopped
         return saveActive();
     }
 
@@ -576,6 +715,7 @@ bool SoundboardService::deleteClip(int boardId, int clipId)
     if (!found)
         return false;
 
+    // Save the updated board to repository
     const bool ok = m_repo.saveBoard(b);
     if (ok) {
         m_state = m_repo.loadIndex();
@@ -589,16 +729,32 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
     if (draft.filePath.trimmed().isEmpty())
         return false;
 
+    // Sanitize file path - convert file:// URL to local path and fix double slashes
+    QString sanitizedPath = draft.filePath;
+    if (sanitizedPath.startsWith("file:")) {
+        sanitizedPath = QUrl(sanitizedPath).toLocalFile();
+    }
+    // Remove any duplicate leading slashes (e.g., "//Users" -> "/Users")
+    while (sanitizedPath.startsWith("//")) {
+        sanitizedPath = sanitizedPath.mid(1);
+    }
+
     // if adding to an active board (in memory)
     if (m_activeBoards.contains(boardId)) {
         Soundboard& board = m_activeBoards[boardId];
         Clip c = draft;
+        c.filePath = sanitizedPath; // Use sanitized path
 
         // default title if empty
         if (c.title.trimmed().isEmpty()) {
             c.title = QFileInfo(c.filePath).baseName();
         } else {
             c.title = c.title.trimmed();
+        }
+
+        // Extract artwork if no image set
+        if (c.imgPath.isEmpty()) {
+            c.imgPath = extractAudioArtwork(c.filePath);
         }
 
         // runtime defaults
@@ -616,6 +772,13 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
             c.durationSec = m_audioEngine->getFileDuration(c.filePath.toStdString());
         }
 
+        // Ensure shared board IDs includes current board if not already set
+        if (c.sharedBoardIds.isEmpty() || !c.sharedBoardIds.contains(boardId)) {
+            if (!c.sharedBoardIds.contains(boardId)) {
+                c.sharedBoardIds.append(boardId);
+            }
+        }
+
         board.clips.push_back(c);
         rebuildHotkeyIndex();
 
@@ -631,8 +794,15 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
     Soundboard b = *loaded;
 
     Clip c = draft;
+    c.filePath = sanitizedPath; // Use sanitized path
     if (c.title.trimmed().isEmpty())
         c.title = QFileInfo(c.filePath).baseName();
+
+    // Extract artwork if no image set
+    if (c.imgPath.isEmpty()) {
+        c.imgPath = extractAudioArtwork(c.filePath);
+    }
+
     c.isPlaying = false;
     c.locked = false;
 
@@ -646,8 +816,16 @@ bool SoundboardService::addClipToBoard(int boardId, const Clip& draft)
         c.durationSec = m_audioEngine->getFileDuration(c.filePath.toStdString());
     }
 
+    // Ensure shared board IDs includes current board if not already set
+    if (c.sharedBoardIds.isEmpty() || !c.sharedBoardIds.contains(boardId)) {
+        if (!c.sharedBoardIds.contains(boardId)) {
+            c.sharedBoardIds.append(boardId);
+        }
+    }
+
     b.clips.push_back(c);
 
+    // Save the updated board to repository
     const bool ok = m_repo.saveBoard(b);
     if (ok) {
         m_state = m_repo.loadIndex();
@@ -707,6 +885,7 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const Clip& u
             n.isRepeat = true;
         c = n;
 
+        // Save the updated board to repository
         const bool ok = m_repo.saveBoard(b);
         if (ok) {
             m_state = m_repo.loadIndex();
@@ -757,6 +936,7 @@ bool SoundboardService::updateClipInBoard(int boardId, int clipId, const QString
         c.hotkey = hotkey;
         c.tags = tags;
 
+        // Save the updated board to repository
         const bool ok = m_repo.saveBoard(b);
         if (ok) {
             m_state = m_repo.loadIndex();
@@ -807,6 +987,7 @@ bool SoundboardService::updateClipImage(int boardId, int clipId, const QString& 
         // Update image path
         c.imgPath = localPath;
 
+        // Save the updated board to repository
         const bool ok = m_repo.saveBoard(b);
         if (ok) {
             m_state = m_repo.loadIndex();
@@ -866,6 +1047,7 @@ bool SoundboardService::updateClipAudioSettings(int boardId, int clipId, int vol
         c.volume = volume;
         c.speed = speed;
 
+        // Save the updated board to repository
         const bool ok = m_repo.saveBoard(b);
         if (ok) {
             m_state = m_repo.loadIndex();
@@ -934,7 +1116,7 @@ void SoundboardService::setClipRepeat(int boardId, int clipId, bool repeat)
 void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mode)
 {
     // Clamp mode to valid range (0-4)
-    mode = std::max(0, std::min(3, mode));
+    mode = std::max(0, std::min(4, mode));
 
     // Active board update
     if (m_activeBoards.contains(boardId)) {
@@ -945,7 +1127,7 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
 
             c.reproductionMode = mode;
 
-            // Mode 4 (Loop) should turn on repeat, Mode 3 (Restart) should not
+            // Mode 4 (Loop) should turn on repeat, all other modes should turn it off
             if (mode == 4) {
                 c.isRepeat = true;
                 // Apply immediately to audio engine if currently assigned to a slot
@@ -953,17 +1135,16 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
                     m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], true);
                 }
             } else {
-                // For all other modes (including mode 3 restart), don't force loop
-                // Keep existing isRepeat value unless it was mode 4 before
+                // For all other modes (including mode 3 restart), turn off loop
+                c.isRepeat = false;
                 if (m_clipIdToSlot.contains(clipId) && m_audioEngine) {
-                    m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], c.isRepeat);
+                    m_audioEngine->setClipLoop(m_clipIdToSlot[clipId], false);
                 }
             }
 
             emit activeClipsChanged();
             emit clipUpdated(boardId, clipId);
             saveActive(); // Persist the change
-            qDebug() << "Reproduction mode set to" << mode << "for clip" << clipId;
             return;
         }
     }
@@ -980,7 +1161,10 @@ void SoundboardService::setClipReproductionMode(int boardId, int clipId, int mod
             // Only mode 4 (Loop) forces repeat on
             if (mode == 4)
                 c.isRepeat = true;
+            else
+                c.isRepeat = false;
             m_repo.saveBoard(b);
+            m_state = m_repo.loadIndex();
             return;
         }
     }
@@ -1011,6 +1195,7 @@ void SoundboardService::setClipStopOtherSounds(int boardId, int clipId, bool sto
         if (c.id == clipId) {
             c.stopOtherSounds = stop;
             m_repo.saveBoard(b);
+            m_state = m_repo.loadIndex();
             return;
         }
     }
@@ -1047,6 +1232,7 @@ void SoundboardService::setClipMuteOtherSounds(int boardId, int clipId, bool mut
             if (mute)
                 c.muteMicDuringPlayback = true;
             m_repo.saveBoard(b);
+            m_state = m_repo.loadIndex();
             return;
         }
     }
@@ -1077,6 +1263,7 @@ void SoundboardService::setClipMuteMicDuringPlayback(int boardId, int clipId, bo
         if (c.id == clipId) {
             c.muteMicDuringPlayback = mute;
             m_repo.saveBoard(b);
+            m_state = m_repo.loadIndex();
             return;
         }
     }
@@ -1116,6 +1303,7 @@ void SoundboardService::setClipTrim(int boardId, int clipId, double startMs, dou
             c.trimStartMs = startMs;
             c.trimEndMs = endMs;
             m_repo.saveBoard(b);
+            m_state = m_repo.loadIndex();
             return;
         }
     }
@@ -1165,6 +1353,7 @@ bool SoundboardService::moveClip(int boardId, int fromIndex, int toIndex)
     Clip clip = b.clips.takeAt(fromIndex);
     b.clips.insert(toIndex, clip);
 
+    // Save the updated board to repository
     const bool ok = m_repo.saveBoard(b);
     if (ok) {
         m_state = m_repo.loadIndex();
@@ -1178,7 +1367,6 @@ void SoundboardService::copyClip(int clipId)
     Clip* clip = findActiveClipById(clipId);
     if (clip) {
         m_clipboardClip = *clip;
-        qDebug() << "Copied clip:" << clip->title;
         emit clipboardChanged();
     }
 }
@@ -1193,13 +1381,292 @@ bool SoundboardService::pasteClip(int boardId)
     draft.hotkey = "";
     draft.id = -1;
 
-    qDebug() << "Pasting clip:" << draft.title << "to board:" << boardId;
     return addClipToBoard(boardId, draft);
 }
 
 bool SoundboardService::canPaste() const
 {
     return m_clipboardClip.has_value();
+}
+
+QVariantList SoundboardService::getBoardsWithClipStatus(int clipId) const
+{
+    QVariantList result;
+
+    // First, find the clip to get its file path
+    QString clipFilePath;
+    int sourceBoardId = -1;
+
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        for (const auto& c : it.value().clips) {
+            if (c.id == clipId) {
+                clipFilePath = c.filePath;
+                sourceBoardId = it.key();
+                break;
+            }
+        }
+        if (!clipFilePath.isEmpty())
+            break;
+    }
+
+    // If not found in active boards, search inactive boards
+    if (clipFilePath.isEmpty()) {
+        for (const auto& boardInfo : m_state.soundboards) {
+            if (!m_activeBoards.contains(boardInfo.id)) {
+                auto loaded = m_repo.loadBoard(boardInfo.id);
+                if (loaded) {
+                    for (const auto& c : loaded->clips) {
+                        if (c.id == clipId) {
+                            clipFilePath = c.filePath;
+                            sourceBoardId = boardInfo.id;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!clipFilePath.isEmpty())
+                break;
+        }
+    }
+
+    if (clipFilePath.isEmpty())
+        return result;
+
+    // Check each board to see if a clip with this file path actually exists
+    for (const auto& boardInfo : m_state.soundboards) {
+        bool hasClip = false;
+
+        // Check active boards
+        if (m_activeBoards.contains(boardInfo.id)) {
+            const Soundboard& board = m_activeBoards.value(boardInfo.id);
+            for (const auto& c : board.clips) {
+                if (c.filePath == clipFilePath) {
+                    hasClip = true;
+                    break;
+                }
+            }
+        } else {
+            // Check inactive boards
+            auto loaded = m_repo.loadBoard(boardInfo.id);
+            if (loaded) {
+                for (const auto& c : loaded->clips) {
+                    if (c.filePath == clipFilePath) {
+                        hasClip = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        QVariantMap boardEntry;
+        boardEntry["id"] = boardInfo.id;
+        boardEntry["name"] = boardInfo.name;
+        boardEntry["hasClip"] = hasClip;
+        boardEntry["isCurrent"] = (boardInfo.id == sourceBoardId);
+        result.append(boardEntry);
+    }
+
+    return result;
+}
+
+bool SoundboardService::copyClipToBoard(int sourceClipId, int targetBoardId)
+{
+    // Find the source clip from any board (active or inactive)
+    int sourceBoardId = -1;
+    auto sourceClipOpt = findClipByIdAnyBoard(sourceClipId, &sourceBoardId);
+    if (!sourceClipOpt.has_value()) {
+        return false;
+    }
+
+    Clip sourceClip = sourceClipOpt.value();
+    QString clipFilePath = sourceClip.filePath;
+
+    // Check if clip already exists in target board (by file path)
+    if (m_activeBoards.contains(targetBoardId)) {
+        const Soundboard& board = m_activeBoards.value(targetBoardId);
+        for (const auto& c : board.clips) {
+            if (c.filePath == clipFilePath) {
+                return false; // Already exists
+            }
+        }
+    } else {
+        auto loaded = m_repo.loadBoard(targetBoardId);
+        if (loaded) {
+            for (const auto& c : loaded->clips) {
+                if (c.filePath == clipFilePath) {
+                    return false; // Already exists
+                }
+            }
+        }
+    }
+
+    // Create a copy of the clip
+    Clip draft = sourceClip;
+    draft.hotkey = ""; // Clear hotkey for the new copy
+    draft.id = -1;     // Will be assigned a new ID
+    draft.isPlaying = false;
+    draft.locked = false;
+
+    // Update shared board IDs - add both source and target boards
+    if (!draft.sharedBoardIds.contains(sourceBoardId) && sourceBoardId != -1) {
+        draft.sharedBoardIds.append(sourceBoardId);
+    }
+    if (!draft.sharedBoardIds.contains(targetBoardId)) {
+        draft.sharedBoardIds.append(targetBoardId);
+    }
+
+    bool ok = addClipToBoard(targetBoardId, draft);
+    if (ok) {
+        // Now sync the sharedBoardIds back to all clips with the same file path
+        syncSharedBoardIds(clipFilePath, draft.sharedBoardIds);
+        emit boardsChanged();
+        emit activeClipsChanged();
+    }
+    return ok;
+}
+
+void SoundboardService::syncSharedBoardIds(const QString& filePath, const QList<int>& sharedBoardIds)
+{
+    // Update all clips with the same file path in all active boards
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        Soundboard& board = it.value();
+        bool boardModified = false;
+
+        for (auto& clip : board.clips) {
+            if (clip.filePath == filePath) {
+                clip.sharedBoardIds = sharedBoardIds;
+                boardModified = true;
+            }
+        }
+
+        if (boardModified) {
+            m_repo.saveBoard(board);
+        }
+    }
+
+    // Also update clips in inactive boards
+    for (const auto& boardInfo : m_state.soundboards) {
+        if (!m_activeBoards.contains(boardInfo.id)) {
+            auto loaded = m_repo.loadBoard(boardInfo.id);
+            if (loaded) {
+                bool boardModified = false;
+
+                for (auto& clip : loaded->clips) {
+                    if (clip.filePath == filePath) {
+                        clip.sharedBoardIds = sharedBoardIds;
+                        boardModified = true;
+                    }
+                }
+
+                if (boardModified) {
+                    m_repo.saveBoard(*loaded);
+                }
+            }
+        }
+    }
+}
+
+bool SoundboardService::removeClipByFilePath(int boardId, const QString& filePath)
+{
+    if (filePath.isEmpty())
+        return false;
+
+    // Active board case
+    if (m_activeBoards.contains(boardId)) {
+        Soundboard& board = m_activeBoards[boardId];
+        for (int i = 0; i < board.clips.size(); ++i) {
+            if (board.clips[i].filePath == filePath) {
+                if (board.clips[i].locked)
+                    return false;
+
+                int clipId = board.clips[i].id;
+
+                // Stop the clip if playing
+                if (m_audioEngine && m_clipIdToSlot.contains(clipId)) {
+                    int slotId = m_clipIdToSlot[clipId];
+                    m_audioEngine->stopClip(slotId);
+                    m_audioEngine->unloadClip(slotId);
+                    m_clipIdToSlot.remove(clipId);
+                }
+
+                board.clips.removeAt(i);
+                rebuildHotkeyIndex();
+
+                // Update sharedBoardIds in all other clips with the same file path
+                removeFromSharedBoardIds(filePath, boardId);
+
+                emit activeClipsChanged();
+                emit clipPlaybackStopped(clipId);
+                return saveActive();
+            }
+        }
+        return false;
+    }
+
+    // Inactive board case
+    auto loaded = m_repo.loadBoard(boardId);
+    if (!loaded)
+        return false;
+
+    Soundboard b = *loaded;
+    for (int i = 0; i < b.clips.size(); ++i) {
+        if (b.clips[i].filePath == filePath) {
+            b.clips.removeAt(i);
+            const bool ok = m_repo.saveBoard(b);
+            if (ok) {
+                // Update sharedBoardIds in all other clips with the same file path
+                removeFromSharedBoardIds(filePath, boardId);
+
+                m_state = m_repo.loadIndex();
+                emit boardsChanged();
+            }
+            return ok;
+        }
+    }
+    return false;
+}
+
+void SoundboardService::removeFromSharedBoardIds(const QString& filePath, int boardIdToRemove)
+{
+    // Remove boardIdToRemove from sharedBoardIds for all clips with this file path
+
+    // Update active boards
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        Soundboard& board = it.value();
+        bool boardModified = false;
+
+        for (auto& clip : board.clips) {
+            if (clip.filePath == filePath) {
+                clip.sharedBoardIds.removeAll(boardIdToRemove);
+                boardModified = true;
+            }
+        }
+
+        if (boardModified) {
+            m_repo.saveBoard(board);
+        }
+    }
+
+    // Update inactive boards
+    for (const auto& boardInfo : m_state.soundboards) {
+        if (!m_activeBoards.contains(boardInfo.id)) {
+            auto loaded = m_repo.loadBoard(boardInfo.id);
+            if (loaded) {
+                bool boardModified = false;
+
+                for (auto& clip : loaded->clips) {
+                    if (clip.filePath == filePath) {
+                        clip.sharedBoardIds.removeAll(boardIdToRemove);
+                        boardModified = true;
+                    }
+                }
+
+                if (boardModified) {
+                    m_repo.saveBoard(*loaded);
+                }
+            }
+        }
+    }
 }
 
 int SoundboardService::createBoard(const QString& name)
@@ -1239,9 +1706,10 @@ bool SoundboardService::renameBoard(int boardId, const QString& newName)
     Soundboard b = *loaded;
     b.name = name;
 
-    const bool ok = m_repo.saveBoard(b); // should update index name + clipCount
+    // Save the renamed board to repository
+    const bool ok = m_repo.saveBoard(b);
     if (ok) {
-        m_state = m_repo.loadIndex(); // IMPORTANT: Reload index in memory!
+        m_state = m_repo.loadIndex();
         emit boardsChanged();
     }
     return ok;
@@ -1279,8 +1747,6 @@ void SoundboardService::clipClicked(int clipId)
     // This method handles a clip tile click:
     // 1. Emit signal to select the clip (shows in right sidebar)
     // 2. Play the clip with reproduction mode logic
-
-    qDebug() << "Clip clicked:" << clipId;
 
     // Emit selection changed signal so UI updates
     setCurrentlySelectedClip(clipId);
@@ -1321,7 +1787,6 @@ void SoundboardService::reproductionPlayingClip(const QVariantList& playingClipI
         case 1: // Play/Pause -> pause previous clips
         {
             double pos = m_audioEngine->getClipPlaybackPositionMs(slotId);
-            qDebug() << "Saving playback position:" << pos;
             Clip* clip = findActiveClipById(cid);
             if (!clip)
                 continue;
@@ -1374,6 +1839,7 @@ void SoundboardService::playClip(int clipId)
     }
 
     const int slotId = getOrAssignSlot(clipId);
+    m_slotToClipId[slotId] = clipId;
 
     // IMPORTANT: reproductionMode of *Clip_B* affects *previous playing clips*.
     // 0=Overlay, 1=Play/Pause, 2=Play/Stop, 3=Restart, 4=Loop
@@ -1384,24 +1850,53 @@ void SoundboardService::playClip(int clipId)
 
     // Per-clip behavior (when user taps the same clip again)
     if (mode == 1 && isCurrentlyPlaying) {
-        if (isPaused) {
-            // Resume from saved position - clip is still loaded in audio engine
-            m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
-            m_audioEngine->resumeClip(slotId);
-            clip->isPlaying = true;
-            emit activeClipsChanged();
-            emit clipPlaybackStarted(clipId);
-            qDebug() << "Resuming paused clip" << clipId << "from position" << clip->lastPlayedPosMs;
-        } else {
-            // User clicked a playing clip - PAUSE it and save position
+        if (!isPaused) {
+            // Currently playing -> pause self
             clip->lastPlayedPosMs = m_audioEngine->getClipPlaybackPositionMs(slotId);
             m_audioEngine->pauseClip(slotId);
             clip->isPlaying = false;
+
             emit activeClipsChanged();
             emit clipPlaybackPaused(clipId);
-            qDebug() << "Paused clip" << clipId << "at position" << clip->lastPlayedPosMs;
+            return;
         }
 
+        // Currently paused -> we want to resume, BUT we must pause others first
+        QVariantList others = playingClipIDs();
+
+        // Remove self if present
+        for (int i = others.size() - 1; i >= 0; --i) {
+            bool ok = false;
+            const int cid = others[i].toInt(&ok);
+            if (ok && cid == clipId) {
+                others.removeAt(i);
+            }
+        }
+
+        // Pause other playing clips (Play/Pause rule)
+        if (!others.isEmpty()) {
+            QList<int> pausedClipIds;
+            for (const QVariant& v : others) {
+                bool ok = false;
+                const int otherId = v.toInt(&ok);
+                if (ok)
+                    pausedClipIds.append(otherId);
+            }
+
+            reproductionPlayingClip(others, 1);
+
+            if (!pausedClipIds.isEmpty()) {
+                m_pausedByClip[clipId] = pausedClipIds;
+            }
+        }
+
+        // Now resume self
+        m_audioEngine->seekClip(slotId, clip->lastPlayedPosMs);
+        m_audioEngine->resumeClip(slotId);
+        clip->isPlaying = true;
+
+        emit activeClipsChanged();
+        emit clipPlaybackStarted(clipId);
         return;
     }
 
@@ -1417,13 +1912,23 @@ void SoundboardService::playClip(int clipId)
         return;
     }
 
+    // Mode 3 (Restart): Always restart from beginning when clicking same clip
+    // If the clip is playing or paused, stop it and let it fall through to restart
+    if (mode == 3 && isCurrentlyPlaying) {
+        m_audioEngine->stopClip(slotId);
+        clip->isPlaying = false;
+        qDebug() << "Mode 3 (Restart): Restarting clip" << clipId << "from beginning";
+        // Fall through to reload and play from beginning
+    }
+
     // If user taps a paused clip in Play/Stop mode: restart from beginning
     // (fall through)
 
     // 1) Apply Clip_B reproduction to OTHER currently playing clips
     QVariantList others = playingClipIDs();
-    qDebug() << "playClip: clipId=" << clipId << "mode=" << mode << "others playing=" << others;
-    
+    qDebug() << "playClip: clipId=" << clipId << "mode=" << mode << "others playing=" << others
+             << "others count=" << others.size();
+
     // Remove this clip if it appears in the "playing" list
     for (int i = others.size() - 1; i >= 0; --i) {
         bool ok = false;
@@ -1432,13 +1937,30 @@ void SoundboardService::playClip(int clipId)
             others.removeAt(i);
         }
     }
-    
-    qDebug() << "playClip: after removing self, others=" << others;
 
-    if (mode == 1) {
-        // Pause Clip_A, play Clip_B
-        qDebug() << "playClip: mode=1, calling reproductionPlayingClip to pause others";
+    qDebug() << "playClip: after removing self, others=" << others << "others count=" << others.size();
+
+    // Track which clips we're pausing for this clip (for resuming later)
+    QList<int> pausedClipIds;
+
+    if (mode == 1 && !others.isEmpty()) {
+        // Pause Clip_A, play Clip_B - track paused clips for resuming later
+        qDebug() << "playClip: mode=1 (Play/Pause), pausing" << others.size() << "other clips";
+        for (const QVariant& v : others) {
+            bool ok = false;
+            int otherId = v.toInt(&ok);
+            if (ok) {
+                pausedClipIds.append(otherId);
+                qDebug() << "playClip: will pause clip" << otherId;
+            }
+        }
         reproductionPlayingClip(others, 1);
+
+        // Store which clips were paused by this clip
+        if (!pausedClipIds.isEmpty()) {
+            m_pausedByClip[clipId] = pausedClipIds;
+            qDebug() << "playClip: stored paused clips for" << clipId << ":" << pausedClipIds;
+        }
     } else if (mode == 2) {
         // Stop Clip_A, play Clip_B
         reproductionPlayingClip(others, 2);
@@ -1462,14 +1984,31 @@ void SoundboardService::playClip(int clipId)
             }
         }
     } else if (clip->muteOtherSounds && !others.isEmpty()) {
-        // Pause (mute) all other playing clips
+        // Pause (mute) all other playing clips and track them for resuming later
+        QList<int> mutedClipIds;
         for (const QVariant& v : others) {
             bool ok = false;
             int otherId = v.toInt(&ok);
             if (ok && m_clipIdToSlot.contains(otherId)) {
-                m_audioEngine->pauseClip(m_clipIdToSlot[otherId]);
+                int otherSlotId = m_clipIdToSlot[otherId];
+                if (m_audioEngine->isClipPlaying(otherSlotId) && !m_audioEngine->isClipPaused(otherSlotId)) {
+                    // Save position before pausing
+                    Clip* otherClip = findActiveClipById(otherId);
+                    if (otherClip) {
+                        otherClip->lastPlayedPosMs = m_audioEngine->getClipPlaybackPositionMs(otherSlotId);
+                        otherClip->isPlaying = false;
+                    }
+                    m_audioEngine->pauseClip(otherSlotId);
+                    mutedClipIds.append(otherId);
+                    emit clipPlaybackPaused(otherId);
+                }
             }
         }
+        // Track which clips were muted by this clip for resuming later
+        if (!mutedClipIds.isEmpty()) {
+            m_pausedByClip[clipId] = mutedClipIds;
+        }
+        emit activeClipsChanged();
     }
 
     // Mute mic if muteMicDuringPlayback is enabled for this clip
@@ -1528,28 +2067,26 @@ void SoundboardService::playClip(int clipId)
     emit activeClipsChanged();
     emit clipPlaybackStarted(clipId);
 
-    const char* modeNames[] = {"Overlay", "Play/Pause", "Play/Stop", "Loop"};
-    if (mode >= 0 && mode <= 3) {
-        qDebug() << "Playing clip" << clipId << "in slot" << slotId << "with mode" << modeNames[mode] << ":"
-                 << clip->filePath;
+    static const char* modeNames[] = {"Overlay", "Play/Pause", "Play/Stop", "Restart", "Loop"};
+    if (mode >= 0 && mode <= 4) {
+        qDebug() << "mode" << modeNames[mode];
     } else {
-        qDebug() << "Playing clip" << clipId << "in slot" << slotId << "with mode" << mode << ":" << clip->filePath;
+        qDebug() << "mode" << mode;
     }
 }
 
 void SoundboardService::stopClip(int clipId)
 {
-    if (!m_audioEngine) {
+    if (!m_audioEngine)
         return;
-    }
-
-    // Check if this clip has a slot assigned
-    if (!m_clipIdToSlot.contains(clipId)) {
+    if (!m_clipIdToSlot.contains(clipId))
         return;
-    }
 
     int slotId = m_clipIdToSlot[clipId];
     m_audioEngine->stopClip(slotId);
+
+    // remove ownership mapping
+    m_slotToClipId.remove(slotId);
 
     finalizeClipPlayback(clipId);
     qDebug() << "Stopped clip" << clipId << "in slot" << slotId;
@@ -1560,12 +2097,30 @@ bool SoundboardService::startRecording()
     if (!m_audioEngine)
         return false;
 
+    // Stop preview if playing (avoid device conflicts)
+    if (m_recordingPreviewPlaying) {
+        stopLastRecordingPreview();
+    }
+
+    // Clear any previous pending recording to prevent re-save duplicates
+    m_hasUnsavedRecording = false;
+    m_lastRecordingPath.clear();
+
+    emit recordingStateChanged(); // updates QML immediately
+
     m_lastRecordingPath = getRecordingOutputPath();
-    // Ensure directory exists
     QDir().mkpath(QFileInfo(m_lastRecordingPath).absolutePath());
 
-    bool success = m_audioEngine->startRecording(m_lastRecordingPath.toStdString());
+    const bool success = m_audioEngine->startRecording(m_lastRecordingPath.toStdString());
     if (success) {
+        // Start periodic UI updates
+        if (m_recordingTickTimer)
+            m_recordingTickTimer->start();
+
+        emit recordingStateChanged();
+    } else {
+        // If failed, don't keep stale path
+        m_lastRecordingPath.clear();
         emit recordingStateChanged();
     }
     return success;
@@ -1576,9 +2131,84 @@ bool SoundboardService::stopRecording()
     if (!m_audioEngine)
         return false;
 
-    bool success = m_audioEngine->stopRecording();
+    const bool success = m_audioEngine->stopRecording();
+
+    if (m_recordingTickTimer)
+        m_recordingTickTimer->stop();
+
+    // Only mark as pending if a real file exists
+    if (success && !m_lastRecordingPath.isEmpty() && QFileInfo::exists(m_lastRecordingPath)) {
+        m_hasUnsavedRecording = true;
+    } else {
+        m_hasUnsavedRecording = false;
+        m_lastRecordingPath.clear();
+    }
+
     emit recordingStateChanged();
     return success;
+}
+
+bool SoundboardService::hasPendingRecording() const
+{
+    return m_hasUnsavedRecording && !m_lastRecordingPath.isEmpty() && QFileInfo::exists(m_lastRecordingPath);
+}
+
+QString SoundboardService::consumePendingRecordingPath()
+{
+    if (!hasPendingRecording())
+        return QString();
+
+    // Stop preview if playing
+    if (m_recordingPreviewPlaying) {
+        // Use the existing stop function so state updates consistently
+        const_cast<SoundboardService*>(this)->stopLastRecordingPreview();
+    }
+
+    m_hasUnsavedRecording = false;
+
+    const QString path = m_lastRecordingPath;
+    m_lastRecordingPath.clear();
+
+    emit recordingStateChanged();
+    return path;
+}
+
+void SoundboardService::cancelPendingRecording()
+{
+    if (!m_audioEngine) {
+        // Still clear state
+        if (!m_lastRecordingPath.isEmpty())
+            QFile::remove(m_lastRecordingPath);
+        m_lastRecordingPath.clear();
+        m_hasUnsavedRecording = false;
+        m_recordingPreviewPlaying = false;
+        emit recordingStateChanged();
+        return;
+    }
+
+    // If currently recording, stop recording first
+    if (isRecording()) {
+        m_audioEngine->stopRecording();
+    }
+
+    if (m_recordingTickTimer)
+        m_recordingTickTimer->stop();
+
+    // Stop preview if playing
+    if (m_recordingPreviewPlaying) {
+        stopLastRecordingPreview();
+    }
+
+    // Delete file if exists
+    if (!m_lastRecordingPath.isEmpty()) {
+        QFile::remove(m_lastRecordingPath);
+    }
+
+    m_lastRecordingPath.clear();
+    m_hasUnsavedRecording = false;
+    m_recordingPreviewPlaying = false;
+
+    emit recordingStateChanged();
 }
 
 bool SoundboardService::isRecording() const
@@ -1594,7 +2224,6 @@ float SoundboardService::recordingDuration() const
         return 0.0f;
     return m_audioEngine->getRecordingDuration();
 }
-
 
 QString SoundboardService::getRecordingOutputPath() const
 {
@@ -1618,9 +2247,13 @@ bool SoundboardService::setRecordingInputDevice(const QString& deviceId)
     if (!m_audioEngine)
         return false;
 
-    // Set the recording input device (capture device for recording)
-    bool success = m_audioEngine->setCaptureDevice(deviceId.toStdString());
+    // This should control the dedicated recording-input device
+    const bool success = m_audioEngine->setRecordingDevice(deviceId.toStdString());
     if (success) {
+        // Optional: persist separately (recommended you add a field in settings)
+        // m_state.settings.selectedRecordingCaptureDeviceId = deviceId;
+        // m_indexDirty = true;
+
         emit settingsChanged();
     }
     return success;
@@ -1631,15 +2264,26 @@ bool SoundboardService::playLastRecordingPreview()
     if (!m_audioEngine || m_lastRecordingPath.isEmpty())
         return false;
 
-    // Use the preview slot to play the last recording
-    // loadClip returns a pair<double, double> with duration info, check if first > 0 for success
+    if (!QFileInfo::exists(m_lastRecordingPath))
+        return false;
+
+    // If already previewing, restart cleanly
+    m_audioEngine->stopClip(kPreviewSlot);
+    m_audioEngine->unloadClip(kPreviewSlot);
+
     auto result = m_audioEngine->loadClip(kPreviewSlot, m_lastRecordingPath.toStdString());
-    bool success = result.first > 0.0;
+    const double endSec = result.second;
+
+    const bool success = (endSec > 0.0);
     if (success) {
         m_audioEngine->playClip(kPreviewSlot);
         m_recordingPreviewPlaying = true;
         emit recordingStateChanged();
+    } else {
+        m_recordingPreviewPlaying = false;
+        emit recordingStateChanged();
     }
+
     return success;
 }
 
@@ -1649,6 +2293,7 @@ void SoundboardService::stopLastRecordingPreview()
         return;
 
     m_audioEngine->stopClip(kPreviewSlot);
+    m_audioEngine->unloadClip(kPreviewSlot);
     m_recordingPreviewPlaying = false;
     emit recordingStateChanged();
 }
@@ -1658,21 +2303,68 @@ bool SoundboardService::isRecordingPreviewPlaying() const
     return m_recordingPreviewPlaying;
 }
 
+QVariantList SoundboardService::listBoardsForDropdown() const
+{
+    QVariantList out;
+    for (const auto& b : m_state.soundboards) {
+        QVariantMap m;
+        m["id"] = b.id;
+        m["name"] = b.name;
+        out.append(m);
+    }
+    return out;
+}
+
 void SoundboardService::finalizeClipPlayback(int clipId)
 {
     // Update state
     Clip* clip = findActiveClipById(clipId);
     if (clip) {
         clip->isPlaying = false;
-        clip->lastPlayedPosMs = 0.0; // Reset position
+        clip->lastPlayedPosMs = 0.0;
         emit activeClipsChanged();
         saveActive();
     }
 
-    // Restore mic if this clip had muted it and no other mic-muting clips are playing
+    // If something else is currently playing (not paused), DO NOT auto-resume paused clips.
+    
+    QVariantList others = playingClipIDs(); // excludes paused by your logic
+    for (int i = others.size() - 1; i >= 0; --i) {
+        bool ok = false;
+        const int cid = others[i].toInt(&ok);
+        if (ok && cid == clipId) {
+            others.removeAt(i);
+        }
+    }
+
+    if (!others.isEmpty()) {
+        qDebug() << "finalizeClipPlayback: skip resuming paused clips because other clips are playing:" << others;
+        emit clipPlaybackStopped(clipId);
+        return;
+    }
+    
+
+    // Resume clips that were paused by this clip (Play/Pause mode)
+    if (m_pausedByClip.contains(clipId)) {
+        QList<int> pausedClips = m_pausedByClip.take(clipId);
+        for (int pausedClipId : pausedClips) {
+            Clip* pausedClip = findActiveClipById(pausedClipId);
+            if (pausedClip && m_clipIdToSlot.contains(pausedClipId)) {
+                int slotId = m_clipIdToSlot[pausedClipId];
+                if (m_audioEngine->isClipPaused(slotId)) {
+                    m_audioEngine->resumeClip(slotId);
+                    pausedClip->isPlaying = true;
+                    emit clipPlaybackStarted(pausedClipId);
+                    qDebug() << "Resumed paused clip" << pausedClipId << "after clip" << clipId << "stopped";
+                }
+            }
+        }
+        emit activeClipsChanged();
+    }
+
+    // Restore mic if needed (keep your current code)
     if (m_clipsThatMutedMic.contains(clipId)) {
         m_clipsThatMutedMic.remove(clipId);
-        // Only restore mic if no other clips that muted the mic are still playing
         if (m_clipsThatMutedMic.isEmpty()) {
             if (m_audioEngine) {
                 m_audioEngine->setMicEnabled(true);
@@ -1738,6 +2430,56 @@ double SoundboardService::getClipPlaybackPositionMs(int clipId) const
     return m_audioEngine->getClipPlaybackPositionMs(m_clipIdToSlot[clipId]);
 }
 
+double SoundboardService::getClipPlaybackProgress(int clipId) const
+{
+    if (!m_audioEngine)
+        return 0.0;
+    if (!m_clipIdToSlot.contains(clipId))
+        return 0.0;
+
+    // Find the clip to get its duration and trim points
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        for (const auto& clip : it.value().clips) {
+            if (clip.id == clipId) {
+                double totalDurationMs = clip.durationSec * 1000.0;
+                if (totalDurationMs <= 0.0)
+                    return 0.0;
+
+                double trimStartMs = clip.trimStartMs;
+                double trimEndMs = clip.trimEndMs > 0.0 ? clip.trimEndMs : totalDurationMs;
+
+                // Calculate effective duration (the portion of the clip that actually plays)
+                double effectiveDurationMs = trimEndMs - trimStartMs;
+                if (effectiveDurationMs <= 0.0)
+                    return 0.0;
+
+                // Get current position (returns trimStartMs + played time)
+                double positionMs = m_audioEngine->getClipPlaybackPositionMs(m_clipIdToSlot[clipId]);
+
+                // Calculate progress within the trimmed region
+                double playedMs = positionMs - trimStartMs;
+                double progress = playedMs / effectiveDurationMs;
+
+                return std::clamp(progress, 0.0, 1.0);
+            }
+        }
+    }
+    return 0.0;
+}
+
+double SoundboardService::getClipDurationMs(int clipId) const
+{
+    // Find the clip to get its duration
+    for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
+        for (const auto& clip : it.value().clips) {
+            if (clip.id == clipId) {
+                return clip.durationSec * 1000.0;
+            }
+        }
+    }
+    return 0.0;
+}
+
 double SoundboardService::getFileDuration(const QString& filePath) const
 {
     if (!m_audioEngine)
@@ -1754,30 +2496,69 @@ double SoundboardService::getFileDuration(const QString& filePath) const
 QVariantList SoundboardService::playingClipIDs() const
 {
     QVariantList playingIds;
-    
-    // Check all active boards for playing clips
+
+    // Check all active boards for playing clips (excluding paused clips)
     for (auto it = m_activeBoards.begin(); it != m_activeBoards.end(); ++it) {
         for (const auto& clip : it.value().clips) {
-            if (isClipPlaying(clip.id)) {
+            // Check our internal state first (more reliable for short clips)
+            // Also verify with audio engine if clip has a slot
+            bool isPlayingInternal = clip.isPlaying;
+            bool isPlayingEngine = false;
+            bool isPausedEngine = false;
+
+            if (m_clipIdToSlot.contains(clip.id)) {
+                int slotId = m_clipIdToSlot[clip.id];
+                isPlayingEngine = m_audioEngine && m_audioEngine->isClipPlaying(slotId);
+                isPausedEngine = m_audioEngine && m_audioEngine->isClipPaused(slotId);
+            }
+
+            // Clip is playing if either our internal state says so OR the audio engine says so
+            // Exclude paused clips
+            if ((isPlayingInternal || isPlayingEngine) && !isPausedEngine) {
                 playingIds.append(clip.id);
+                qDebug() << "playingClipIDs: clip" << clip.id << "is playing (internal=" << isPlayingInternal
+                         << ", engine=" << isPlayingEngine << ")";
             }
         }
     }
+    qDebug() << "playingClipIDs: returning" << playingIds;
     return playingIds;
 }
 
 int SoundboardService::getOrAssignSlot(int clipId)
 {
-    // Check if clip already has a slot
-    if (m_clipIdToSlot.contains(clipId)) {
+    if (m_clipIdToSlot.contains(clipId))
         return m_clipIdToSlot[clipId];
+
+    QSet<int> usedSlots;
+    for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end(); ++it)
+        usedSlots.insert(it.value());
+
+    // Only use 0..14 (reserve 15 for preview)
+    for (int i = 0; i < kClipSlotsUsable; ++i) {
+        int candidateSlot = (m_nextSlot + i) % kClipSlotsUsable;
+        if (!usedSlots.contains(candidateSlot)) {
+            m_clipIdToSlot[clipId] = candidateSlot;
+            m_nextSlot = (candidateSlot + 1) % kClipSlotsUsable;
+            return candidateSlot;
+        }
     }
 
-    // Assign a new slot (wrap around if we exceed MAX_CLIPS)
-    int slotId = m_nextSlot % 16; // MAX_CLIPS is 16
-    m_clipIdToSlot[clipId] = slotId;
-    m_nextSlot++;
+    // Evict using round-robin within usable slots only
+    int slotId = m_nextSlot % kClipSlotsUsable;
 
+    for (auto it = m_clipIdToSlot.begin(); it != m_clipIdToSlot.end();) {
+        if (it.value() == slotId && it.key() != clipId) {
+            if (m_audioEngine && m_audioEngine->isClipPlaying(slotId))
+                m_audioEngine->stopClip(slotId);
+            it = m_clipIdToSlot.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    m_clipIdToSlot[clipId] = slotId;
+    m_nextSlot = (slotId + 1) % kClipSlotsUsable;
     return slotId;
 }
 
@@ -1831,7 +2612,7 @@ bool SoundboardService::setInputDevice(const QString& deviceId)
     bool success = m_audioEngine->setCaptureDevice(deviceId.toStdString());
     if (success) {
         m_state.settings.selectedCaptureDeviceId = deviceId;
-        m_repo.saveIndex(m_state);
+        m_indexDirty = true; // Mark as dirty instead of immediate save
         qDebug() << "Input device set to:" << deviceId;
         emit settingsChanged();
     } else {
@@ -1850,7 +2631,7 @@ bool SoundboardService::setOutputDevice(const QString& deviceId)
     bool success = m_audioEngine->setPlaybackDevice(deviceId.toStdString());
     if (success) {
         m_state.settings.selectedPlaybackDeviceId = deviceId;
-        m_repo.saveIndex(m_state);
+        m_indexDirty = true; // Mark as dirty instead of immediate save
         qDebug() << "Output device set to:" << deviceId;
         emit settingsChanged();
     } else {
@@ -1869,13 +2650,67 @@ bool SoundboardService::setMonitorOutputDevice(const QString& deviceId)
     bool success = m_audioEngine->setMonitorPlaybackDevice(deviceId.toStdString());
     if (success) {
         m_state.settings.selectedMonitorDeviceId = deviceId;
-        m_repo.saveIndex(m_state);
+        m_indexDirty = true; // Mark as dirty instead of immediate save
         qDebug() << "Secondary output device set to:" << deviceId;
         emit settingsChanged();
     } else {
         qWarning() << "Failed to set secondary output device:" << deviceId;
     }
     return success;
+}
+
+void SoundboardService::refreshAudioDevices()
+{
+    if (!m_audioEngine) {
+        qWarning() << "AudioEngine not initialized";
+        return;
+    }
+
+    // Refresh the audio context and devices
+    m_audioEngine->refreshPlaybackDevices();
+
+    // Try to reconnect to previously selected devices if they're available again
+    // Check and reconnect capture device
+    if (!m_state.settings.selectedCaptureDeviceId.isEmpty()) {
+        auto inputDevices = m_audioEngine->enumerateCaptureDevices();
+        for (const auto& device : inputDevices) {
+            if (QString::fromStdString(device.id) == m_state.settings.selectedCaptureDeviceId ||
+                QString::fromStdString(device.name) == m_state.settings.selectedCaptureDeviceId) {
+                qDebug() << "Reconnecting to capture device:" << m_state.settings.selectedCaptureDeviceId;
+                m_audioEngine->setCaptureDevice(m_state.settings.selectedCaptureDeviceId.toStdString());
+                break;
+            }
+        }
+    }
+
+    // Check and reconnect playback device
+    if (!m_state.settings.selectedPlaybackDeviceId.isEmpty()) {
+        auto outputDevices = m_audioEngine->enumeratePlaybackDevices();
+        for (const auto& device : outputDevices) {
+            if (QString::fromStdString(device.id) == m_state.settings.selectedPlaybackDeviceId ||
+                QString::fromStdString(device.name) == m_state.settings.selectedPlaybackDeviceId) {
+                qDebug() << "Reconnecting to playback device:" << m_state.settings.selectedPlaybackDeviceId;
+                m_audioEngine->setPlaybackDevice(m_state.settings.selectedPlaybackDeviceId.toStdString());
+                break;
+            }
+        }
+    }
+
+    // Check and reconnect monitor device
+    if (!m_state.settings.selectedMonitorDeviceId.isEmpty()) {
+        auto outputDevices = m_audioEngine->enumeratePlaybackDevices();
+        for (const auto& device : outputDevices) {
+            if (QString::fromStdString(device.id) == m_state.settings.selectedMonitorDeviceId ||
+                QString::fromStdString(device.name) == m_state.settings.selectedMonitorDeviceId) {
+                qDebug() << "Reconnecting to monitor device:" << m_state.settings.selectedMonitorDeviceId;
+                m_audioEngine->setMonitorPlaybackDevice(m_state.settings.selectedMonitorDeviceId.toStdString());
+                break;
+            }
+        }
+    }
+
+    qDebug() << "Audio devices refreshed and reconnected";
+    emit audioDevicesChanged();
 }
 
 // ============================================================================
@@ -1939,7 +2774,7 @@ void SoundboardService::setMicSoundboardBalance(float balance)
     m_audioEngine->setMicSoundboardBalance(balance);
 
     m_state.settings.micSoundboardBalance = balance;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
 
     qDebug() << "Mic/Soundboard balance set to:" << balance;
     emit settingsChanged();
@@ -1960,7 +2795,7 @@ void SoundboardService::setMicPassthroughEnabled(bool enabled)
     }
     m_audioEngine->setMicPassthroughEnabled(enabled);
     m_state.settings.micPassthroughEnabled = enabled;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     qDebug() << "Mic passthrough" << (enabled ? "enabled" : "disabled");
     emit settingsChanged();
 }
@@ -1980,7 +2815,7 @@ void SoundboardService::setMicEnabled(bool enabled)
     }
     m_audioEngine->setMicEnabled(enabled);
     m_state.settings.micEnabled = enabled;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     qDebug() << "Mic capture" << (enabled ? "enabled" : "disabled");
     emit settingsChanged();
 }
@@ -2019,18 +2854,18 @@ bool SoundboardService::setBoardHotkey(int boardId, const QString& hotkey)
     // If it's an active board, update in memory too
     if (m_activeBoards.contains(boardId)) {
         m_activeBoards[boardId].hotkey = hotkey;
-        m_repo.saveBoard(m_activeBoards[boardId]);
+        m_dirtyBoards.insert(boardId);
     } else {
-        // Load, update, save the board
+        // Load, update, mark as dirty
         auto loaded = m_repo.loadBoard(boardId);
         if (loaded) {
             loaded->hotkey = hotkey;
-            m_repo.saveBoard(*loaded);
+            m_dirtyBoards.insert(boardId);
         }
     }
 
-    // Save index
-    m_repo.saveIndex(m_state);
+    // Mark index as dirty
+    m_indexDirty = true;
     emit boardsChanged();
 
     return true;
@@ -2083,7 +2918,7 @@ void SoundboardService::setTheme(const QString& theme)
     if (m_state.settings.theme == theme)
         return;
     m_state.settings.theme = theme;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2092,7 +2927,7 @@ void SoundboardService::setAccentColor(const QString& color)
     if (m_state.settings.accentColor == color)
         return;
     m_state.settings.accentColor = color;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2101,7 +2936,7 @@ void SoundboardService::setSlotSize(const QString& size)
     if (m_state.settings.slotSize == size)
         return;
     m_state.settings.slotSize = size;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2112,7 +2947,7 @@ void SoundboardService::setSlotSizeScale(double scale)
     if (qFuzzyCompare(m_state.settings.slotSizeScale, scale))
         return;
     m_state.settings.slotSizeScale = scale;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2121,7 +2956,7 @@ void SoundboardService::setLanguage(const QString& lang)
     if (m_state.settings.language == lang)
         return;
     m_state.settings.language = lang;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2130,7 +2965,7 @@ void SoundboardService::setHotkeyMode(const QString& mode)
     if (m_state.settings.hotkeyMode == mode)
         return;
     m_state.settings.hotkeyMode = mode;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2142,7 +2977,7 @@ void SoundboardService::setBufferSizeFrames(int frames)
     if (m_state.settings.bufferSizeFrames == frames)
         return;
     m_state.settings.bufferSizeFrames = frames;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
     // Note: Audio engine needs restart to apply new buffer settings
 }
@@ -2155,7 +2990,7 @@ void SoundboardService::setBufferPeriods(int periods)
     if (m_state.settings.bufferPeriods == periods)
         return;
     m_state.settings.bufferPeriods = periods;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2167,7 +3002,7 @@ void SoundboardService::setSampleRate(int rate)
     if (m_state.settings.sampleRate == rate)
         return;
     m_state.settings.sampleRate = rate;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2179,7 +3014,7 @@ void SoundboardService::setAudioChannels(int channels)
     if (m_state.settings.channels == channels)
         return;
     m_state.settings.channels = channels;
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
 }
 
@@ -2268,8 +3103,8 @@ bool SoundboardService::importSettings(const QString& filePath)
         m_state.settings.sampleRate = s.value("sampleRate").toInt(m_state.settings.sampleRate);
         m_state.settings.channels = s.value("channels").toInt(m_state.settings.channels);
 
-        // Save updated state
-        m_repo.saveIndex(m_state);
+        // Mark as dirty instead of immediate save
+        m_indexDirty = true;
 
         // Apply settings
         if (m_audioEngine) {
@@ -2314,6 +3149,62 @@ void SoundboardService::resetSettings()
         m_audioEngine->setMicSoundboardBalance(m_state.settings.micSoundboardBalance);
     }
 
-    m_repo.saveIndex(m_state);
+    m_indexDirty = true; // Mark as dirty instead of immediate save
     emit settingsChanged();
+}
+
+QString SoundboardService::extractAudioArtwork(const QString& audioFilePath)
+{
+    if (audioFilePath.isEmpty())
+        return QString();
+
+    QFileInfo fileInfo(audioFilePath);
+    if (!fileInfo.exists())
+        return QString();
+
+    // Create artwork cache directory
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/artwork_cache";
+    QDir().mkpath(cacheDir);
+
+    // Generate unique filename based on audio file path hash
+    QByteArray hash = QCryptographicHash::hash(audioFilePath.toUtf8(), QCryptographicHash::Md5);
+    QString artworkPath = cacheDir + "/" + hash.toHex() + ".jpg";
+
+    // Check if already extracted
+    if (QFileInfo::exists(artworkPath)) {
+        return artworkPath;
+    }
+
+    // Try using ffmpeg to extract artwork
+    QProcess process;
+    process.setProgram("ffmpeg");
+    process.setArguments({"-i", audioFilePath,
+                          "-an",                                                       // No audio
+                          "-vcodec", "mjpeg",                                          // Use MJPEG codec for cover art
+                          "-vf", "scale=512:512:force_original_aspect_ratio=decrease", // Resize
+                          "-y",                                                        // Overwrite
+                          artworkPath});
+
+    process.start();
+    if (!process.waitForFinished(5000)) { // 5 second timeout
+        process.kill();
+        qDebug() << "FFmpeg timeout extracting artwork from:" << audioFilePath;
+        return QString();
+    }
+
+    if (process.exitCode() != 0) {
+        // FFmpeg failed - may not have embedded artwork
+        qDebug() << "No embedded artwork found in:" << audioFilePath;
+        QFile::remove(artworkPath); // Clean up any partial file
+        return QString();
+    }
+
+    // Verify the file was created and has content
+    QFileInfo artworkInfo(artworkPath);
+    if (artworkInfo.exists() && artworkInfo.size() > 0) {
+        qDebug() << "Extracted artwork to:" << artworkPath;
+        return artworkPath;
+    }
+
+    return QString();
 }
