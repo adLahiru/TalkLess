@@ -333,82 +333,28 @@ else()
 endif()
 
 # ----------------------------
-# SpeexDSP (optional, for noise cancellation)
+# RNNoise (for AI-based noise cancellation)
 # ----------------------------
-option(TALKLESS_ENABLE_SPEEXDSP "Enable SpeexDSP for noise cancellation" ON)
+option(TALKLESS_ENABLE_RNNOISE "Enable RNNoise for AI-based noise cancellation" ON)
 
-if(TALKLESS_ENABLE_SPEEXDSP)
-    set(_speexdsp_include_paths "")
-    set(_speexdsp_lib_paths "")
+if(TALKLESS_ENABLE_RNNOISE)
+    # Add cmake modules path
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
     
-    if(WIN32)
-        # Windows: vcpkg paths
-        list(APPEND _speexdsp_include_paths "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/include")
-        list(APPEND _speexdsp_lib_paths "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/lib")
-    elseif(APPLE)
-        # macOS: Homebrew paths (Apple Silicon and Intel)
-        list(APPEND _speexdsp_include_paths
-            "/opt/homebrew/include"
-            "/usr/local/include"
-            "${CMAKE_SOURCE_DIR}/vcpkg_installed/arm64-osx/include"
-            "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-osx/include"
-        )
-        list(APPEND _speexdsp_lib_paths
-            "/opt/homebrew/lib"
-            "/usr/local/lib"
-            "${CMAKE_SOURCE_DIR}/vcpkg_installed/arm64-osx/lib"
-            "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-osx/lib"
-        )
+    # Include our RNNoise finder/builder
+    include(FindRNNoise)
+    
+    if(RNNOISE_FOUND)
+        message(STATUS "RNNoise enabled for noise suppression")
+        target_include_directories(appTalkLess PRIVATE ${RNNOISE_INCLUDE_DIRS})
+        target_link_libraries(appTalkLess PRIVATE ${RNNOISE_LIBRARIES})
+        target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_RNNOISE=1)
     else()
-        # Linux
-        list(APPEND _speexdsp_include_paths
-            "/usr/include"
-            "/usr/local/include"
-            "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-linux/include"
-        )
-        list(APPEND _speexdsp_lib_paths
-            "/usr/lib"
-            "/usr/lib64"
-            "/usr/local/lib"
-            "/usr/local/lib64"
-            "${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-linux/lib"
-        )
-    endif()
-    
-    # Try to find SpeexDSP library
-    find_library(SPEEXDSP_LIB NAMES speexdsp libspeexdsp PATHS ${_speexdsp_lib_paths})
-    
-    if(SPEEXDSP_LIB)
-        # Find include directory
-        set(SPEEXDSP_INCLUDE_DIR "")
-        foreach(_inc_path ${_speexdsp_include_paths})
-            if(EXISTS "${_inc_path}/speex/speex_preprocess.h")
-                set(SPEEXDSP_INCLUDE_DIR "${_inc_path}")
-                break()
-            endif()
-        endforeach()
-        
-        if(SPEEXDSP_INCLUDE_DIR)
-            message(STATUS "Found SpeexDSP:")
-            message(STATUS "  Include: ${SPEEXDSP_INCLUDE_DIR}")
-            message(STATUS "  Library: ${SPEEXDSP_LIB}")
-            
-            target_include_directories(appTalkLess PRIVATE "${SPEEXDSP_INCLUDE_DIR}")
-            target_link_libraries(appTalkLess PRIVATE ${SPEEXDSP_LIB})
-            target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_SPEEXDSP=1)
-        else()
-            message(WARNING "SpeexDSP headers not found. Continuing without noise cancellation.")
-            target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_SPEEXDSP=0)
-        endif()
-    else()
-        message(WARNING
-            "SpeexDSP library not found. Searched in: ${_speexdsp_lib_paths}. "
-            "Continuing without noise cancellation. Install speexdsp via vcpkg for noise suppression."
-        )
-        target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_SPEEXDSP=0)
+        message(WARNING "RNNoise not available. Continuing without noise cancellation.")
+        target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_RNNOISE=0)
     endif()
 else()
-    target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_SPEEXDSP=0)
+    target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_RNNOISE=0)
 endif()
 
 # ----------------------------
