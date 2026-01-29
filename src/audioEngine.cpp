@@ -16,6 +16,10 @@
 #include <iostream>
 #include <thread>
 
+#if TALKLESS_HAS_EBUR128
+    #include "ebur128.h"
+#endif
+
 #ifdef _WIN32
     #include <windows.h>
 
@@ -2135,6 +2139,201 @@ bool AudioEngine::exportTrimmedAudio(const std::string& sourcePath, const std::s
 
     std::cout << "exportTrimmedAudio: Exported " << framesWritten << " frames to " << destPath << std::endl;
     return true;
+}
+
+// ------------------------------------------------------------
+// Audio Normalization
+// ------------------------------------------------------------
+
+double AudioEngine::measureLoudness(const std::string& filepath, NormalizationType type)
+{
+    // Initialize decoder
+    ma_decoder_config decCfg = ma_decoder_config_init(ma_format_f32, 2, m_sampleRate);
+    ma_decoder decoder;
+
+#ifdef _WIN32
+    std::wstring wpath = utf8ToWide(filepath);
+    if (ma_decoder_init_file_w(wpath.c_str(), &decCfg, &decoder) != MA_SUCCESS) {
+#else
+    if (ma_decoder_init_file(filepath.c_str(), &decCfg, &decoder) != MA_SUCCESS) {
+#endif
+        std::cerr << "measureLoudness: Failed to open file: " << filepath << std::endl;
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    const ma_uint32 channels = decoder.outputChannels;
+    const ma_uint32 sampleRate = decoder.outputSampleRate;
+
+#if TALKLESS_HAS_EBUR128
+    if (type == NormalizationType::LUFS) {
+        // Use libebur128 for LUFS measurement
+        ebur128_state* state = ebur128_init(channels, sampleRate, EBUR128_MODE_I);
+        if (!state) {
+            std::cerr << "measureLoudness: Failed to initialize ebur128" << std::endl;
+            ma_decoder_uninit(&decoder);
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+
+        // Read and process in chunks
+        constexpr ma_uint32 kChunkFrames = 4096;
+        std::vector<float> buffer(static_cast<size_t>(kChunkFrames) * channels);
+
+        while (true) {
+            ma_uint64 framesRead = 0;
+            ma_result res = ma_decoder_read_pcm_frames(&decoder, buffer.data(), kChunkFrames, &framesRead);
+            if (framesRead == 0 || res != MA_SUCCESS) {
+                break;
+            }
+            ebur128_add_frames_float(state, buffer.data(), static_cast<size_t>(framesRead));
+        }
+
+        double loudness = 0.0;
+        ebur128_loudness_global(state, &loudness);
+        ebur128_destroy(&state);
+        ma_decoder_uninit(&decoder);
+        return loudness;
+    }
+#endif
+
+    // RMS calculation (fallback or if LUFS not available/requested)
+    // Also used for RMS normalization type
+    double sumSquares = 0.0;
+    uint64_t totalSamples = 0;
+
+    constexpr ma_uint32 kChunkFrames = 4096;
+    std::vector<float> buffer(static_cast<size_t>(kChunkFrames) * channels);
+
+    while (true) {
+        ma_uint64 framesRead = 0;
+        ma_result res = ma_decoder_read_pcm_frames(&decoder, buffer.data(), kChunkFrames, &framesRead);
+        if (framesRead == 0 || res != MA_SUCCESS) {
+            break;
+        }
+        const size_t samples = static_cast<size_t>(framesRead) * channels;
+        for (size_t i = 0; i < samples; ++i) {
+            sumSquares += static_cast<double>(buffer[i]) * buffer[i];
+        }
+        totalSamples += samples;
+    }
+
+    ma_decoder_uninit(&decoder);
+
+    if (totalSamples == 0) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    double rms = std::sqrt(sumSquares / static_cast<double>(totalSamples));
+    // Convert to dB (RMS relative to full scale)
+    double rmsDb = 20.0 * std::log10(std::max(rms, 1e-10));
+    return rmsDb;
+}
+
+AudioEngine::NormalizationResult AudioEngine::normalizeAudio(
+    const std::string& sourcePath,
+    double targetLevel,
+    NormalizationType type,
+    const std::string& outputDir)
+{
+    NormalizationResult result;
+
+    // Measure current loudness
+    double measuredLevel = measureLoudness(sourcePath, type);
+    if (std::isnan(measuredLevel)) {
+        result.error = "Failed to measure audio loudness";
+        return result;
+    }
+    result.measuredLevel = measuredLevel;
+
+    // Calculate required gain
+    double gainDb = targetLevel - measuredLevel;
+    double gainLinear = std::pow(10.0, gainDb / 20.0);
+    result.appliedGain = gainDb;
+
+    // Determine output path
+    std::string dir = outputDir;
+    std::string filename;
+    size_t lastSlash = sourcePath.find_last_of("/\\");
+    if (lastSlash != std::string::npos) {
+        if (dir.empty()) {
+            dir = sourcePath.substr(0, lastSlash);
+        }
+        filename = sourcePath.substr(lastSlash + 1);
+    } else {
+        filename = sourcePath;
+    }
+
+    // Remove extension and add _normalized.wav
+    size_t lastDot = filename.find_last_of('.');
+    std::string baseName = (lastDot != std::string::npos) ? filename.substr(0, lastDot) : filename;
+    std::string normalizedFilename = baseName + "_normalized.wav";
+    result.outputPath = dir + "/" + normalizedFilename;
+
+    // Create backup path
+    result.backupPath = sourcePath + ".backup";
+
+    // Initialize decoder for source file
+    ma_decoder_config decCfg = ma_decoder_config_init(ma_format_f32, 2, m_sampleRate);
+    ma_decoder decoder;
+
+#ifdef _WIN32
+    std::wstring wsourcePath = utf8ToWide(sourcePath);
+    if (ma_decoder_init_file_w(wsourcePath.c_str(), &decCfg, &decoder) != MA_SUCCESS) {
+#else
+    if (ma_decoder_init_file(sourcePath.c_str(), &decCfg, &decoder) != MA_SUCCESS) {
+#endif
+        result.error = "Failed to open source file";
+        return result;
+    }
+
+    const ma_uint32 sampleRate = decoder.outputSampleRate;
+    const ma_uint32 channels = decoder.outputChannels;
+
+    // Initialize encoder for output file
+    ma_encoder encoder;
+    ma_encoder_config encCfg = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, channels, sampleRate);
+
+    if (ma_encoder_init_file(result.outputPath.c_str(), &encCfg, &encoder) != MA_SUCCESS) {
+        result.error = "Failed to create output file";
+        ma_decoder_uninit(&decoder);
+        return result;
+    }
+
+    // Read, apply gain, and write in chunks
+    constexpr ma_uint32 kChunkFrames = 4096;
+    std::vector<float> buffer(static_cast<size_t>(kChunkFrames) * channels);
+    const float gainF = static_cast<float>(gainLinear);
+
+    while (true) {
+        ma_uint64 framesRead = 0;
+        ma_result res = ma_decoder_read_pcm_frames(&decoder, buffer.data(), kChunkFrames, &framesRead);
+        if (framesRead == 0 || res != MA_SUCCESS) {
+            break;
+        }
+
+        // Apply gain with soft clipping
+        const size_t samples = static_cast<size_t>(framesRead) * channels;
+        for (size_t i = 0; i < samples; ++i) {
+            float sample = buffer[i] * gainF;
+            // Soft clipping to prevent harsh distortion
+            if (sample > 1.0F) {
+                sample = 1.0F - std::exp(-(sample - 1.0F));
+            } else if (sample < -1.0F) {
+                sample = -1.0F + std::exp(-(-sample - 1.0F));
+            }
+            buffer[i] = sample;
+        }
+
+        ma_encoder_write_pcm_frames(&encoder, buffer.data(), framesRead, nullptr);
+    }
+
+    // Cleanup
+    ma_encoder_uninit(&encoder);
+    ma_decoder_uninit(&decoder);
+
+    result.success = true;
+    std::cout << "normalizeAudio: Normalized " << sourcePath << " (measured: " << measuredLevel 
+              << " dB, target: " << targetLevel << " dB, gain: " << gainDb << " dB)" << std::endl;
+    return result;
 }
 
 // ------------------------------------------------------------

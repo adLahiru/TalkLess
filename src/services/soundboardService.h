@@ -300,6 +300,11 @@ public:
     // ---- Hotkey Action Handler ----
     Q_INVOKABLE void handleHotkeyAction(const QString& actionId);
 
+    // ---- Audio Normalization ----
+    Q_INVOKABLE void normalizeClip(int boardId, int clipId, double targetLevel, const QString& targetType);
+    Q_INVOKABLE void normalizeClipBatch(int boardId, const QVariantList& clipIds, double targetLevel, const QString& targetType);
+    Q_INVOKABLE double measureClipLoudness(int clipId, const QString& targetType) const;
+
 signals:
     void boardsChanged();
     void activeBoardChanged();
@@ -320,6 +325,11 @@ signals:
 
     // Error notification for UI
     void errorOccurred(const QString& message);
+
+    // Audio normalization signals
+    void normalizationStarted(int clipId);
+    void normalizationProgress(int clipId, double progress);
+    void normalizationComplete(int clipId, bool success, const QString& error, const QString& outputPath);
 
 private:
     void rebuildHotkeyIndex();

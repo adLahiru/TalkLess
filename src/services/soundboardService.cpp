@@ -3904,6 +3904,111 @@ void SoundboardService::handleHotkeyAction(const QString& actionId)
     }
 }
 
+// ============================================================================
+// AUDIO NORMALIZATION
+// ============================================================================
+
+void SoundboardService::normalizeClip(int boardId, int clipId, double targetLevel, const QString& targetType)
+{
+    if (!m_audioEngine) {
+        emit normalizationComplete(clipId, false, "Audio engine not initialized", "");
+        return;
+    }
+
+    // Find the clip
+    auto clipOpt = findClipByIdAnyBoard(clipId);
+    if (!clipOpt) {
+        emit normalizationComplete(clipId, false, "Clip not found", "");
+        return;
+    }
+
+    const Clip& clip = *clipOpt;
+    if (clip.filePath.isEmpty()) {
+        emit normalizationComplete(clipId, false, "Clip has no audio file", "");
+        return;
+    }
+
+    emit normalizationStarted(clipId);
+
+    // Convert QString to std::string for file path
+    QString filePath = clip.filePath;
+    if (filePath.startsWith("file://")) {
+        filePath = QUrl(filePath).toLocalFile();
+    }
+
+    // Determine normalization type
+    AudioEngine::NormalizationType normType = (targetType.toLower() == "lufs")
+        ? AudioEngine::NormalizationType::LUFS
+        : AudioEngine::NormalizationType::RMS;
+
+    // Run normalization in background thread
+    (void)QtConcurrent::run([this, clipId, boardId, filePath, targetLevel, normType]() {
+        auto result = m_audioEngine->normalizeAudio(filePath.toStdString(), targetLevel, normType);
+
+        // Emit result on completion
+        QMetaObject::invokeMethod(this, [this, clipId, boardId, result]() {
+            if (result.success) {
+                // Update clip's file path to the normalized version
+                QString newPath = QString::fromStdString(result.outputPath);
+
+                // Update in active boards if present
+                if (m_activeBoards.contains(boardId)) {
+                    for (auto& c : m_activeBoards[boardId].clips) {
+                        if (c.id == clipId) {
+                            c.filePath = newPath;
+                            break;
+                        }
+                    }
+                    m_dirtyBoards.insert(boardId);
+                }
+
+                // Invalidate waveform cache for this clip
+                {
+                    QMutexLocker locker(&m_waveformCacheMutex);
+                    m_waveformCache.remove(clipId);
+                }
+
+                emit clipUpdated(boardId, clipId);
+                emit normalizationComplete(clipId, true, QString(), QString::fromStdString(result.outputPath));
+            } else {
+                emit normalizationComplete(clipId, false, QString::fromStdString(result.error), QString());
+            }
+        }, Qt::QueuedConnection);
+    });
+}
+
+void SoundboardService::normalizeClipBatch(int boardId, const QVariantList& clipIds, double targetLevel, const QString& targetType)
+{
+    for (const auto& idVar : clipIds) {
+        int clipId = idVar.toInt();
+        normalizeClip(boardId, clipId, targetLevel, targetType);
+    }
+}
+
+double SoundboardService::measureClipLoudness(int clipId, const QString& targetType) const
+{
+    if (!m_audioEngine) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    // Find the clip
+    auto clipOpt = findClipByIdAnyBoard(clipId);
+    if (!clipOpt) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
+    QString filePath = clipOpt->filePath;
+    if (filePath.startsWith("file://")) {
+        filePath = QUrl(filePath).toLocalFile();
+    }
+
+    AudioEngine::NormalizationType normType = (targetType.toLower() == "lufs")
+        ? AudioEngine::NormalizationType::LUFS
+        : AudioEngine::NormalizationType::RMS;
+
+    return m_audioEngine->measureLoudness(filePath.toStdString(), normType);
+}
+
 void SoundboardService::setTheme(const QString& theme)
 {
     if (m_state.settings.theme == theme)

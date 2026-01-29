@@ -579,6 +579,7 @@ Item {
                         clipTitle: model.clipTitle || model.filePath || "Untitled"
                         hotkeyLabel: model.hotkey || ""
                         iconSource: model.imgPath || "qrc:/assets/icons/sound.svg"
+                        boardId: playbackDashboardCard.selectedBoardId
 
                         // Accordion behavior: only this clip is expanded if its ID matches
                         expanded: clipId === clipsListView.expandedClipId
@@ -594,6 +595,26 @@ Item {
 
                         onSettingsClicked: {
                             console.log("Settings clicked for clip:", clipId);
+                        }
+
+                        onNormalizeClicked: (clipId, boardId, targetLevel, targetType) => {
+                            isNormalizing = true;
+                            soundboardService.normalizeClip(boardId, clipId, targetLevel, targetType);
+                        }
+
+                        // Connect to normalization signals
+                        Connections {
+                            target: soundboardService
+                            function onNormalizationComplete(normClipId, success, error, outputPath) {
+                                if (normClipId === clipId) {
+                                    isNormalizing = false;
+                                    if (!success) {
+                                        console.log("Normalization failed for clip", clipId, ":", error);
+                                    } else {
+                                        console.log("Normalization complete for clip", clipId, ":", outputPath);
+                                    }
+                                }
+                            }
                         }
                     }
 

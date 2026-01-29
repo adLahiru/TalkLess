@@ -174,6 +174,33 @@ public:
                             double trimEndMs);
 
     // ------------------------------------------------------------
+    // Audio Normalization
+    // ------------------------------------------------------------
+    enum class NormalizationType { LUFS, RMS };
+
+    struct NormalizationResult {
+        bool success = false;
+        std::string error;
+        std::string outputPath;
+        std::string backupPath;
+        double measuredLevel = 0.0;  // Original level in dB
+        double appliedGain = 0.0;    // Gain applied in dB
+    };
+
+    // Measure loudness of an audio file (LUFS or RMS)
+    // Returns the measured level in dB, or NaN on error
+    double measureLoudness(const std::string& filepath, NormalizationType type);
+
+    // Normalize an audio file to target level
+    // Creates backup of original and saves normalized version
+    NormalizationResult normalizeAudio(
+        const std::string& sourcePath,
+        double targetLevel,           // Target in dB (LUFS or RMS)
+        NormalizationType type,
+        const std::string& outputDir = ""  // Empty = same dir as source
+    );
+
+    // ------------------------------------------------------------
     // Recording
     // ------------------------------------------------------------
     // recordMic: include microphone/input device in recording
