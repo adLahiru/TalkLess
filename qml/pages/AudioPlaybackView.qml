@@ -554,6 +554,288 @@ Item {
                     }
                 }
 
+                // Board-level Normalization Controls
+                Rectangle {
+                    id: normalizationPanel
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 56
+                    radius: 8
+                    color: Colors.surfaceDark
+                    border.width: 1
+                    border.color: Colors.border
+                    visible: playbackDashboardCard.selectedBoardId >= 0
+
+                    // Normalization state
+                    property string normalizeType: "LUFS"
+                    property double normalizeTarget: -16.0
+                    property bool isNormalizing: false
+                    property int normalizedCount: 0
+                    property int totalToNormalize: 0
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 16
+                        anchors.rightMargin: 16
+                        spacing: 16
+
+                        // Label
+                        Text {
+                            text: "🎚 Normalize All Clips"
+                            color: Colors.textPrimary
+                            font.pixelSize: 14
+                            font.weight: Font.Medium
+                        }
+
+                        // Separator
+                        Rectangle {
+                            Layout.preferredWidth: 1
+                            Layout.preferredHeight: 32
+                            color: Colors.border
+                        }
+
+                        // Type selector (LUFS/RMS)
+                        Rectangle {
+                            Layout.preferredWidth: 100
+                            Layout.preferredHeight: 36
+                            radius: 8
+                            color: Colors.background
+                            border.width: 1
+                            border.color: Colors.border
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 0
+
+                                Rectangle {
+                                    width: 48
+                                    height: 30
+                                    radius: 6
+                                    color: normalizationPanel.normalizeType === "LUFS" ? Colors.accent : "transparent"
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "LUFS"
+                                        color: normalizationPanel.normalizeType === "LUFS" ? Colors.textOnAccent : Colors.textSecondary
+                                        font.pixelSize: 12
+                                        font.weight: Font.Medium
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            normalizationPanel.normalizeType = "LUFS";
+                                            normalizationPanel.normalizeTarget = -16.0;
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    width: 48
+                                    height: 30
+                                    radius: 6
+                                    color: normalizationPanel.normalizeType === "RMS" ? Colors.accent : "transparent"
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "RMS"
+                                        color: normalizationPanel.normalizeType === "RMS" ? Colors.textOnAccent : Colors.textSecondary
+                                        font.pixelSize: 12
+                                        font.weight: Font.Medium
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            normalizationPanel.normalizeType = "RMS";
+                                            normalizationPanel.normalizeTarget = -14.0;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Target level dropdown
+                        Rectangle {
+                            Layout.preferredWidth: 90
+                            Layout.preferredHeight: 36
+                            radius: 8
+                            color: Colors.background
+                            border.width: 1
+                            border.color: Colors.border
+
+                            ComboBox {
+                                id: boardTargetLevelCombo
+                                anchors.fill: parent
+                                model: normalizationPanel.normalizeType === "LUFS"
+                                    ? ["-14 dB", "-16 dB", "-18 dB", "-23 dB"]
+                                    : ["-12 dB", "-14 dB", "-16 dB", "-18 dB"]
+                                currentIndex: 1
+
+                                onCurrentTextChanged: {
+                                    var val = parseFloat(currentText);
+                                    if (!isNaN(val)) {
+                                        normalizationPanel.normalizeTarget = val;
+                                    }
+                                }
+
+                                background: Rectangle {
+                                    color: "transparent"
+                                }
+
+                                contentItem: Text {
+                                    text: boardTargetLevelCombo.displayText
+                                    color: Colors.textPrimary
+                                    font.pixelSize: 13
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                indicator: Text {
+                                    x: parent.width - width - 8
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "▼"
+                                    font.pixelSize: 10
+                                    color: Colors.textSecondary
+                                }
+
+                                popup: Popup {
+                                    y: parent.height + 4
+                                    width: parent.width
+                                    padding: 4
+
+                                    background: Rectangle {
+                                        color: Colors.cardBg
+                                        border.color: Colors.border
+                                        border.width: 1
+                                        radius: 8
+                                    }
+
+                                    contentItem: ListView {
+                                        implicitHeight: contentHeight
+                                        model: boardTargetLevelCombo.popup.visible ? boardTargetLevelCombo.delegateModel : null
+                                        clip: true
+                                    }
+                                }
+
+                                delegate: ItemDelegate {
+                                    width: boardTargetLevelCombo.width
+                                    height: 32
+                                    contentItem: Text {
+                                        text: modelData
+                                        color: Colors.textPrimary
+                                        font.pixelSize: 13
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                    background: Rectangle {
+                                        color: highlighted ? Colors.surfaceLight : "transparent"
+                                        radius: 6
+                                    }
+                                }
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        // Progress indicator (shown while normalizing)
+                        Text {
+                            visible: normalizationPanel.isNormalizing
+                            text: "Processing " + normalizationPanel.normalizedCount + "/" + normalizationPanel.totalToNormalize + "..."
+                            color: Colors.textSecondary
+                            font.pixelSize: 13
+                        }
+
+                        // Normalize All button
+                        Rectangle {
+                            Layout.preferredWidth: 140
+                            Layout.preferredHeight: 36
+                            radius: 8
+                            color: normalizationPanel.isNormalizing ? Colors.surfaceDark : (normalizeAllMa.containsMouse ? Colors.accentHover : Colors.accent)
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 8
+
+                                // Loading spinner when normalizing
+                                Rectangle {
+                                    visible: normalizationPanel.isNormalizing
+                                    width: 16
+                                    height: 16
+                                    radius: 8
+                                    color: "transparent"
+                                    border.width: 2
+                                    border.color: Colors.textOnAccent
+
+                                    RotationAnimation on rotation {
+                                        running: normalizationPanel.isNormalizing
+                                        from: 0
+                                        to: 360
+                                        duration: 1000
+                                        loops: Animation.Infinite
+                                    }
+                                }
+
+                                Text {
+                                    text: normalizationPanel.isNormalizing ? "Normalizing..." : "Normalize All"
+                                    color: Colors.textOnAccent
+                                    font.pixelSize: 13
+                                    font.weight: Font.Medium
+                                }
+                            }
+
+                            MouseArea {
+                                id: normalizeAllMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: normalizationPanel.isNormalizing ? Qt.WaitCursor : Qt.PointingHandCursor
+                                enabled: !normalizationPanel.isNormalizing && dashboardClipsModel.count > 0
+                                onClicked: {
+                                    // Collect all clip IDs from the model
+                                    var clipIds = [];
+                                    for (var i = 0; i < dashboardClipsModel.count; i++) {
+                                        var idx = dashboardClipsModel.index(i, 0);
+                                        var clipId = dashboardClipsModel.data(idx, 257); // 257 = IdRole (Qt.UserRole + 1)
+                                        if (clipId !== undefined && clipId !== null) {
+                                            clipIds.push(clipId);
+                                        }
+                                    }
+
+                                    if (clipIds.length > 0) {
+                                        normalizationPanel.isNormalizing = true;
+                                        normalizationPanel.normalizedCount = 0;
+                                        normalizationPanel.totalToNormalize = clipIds.length;
+                                        soundboardService.normalizeClipBatch(
+                                            playbackDashboardCard.selectedBoardId,
+                                            clipIds,
+                                            normalizationPanel.normalizeTarget,
+                                            normalizationPanel.normalizeType
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Connect to normalization signals for batch progress
+                    Connections {
+                        target: soundboardService
+                        function onNormalizationComplete(clipId, success, error, outputPath) {
+                            if (normalizationPanel.isNormalizing) {
+                                normalizationPanel.normalizedCount++;
+                                if (normalizationPanel.normalizedCount >= normalizationPanel.totalToNormalize) {
+                                    normalizationPanel.isNormalizing = false;
+                                    normalizationPanel.normalizedCount = 0;
+                                    normalizationPanel.totalToNormalize = 0;
+                                }
+                                if (!success) {
+                                    console.log("Normalization failed for clip", clipId, ":", error);
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Clips list
                 ListView {
                     id: clipsListView
@@ -595,26 +877,6 @@ Item {
 
                         onSettingsClicked: {
                             console.log("Settings clicked for clip:", clipId);
-                        }
-
-                        onNormalizeClicked: (clipId, boardId, targetLevel, targetType) => {
-                            isNormalizing = true;
-                            soundboardService.normalizeClip(boardId, clipId, targetLevel, targetType);
-                        }
-
-                        // Connect to normalization signals
-                        Connections {
-                            target: soundboardService
-                            function onNormalizationComplete(normClipId, success, error, outputPath) {
-                                if (normClipId === clipId) {
-                                    isNormalizing = false;
-                                    if (!success) {
-                                        console.log("Normalization failed for clip", clipId, ":", error);
-                                    } else {
-                                        console.log("Normalization complete for clip", clipId, ":", outputPath);
-                                    }
-                                }
-                            }
                         }
                     }
 

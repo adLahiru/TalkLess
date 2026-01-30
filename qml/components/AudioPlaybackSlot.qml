@@ -16,19 +16,14 @@ Item {
     property double rmsVolume: -5.0  // dB value
     property double micVolume: -3.0  // dB value
     property bool muteMic: false
-    property int boardId: -1  // For normalization
-
-    // Normalization state
-    property bool isNormalizing: false
-    property string normalizeType: "LUFS"  // "LUFS" or "RMS"
-    property double normalizeTarget: -16.0  // Target level in dB
+    property int boardId: -1
 
     // State
     property bool expanded: false
 
     // Dimensions
     implicitWidth: parent ? parent.width : 400
-    implicitHeight: expanded ? 280 : 56  // Increased height for normalize controls
+    implicitHeight: expanded ? 220 : 56  // Height for volume controls
 
     Behavior on implicitHeight {
         NumberAnimation {
@@ -46,7 +41,6 @@ Item {
     signal micVolumeAdjusted(double value)
     signal muteMicToggled(bool muted)
     signal expansionRequested(int clipId, bool isExpanded)  // For accordion behavior
-    signal normalizeClicked(int clipId, int boardId, double targetLevel, string targetType)
 
     Rectangle {
         id: card
@@ -480,217 +474,6 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.testVolumeMatchClicked()
                     }
-                }
-
-                // Normalization controls row
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 12
-                    Layout.topMargin: 8
-
-                    Text {
-                        text: "Normalize"
-                        color: Colors.textSecondary
-                        font.pixelSize: 12
-                        Layout.preferredWidth: 70
-                    }
-
-                    // Type selector (LUFS/RMS)
-                    Rectangle {
-                        Layout.preferredWidth: 80
-                        Layout.preferredHeight: 28
-                        radius: 6
-                        color: Colors.surfaceDark
-                        border.width: 1
-                        border.color: Colors.border
-
-                        RowLayout {
-                            anchors.centerIn: parent
-                            spacing: 0
-
-                            Rectangle {
-                                width: 38
-                                height: 24
-                                radius: 4
-                                color: root.normalizeType === "LUFS" ? Colors.accent : "transparent"
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "LUFS"
-                                    color: root.normalizeType === "LUFS" ? Colors.textOnAccent : Colors.textSecondary
-                                    font.pixelSize: 10
-                                    font.weight: Font.Medium
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        root.normalizeType = "LUFS";
-                                        root.normalizeTarget = -16.0;
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                width: 38
-                                height: 24
-                                radius: 4
-                                color: root.normalizeType === "RMS" ? Colors.accent : "transparent"
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "RMS"
-                                    color: root.normalizeType === "RMS" ? Colors.textOnAccent : Colors.textSecondary
-                                    font.pixelSize: 10
-                                    font.weight: Font.Medium
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        root.normalizeType = "RMS";
-                                        root.normalizeTarget = -14.0;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Target level dropdown
-                    Rectangle {
-                        Layout.preferredWidth: 70
-                        Layout.preferredHeight: 28
-                        radius: 6
-                        color: Colors.surfaceDark
-                        border.width: 1
-                        border.color: Colors.border
-
-                        ComboBox {
-                            id: targetLevelCombo
-                            anchors.fill: parent
-                            model: root.normalizeType === "LUFS" 
-                                ? ["-14 dB", "-16 dB", "-18 dB", "-23 dB"]
-                                : ["-12 dB", "-14 dB", "-16 dB", "-18 dB"]
-                            currentIndex: 1
-                            
-                            onCurrentTextChanged: {
-                                var val = parseFloat(currentText);
-                                if (!isNaN(val)) {
-                                    root.normalizeTarget = val;
-                                }
-                            }
-
-                            background: Rectangle {
-                                color: "transparent"
-                            }
-
-                            contentItem: Text {
-                                text: targetLevelCombo.displayText
-                                color: Colors.textPrimary
-                                font.pixelSize: 11
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-
-                            indicator: Text {
-                                x: parent.width - width - 6
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "▼"
-                                font.pixelSize: 8
-                                color: Colors.textSecondary
-                            }
-
-                            popup: Popup {
-                                y: parent.height
-                                width: parent.width
-                                padding: 4
-
-                                background: Rectangle {
-                                    color: Colors.cardBg
-                                    border.color: Colors.border
-                                    border.width: 1
-                                    radius: 6
-                                }
-
-                                contentItem: ListView {
-                                    implicitHeight: contentHeight
-                                    model: targetLevelCombo.popup.visible ? targetLevelCombo.delegateModel : null
-                                    clip: true
-                                }
-                            }
-
-                            delegate: ItemDelegate {
-                                width: targetLevelCombo.width
-                                height: 26
-                                contentItem: Text {
-                                    text: modelData
-                                    color: Colors.textPrimary
-                                    font.pixelSize: 11
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-                                background: Rectangle {
-                                    color: highlighted ? Colors.surfaceLight : "transparent"
-                                    radius: 4
-                                }
-                            }
-                        }
-                    }
-
-                    // Normalize button
-                    Rectangle {
-                        Layout.preferredWidth: 100
-                        Layout.preferredHeight: 28
-                        radius: 6
-                        color: root.isNormalizing ? Colors.surfaceDark : (normalizeBtnMa.containsMouse ? Colors.accentHover : Colors.accent)
-
-                        RowLayout {
-                            anchors.centerIn: parent
-                            spacing: 6
-
-                            // Loading spinner when normalizing
-                            Rectangle {
-                                visible: root.isNormalizing
-                                width: 14
-                                height: 14
-                                radius: 7
-                                color: "transparent"
-                                border.width: 2
-                                border.color: Colors.textOnAccent
-                                
-                                RotationAnimation on rotation {
-                                    running: root.isNormalizing
-                                    from: 0
-                                    to: 360
-                                    duration: 1000
-                                    loops: Animation.Infinite
-                                }
-                            }
-
-                            Text {
-                                text: root.isNormalizing ? "Processing..." : "🎚 Normalize"
-                                color: Colors.textOnAccent
-                                font.pixelSize: 11
-                                font.weight: Font.Medium
-                            }
-                        }
-
-                        MouseArea {
-                            id: normalizeBtnMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: root.isNormalizing ? Qt.WaitCursor : Qt.PointingHandCursor
-                            enabled: !root.isNormalizing
-                            onClicked: {
-                                root.normalizeClicked(root.clipId, root.boardId, root.normalizeTarget, root.normalizeType);
-                            }
-                        }
-                    }
-
-                    Item {
-                        Layout.fillWidth: true
-                    } // Spacer
                 }
             }
         }
