@@ -3,6 +3,7 @@
 #include "qmlmodels/soundboardsListModel.h"
 #include "services/ApiClient.h"
 #include "services/soundboardService.h"
+#include "services/TranscriptionService.h"
 
 #include <QGuiApplication>
 #include <QIcon>
@@ -30,6 +31,9 @@ int main(int argc, char* argv[])
 
     // API Client for authentication
     ApiClient apiClient;
+
+    // Transcription Service for speech-to-text
+    TranscriptionService transcriptionService;
 
     // Model for QML
     SoundboardsListModel soundboardsModel;
@@ -59,6 +63,7 @@ int main(int argc, char* argv[])
     // Expose to QML
     engine.rootContext()->setContextProperty("soundboardService", &soundboardService);
     engine.rootContext()->setContextProperty("apiClient", &apiClient);
+    engine.rootContext()->setContextProperty("transcriptionService", &transcriptionService);
     engine.rootContext()->setContextProperty("soundboardsModel", &soundboardsModel);
     engine.rootContext()->setContextProperty("clipsModel", &clipsModel);
     engine.rootContext()->setContextProperty("hotkeyManager", &hotkeyManager);

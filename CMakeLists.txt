@@ -16,7 +16,6 @@ set(CMAKE_AUTORCC ON)
 set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "" FORCE)
 
 # Require Qt 6.5+
-# Require Qt 6.5+
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg Network Concurrent)
 qt_standard_project_setup(REQUIRES 6.5)
 
@@ -38,6 +37,18 @@ FetchContent_Declare(QHotkey
   GIT_TAG        ${QHOTKEY_GIT_TAG}
 )
 FetchContent_MakeAvailable(QHotkey)
+
+# ----------------------------
+# IXWebSocket (BSD-3-Clause) - WebSocket client library
+# ----------------------------
+set(USE_TLS ON CACHE BOOL "Enable TLS support in IXWebSocket")
+set(USE_OPEN_SSL ON CACHE BOOL "Use OpenSSL for TLS")
+
+FetchContent_Declare(ixwebsocket
+  GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
+  GIT_TAG        v11.4.5
+)
+FetchContent_MakeAvailable(ixwebsocket)
 
 # ----------------------------
 # Executable
@@ -80,6 +91,8 @@ qt_add_executable(appTalkLess
     src/services/storageRepository.cpp
     src/services/soundboardService.h
     src/services/soundboardService.cpp
+    src/services/TranscriptionService.h
+    src/services/TranscriptionService.cpp
 )
 
 # QML singletons
@@ -230,6 +243,7 @@ target_link_libraries(appTalkLess PRIVATE
     Qt6::Svg
     Qt6::Network
     Qt6::Concurrent
+    ixwebsocket
     QHotkey::QHotkey
 )
 
