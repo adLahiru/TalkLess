@@ -39,16 +39,21 @@ FetchContent_Declare(QHotkey
 FetchContent_MakeAvailable(QHotkey)
 
 # ----------------------------
-# IXWebSocket (BSD-3-Clause) - WebSocket client library
+# libebur128 (for LUFS/RMS loudness measurement)
 # ----------------------------
-set(USE_TLS ON CACHE BOOL "Enable TLS support in IXWebSocket")
-set(USE_OPEN_SSL ON CACHE BOOL "Use OpenSSL for TLS")
+option(TALKLESS_ENABLE_EBUR128 "Enable libebur128 for audio normalization" ON)
 
-FetchContent_Declare(ixwebsocket
-  GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
-  GIT_TAG        v11.4.5
-)
-FetchContent_MakeAvailable(ixwebsocket)
+if(TALKLESS_ENABLE_EBUR128)
+    FetchContent_Declare(ebur128
+        GIT_REPOSITORY https://github.com/jiixyj/libebur128.git
+        GIT_TAG        v1.2.6
+    )
+    # Don't build the ebur128 tests or examples
+    set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(ebur128)
+    message(STATUS "libebur128 enabled for audio normalization")
+endif()
 
 # ----------------------------
 # Executable
@@ -369,6 +374,17 @@ if(TALKLESS_ENABLE_RNNOISE)
     endif()
 else()
     target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_RNNOISE=0)
+endif()
+
+# ----------------------------
+# libebur128 (link if enabled)
+# ----------------------------
+if(TALKLESS_ENABLE_EBUR128)
+    target_include_directories(appTalkLess PRIVATE ${ebur128_SOURCE_DIR}/ebur128)
+    target_link_libraries(appTalkLess PRIVATE ebur128)
+    target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_EBUR128=1)
+else()
+    target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_EBUR128=0)
 endif()
 
 # ----------------------------

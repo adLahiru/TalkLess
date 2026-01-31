@@ -16,13 +16,17 @@ Item {
     property double rmsVolume: -5.0  // dB value
     property double micVolume: -3.0  // dB value
     property bool muteMic: false
+    property int boardId: -1
+    property var appliedEffects: []  // List of applied effects/normalization
 
     // State
     property bool expanded: false
+    property bool isSelected: false
+    property bool isPlaying: false
 
     // Dimensions
     implicitWidth: parent ? parent.width : 400
-    implicitHeight: expanded ? 220 : 56
+    implicitHeight: expanded ? (appliedEffects.length > 0 ? 270 : 220) : 56  // Extra height for effect tags
 
     Behavior on implicitHeight {
         NumberAnimation {
@@ -40,14 +44,27 @@ Item {
     signal micVolumeAdjusted(double value)
     signal muteMicToggled(bool muted)
     signal expansionRequested(int clipId, bool isExpanded)  // For accordion behavior
+    signal selectionToggled(int clipId, bool selected)  // For multi-select
+    signal playClicked(int clipId)  // For playing audio
+    signal stopClicked(int clipId)  // For stopping audio
 
     Rectangle {
         id: card
         anchors.fill: parent
-        color: Colors.cardBg
+        color: root.isSelected ? Qt.rgba(Colors.accent.r, Colors.accent.g, Colors.accent.b, 0.1) : Colors.cardBg
         radius: 12
-        border.width: 1
-        border.color: Colors.border
+        border.width: root.isSelected ? 2 : 1
+        border.color: root.isSelected ? Colors.accent : Colors.border
+        
+        Behavior on border.color {
+            ColorAnimation { duration: 150 }
+        }
+        Behavior on border.width {
+            NumberAnimation { duration: 150 }
+        }
+        Behavior on color {
+            ColorAnimation { duration: 150 }
+        }
 
         // Collapsed header row (always visible)
         RowLayout {
@@ -137,6 +154,37 @@ Item {
             // Action buttons
             RowLayout {
                 spacing: 8
+                
+                // Play/Stop button
+                Rectangle {
+                    Layout.preferredWidth: 36
+                    Layout.preferredHeight: 28
+                    radius: 6
+                    color: root.isPlaying ? Colors.accent : (playMa.containsMouse ? Colors.surfaceLight : "transparent")
+                    border.width: 1
+                    border.color: root.isPlaying ? Colors.accent : Colors.border
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.isPlaying ? "⏹" : "▶"
+                        color: root.isPlaying ? Colors.textOnAccent : Colors.textPrimary
+                        font.pixelSize: 14
+                    }
+
+                    MouseArea {
+                        id: playMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (root.isPlaying) {
+                                root.stopClicked(root.clipId)
+                            } else {
+                                root.playClicked(root.clipId)
+                            }
+                        }
+                    }
+                }
 
                 // Loop button
                 Rectangle {
@@ -209,11 +257,53 @@ Item {
             }
         }
 
-        // Click to expand/collapse
+        // Click to expand/collapse OR select (Ctrl+Click)
         MouseArea {
             anchors.fill: headerRow
-            onClicked: root.expanded = !root.expanded
+            onClicked: function(mouse) {
+                if (mouse.modifiers & Qt.ControlModifier) {
+                    // Ctrl+Click toggles selection
+                    root.selectionToggled(root.clipId, !root.isSelected)
+                } else {
+                    // Normal click expands/collapses
+                    root.expanded = !root.expanded
+                }
+            }
             z: -1
+        }
+        
+        // Selection checkbox (visible when any clip is selected)
+        Rectangle {
+            id: selectionCheckbox
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.leftMargin: -4
+            anchors.topMargin: -4
+            width: 20
+            height: 20
+            radius: 10
+            color: root.isSelected ? Colors.accent : Colors.surfaceDark
+            border.width: 1
+            border.color: root.isSelected ? Colors.accent : Colors.border
+            visible: root.isSelected || selectionCheckboxMa.containsMouse
+            z: 10
+            
+            Text {
+                anchors.centerIn: parent
+                text: "✓"
+                color: Colors.textOnAccent
+                font.pixelSize: 12
+                font.weight: Font.Bold
+                visible: root.isSelected
+            }
+            
+            MouseArea {
+                id: selectionCheckboxMa
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.selectionToggled(root.clipId, !root.isSelected)
+            }
         }
 
         // Expanded content
@@ -225,7 +315,7 @@ Item {
             anchors.topMargin: 12
             anchors.leftMargin: 16
             anchors.rightMargin: 16
-            height: 150  // Fit all content including test button
+            height: root.appliedEffects.length > 0 ? 200 : 150  // Extra height for effect tags
             visible: root.expanded
             opacity: root.expanded ? 1 : 0
 
@@ -238,6 +328,43 @@ Item {
             ColumnLayout {
                 anchors.fill: parent
                 spacing: 12
+                
+                // Applied Effects Tags
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    visible: root.appliedEffects && root.appliedEffects.length > 0
+                    
+                    Repeater {
+                        model: root.appliedEffects || []
+                        
+                        Rectangle {
+                            width: effectTagText.implicitWidth + 16
+                            height: 24
+                            radius: 12
+                            color: {
+                                var effectName = modelData.toLowerCase();
+                                if (effectName.indexOf("normalized") !== -1) return "#059669";  // Green for normalization
+                                if (effectName.indexOf("bass") !== -1) return "#DC2626";  // Red for bass
+                                if (effectName.indexOf("treble") !== -1) return "#2563EB";  // Blue for treble
+                                if (effectName.indexOf("voice") !== -1) return "#7C3AED";  // Purple for voice
+                                if (effectName.indexOf("warm") !== -1) return "#EA580C";  // Orange for warmth
+                                if (effectName.indexOf("low cut") !== -1) return "#0891B2";  // Cyan for low cut
+                                if (effectName.indexOf("high cut") !== -1) return "#DB2777";  // Pink for high cut
+                                return Colors.accent;  // Default
+                            }
+                            
+                            Text {
+                                id: effectTagText
+                                anchors.centerIn: parent
+                                text: modelData
+                                color: "white"
+                                font.pixelSize: 10
+                                font.weight: Font.Medium
+                            }
+                        }
+                    }
+                }
 
                 // RMS Volume slider row
                 RowLayout {
