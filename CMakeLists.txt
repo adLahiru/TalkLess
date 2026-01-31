@@ -371,16 +371,21 @@ if(TALKLESS_ENABLE_RNNOISE)
     # Add cmake modules path
     list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
     
-    # Include our RNNoise finder/builder
-    include(FindRNNoise)
-    
-    if(RNNOISE_FOUND)
-        message(STATUS "RNNoise enabled for noise suppression")
-        target_include_directories(appTalkLess PRIVATE ${RNNOISE_INCLUDE_DIRS})
-        target_link_libraries(appTalkLess PRIVATE ${RNNOISE_LIBRARIES})
-        target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_RNNOISE=1)
+    # Check if FindRNNoise.cmake exists before trying to include it
+    if(EXISTS "${CMAKE_SOURCE_DIR}/cmake/FindRNNoise.cmake")
+        include(FindRNNoise)
+        
+        if(RNNOISE_FOUND)
+            message(STATUS "RNNoise enabled for noise suppression")
+            target_include_directories(appTalkLess PRIVATE ${RNNOISE_INCLUDE_DIRS})
+            target_link_libraries(appTalkLess PRIVATE ${RNNOISE_LIBRARIES})
+            target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_RNNOISE=1)
+        else()
+            message(STATUS "RNNoise not found. Continuing without noise cancellation.")
+            target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_RNNOISE=0)
+        endif()
     else()
-        message(WARNING "RNNoise not available. Continuing without noise cancellation.")
+        message(STATUS "FindRNNoise.cmake not found - RNNoise support disabled")
         target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_RNNOISE=0)
     endif()
 else()
