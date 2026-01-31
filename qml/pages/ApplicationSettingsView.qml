@@ -238,7 +238,7 @@ Rectangle {
                             ColumnLayout {
                                 anchors.fill: parent
                                 anchors.margins: 24
-                                spacing: 20
+                                spacing: 12
 
                                 // Title
                                 Text {
@@ -348,23 +348,76 @@ Rectangle {
                                     }
                                 }
 
-                                // Test Mic Button
-                                Rectangle {
+                                // Noise Cancellation Section
+                                ColumnLayout {
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: 50
-                                    color: Colors.surface
-                                    radius: 12
-                                    border.width: 1
-                                    border.color: Colors.border
+                                    spacing: 8
 
+                                    // Noise Cancellation Toggle Row
                                     RowLayout {
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 16
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        spacing: 10
+                                        Layout.fillWidth: true
+                                        spacing: 12
+
+                                        // Toggle Switch
+                                        Rectangle {
+                                            id: noiseCancellationToggle
+                                            width: 52
+                                            height: 28
+                                            radius: 14
+                                            color: noiseCancellationToggle.isOn ? Colors.success : Colors.surfaceLight
+
+                                            // ON = level 4 (VeryHigh), OFF = level 0 (Off)
+                                            property bool isOn: (soundboardService?.noiseSuppressionLevel ?? 0) > 0
+                                            onIsOnChanged: {
+                                                if (soundboardService) {
+                                                    var newLevel = isOn ? 4 : 0;
+                                                    if (newLevel !== soundboardService.noiseSuppressionLevel) {
+                                                        console.log("Noise cancellation toggled:", isOn ? "ON (VeryHigh)" : "OFF");
+                                                        soundboardService.setNoiseSuppressionLevel(newLevel);
+                                                    }
+                                                }
+                                            }
+
+                                            // Listen for backend changes to update the toggle
+                                            Connections {
+                                                target: soundboardService
+                                                function onSettingsChanged() {
+                                                    if (soundboardService) {
+                                                        noiseCancellationToggle.isOn = soundboardService.noiseSuppressionLevel > 0;
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                width: 22
+                                                height: 22
+                                                radius: 11
+                                                color: noiseCancellationToggle.isOn ? Colors.textPrimary : Colors.border
+                                                x: noiseCancellationToggle.isOn ? parent.width - width - 3 : 3
+                                                anchors.verticalCenter: parent.verticalCenter
+
+                                                Behavior on x {
+                                                    NumberAnimation {
+                                                        duration: 150
+                                                    }
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: noiseCancellationToggle.isOn = !noiseCancellationToggle.isOn
+                                            }
+
+                                            Behavior on color {
+                                                ColorAnimation {
+                                                    duration: 150
+                                                }
+                                            }
+                                        }
 
                                         Text {
-                                            text: "Test Mic"
+                                            text: "Noise Cancellation"
                                             color: Colors.textPrimary
                                             font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
                                             font.pixelSize: Typography.fontSizeMedium
@@ -372,91 +425,10 @@ Rectangle {
                                         }
                                     }
 
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: console.log("Test mic clicked")
-                                    }
-                                }
-
-                                // Noise Cancellation Section
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 8
-                                    Layout.topMargin: 8
-
-                                    Text {
-                                        text: "Noise Cancellation"
-                                        color: Colors.textPrimary
-                                        font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                        font.pixelSize: Typography.fontSizeMedium
-                                        font.weight: Font.Medium
-                                    }
-
                                     Text {
                                         text: "Reduce background noise from your microphone"
                                         color: Colors.textSecondary
                                         font.pixelSize: Typography.fontSizeSmall
-                                    }
-
-                                    // Noise Cancellation Level Selector
-                                    RowLayout {
-                                        id: noiseLevelSelector
-                                        Layout.fillWidth: true
-                                        spacing: 8
-
-                                        property var levelNames: soundboardService?.getNoiseSuppressionLevelNames() ?? ["Off", "Low", "Moderate", "High", "Very High"]
-                                        property int currentLevel: soundboardService?.noiseSuppressionLevel ?? 2
-
-                                        // Update when settings change
-                                        Connections {
-                                            target: soundboardService
-                                            function onSettingsChanged() {
-                                                noiseLevelSelector.currentLevel = soundboardService?.noiseSuppressionLevel ?? 2;
-                                            }
-                                        }
-
-                                        Repeater {
-                                            model: noiseLevelSelector.levelNames
-
-                                            Rectangle {
-                                                Layout.fillWidth: true
-                                                height: 36
-                                                radius: 8
-
-                                                property bool isActive: index === noiseLevelSelector.currentLevel
-
-                                                color: isActive ? Colors.accent : Colors.surface
-                                                border.width: isActive ? 2 : 1
-                                                border.color: isActive ? Colors.accentLight : Colors.border
-
-                                                Text {
-                                                    anchors.centerIn: parent
-                                                    text: modelData
-                                                    color: parent.isActive ? Colors.textOnAccent : Colors.textPrimary
-                                                    font.family: interFont.status === FontLoader.Ready ? interFont.name : "Arial"
-                                                    font.pixelSize: Typography.fontSizeSmall
-                                                    font.weight: parent.isActive ? Font.DemiBold : Font.Normal
-                                                }
-
-                                                MouseArea {
-                                                    anchors.fill: parent
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    onClicked: {
-                                                        console.log("Noise cancellation level set to:", index, modelData);
-                                                        soundboardService.setNoiseSuppressionLevel(index);
-                                                    }
-                                                }
-
-                                                Behavior on color {
-                                                    ColorAnimation { duration: 150 }
-                                                }
-
-                                                Behavior on border.width {
-                                                    NumberAnimation { duration: 150 }
-                                                }
-                                            }
-                                        }
                                     }
                                 }
                             }
