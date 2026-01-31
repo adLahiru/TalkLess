@@ -2341,6 +2341,335 @@ AudioEngine::NormalizationResult AudioEngine::normalizeAudio(const std::string& 
 }
 
 // ------------------------------------------------------------
+// Audio Effects
+// ------------------------------------------------------------
+
+AudioEngine::AudioEffectParams AudioEngine::getDefaultEffectParams(AudioEffectType type)
+{
+    AudioEffectParams params;
+    params.type = type;
+
+    switch (type) {
+    case AudioEffectType::BassBoost:
+        params.gainDb = 6.0;      // +6dB boost
+        params.frequency = 150.0; // 150 Hz shelf frequency
+        params.q = 0.7;
+        break;
+    case AudioEffectType::TrebleBoost:
+        params.gainDb = 4.0;       // +4dB boost
+        params.frequency = 8000.0; // 8kHz shelf frequency
+        params.q = 0.7;
+        break;
+    case AudioEffectType::LowCut:
+        params.gainDb = 0.0;
+        params.frequency = 80.0; // 80 Hz cutoff
+        params.q = 0.707;        // Butterworth
+        break;
+    case AudioEffectType::HighCut:
+        params.gainDb = 0.0;
+        params.frequency = 12000.0; // 12kHz cutoff
+        params.q = 0.707;
+        break;
+    case AudioEffectType::VoiceEnhance:
+        params.gainDb = 3.0;
+        params.frequency = 3000.0; // Presence frequency
+        params.q = 1.5;
+        break;
+    case AudioEffectType::Warmth:
+        params.gainDb = 3.0;
+        params.frequency = 250.0; // Low-mid warmth
+        params.q = 0.8;
+        break;
+    }
+
+    return params;
+}
+
+static std::string effectTypeToString(AudioEngine::AudioEffectType type)
+{
+    switch (type) {
+    case AudioEngine::AudioEffectType::BassBoost:
+        return "bassboost";
+    case AudioEngine::AudioEffectType::TrebleBoost:
+        return "trebleboost";
+    case AudioEngine::AudioEffectType::LowCut:
+        return "lowcut";
+    case AudioEngine::AudioEffectType::HighCut:
+        return "highcut";
+    case AudioEngine::AudioEffectType::VoiceEnhance:
+        return "voiceenhance";
+    case AudioEngine::AudioEffectType::Warmth:
+        return "warmth";
+    default:
+        return "effect";
+    }
+}
+
+AudioEngine::AudioEffectResult AudioEngine::applyAudioEffect(const std::string& sourcePath,
+                                                             const AudioEffectParams& params,
+                                                             const std::string& outputDir)
+{
+    AudioEffectResult result;
+    result.effectName = effectTypeToString(params.type);
+
+    // Determine output path
+    std::string dir = outputDir;
+    std::string filename;
+    size_t lastSlash = sourcePath.find_last_of("/\\");
+    if (lastSlash != std::string::npos) {
+        if (dir.empty()) {
+            dir = sourcePath.substr(0, lastSlash);
+        }
+        filename = sourcePath.substr(lastSlash + 1);
+    } else {
+        filename = sourcePath;
+    }
+
+    // Remove extension and add effect suffix
+    size_t lastDot = filename.find_last_of('.');
+    std::string baseName = (lastDot != std::string::npos) ? filename.substr(0, lastDot) : filename;
+
+    // Generate a short hash from the full source path to ensure unique filenames
+    std::size_t pathHash = std::hash<std::string>{}(sourcePath);
+    std::string hashSuffix = "_" + std::to_string(pathHash % 100000);
+
+    std::string effectFilename = baseName + hashSuffix + "_" + result.effectName + ".wav";
+    result.outputPath = dir + "/" + effectFilename;
+
+    // Initialize decoder for source file
+    ma_decoder_config decCfg = ma_decoder_config_init(ma_format_f32, 2, m_sampleRate);
+    ma_decoder decoder;
+
+#ifdef _WIN32
+    std::wstring wsourcePath = utf8ToWide(sourcePath);
+    if (ma_decoder_init_file_w(wsourcePath.c_str(), &decCfg, &decoder) != MA_SUCCESS) {
+#else
+    if (ma_decoder_init_file(sourcePath.c_str(), &decCfg, &decoder) != MA_SUCCESS) {
+#endif
+        result.error = "Failed to open source file";
+        return result;
+    }
+
+    const ma_uint32 sampleRate = decoder.outputSampleRate;
+    const ma_uint32 channels = decoder.outputChannels;
+
+    // Initialize encoder for output file
+    ma_encoder encoder;
+    ma_encoder_config encCfg = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, channels, sampleRate);
+
+    if (ma_encoder_init_file(result.outputPath.c_str(), &encCfg, &encoder) != MA_SUCCESS) {
+        result.error = "Failed to create output file";
+        ma_decoder_uninit(&decoder);
+        return result;
+    }
+
+    // Initialize the appropriate filter based on effect type
+    // We'll use biquad filters from miniaudio
+    ma_biquad_config bqConfig;
+    ma_biquad biquad;
+    bool useBiquad = false;
+
+    ma_lpf2_config lpfConfig;
+    ma_lpf2 lpf;
+    bool useLpf = false;
+
+    ma_hpf2_config hpfConfig;
+    ma_hpf2 hpf;
+    bool useHpf = false;
+
+    ma_loshelf2_config loshelfConfig;
+    ma_loshelf2 loshelf;
+    bool useLoshelf = false;
+
+    ma_hishelf2_config hishelfConfig;
+    ma_hishelf2 hishelf;
+    bool useHishelf = false;
+
+    ma_peak2_config peakConfig;
+    ma_peak2 peak;
+    bool usePeak = false;
+
+    switch (params.type) {
+    case AudioEffectType::BassBoost:
+        // Low-shelf filter for bass boost
+        loshelfConfig =
+            ma_loshelf2_config_init(ma_format_f32, channels, sampleRate, params.gainDb, params.q, params.frequency);
+        if (ma_loshelf2_init(&loshelfConfig, nullptr, &loshelf) != MA_SUCCESS) {
+            result.error = "Failed to initialize bass boost filter";
+            ma_decoder_uninit(&decoder);
+            ma_encoder_uninit(&encoder);
+            return result;
+        }
+        useLoshelf = true;
+        break;
+
+    case AudioEffectType::TrebleBoost:
+        // High-shelf filter for treble boost
+        hishelfConfig =
+            ma_hishelf2_config_init(ma_format_f32, channels, sampleRate, params.gainDb, params.q, params.frequency);
+        if (ma_hishelf2_init(&hishelfConfig, nullptr, &hishelf) != MA_SUCCESS) {
+            result.error = "Failed to initialize treble boost filter";
+            ma_decoder_uninit(&decoder);
+            ma_encoder_uninit(&encoder);
+            return result;
+        }
+        useHishelf = true;
+        break;
+
+    case AudioEffectType::LowCut:
+        // High-pass filter to cut low frequencies
+        hpfConfig = ma_hpf2_config_init(ma_format_f32, channels, sampleRate, params.frequency, params.q);
+        if (ma_hpf2_init(&hpfConfig, nullptr, &hpf) != MA_SUCCESS) {
+            result.error = "Failed to initialize low-cut filter";
+            ma_decoder_uninit(&decoder);
+            ma_encoder_uninit(&encoder);
+            return result;
+        }
+        useHpf = true;
+        break;
+
+    case AudioEffectType::HighCut:
+        // Low-pass filter to cut high frequencies
+        lpfConfig = ma_lpf2_config_init(ma_format_f32, channels, sampleRate, params.frequency, params.q);
+        if (ma_lpf2_init(&lpfConfig, nullptr, &lpf) != MA_SUCCESS) {
+            result.error = "Failed to initialize high-cut filter";
+            ma_decoder_uninit(&decoder);
+            ma_encoder_uninit(&encoder);
+            return result;
+        }
+        useLpf = true;
+        break;
+
+    case AudioEffectType::VoiceEnhance:
+        // Peaking EQ to boost presence frequencies (voice clarity)
+        peakConfig =
+            ma_peak2_config_init(ma_format_f32, channels, sampleRate, params.gainDb, params.q, params.frequency);
+        if (ma_peak2_init(&peakConfig, nullptr, &peak) != MA_SUCCESS) {
+            result.error = "Failed to initialize voice enhance filter";
+            ma_decoder_uninit(&decoder);
+            ma_encoder_uninit(&encoder);
+            return result;
+        }
+        usePeak = true;
+        break;
+
+    case AudioEffectType::Warmth:
+        // Low-shelf for warmth
+        loshelfConfig =
+            ma_loshelf2_config_init(ma_format_f32, channels, sampleRate, params.gainDb, params.q, params.frequency);
+        if (ma_loshelf2_init(&loshelfConfig, nullptr, &loshelf) != MA_SUCCESS) {
+            result.error = "Failed to initialize warmth filter";
+            ma_decoder_uninit(&decoder);
+            ma_encoder_uninit(&encoder);
+            return result;
+        }
+        useLoshelf = true;
+        break;
+
+    default:
+        result.error = "Unknown effect type";
+        ma_decoder_uninit(&decoder);
+        ma_encoder_uninit(&encoder);
+        return result;
+    }
+
+    // Read, apply filter, and write in chunks
+    constexpr ma_uint32 kChunkFrames = 4096;
+    std::vector<float> buffer(static_cast<size_t>(kChunkFrames) * channels);
+
+    while (true) {
+        ma_uint64 framesRead = 0;
+        ma_result res = ma_decoder_read_pcm_frames(&decoder, buffer.data(), kChunkFrames, &framesRead);
+        if (framesRead == 0 || res != MA_SUCCESS) {
+            break;
+        }
+
+        // Apply the appropriate filter
+        if (useLoshelf) {
+            ma_loshelf2_process_pcm_frames(&loshelf, buffer.data(), buffer.data(), framesRead);
+        } else if (useHishelf) {
+            ma_hishelf2_process_pcm_frames(&hishelf, buffer.data(), buffer.data(), framesRead);
+        } else if (useLpf) {
+            ma_lpf2_process_pcm_frames(&lpf, buffer.data(), buffer.data(), framesRead);
+        } else if (useHpf) {
+            ma_hpf2_process_pcm_frames(&hpf, buffer.data(), buffer.data(), framesRead);
+        } else if (usePeak) {
+            ma_peak2_process_pcm_frames(&peak, buffer.data(), buffer.data(), framesRead);
+        }
+
+        ma_encoder_write_pcm_frames(&encoder, buffer.data(), framesRead, nullptr);
+    }
+
+    // Cleanup filters
+    if (useLoshelf)
+        ma_loshelf2_uninit(&loshelf, nullptr);
+    if (useHishelf)
+        ma_hishelf2_uninit(&hishelf, nullptr);
+    if (useLpf)
+        ma_lpf2_uninit(&lpf, nullptr);
+    if (useHpf)
+        ma_hpf2_uninit(&hpf, nullptr);
+    if (usePeak)
+        ma_peak2_uninit(&peak, nullptr);
+
+    // Cleanup encoder/decoder
+    ma_encoder_uninit(&encoder);
+    ma_decoder_uninit(&decoder);
+
+    result.success = true;
+    std::cout << "applyAudioEffect: Applied " << result.effectName << " to " << sourcePath << " -> "
+              << result.outputPath << std::endl;
+    return result;
+}
+
+AudioEngine::AudioEffectResult AudioEngine::applyAudioEffects(const std::string& sourcePath,
+                                                              const std::vector<AudioEffectParams>& effects,
+                                                              const std::string& outputDir)
+{
+    AudioEffectResult result;
+
+    if (effects.empty()) {
+        result.error = "No effects specified";
+        return result;
+    }
+
+    // Apply effects one by one, using output of previous as input for next
+    std::string currentSource = sourcePath;
+    std::string tempPath;
+
+    for (size_t i = 0; i < effects.size(); ++i) {
+        bool isLast = (i == effects.size() - 1);
+
+        // For intermediate files, use a temp directory
+        std::string effectOutputDir = isLast ? outputDir : outputDir;
+
+        AudioEffectResult effectResult = applyAudioEffect(currentSource, effects[i], effectOutputDir);
+
+        if (!effectResult.success) {
+            result.error = effectResult.error;
+            // Clean up temp file if we created one
+            if (!tempPath.empty()) {
+                std::remove(tempPath.c_str());
+            }
+            return result;
+        }
+
+        // If not the first iteration, delete the temp file from previous iteration
+        if (!tempPath.empty() && tempPath != sourcePath) {
+            std::remove(tempPath.c_str());
+        }
+
+        tempPath = effectResult.outputPath;
+        currentSource = effectResult.outputPath;
+        result.effectName += (result.effectName.empty() ? "" : "+") + effectResult.effectName;
+    }
+
+    result.success = true;
+    result.outputPath = currentSource;
+    return result;
+}
+
+// ------------------------------------------------------------
 // Recording
 // ------------------------------------------------------------
 // Recording sources:

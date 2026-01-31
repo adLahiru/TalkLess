@@ -123,6 +123,8 @@ QVariant ClipsListModel::data(const QModelIndex& index, int role) const
         return c.durationSec;
     case TeleprompterTextRole:
         return c.teleprompterText;
+    case AppliedEffectsRole:
+        return c.appliedEffects;
     default:
         return {};
     }
@@ -149,7 +151,8 @@ QHash<int, QByteArray> ClipsListModel::roleNames() const
         {      MuteOtherSoundsRole,       "muteOtherSounds"},
         {MuteMicDuringPlaybackRole, "muteMicDuringPlayback"},
         {          DurationSecRole,           "durationSec"},
-        {     TeleprompterTextRole,      "teleprompterText"}
+        {     TeleprompterTextRole,      "teleprompterText"},
+        {       AppliedEffectsRole,        "appliedEffects"}
     };
 }
 
@@ -162,6 +165,10 @@ void ClipsListModel::reload()
 
     if (m_boardId >= 0) {
         m_cache = m_service->getClipsForBoard(m_boardId);
+        // Debug: Log first clip's filePath to verify it's updated
+        if (!m_cache.isEmpty()) {
+            qDebug() << "ClipsListModel::reload() - First clip filePath:" << m_cache.first().filePath;
+        }
     } else if (m_autoLoadActive) {
         // If no board ID specified and auto-load is on, use active board
         m_cache = m_service->getActiveClips();

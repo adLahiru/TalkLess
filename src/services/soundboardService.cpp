@@ -2380,6 +2380,7 @@ void SoundboardService::playClip(int clipId)
     m_audioEngine->stopClip(slotId);
 
     const std::string filePath = sanitizeFilePath(clip->filePath).toUtf8().constData();
+    qDebug() << "playClip: Loading audio file:" << QString::fromStdString(filePath);
     auto [startSec, endSec] = m_audioEngine->loadClip(slotId, filePath);
     if (startSec == endSec) {
         qWarning() << "Failed to load clip:" << clip->filePath;
@@ -2392,6 +2393,7 @@ void SoundboardService::playClip(int clipId)
         return;
     }
     clip->durationSec = endSec;
+    qDebug() << "playClip: Successfully loaded clip, duration:" << endSec << "sec";
 
     // Apply gain
     const float gainDb = (clip->volume <= 0) ? -60.0f : 20.0f * std::log10(clip->volume / 100.0f);
@@ -3947,14 +3949,17 @@ void SoundboardService::normalizeClip(int boardId, int clipId, double targetLeve
     QDir().mkpath(normalizedDir);
 
     // Run normalization in background thread
-    (void)QtConcurrent::run([this, clipId, boardId, filePath, targetLevel, normType, normalizedDir]() {
+    (void)QtConcurrent::run([this, clipId, boardId, filePath, targetLevel, normType, normalizedDir, targetType]() {
         auto result =
             m_audioEngine->normalizeAudio(filePath.toStdString(), targetLevel, normType, normalizedDir.toStdString());
+
+        // Create effect label for tracking
+        QString effectLabel = QString("Normalized (%1 %2)").arg(targetLevel).arg(targetType.toUpper());
 
         // Emit result on completion
         QMetaObject::invokeMethod(
             this,
-            [this, clipId, boardId, result]() {
+            [this, clipId, boardId, result, effectLabel]() {
                 if (result.success) {
                     // Update clip's file path to the normalized version
                     QString newPath = QString::fromStdString(result.outputPath);
@@ -3987,7 +3992,15 @@ void SoundboardService::normalizeClip(int boardId, int clipId, double targetLeve
                             for (auto& c : m_activeBoards[updateBoardId].clips) {
                                 // Match by clip ID or by original file path (for shared clips)
                                 if (c.id == clipId || (!originalPath.isEmpty() && c.filePath == originalPath)) {
+                                    // Save original path if not already set (for reset functionality)
+                                    if (c.originalFilePath.isEmpty()) {
+                                        c.originalFilePath = c.filePath;
+                                    }
                                     c.filePath = newPath;
+                                    // Track applied effect
+                                    if (!c.appliedEffects.contains(effectLabel)) {
+                                        c.appliedEffects.append(effectLabel);
+                                    }
                                 }
                             }
                             // Immediately save the board to persist the normalized path
@@ -3999,7 +4012,16 @@ void SoundboardService::normalizeClip(int boardId, int clipId, double targetLeve
                                 bool needsSave = false;
                                 for (auto& c : loadedBoard->clips) {
                                     if (c.id == clipId || (!originalPath.isEmpty() && c.filePath == originalPath)) {
+                                        // Save original path if not already set (for reset functionality)
+                                        if (c.originalFilePath.isEmpty()) {
+                                            c.originalFilePath = c.filePath;
+                                        }
                                         c.filePath = newPath;
+                                        // Track applied effect
+                                        if (!c.appliedEffects.contains(effectLabel)) {
+                                            c.appliedEffects.append(effectLabel);
+                                        }
+                                        needsSave = true;
                                         needsSave = true;
                                     }
                                 }
@@ -4061,6 +4083,327 @@ double SoundboardService::measureClipLoudness(int clipId, const QString& targetT
         (targetType.toLower() == "lufs") ? AudioEngine::NormalizationType::LUFS : AudioEngine::NormalizationType::RMS;
 
     return m_audioEngine->measureLoudness(filePath.toStdString(), normType);
+}
+
+// ============================================================================
+// AUDIO EFFECTS
+// ============================================================================
+
+static AudioEngine::AudioEffectType stringToEffectType(const QString& effectType)
+{
+    QString lower = effectType.toLower();
+    if (lower == "bassboost" || lower == "bass_boost" || lower == "bass")
+        return AudioEngine::AudioEffectType::BassBoost;
+    if (lower == "trebleboost" || lower == "treble_boost" || lower == "treble")
+        return AudioEngine::AudioEffectType::TrebleBoost;
+    if (lower == "lowcut" || lower == "low_cut" || lower == "highpass")
+        return AudioEngine::AudioEffectType::LowCut;
+    if (lower == "highcut" || lower == "high_cut" || lower == "lowpass")
+        return AudioEngine::AudioEffectType::HighCut;
+    if (lower == "voiceenhance" || lower == "voice_enhance" || lower == "voice")
+        return AudioEngine::AudioEffectType::VoiceEnhance;
+    if (lower == "warmth" || lower == "warm")
+        return AudioEngine::AudioEffectType::Warmth;
+
+    // Default to bass boost
+    return AudioEngine::AudioEffectType::BassBoost;
+}
+
+QStringList SoundboardService::availableEffects() const
+{
+    return QStringList{"bassboost", "trebleboost", "lowcut", "highcut", "voiceenhance", "warmth"};
+}
+
+void SoundboardService::applyEffectToClip(int boardId, int clipId, const QString& effectType)
+{
+    AudioEngine::AudioEffectType type = stringToEffectType(effectType);
+    AudioEngine::AudioEffectParams params = AudioEngine::getDefaultEffectParams(type);
+    applyEffectToClipWithParams(boardId, clipId, effectType, params.gainDb, params.frequency, params.q);
+}
+
+void SoundboardService::applyEffectToClipWithParams(int boardId, int clipId, const QString& effectType, double gainDb,
+                                                    double frequency, double q)
+{
+    if (!m_audioEngine) {
+        emit effectComplete(clipId, false, "Audio engine not initialized", "");
+        return;
+    }
+
+    // Find the clip
+    auto clipOpt = findClipByIdAnyBoard(clipId);
+    if (!clipOpt) {
+        emit effectComplete(clipId, false, "Clip not found", "");
+        return;
+    }
+
+    const Clip& clip = *clipOpt;
+    if (clip.filePath.isEmpty()) {
+        emit effectComplete(clipId, false, "Clip has no audio file", "");
+        return;
+    }
+
+    emit effectStarted(clipId, effectType);
+
+    // Convert QString to std::string for file path
+    QString filePath = clip.filePath;
+    if (filePath.startsWith("file://")) {
+        filePath = QUrl(filePath).toLocalFile();
+    }
+
+    // Prepare effect parameters
+    AudioEngine::AudioEffectType type = stringToEffectType(effectType);
+    AudioEngine::AudioEffectParams params;
+    params.type = type;
+    params.gainDb = gainDb;
+    params.frequency = frequency;
+    params.q = q;
+
+    // Create effects output directory in app data location
+    QString effectsDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/effects_audio";
+    QDir().mkpath(effectsDir);
+
+    // Run effect processing in background thread
+    (void)QtConcurrent::run([this, clipId, boardId, filePath, params, effectsDir, effectType]() {
+        auto result = m_audioEngine->applyAudioEffect(filePath.toStdString(), params, effectsDir.toStdString());
+
+        // Create effect label for tracking
+        QString effectLabel;
+        if (effectType.toLower() == "bassboost")
+            effectLabel = "Bass Boost";
+        else if (effectType.toLower() == "trebleboost")
+            effectLabel = "Treble Boost";
+        else if (effectType.toLower() == "voiceenhance")
+            effectLabel = "Voice Enhance";
+        else if (effectType.toLower() == "warmth")
+            effectLabel = "Warmth";
+        else if (effectType.toLower() == "lowcut")
+            effectLabel = "Low Cut";
+        else if (effectType.toLower() == "highcut")
+            effectLabel = "High Cut";
+        else
+            effectLabel = effectType;
+
+        // Emit result on completion
+        QMetaObject::invokeMethod(
+            this,
+            [this, clipId, boardId, result, effectType, effectLabel]() {
+                if (result.success) {
+                    // Update clip's file path to the processed version
+                    QString newPath = QString::fromStdString(result.outputPath);
+                    QString originalPath;
+
+                    // First, get the original file path and sharedBoardIds from the clip
+                    QList<int> boardsToUpdate;
+                    boardsToUpdate.append(boardId);
+
+                    // Find the clip and get its shared board IDs
+                    if (m_activeBoards.contains(boardId)) {
+                        for (const auto& c : m_activeBoards[boardId].clips) {
+                            if (c.id == clipId) {
+                                originalPath = c.filePath;
+                                for (int sharedBoardId : c.sharedBoardIds) {
+                                    if (!boardsToUpdate.contains(sharedBoardId)) {
+                                        boardsToUpdate.append(sharedBoardId);
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    // Update the clip's file path in all boards where it exists
+                    for (int updateBoardId : boardsToUpdate) {
+                        if (m_activeBoards.contains(updateBoardId)) {
+                            for (auto& c : m_activeBoards[updateBoardId].clips) {
+                                if (c.id == clipId || (!originalPath.isEmpty() && c.filePath == originalPath)) {
+                                    // Save original path if not already set (for reset functionality)
+                                    if (c.originalFilePath.isEmpty()) {
+                                        c.originalFilePath = c.filePath;
+                                    }
+                                    qDebug() << "applyEffectToClip: Updating clip" << c.id << "filePath from"
+                                             << c.filePath << "to" << newPath;
+                                    c.filePath = newPath;
+                                    // Track applied effect
+                                    if (!c.appliedEffects.contains(effectLabel)) {
+                                        c.appliedEffects.append(effectLabel);
+                                    }
+                                }
+                            }
+                            m_repo.saveBoard(m_activeBoards[updateBoardId]);
+                        } else {
+                            auto loadedBoard = m_repo.loadBoard(updateBoardId);
+                            if (loadedBoard) {
+                                bool needsSave = false;
+                                for (auto& c : loadedBoard->clips) {
+                                    if (c.id == clipId || (!originalPath.isEmpty() && c.filePath == originalPath)) {
+                                        // Save original path if not already set (for reset functionality)
+                                        if (c.originalFilePath.isEmpty()) {
+                                            c.originalFilePath = c.filePath;
+                                        }
+                                        c.filePath = newPath;
+                                        // Track applied effect
+                                        if (!c.appliedEffects.contains(effectLabel)) {
+                                            c.appliedEffects.append(effectLabel);
+                                        }
+                                        needsSave = true;
+                                    }
+                                }
+                                if (needsSave) {
+                                    m_repo.saveBoard(*loadedBoard);
+                                }
+                            }
+                        }
+                    }
+
+                    // Invalidate waveform cache for this clip
+                    {
+                        QMutexLocker locker(&m_waveformCacheMutex);
+                        m_waveformCache.remove(clipId);
+                    }
+
+                    emit activeClipsChanged();
+                    emit clipUpdated(boardId, clipId);
+                    emit effectComplete(clipId, true, QString(), QString::fromStdString(result.outputPath));
+                } else {
+                    emit effectComplete(clipId, false, QString::fromStdString(result.error), QString());
+                }
+            },
+            Qt::QueuedConnection);
+    });
+}
+
+void SoundboardService::applyEffectToClipBatch(int boardId, const QVariantList& clipIds, const QString& effectType)
+{
+    for (const auto& idVar : clipIds) {
+        int clipId = idVar.toInt();
+        applyEffectToClip(boardId, clipId, effectType);
+    }
+}
+
+void SoundboardService::resetClipToOriginal(int boardId, int clipId)
+{
+    // Find the board in active boards
+    if (!m_activeBoards.contains(boardId)) {
+        qWarning() << "resetClipToOriginal: Board" << boardId << "not active";
+        emit clipReset(clipId, false, "Board not active");
+        return;
+    }
+
+    Soundboard& board = m_activeBoards[boardId];
+
+    // Find the clip
+    Clip* clip = nullptr;
+    for (auto& c : board.clips) {
+        if (c.id == clipId) {
+            clip = &c;
+            break;
+        }
+    }
+    if (!clip) {
+        qWarning() << "resetClipToOriginal: Clip" << clipId << "not found in board" << boardId;
+        emit clipReset(clipId, false, "Clip not found");
+        return;
+    }
+
+    // Check if there's an original file path to restore
+    if (clip->originalFilePath.isEmpty()) {
+        qWarning() << "resetClipToOriginal: No original file path for clip" << clipId;
+        emit clipReset(clipId, false, "No original file to restore");
+        return;
+    }
+
+    // Check if the original file still exists
+    if (!QFile::exists(clip->originalFilePath)) {
+        qWarning() << "resetClipToOriginal: Original file no longer exists:" << clip->originalFilePath;
+        emit clipReset(clipId, false, "Original file no longer exists");
+        return;
+    }
+
+    // Get the shared board IDs before resetting
+    QList<int> boardsToUpdate;
+    boardsToUpdate.append(boardId);
+    for (int sharedBoardId : clip->sharedBoardIds) {
+        if (!boardsToUpdate.contains(sharedBoardId)) {
+            boardsToUpdate.append(sharedBoardId);
+        }
+    }
+
+    // Restore the original file path
+    QString originalPath = clip->originalFilePath;
+    QString processedPath = clip->filePath;
+    clip->filePath = originalPath;
+    clip->originalFilePath.clear();
+    clip->appliedEffects.clear(); // Clear all applied effects
+
+    // Save the board
+    m_repo.saveBoard(board);
+
+    // Update clip in all shared boards
+    for (int updateBoardId : boardsToUpdate) {
+        if (updateBoardId == boardId)
+            continue;
+
+        if (m_activeBoards.contains(updateBoardId)) {
+            for (auto& otherClip : m_activeBoards[updateBoardId].clips) {
+                if (otherClip.id == clipId || otherClip.filePath == processedPath) {
+                    otherClip.filePath = originalPath;
+                    otherClip.originalFilePath.clear();
+                    otherClip.appliedEffects.clear(); // Clear all applied effects
+                }
+            }
+            m_repo.saveBoard(m_activeBoards[updateBoardId]);
+        } else {
+            // Load inactive board, update it, and save
+            auto loadedBoard = m_repo.loadBoard(updateBoardId);
+            if (loadedBoard) {
+                bool needsSave = false;
+                for (auto& c : loadedBoard->clips) {
+                    if (c.id == clipId || c.filePath == processedPath) {
+                        c.filePath = originalPath;
+                        c.originalFilePath.clear();
+                        c.appliedEffects.clear(); // Clear all applied effects
+                        needsSave = true;
+                    }
+                }
+                if (needsSave) {
+                    m_repo.saveBoard(*loadedBoard);
+                }
+            }
+        }
+    }
+
+    // Invalidate waveform cache for this clip
+    {
+        QMutexLocker locker(&m_waveformCacheMutex);
+        m_waveformCache.remove(clipId);
+    }
+
+    emit activeClipsChanged();
+    emit clipUpdated(boardId, clipId);
+    emit clipReset(clipId, true, QString());
+
+    qInfo() << "Reset clip" << clipId << "to original:" << originalPath;
+}
+
+void SoundboardService::resetClipToOriginalBatch(int boardId, const QVariantList& clipIds)
+{
+    for (const auto& idVar : clipIds) {
+        int clipId = idVar.toInt();
+        resetClipToOriginal(boardId, clipId);
+    }
+}
+
+bool SoundboardService::canResetClip(int clipId) const
+{
+    // Search for the clip in all active boards
+    for (auto it = m_activeBoards.constBegin(); it != m_activeBoards.constEnd(); ++it) {
+        for (const auto& clip : it.value().clips) {
+            if (clip.id == clipId) {
+                return !clip.originalFilePath.isEmpty() && QFile::exists(clip.originalFilePath);
+            }
+        }
+    }
+    return false;
 }
 
 void SoundboardService::setTheme(const QString& theme)

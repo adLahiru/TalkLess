@@ -33,6 +33,7 @@ QtObject {
     property color accentLight: Qt.lighter(accent, 1.2)
     property color accentDark: Qt.darker(accent, 1.2)
     property color accentMedium: Qt.darker(accent, 1.1)
+    property color accentHover: Qt.lighter(accent, 1.1)
 
     // Panel & Card Colors
     property color panelBg: currentTheme === "light" ? "#FFFFFF" : "#141416"

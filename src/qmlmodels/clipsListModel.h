@@ -15,7 +15,6 @@ class ClipsListModel : public QAbstractListModel
     Q_PROPERTY(int count READ count NOTIFY clipsChanged)
     Q_PROPERTY(bool autoLoadActive READ autoLoadActive WRITE setAutoLoadActive NOTIFY autoLoadActiveChanged)
 
-
 public:
     enum Roles {
         IdRole = Qt::UserRole + 1,
@@ -36,7 +35,8 @@ public:
         MuteOtherSoundsRole,
         MuteMicDuringPlaybackRole,
         DurationSecRole,
-        TeleprompterTextRole
+        TeleprompterTextRole,
+        AppliedEffectsRole
     };
 
     explicit ClipsListModel(QObject* parent = nullptr);

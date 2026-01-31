@@ -176,15 +176,19 @@ public:
     // ------------------------------------------------------------
     // Audio Normalization
     // ------------------------------------------------------------
-    enum class NormalizationType { LUFS, RMS };
+    enum class NormalizationType {
+        LUFS,
+        RMS
+    };
 
-    struct NormalizationResult {
+    struct NormalizationResult
+    {
         bool success = false;
         std::string error;
         std::string outputPath;
         std::string backupPath;
-        double measuredLevel = 0.0;  // Original level in dB
-        double appliedGain = 0.0;    // Gain applied in dB
+        double measuredLevel = 0.0; // Original level in dB
+        double appliedGain = 0.0;   // Gain applied in dB
     };
 
     // Measure loudness of an audio file (LUFS or RMS)
@@ -193,12 +197,51 @@ public:
 
     // Normalize an audio file to target level
     // Creates backup of original and saves normalized version
-    NormalizationResult normalizeAudio(
-        const std::string& sourcePath,
-        double targetLevel,           // Target in dB (LUFS or RMS)
-        NormalizationType type,
-        const std::string& outputDir = ""  // Empty = same dir as source
+    NormalizationResult normalizeAudio(const std::string& sourcePath,
+                                       double targetLevel, // Target in dB (LUFS or RMS)
+                                       NormalizationType type,
+                                       const std::string& outputDir = "" // Empty = same dir as source
     );
+
+    // ------------------------------------------------------------
+    // Audio Effects
+    // ------------------------------------------------------------
+    enum class AudioEffectType {
+        BassBoost,    // Low-shelf filter to boost bass frequencies
+        TrebleBoost,  // High-shelf filter to boost treble frequencies
+        LowCut,       // High-pass filter to cut low frequencies
+        HighCut,      // Low-pass filter to cut high frequencies
+        VoiceEnhance, // Combination of filters to enhance voice clarity
+        Warmth        // Subtle low-mid boost for warmth
+    };
+
+    struct AudioEffectParams
+    {
+        AudioEffectType type;
+        double gainDb = 0.0;    // Gain in dB (for boost effects)
+        double frequency = 0.0; // Cutoff/center frequency in Hz
+        double q = 1.0;         // Q factor (filter sharpness)
+    };
+
+    struct AudioEffectResult
+    {
+        bool success = false;
+        std::string error;
+        std::string outputPath;
+        std::string effectName;
+    };
+
+    // Apply audio effect to a file and save the result
+    AudioEffectResult applyAudioEffect(const std::string& sourcePath, const AudioEffectParams& params,
+                                       const std::string& outputDir = "" // Empty = same dir as source
+    );
+
+    // Apply multiple effects in sequence
+    AudioEffectResult applyAudioEffects(const std::string& sourcePath, const std::vector<AudioEffectParams>& effects,
+                                        const std::string& outputDir = "");
+
+    // Get default parameters for an effect type
+    static AudioEffectParams getDefaultEffectParams(AudioEffectType type);
 
     // ------------------------------------------------------------
     // Recording

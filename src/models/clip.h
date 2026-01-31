@@ -9,9 +9,13 @@ struct Clip
     int id = -1;
 
     QString filePath;
+    QString originalFilePath; // Original file path before any effects/normalization
     QString imgPath;
     QString hotkey; // e.g. "Ctrl+1", "F5"
     QStringList tags;
+
+    // Track applied audio processing
+    QStringList appliedEffects; // e.g. "Normalized (-16 LUFS)", "Bass Boost", "Treble Boost"
 
     double trimStartMs = 0.0; // seek start
     double trimEndMs = 0.0;   // stop at end (0 = no end limit)

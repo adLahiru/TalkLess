@@ -92,6 +92,7 @@ static QJsonObject clipToJson(const Clip& c)
     QJsonObject o;
     o["id"] = c.id;
     o["filePath"] = c.filePath;
+    o["originalFilePath"] = c.originalFilePath;
     o["imgPath"] = c.imgPath;
     o["hotkey"] = c.hotkey;
 
@@ -99,6 +100,11 @@ static QJsonObject clipToJson(const Clip& c)
     for (const auto& t : c.tags)
         tags.append(t);
     o["tags"] = tags;
+
+    QJsonArray appliedEffects;
+    for (const auto& e : c.appliedEffects)
+        appliedEffects.append(e);
+    o["appliedEffects"] = appliedEffects;
 
     o["trimStartMs"] = static_cast<qint64>(c.trimStartMs);
     o["trimEndMs"] = static_cast<qint64>(c.trimEndMs);
@@ -134,12 +140,17 @@ static Clip clipFromJson(const QJsonObject& o)
     Clip c;
     c.id = o.value("id").toInt(-1);
     c.filePath = o.value("filePath").toString();
+    c.originalFilePath = o.value("originalFilePath").toString();
     c.imgPath = o.value("imgPath").toString();
     c.hotkey = o.value("hotkey").toString();
 
     const auto tagsArr = o.value("tags").toArray();
     for (const auto& v : tagsArr)
         c.tags.push_back(v.toString());
+
+    const auto appliedEffectsArr = o.value("appliedEffects").toArray();
+    for (const auto& v : appliedEffectsArr)
+        c.appliedEffects.push_back(v.toString());
 
     c.trimStartMs = o.value("trimStartMs").toVariant().toLongLong();
     c.trimEndMs = o.value("trimEndMs").toVariant().toLongLong();
