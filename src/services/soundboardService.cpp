@@ -3958,17 +3958,60 @@ void SoundboardService::normalizeClip(int boardId, int clipId, double targetLeve
                 if (result.success) {
                     // Update clip's file path to the normalized version
                     QString newPath = QString::fromStdString(result.outputPath);
+                    QString originalPath;
 
-                    // Update in active boards if present
+                    // First, get the original file path and sharedBoardIds from the clip
+                    QList<int> boardsToUpdate;
+                    boardsToUpdate.append(boardId);
+
+                    // Find the clip and get its shared board IDs
                     if (m_activeBoards.contains(boardId)) {
-                        for (auto& c : m_activeBoards[boardId].clips) {
+                        for (const auto& c : m_activeBoards[boardId].clips) {
                             if (c.id == clipId) {
-                                c.filePath = newPath;
+                                originalPath = c.filePath;
+                                // Add all shared boards to the update list
+                                for (int sharedBoardId : c.sharedBoardIds) {
+                                    if (!boardsToUpdate.contains(sharedBoardId)) {
+                                        boardsToUpdate.append(sharedBoardId);
+                                    }
+                                }
                                 break;
                             }
                         }
-                        m_dirtyBoards.insert(boardId);
                     }
+
+                    // Update the clip's file path in all boards where it exists
+                    for (int updateBoardId : boardsToUpdate) {
+                        if (m_activeBoards.contains(updateBoardId)) {
+                            // Update in active/cached board
+                            for (auto& c : m_activeBoards[updateBoardId].clips) {
+                                // Match by clip ID or by original file path (for shared clips)
+                                if (c.id == clipId || (!originalPath.isEmpty() && c.filePath == originalPath)) {
+                                    c.filePath = newPath;
+                                }
+                            }
+                            // Immediately save the board to persist the normalized path
+                            m_repo.saveBoard(m_activeBoards[updateBoardId]);
+                        } else {
+                            // Load inactive board, update it, and save
+                            auto loadedBoard = m_repo.loadBoard(updateBoardId);
+                            if (loadedBoard) {
+                                bool needsSave = false;
+                                for (auto& c : loadedBoard->clips) {
+                                    if (c.id == clipId || (!originalPath.isEmpty() && c.filePath == originalPath)) {
+                                        c.filePath = newPath;
+                                        needsSave = true;
+                                    }
+                                }
+                                if (needsSave) {
+                                    m_repo.saveBoard(*loadedBoard);
+                                }
+                            }
+                        }
+                    }
+
+                    // Clear this board from dirty set since we saved immediately
+                    m_dirtyBoards.remove(boardId);
 
                     // Invalidate waveform cache for this clip
                     {
@@ -3976,6 +4019,8 @@ void SoundboardService::normalizeClip(int boardId, int clipId, double targetLeve
                         m_waveformCache.remove(clipId);
                     }
 
+                    // Notify that clips have changed so QML models refresh
+                    emit activeClipsChanged();
                     emit clipUpdated(boardId, clipId);
                     emit normalizationComplete(clipId, true, QString(), QString::fromStdString(result.outputPath));
                 } else {
