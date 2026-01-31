@@ -55,15 +55,21 @@ Item {
         radius: 12
         border.width: root.isSelected ? 2 : 1
         border.color: root.isSelected ? Colors.accent : Colors.border
-        
+
         Behavior on border.color {
-            ColorAnimation { duration: 150 }
+            ColorAnimation {
+                duration: 150
+            }
         }
         Behavior on border.width {
-            NumberAnimation { duration: 150 }
+            NumberAnimation {
+                duration: 150
+            }
         }
         Behavior on color {
-            ColorAnimation { duration: 150 }
+            ColorAnimation {
+                duration: 150
+            }
         }
 
         // Collapsed header row (always visible)
@@ -154,7 +160,7 @@ Item {
             // Action buttons
             RowLayout {
                 spacing: 8
-                
+
                 // Play/Stop button
                 Rectangle {
                     Layout.preferredWidth: 36
@@ -178,9 +184,9 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             if (root.isPlaying) {
-                                root.stopClicked(root.clipId)
+                                root.stopClicked(root.clipId);
                             } else {
-                                root.playClicked(root.clipId)
+                                root.playClicked(root.clipId);
                             }
                         }
                     }
@@ -260,18 +266,18 @@ Item {
         // Click to expand/collapse OR select (Ctrl+Click)
         MouseArea {
             anchors.fill: headerRow
-            onClicked: function(mouse) {
+            onClicked: function (mouse) {
                 if (mouse.modifiers & Qt.ControlModifier) {
                     // Ctrl+Click toggles selection
-                    root.selectionToggled(root.clipId, !root.isSelected)
+                    root.selectionToggled(root.clipId, !root.isSelected);
                 } else {
                     // Normal click expands/collapses
-                    root.expanded = !root.expanded
+                    root.expanded = !root.expanded;
                 }
             }
             z: -1
         }
-        
+
         // Selection checkbox (visible when any clip is selected)
         Rectangle {
             id: selectionCheckbox
@@ -287,7 +293,7 @@ Item {
             border.color: root.isSelected ? Colors.accent : Colors.border
             visible: root.isSelected || selectionCheckboxMa.containsMouse
             z: 10
-            
+
             Text {
                 anchors.centerIn: parent
                 text: "✓"
@@ -296,7 +302,7 @@ Item {
                 font.weight: Font.Bold
                 visible: root.isSelected
             }
-            
+
             MouseArea {
                 id: selectionCheckboxMa
                 anchors.fill: parent
@@ -328,36 +334,46 @@ Item {
             ColumnLayout {
                 anchors.fill: parent
                 spacing: 12
-                
+
                 // Applied Effects Tags
                 Flow {
                     Layout.fillWidth: true
                     spacing: 6
                     visible: root.appliedEffects && root.appliedEffects.length > 0
-                    
+
                     Repeater {
                         model: root.appliedEffects || []
-                        
+
                         Rectangle {
+                            id: effectTagDelegate
+                            required property string modelData
+
                             width: effectTagText.implicitWidth + 16
                             height: 24
                             radius: 12
                             color: {
-                                var effectName = modelData.toLowerCase();
-                                if (effectName.indexOf("normalized") !== -1) return "#059669";  // Green for normalization
-                                if (effectName.indexOf("bass") !== -1) return "#DC2626";  // Red for bass
-                                if (effectName.indexOf("treble") !== -1) return "#2563EB";  // Blue for treble
-                                if (effectName.indexOf("voice") !== -1) return "#7C3AED";  // Purple for voice
-                                if (effectName.indexOf("warm") !== -1) return "#EA580C";  // Orange for warmth
-                                if (effectName.indexOf("low cut") !== -1) return "#0891B2";  // Cyan for low cut
-                                if (effectName.indexOf("high cut") !== -1) return "#DB2777";  // Pink for high cut
+                                var effectName = effectTagDelegate.modelData.toLowerCase();
+                                if (effectName.indexOf("normalized") !== -1)
+                                    return "#059669";  // Green for normalization
+                                if (effectName.indexOf("bass") !== -1)
+                                    return "#DC2626";  // Red for bass
+                                if (effectName.indexOf("treble") !== -1)
+                                    return "#2563EB";  // Blue for treble
+                                if (effectName.indexOf("voice") !== -1)
+                                    return "#7C3AED";  // Purple for voice
+                                if (effectName.indexOf("warm") !== -1)
+                                    return "#EA580C";  // Orange for warmth
+                                if (effectName.indexOf("low cut") !== -1)
+                                    return "#0891B2";  // Cyan for low cut
+                                if (effectName.indexOf("high cut") !== -1)
+                                    return "#DB2777";  // Pink for high cut
                                 return Colors.accent;  // Default
                             }
-                            
+
                             Text {
                                 id: effectTagText
                                 anchors.centerIn: parent
-                                text: modelData
+                                text: effectTagDelegate.modelData
                                 color: "white"
                                 font.pixelSize: 10
                                 font.weight: Font.Medium

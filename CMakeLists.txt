@@ -41,8 +41,24 @@ FetchContent_MakeAvailable(QHotkey)
 # ----------------------------
 # IXWebSocket (BSD-3-Clause) - WebSocket client library
 # ----------------------------
-set(USE_TLS ON CACHE BOOL "Enable TLS support in IXWebSocket")
-set(USE_OPEN_SSL ON CACHE BOOL "Use OpenSSL for TLS")
+# Try to find OpenSSL first - if not found, disable TLS for IXWebSocket
+find_package(OpenSSL QUIET)
+if(OPENSSL_FOUND)
+    message(STATUS "OpenSSL found - enabling TLS for IXWebSocket")
+    set(USE_TLS ON CACHE BOOL "Enable TLS support in IXWebSocket" FORCE)
+    set(USE_OPEN_SSL ON CACHE BOOL "Use OpenSSL for TLS" FORCE)
+else()
+    message(WARNING "OpenSSL not found - disabling TLS for IXWebSocket. WebSocket connections will be unencrypted.")
+    set(USE_TLS OFF CACHE BOOL "Enable TLS support in IXWebSocket" FORCE)
+    set(USE_OPEN_SSL OFF CACHE BOOL "Use OpenSSL for TLS" FORCE)
+endif()
+
+# Disable ZLIB to avoid dependency issues
+find_package(ZLIB QUIET)
+if(NOT ZLIB_FOUND)
+    message(WARNING "ZLIB not found - disabling compression for IXWebSocket.")
+    set(USE_ZLIB OFF CACHE BOOL "Enable ZLIB compression in IXWebSocket" FORCE)
+endif()
 
 FetchContent_Declare(ixwebsocket
   GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
