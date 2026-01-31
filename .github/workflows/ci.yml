@@ -38,9 +38,10 @@ jobs:
 
       - name: Install optional dependencies
         run: |
-          # Install optional deps - build will succeed without them
-          brew install openssl@3 zlib || true
-          echo "OPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" >> $GITHUB_ENV
+          # Note: We DON'T install OpenSSL here because Homebrew's OpenSSL is arm64-only
+          # and we're building a Universal Binary (x86_64 + arm64). TLS will be disabled.
+          # ZLIB is available in macOS SDK so compression will work.
+          echo "Skipping OpenSSL (incompatible with Universal Binary builds)"
 
       - name: Configure CMake
         run: |
@@ -48,8 +49,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
             -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR}" \
             -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0" \
-            -DOPENSSL_ROOT_DIR="${OPENSSL_ROOT_DIR}"
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
 
       - name: Build
         run: cmake --build build --config ${{ env.BUILD_TYPE }} --parallel $(sysctl -n hw.ncpu)
