@@ -13,6 +13,7 @@
 #include <cstdio>  // FILE*
 #include <cstdlib> // malloc/free
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <thread>
 
@@ -2228,11 +2229,8 @@ double AudioEngine::measureLoudness(const std::string& filepath, NormalizationTy
     return rmsDb;
 }
 
-AudioEngine::NormalizationResult AudioEngine::normalizeAudio(
-    const std::string& sourcePath,
-    double targetLevel,
-    NormalizationType type,
-    const std::string& outputDir)
+AudioEngine::NormalizationResult AudioEngine::normalizeAudio(const std::string& sourcePath, double targetLevel,
+                                                             NormalizationType type, const std::string& outputDir)
 {
     NormalizationResult result;
 
@@ -2263,12 +2261,18 @@ AudioEngine::NormalizationResult AudioEngine::normalizeAudio(
     }
 
     // Remove extension and add _normalized.wav
+    // Include a hash of the full source path to avoid collisions when using a central output directory
     size_t lastDot = filename.find_last_of('.');
     std::string baseName = (lastDot != std::string::npos) ? filename.substr(0, lastDot) : filename;
-    std::string normalizedFilename = baseName + "_normalized.wav";
+
+    // Generate a short hash from the full source path to ensure unique filenames
+    std::size_t pathHash = std::hash<std::string>{}(sourcePath);
+    std::string hashSuffix = "_" + std::to_string(pathHash % 100000); // 5-digit suffix
+
+    std::string normalizedFilename = baseName + hashSuffix + "_normalized.wav";
     result.outputPath = dir + "/" + normalizedFilename;
 
-    // Create backup path
+    // Create backup path (not used when outputDir is provided, kept for compatibility)
     result.backupPath = sourcePath + ".backup";
 
     // Initialize decoder for source file
@@ -2331,7 +2335,7 @@ AudioEngine::NormalizationResult AudioEngine::normalizeAudio(
     ma_decoder_uninit(&decoder);
 
     result.success = true;
-    std::cout << "normalizeAudio: Normalized " << sourcePath << " (measured: " << measuredLevel 
+    std::cout << "normalizeAudio: Normalized " << sourcePath << " (measured: " << measuredLevel
               << " dB, target: " << targetLevel << " dB, gain: " << gainDb << " dB)" << std::endl;
     return result;
 }

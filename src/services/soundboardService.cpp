@@ -3937,47 +3937,57 @@ void SoundboardService::normalizeClip(int boardId, int clipId, double targetLeve
     }
 
     // Determine normalization type
-    AudioEngine::NormalizationType normType = (targetType.toLower() == "lufs")
-        ? AudioEngine::NormalizationType::LUFS
-        : AudioEngine::NormalizationType::RMS;
+    AudioEngine::NormalizationType normType =
+        (targetType.toLower() == "lufs") ? AudioEngine::NormalizationType::LUFS : AudioEngine::NormalizationType::RMS;
+
+    // Create normalized audio output directory in app data location
+    // This is cross-platform: ~/Library/Application Support/TalkLess on macOS,
+    // ~/.local/share/TalkLess on Linux, %APPDATA%/TalkLess on Windows
+    QString normalizedDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/normalized_audio";
+    QDir().mkpath(normalizedDir);
 
     // Run normalization in background thread
-    (void)QtConcurrent::run([this, clipId, boardId, filePath, targetLevel, normType]() {
-        auto result = m_audioEngine->normalizeAudio(filePath.toStdString(), targetLevel, normType);
+    (void)QtConcurrent::run([this, clipId, boardId, filePath, targetLevel, normType, normalizedDir]() {
+        auto result =
+            m_audioEngine->normalizeAudio(filePath.toStdString(), targetLevel, normType, normalizedDir.toStdString());
 
         // Emit result on completion
-        QMetaObject::invokeMethod(this, [this, clipId, boardId, result]() {
-            if (result.success) {
-                // Update clip's file path to the normalized version
-                QString newPath = QString::fromStdString(result.outputPath);
+        QMetaObject::invokeMethod(
+            this,
+            [this, clipId, boardId, result]() {
+                if (result.success) {
+                    // Update clip's file path to the normalized version
+                    QString newPath = QString::fromStdString(result.outputPath);
 
-                // Update in active boards if present
-                if (m_activeBoards.contains(boardId)) {
-                    for (auto& c : m_activeBoards[boardId].clips) {
-                        if (c.id == clipId) {
-                            c.filePath = newPath;
-                            break;
+                    // Update in active boards if present
+                    if (m_activeBoards.contains(boardId)) {
+                        for (auto& c : m_activeBoards[boardId].clips) {
+                            if (c.id == clipId) {
+                                c.filePath = newPath;
+                                break;
+                            }
                         }
+                        m_dirtyBoards.insert(boardId);
                     }
-                    m_dirtyBoards.insert(boardId);
-                }
 
-                // Invalidate waveform cache for this clip
-                {
-                    QMutexLocker locker(&m_waveformCacheMutex);
-                    m_waveformCache.remove(clipId);
-                }
+                    // Invalidate waveform cache for this clip
+                    {
+                        QMutexLocker locker(&m_waveformCacheMutex);
+                        m_waveformCache.remove(clipId);
+                    }
 
-                emit clipUpdated(boardId, clipId);
-                emit normalizationComplete(clipId, true, QString(), QString::fromStdString(result.outputPath));
-            } else {
-                emit normalizationComplete(clipId, false, QString::fromStdString(result.error), QString());
-            }
-        }, Qt::QueuedConnection);
+                    emit clipUpdated(boardId, clipId);
+                    emit normalizationComplete(clipId, true, QString(), QString::fromStdString(result.outputPath));
+                } else {
+                    emit normalizationComplete(clipId, false, QString::fromStdString(result.error), QString());
+                }
+            },
+            Qt::QueuedConnection);
     });
 }
 
-void SoundboardService::normalizeClipBatch(int boardId, const QVariantList& clipIds, double targetLevel, const QString& targetType)
+void SoundboardService::normalizeClipBatch(int boardId, const QVariantList& clipIds, double targetLevel,
+                                           const QString& targetType)
 {
     for (const auto& idVar : clipIds) {
         int clipId = idVar.toInt();
@@ -4002,9 +4012,8 @@ double SoundboardService::measureClipLoudness(int clipId, const QString& targetT
         filePath = QUrl(filePath).toLocalFile();
     }
 
-    AudioEngine::NormalizationType normType = (targetType.toLower() == "lufs")
-        ? AudioEngine::NormalizationType::LUFS
-        : AudioEngine::NormalizationType::RMS;
+    AudioEngine::NormalizationType normType =
+        (targetType.toLower() == "lufs") ? AudioEngine::NormalizationType::LUFS : AudioEngine::NormalizationType::RMS;
 
     return m_audioEngine->measureLoudness(filePath.toStdString(), normType);
 }
