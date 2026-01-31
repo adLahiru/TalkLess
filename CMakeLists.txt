@@ -16,7 +16,6 @@ set(CMAKE_AUTORCC ON)
 set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "" FORCE)
 
 # Require Qt 6.5+
-# Require Qt 6.5+
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Quick Qml Multimedia QuickControls2 Svg Network Concurrent)
 qt_standard_project_setup(REQUIRES 6.5)
 
@@ -40,21 +39,16 @@ FetchContent_Declare(QHotkey
 FetchContent_MakeAvailable(QHotkey)
 
 # ----------------------------
-# libebur128 (for LUFS/RMS loudness measurement)
+# IXWebSocket (BSD-3-Clause) - WebSocket client library
 # ----------------------------
-option(TALKLESS_ENABLE_EBUR128 "Enable libebur128 for audio normalization" ON)
+set(USE_TLS ON CACHE BOOL "Enable TLS support in IXWebSocket")
+set(USE_OPEN_SSL ON CACHE BOOL "Use OpenSSL for TLS")
 
-if(TALKLESS_ENABLE_EBUR128)
-    FetchContent_Declare(ebur128
-        GIT_REPOSITORY https://github.com/jiixyj/libebur128.git
-        GIT_TAG        v1.2.6
-    )
-    # Don't build the ebur128 tests or examples
-    set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(ebur128)
-    message(STATUS "libebur128 enabled for audio normalization")
-endif()
+FetchContent_Declare(ixwebsocket
+  GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
+  GIT_TAG        v11.4.5
+)
+FetchContent_MakeAvailable(ixwebsocket)
 
 # ----------------------------
 # Executable
@@ -97,6 +91,8 @@ qt_add_executable(appTalkLess
     src/services/storageRepository.cpp
     src/services/soundboardService.h
     src/services/soundboardService.cpp
+    src/services/TranscriptionService.h
+    src/services/TranscriptionService.cpp
 )
 
 # QML singletons
@@ -247,6 +243,7 @@ target_link_libraries(appTalkLess PRIVATE
     Qt6::Svg
     Qt6::Network
     Qt6::Concurrent
+    ixwebsocket
     QHotkey::QHotkey
 )
 
@@ -375,10 +372,18 @@ else()
 endif()
 
 # ----------------------------
-# libebur128 (link if enabled)
+# libebur128 (for loudness normalization)
 # ----------------------------
+option(TALKLESS_ENABLE_EBUR128 "Enable libebur128 for audio normalization" OFF)
+
 if(TALKLESS_ENABLE_EBUR128)
-    target_include_directories(appTalkLess PRIVATE ${ebur128_SOURCE_DIR}/ebur128)
+    FetchContent_Declare(libebur128
+        GIT_REPOSITORY https://github.com/jiixyj/libebur128.git
+        GIT_TAG        v1.2.6
+    )
+    FetchContent_MakeAvailable(libebur128)
+    
+    target_include_directories(appTalkLess PRIVATE ${libebur128_SOURCE_DIR}/ebur128)
     target_link_libraries(appTalkLess PRIVATE ebur128)
     target_compile_definitions(appTalkLess PRIVATE TALKLESS_HAS_EBUR128=1)
 else()

@@ -47,8 +47,49 @@ Popup {
         }
     }
 
+    // Transcription service connections
+    Connections {
+        target: transcriptionService
+
+        function onTranscriptDelta(itemId, delta) {
+            // Append delta text to the text edit in real-time
+            console.log("[QML] Received transcript delta:", delta);
+            teleprompterTextEdit.insert(teleprompterTextEdit.length, delta);
+        }
+
+        function onTranscriptFinal(itemId, text) {
+            // Add a space or newline after final segment
+            console.log("[QML] Received transcript final:", text);
+            teleprompterTextEdit.insert(teleprompterTextEdit.length, " ");
+        }
+
+        function onSttError(message) {
+            console.log("[QML] Received STT error:", message);
+            errorLabel.text = message;
+            errorLabel.visible = true;
+            errorTimer.restart();
+        }
+    }
+
+    // Timer to hide error message
+    Timer {
+        id: errorTimer
+        interval: 5000
+        onTriggered: errorLabel.visible = false
+    }
+
     onOpened: {
         teleprompterTextEdit.text = root.teleprompterText;
+        errorLabel.visible = false;
+    }
+
+    onClosed: {
+        // Auto-save the current content when dialog is closed
+        root.saved(root.clipId, teleprompterTextEdit.text);
+        // Stop listening if still active
+        if (transcriptionService.isListening) {
+            transcriptionService.stopListening();
+        }
     }
 
     contentItem: ColumnLayout {
@@ -123,7 +164,7 @@ Popup {
                 // Upload Script button
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 50
+                    Layout.preferredHeight: 44
                     color: Colors.surfaceDark
                     radius: 8
                     border.color: Colors.border
@@ -170,12 +211,15 @@ Popup {
 
                 // Speak to Transcribe button
                 Rectangle {
+                    id: transcribeButton
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 50
-                    color: Colors.surfaceDark
+                    Layout.preferredHeight: 44
+                    color: transcriptionService.isListening ? Colors.accent : Colors.surfaceDark
                     radius: 8
-                    border.color: Colors.border
+                    border.color: transcriptionService.isListening ? Colors.accent : Colors.border
                     border.width: 1
+
+                    Behavior on color { ColorAnimation { duration: 200 } }
 
                     RowLayout {
                         anchors.centerIn: parent
@@ -195,14 +239,22 @@ Popup {
                             height: 20
                             source: micIcon
                             colorization: 1.0
-                            colorizationColor: Colors.textSecondary
+                            colorizationColor: transcriptionService.isListening ? Colors.textOnPrimary : Colors.textSecondary
                         }
 
                         Text {
-                            text: "Speak to Transcribe"
+                            text: transcriptionService.isListening ? "Stop Listening" : "Speak to Transcribe"
                             font.pixelSize: 13
-                            color: Colors.textPrimary
+                            color: transcriptionService.isListening ? Colors.textOnPrimary : Colors.textPrimary
                         }
+                    }
+
+                    // Pulsing animation when listening
+                    SequentialAnimation on opacity {
+                        running: transcriptionService.isListening
+                        loops: Animation.Infinite
+                        NumberAnimation { to: 0.7; duration: 600 }
+                        NumberAnimation { to: 1.0; duration: 600 }
                     }
 
                     MouseArea {
@@ -210,10 +262,29 @@ Popup {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            console.log("Speak to Transcribe clicked - placeholder");
+                            if (transcriptionService.isListening) {
+                                transcriptionService.stopListening();
+                            } else if (!transcriptionService.hasApiKey) {
+                                // Show API key input dialog
+                                apiKeyDialog.open();
+                            } else {
+                                transcriptionService.startListening();
+                            }
                         }
                     }
                 }
+            }
+
+            // Error message label
+            Text {
+                id: errorLabel
+                Layout.fillWidth: true
+                visible: false
+                text: ""
+                color: "#FF6B6B"
+                font.pixelSize: 12
+                wrapMode: Text.Wrap
+                horizontalAlignment: Text.AlignHCenter
             }
 
             // Text area
@@ -360,4 +431,88 @@ Popup {
             }
         }
     }
+
+    // API Key input dialog
+    Dialog {
+        id: apiKeyDialog
+        title: "OpenAI API Key Required"
+        modal: true
+        parent: Overlay.overlay
+        x: Math.round((parent ? parent.width : 800) / 2 - width / 2)
+        y: Math.round((parent ? parent.height : 600) / 2 - height / 2)
+        width: 420
+        standardButtons: Dialog.Cancel
+
+        background: Rectangle {
+            color: Colors.panelBg
+            radius: 12
+            border.width: 1
+            border.color: Colors.border
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 16
+
+            Text {
+                Layout.fillWidth: true
+                text: "Enter your OpenAI API key to enable speech-to-text transcription."
+                font.pixelSize: 13
+                color: Colors.textSecondary
+                wrapMode: Text.Wrap
+            }
+
+            TextField {
+                id: apiKeyInput
+                Layout.fillWidth: true
+                placeholderText: "sk-proj-..."
+                echoMode: TextInput.Password
+                color: Colors.textPrimary
+                font.pixelSize: 14
+
+                background: Rectangle {
+                    color: Colors.surfaceDark
+                    radius: 8
+                    border.color: apiKeyInput.focus ? Colors.accent : Colors.border
+                    border.width: 1
+                }
+            }
+
+            Text {
+                Layout.fillWidth: true
+                text: "Your key is stored locally and never sent anywhere except OpenAI."
+                font.pixelSize: 11
+                color: Colors.textSecondary
+                opacity: 0.7
+            }
+
+            Button {
+                Layout.alignment: Qt.AlignRight
+                text: "Save & Start Listening"
+                enabled: apiKeyInput.text.length > 10
+
+                background: Rectangle {
+                    color: parent.enabled ? Colors.accent : Colors.surfaceDark
+                    radius: 8
+                }
+
+                contentItem: Text {
+                    text: parent.text
+                    font.pixelSize: 13
+                    font.weight: Font.DemiBold
+                    color: parent.enabled ? Colors.textOnPrimary : Colors.textSecondary
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                onClicked: {
+                    transcriptionService.setApiToken(apiKeyInput.text);
+                    apiKeyInput.text = "";
+                    apiKeyDialog.close();
+                    transcriptionService.startListening();
+                }
+            }
+        }
+    }
 }
+
